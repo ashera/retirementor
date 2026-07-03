@@ -1,0 +1,357 @@
+// Year-by-year retirement simulation for the Australian system.
+//
+// Everything is modelled in TODAY'S DOLLARS: we use a real (inflation-adjusted)
+// return, and Age Pension figures — which are indexed to wages/CPI — are treated
+// as roughly constant in real terms. All rates/thresholds come from the supplied
+// EngineConfig (the active DB version).
+//
+// Phases:
+//   accumulation — still working: super grows (SG + voluntary, 15% earnings tax)
+//   bridge       — retired but everyone < preservation age: live off outside-super
+//   drawdown     — retired, preservation age..pension age: tax-free super + outside
+//   pension      — pension age+: means-tested Age Pension tops up private drawdown
+
+import { minDrawdownRate, type EngineConfig } from "./config";
+import { agePension } from "./agePension";
+import { spendingForAge, startingSuperBalances } from "./types";
+import { mortgageActiveAtAge, mortgageAnnualCost } from "./mortgage";
+import {
+  capitalGainsTax,
+  incomeTestRent,
+  netEquity,
+  netRentCash,
+  netSaleProceeds,
+  propertyValueAt,
+} from "./property";
+import type { Phase, RetirementPlan, SimResult, YearBreakdown, YearRow } from "./types";
+
+const EPS = 1e-6;
+
+function realRate(nominalPct: number, inflationPct: number): number {
+  return (1 + nominalPct / 100) / (1 + inflationPct / 100) - 1;
+}
+
+// Optional per-year NOMINAL returns (percent). When omitted the deterministic mean
+// (plan.investmentReturn) is used every year. Monte Carlo passes a random sequence.
+export function simulate(
+  plan: RetirementPlan,
+  config: EngineConfig,
+  nominalReturns?: number[],
+): SimResult {
+  const preservationAge = config.preservationAge;
+  const pensionAge = config.agePensionAge;
+
+  const meanRealReturn = realRate(plan.investmentReturn, plan.inflation);
+
+  const balances = startingSuperBalances(plan);
+  let outside = plan.outsideSuper;
+
+  const startOldest = Math.max(...plan.people.map((p) => p.currentAge));
+  const horizon = Math.max(0, Math.round(plan.lifeExpectancy - startOldest));
+  const retireOffset = Math.max(
+    0,
+    Math.round(plan.retirementAge - plan.people[0].currentAge),
+  );
+
+  const rows: YearRow[] = [];
+  let depletedAge: number | null = null;
+  let firstAgePensionAge: number | null = null;
+  let superAtRetirement = 0;
+  let totalAtRetirement = 0;
+
+  // A home loan carried into retirement. `mortgageCleared` flips true once a
+  // "clear at retirement" lump sum has been paid off from super.
+  const mortgage = plan.mortgage;
+  let mortgageCleared = false;
+
+  // An investment property. `propertySold` flips true once a "sell at age" event
+  // has released its net proceeds into the outside-super pool.
+  const property = plan.investmentProperty;
+  let propertySold = false;
+
+  for (let t = 0; t <= horizon; t++) {
+    const ages = plan.people.map((p) => p.currentAge + t);
+    const oldest = Math.max(...ages);
+    const working = t < retireOffset;
+
+    // This year's returns (constant mean, or a Monte Carlo draw).
+    const nom = nominalReturns ? (nominalReturns[t] ?? plan.investmentReturn) : plan.investmentReturn;
+    const realReturn = realRate(nom, plan.inflation);
+    // Super in accumulation pays 15% earnings tax; approximate by taxing the return.
+    const superAccumReturn = realRate(
+      nom * (1 - config.superEarningsTaxAccumulation),
+      plan.inflation,
+    );
+
+    // Balances at the START of this year (on the birthday) — this is what each
+    // data point plots, so the peak lands on the retirement age, not the year before.
+    const startSuper = sum(balances);
+    const startOutside = outside;
+
+    if (working) {
+      // --- Accumulation: add contributions (net of 15%), then grow. ---
+      let contribGross = 0;
+      let contribTax = 0;
+      let contribNet = 0;
+      let superGrowth = 0;
+      let earningsTax = 0;
+      plan.people.forEach((p, i) => {
+        const concessional = Math.min(
+          p.salary * config.sgRate + p.voluntaryConcessional,
+          config.concessionalCap,
+        );
+        const ncc = Math.min(p.voluntaryNonConcessional, config.nonConcessionalCap);
+        const added = concessional * (1 - config.contributionsTax) + ncc;
+        balances[i] += added;
+        const beforeGrowth = balances[i];
+        balances[i] *= 1 + superAccumReturn;
+        contribGross += concessional;
+        contribTax += concessional * config.contributionsTax;
+        contribNet += added;
+        superGrowth += beforeGrowth * superAccumReturn;
+        earningsTax += beforeGrowth * (realReturn - superAccumReturn); // vs a tax-free pool
+      });
+      const savings = plan.annualOutsideSavings;
+      const outsideGrowth = (startOutside + savings) * realReturn;
+      outside = (startOutside + savings) * (1 + realReturn);
+
+      rows.push(
+        row(oldest, startSuper, startOutside, 0, 0, 0, 0, "accumulation", true, 0, 0, {
+          openingSuper: startSuper,
+          openingOutside: startOutside,
+          closingSuper: sum(balances),
+          closingOutside: outside,
+          contribGross,
+          contribTax,
+          contribNet,
+          savings,
+          superGrowth,
+          outsideGrowth,
+          earningsTax: Math.max(0, earningsTax),
+          agePension: 0,
+          rentIncome: 0,
+          livingSpend: 0,
+          mortgageCost: 0,
+          mortgageCleared: 0,
+          propertyProceeds: 0,
+          propertyCgt: 0,
+        }),
+      );
+      continue;
+    }
+
+    // --- Retirement year ---
+    if (t === retireOffset) {
+      superAtRetirement = startSuper;
+      totalAtRetirement = startSuper + startOutside;
+    }
+
+    const accessibleIdx = plan.people
+      .map((_, i) => i)
+      .filter((i) => ages[i] >= preservationAge);
+    let accessibleSuper = accessibleIdx.reduce((s, i) => s + balances[i], 0);
+
+    // Clear-at-retirement: once retired, pay the loan off from super as soon as
+    // super is both accessible (preservation age, so tax-free) and enough to
+    // cover it. This permanently removes the repayment AND lowers assessable
+    // assets, so the Age Pension below is recomputed on the reduced balances —
+    // the family home stays exempt regardless of any loan against it.
+    let mortgageClearedNow = 0;
+    if (
+      mortgage &&
+      mortgage.strategy === "clear_at_retirement" &&
+      !mortgageCleared &&
+      accessibleSuper >= mortgage.balance
+    ) {
+      const ratio = mortgage.balance / accessibleSuper;
+      accessibleIdx.forEach((i) => {
+        balances[i] -= balances[i] * ratio;
+      });
+      accessibleSuper -= mortgage.balance;
+      mortgageCleared = true;
+      mortgageClearedNow = mortgage.balance;
+    }
+
+    // Steady-state spend plus any ongoing loan cost. A repayment/interest bill is
+    // fixed in nominal dollars, so in this today's-dollars model it erodes by
+    // inflation each year and (for P&I) stops at payoff.
+    let mortgageCost = 0;
+    if (mortgage && !mortgageCleared && mortgageActiveAtAge(mortgage, oldest)) {
+      mortgageCost = mortgageAnnualCost(mortgage) / Math.pow(1 + plan.inflation / 100, t);
+    }
+    const livingSpend = spendingForAge(plan, oldest);
+    const spending = livingSpend + mortgageCost;
+
+    // Investment property: real capital growth, actual net rent (income test) and
+    // net equity (assets test — assessed, NOT deemed). An optional sale releases
+    // its proceeds (after CGT + loan) into the deemed outside-super pool.
+    let rentCash = 0; // net cash rent this year (negative if geared)
+    let rentAssessable = 0; // actual net rent for the income test (floored at 0)
+    let propertyEquity = 0;
+    let propertyProceeds = 0;
+    let propertyCgt = 0;
+    if (property && !propertySold) {
+      const value = propertyValueAt(property, t);
+      if (property.strategy === "sell" && oldest >= property.sellAtAge) {
+        propertyProceeds = netSaleProceeds(property, value);
+        propertyCgt = capitalGainsTax(property, value);
+        outside += propertyProceeds;
+        propertySold = true;
+      } else {
+        rentCash = netRentCash(property, value);
+        rentAssessable = incomeTestRent(property, value);
+        propertyEquity = netEquity(property, value);
+      }
+    }
+
+    // Age Pension (household level, from pension age). Financial assets are deemed;
+    // an investment property's equity is assessable but NOT deemed, and its rent is
+    // counted as actual income — so these two are no longer the same figure.
+    let agePensionAmt = 0;
+    if (oldest >= pensionAge) {
+      const financialAssets = outside + accessibleSuper;
+      const ap = agePension(
+        {
+          household: plan.household,
+          homeowner: plan.homeowner,
+          assessableAssets: financialAssets + propertyEquity,
+          financialAssets,
+          otherIncome: rentAssessable,
+        },
+        config,
+      );
+      agePensionAmt = ap.annual;
+      if (agePensionAmt > 0 && firstAgePensionAge === null) {
+        firstAgePensionAge = oldest;
+      }
+    }
+
+    // Rent offsets the spending the household must fund from super/outside; any
+    // surplus income (pension + rent beyond spending) is saved to outside super.
+    const externalIncome = agePensionAmt + rentCash;
+    const privateNeed = Math.max(0, spending - externalIncome);
+    if (externalIncome > spending) outside += externalIncome - spending;
+
+    // Draw from super first (reduces assessable assets), enforcing minimum drawdown.
+    const minDraw = accessibleIdx.reduce(
+      (s, i) => s + balances[i] * minDrawdownRate(ages[i], config),
+      0,
+    );
+    const fromSuper = Math.min(Math.max(privateNeed, minDraw), accessibleSuper);
+    if (accessibleSuper > EPS && fromSuper > 0) {
+      const ratio = fromSuper / accessibleSuper;
+      accessibleIdx.forEach((i) => {
+        balances[i] -= balances[i] * ratio;
+      });
+    }
+
+    // Any mandatory super drawn beyond need is reinvested outside super.
+    const surplus = Math.max(0, fromSuper - privateNeed);
+    outside += surplus;
+
+    const stillNeed = Math.max(0, privateNeed - fromSuper);
+    const outsideDrawn = Math.min(stillNeed, outside);
+    outside -= outsideDrawn;
+
+    const funded = externalIncome + fromSuper + outsideDrawn + EPS >= spending;
+
+    // Grow remaining pools. Pension-phase super (≥ preservation age) is tax-free.
+    let superGrowth = 0;
+    plan.people.forEach((_, i) => {
+      const rate = ages[i] >= preservationAge ? realReturn : superAccumReturn;
+      superGrowth += balances[i] * rate;
+      balances[i] *= 1 + rate;
+    });
+    const outsideGrowth = outside * realReturn;
+    outside *= 1 + realReturn;
+
+    const phase: Phase =
+      oldest >= pensionAge
+        ? "pension"
+        : ages.every((a) => a < preservationAge)
+          ? "bridge"
+          : "drawdown";
+
+    rows.push(
+      row(oldest, startSuper, startOutside, agePensionAmt, fromSuper, outsideDrawn, spending, phase, funded, rentCash, propertyEquity, {
+        openingSuper: startSuper,
+        openingOutside: startOutside,
+        closingSuper: sum(balances),
+        closingOutside: outside,
+        contribGross: 0,
+        contribTax: 0,
+        contribNet: 0,
+        savings: 0,
+        superGrowth,
+        outsideGrowth,
+        earningsTax: 0,
+        agePension: agePensionAmt,
+        rentIncome: rentCash,
+        livingSpend,
+        mortgageCost,
+        mortgageCleared: mortgageClearedNow,
+        propertyProceeds,
+        propertyCgt,
+      }),
+    );
+  }
+
+  // Depletion = the age the balance actually reaches $0 on the chart. A shortfall
+  // year first appears when savings can't cover full spending; because the plot
+  // shows start-of-year balances, the balance itself only hits zero the next year.
+  // Reporting that zero age keeps the marker, card and narrative aligned with the graph.
+  const firstShortAge = rows.find((r) => !r.funded)?.age ?? null;
+  if (firstShortAge !== null) {
+    const zeroRow = rows.find(
+      (r) => r.phase !== "accumulation" && r.age >= firstShortAge && r.total < 1,
+    );
+    depletedAge = zeroRow ? zeroRow.age : firstShortAge;
+  }
+
+  return {
+    rows,
+    retirementAge: plan.retirementAge,
+    agePensionAge: pensionAge,
+    superAtRetirement,
+    totalAtRetirement,
+    depletedAge,
+    lastsToLifeExpectancy: depletedAge === null,
+    firstAgePensionAge,
+    realReturn: meanRealReturn,
+  };
+}
+
+function sum(xs: number[]): number {
+  return xs.reduce((a, b) => a + b, 0);
+}
+
+function row(
+  age: number,
+  totalSuper: number,
+  outside: number,
+  agePensionAmt: number,
+  superDrawn: number,
+  outsideDrawn: number,
+  spending: number,
+  phase: Phase,
+  funded: boolean,
+  rentIncome: number,
+  propertyEquity: number,
+  breakdown: YearBreakdown,
+): YearRow {
+  return {
+    age,
+    totalSuper,
+    outside,
+    total: totalSuper + outside,
+    agePension: agePensionAmt,
+    superDrawn,
+    outsideDrawn,
+    spending,
+    rentIncome,
+    propertyEquity,
+    phase,
+    funded,
+    breakdown,
+  };
+}

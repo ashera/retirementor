@@ -1,0 +1,80 @@
+import "server-only";
+import { randomBytes, scrypt, timingSafeEqual } from "crypto";
+import { promisify } from "util";
+import { cookies } from "next/headers";
+import { query } from "./db";
+
+const scryptAsync = promisify(scrypt);
+const COOKIE = "session";
+const SESSION_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+
+export interface User {
+  id: string;
+  email: string;
+  is_admin: boolean;
+}
+
+// --- Password hashing (scrypt, salt stored alongside the hash) ---
+export async function hashPassword(password: string): Promise<string> {
+  const salt = randomBytes(16).toString("hex");
+  const buf = (await scryptAsync(password, salt, 64)) as Buffer;
+  return `${salt}:${buf.toString("hex")}`;
+}
+
+export async function verifyPassword(
+  password: string,
+  stored: string,
+): Promise<boolean> {
+  const [salt, key] = stored.split(":");
+  if (!salt || !key) return false;
+  const keyBuf = Buffer.from(key, "hex");
+  const buf = (await scryptAsync(password, salt, 64)) as Buffer;
+  return keyBuf.length === buf.length && timingSafeEqual(keyBuf, buf);
+}
+
+// --- Sessions (DB-backed token in an httpOnly cookie) ---
+export async function createSession(userId: string): Promise<void> {
+  const token = randomBytes(32).toString("hex");
+  const expires = new Date(Date.now() + SESSION_MS);
+  await query(
+    "insert into sessions (user_id, token, expires_at) values ($1, $2, $3)",
+    [userId, token, expires],
+  );
+  const store = await cookies();
+  store.set(COOKIE, token, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    expires,
+  });
+}
+
+export async function destroySession(): Promise<void> {
+  const store = await cookies();
+  const token = store.get(COOKIE)?.value;
+  if (token) {
+    await query("delete from sessions where token = $1", [token]);
+    store.delete(COOKIE);
+  }
+}
+
+export async function getCurrentUser(): Promise<User | null> {
+  const store = await cookies();
+  const token = store.get(COOKIE)?.value;
+  if (!token) return null;
+  const r = await query<User>(
+    `select u.id, u.email, u.is_admin
+       from sessions s
+       join users u on u.id = s.user_id
+      where s.token = $1 and s.expires_at > now()`,
+    [token],
+  );
+  return r.rows[0] ?? null;
+}
+
+/** For server actions: returns the current user only if they are an admin, else null. */
+export async function getAdmin(): Promise<User | null> {
+  const user = await getCurrentUser();
+  return user?.is_admin ? user : null;
+}
