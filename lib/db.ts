@@ -1,11 +1,28 @@
 import { Pool, type QueryResultRow } from "pg";
+import type { ConnectionOptions } from "tls";
+
+/**
+ * TLS settings for a connection string. Local dev and Railway's private
+ * network (`*.railway.internal`) run unencrypted; any other host (e.g. a
+ * Railway public proxy URL, or another managed provider) gets TLS with
+ * relaxed cert verification, which is what those providers expect.
+ */
+export function sslFor(url: string | undefined): ConnectionOptions | false {
+  if (!url) return false;
+  if (/@(localhost|127\.0\.0\.1|\[::1\])[:/]/.test(url)) return false;
+  if (/\.railway\.internal[:/]/.test(url)) return false;
+  return { rejectUnauthorized: false };
+}
 
 // Reuse a single pool across HMR reloads in development.
 const globalForPg = globalThis as unknown as { __pgPool?: Pool };
 
 export const pool =
   globalForPg.__pgPool ??
-  new Pool({ connectionString: process.env.DATABASE_URL });
+  new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: sslFor(process.env.DATABASE_URL),
+  });
 
 if (process.env.NODE_ENV !== "production") globalForPg.__pgPool = pool;
 

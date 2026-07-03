@@ -26,11 +26,9 @@ Prerequisites: Node 20+, PostgreSQL.
    ```
    DATABASE_URL=postgresql://USER:PASSWORD@localhost:5432/financial
    ```
-3. Set up the schema and seed reference data:
+3. Set up the schema and seed reference data (idempotent — safe to re-run):
    ```bash
-   node scripts/db-setup.mjs
-   npx tsx scripts/seed-refdata.ts
-   npx tsx scripts/seed-sources.ts
+   npm run db:migrate
    ```
 4. (Optional) Promote a user to admin for the backoffice:
    ```bash
@@ -48,8 +46,32 @@ Prerequisites: Node 20+, PostgreSQL.
 | `npm run dev` | Start the dev server |
 | `npm run build` | Production build |
 | `npm run start` | Serve the production build |
+| `npm run db:migrate` | Apply the schema and seed reference data (idempotent) |
 | `npm test` | Run the Vitest suite |
 | `npm run test:record` | Run tests and record results to the DB |
+
+## Deploying to Railway
+
+The repo is Railway-ready (`railway.json`):
+
+1. Create a project from this GitHub repo and add a **PostgreSQL** plugin. Railway
+   injects `DATABASE_URL` automatically — reference the Postgres service's
+   `DATABASE_URL` from the app service's variables (the private `*.railway.internal`
+   URL is preferred; the app also accepts a public proxy URL over TLS).
+2. On every deploy Railway runs, in order:
+   - **build** — `npm run build`
+   - **pre-deploy** — `npm run db:migrate` (creates tables and seeds reference data
+     against the live database; idempotent, so it's safe on every deploy and never
+     clobbers admin edits)
+   - **start** — `npm run start`
+3. After the first deploy, create an account in the app, then promote it to admin:
+   ```bash
+   railway run npm run db:migrate   # if you ever need to run it manually
+   railway run node scripts/make-admin.mjs you@example.com
+   ```
+
+Because the migration is the pre-deploy step, a failed migration aborts the deploy
+and the previous version keeps serving — a bad schema change never ships.
 
 ## Testing & the independent oracle
 

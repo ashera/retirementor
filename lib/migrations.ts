@@ -1,10 +1,12 @@
-import { Client } from "pg";
+// Single source of truth for the database schema and idempotent seed data.
+// Imported by scripts/migrate.ts (run on every deploy) and the granular
+// seed scripts. Every statement here MUST be safe to run repeatedly.
+import type { Client } from "pg";
+import { DEFAULT_CONFIG } from "./au/config";
+import { PARAM_DESCRIPTORS } from "./au/params";
+import { SOURCE_SEEDS } from "./au/sources";
 
-const url =
-  process.env.DATABASE_URL ||
-  "postgresql://postgres:password@localhost:5432/financial";
-
-const SQL = `
+export const SCHEMA_SQL = `
 create table if not exists users (
   id uuid primary key default gen_random_uuid(),
   email text unique not null,
@@ -111,11 +113,72 @@ create index if not exists ref_audit_version_idx on ref_data_audit(version_id, c
 create index if not exists test_results_run_idx on test_results(run_id, area);
 `;
 
-const c = new Client({ connectionString: url });
-await c.connect();
-await c.query(SQL);
-const t = await c.query(
-  "select tablename from pg_tables where schemaname='public' order by tablename",
-);
-console.log("Schema applied. Tables:", t.rows.map((r) => r.tablename).join(", "));
-await c.end();
+/** Apply the schema. Safe to run repeatedly. */
+export async function applySchema(c: Client): Promise<void> {
+  await c.query(SCHEMA_SQL);
+}
+
+/**
+ * Seed the active reference-data version from code defaults, but only if a
+ * version for this financial year doesn't already exist — never clobbers
+ * admin edits made through the backoffice.
+ */
+export async function seedRefData(c: Client): Promise<void> {
+  const meta: Record<string, unknown> = {};
+  for (const d of PARAM_DESCRIPTORS) {
+    meta[d.key] = {
+      lastVerifiedAt: null,
+      verifiedBy: null,
+      note: "",
+      needsVerification: d.key.startsWith("deeming"),
+    };
+  }
+
+  const fy = DEFAULT_CONFIG.financialYear;
+  const existing = await c.query(
+    "select id from ref_data_versions where financial_year = $1",
+    [fy],
+  );
+
+  if (existing.rows.length) {
+    console.log(`  ref-data: FY${fy} already present — left untouched.`);
+    return;
+  }
+
+  const r = await c.query(
+    `insert into ref_data_versions (financial_year, data, meta, is_active, status, notes)
+     values ($1, $2, $3, true, 'active', $4) returning id`,
+    [fy, JSON.stringify(DEFAULT_CONFIG), JSON.stringify(meta), "Seeded from code defaults."],
+  );
+  await c.query(
+    `insert into ref_data_audit (version_id, financial_year, action, note)
+     values ($1, $2, 'create', 'Seeded active version from code defaults')`,
+    [r.rows[0].id, fy],
+  );
+  console.log(`  ref-data: seeded active version FY${fy} (${PARAM_DESCRIPTORS.length} params).`);
+}
+
+/**
+ * Upsert the reference-data sources. Inserts new sources and backfills the
+ * review interval where missing; never clobbers other admin-managed attributes.
+ */
+export async function seedSources(c: Client): Promise<void> {
+  for (const s of SOURCE_SEEDS) {
+    await c.query(
+      `insert into sources (key, name, organisation, url, update_frequency, review_interval_days, description)
+       values ($1,$2,$3,$4,$5,$6,$7)
+       on conflict (key) do update
+         set review_interval_days = coalesce(sources.review_interval_days, excluded.review_interval_days)`,
+      [s.key, s.name, s.organisation, s.url, s.updateFrequency, s.reviewIntervalDays, s.description],
+    );
+  }
+  console.log(`  sources: upserted ${SOURCE_SEEDS.length} (review intervals backfilled, other attributes preserved).`);
+}
+
+/** Run the full idempotent migration: schema + all seeds. */
+export async function migrate(c: Client): Promise<void> {
+  await applySchema(c);
+  console.log("  schema: applied.");
+  await seedRefData(c);
+  await seedSources(c);
+}

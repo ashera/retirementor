@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "db:migrate": "tsx scripts/migrate.ts",
     "test": "vitest run",
     "test:record": "node scripts/run-tests.mjs"
   },
@@ -16,7 +17,8 @@
     "pg": "^8.22.0",
     "react": "19.0.0",
     "react-dom": "19.0.0",
-    "recharts": "2.15.0"
+    "recharts": "2.15.0",
+    "tsx": "^4.19.2"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.2",
