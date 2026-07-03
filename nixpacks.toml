@@ -1,0 +1,16 @@
+# The package-lock.json is generated on Windows during local development.
+# npm has a long-standing bug (https://github.com/npm/cli/issues/4828) where
+# `npm ci` will not install platform-specific native binaries — here Tailwind
+# v4's @tailwindcss/oxide and lightningcss Linux bindings — from a lockfile
+# that was resolved on another OS. The build then fails with
+# "Cannot find native binding" while compiling app/globals.css.
+#
+# Removing the lockfile and running a fresh `npm install` on the Linux build
+# host lets npm resolve the correct native bindings for this platform.
+# --include=dev keeps the build-time toolchain (Tailwind, TypeScript) even
+# when Railway sets NODE_ENV=production.
+[phases.install]
+cmds = [
+  "rm -f package-lock.json",
+  "npm install --include=dev --include=optional",
+]
