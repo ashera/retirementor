@@ -6,6 +6,7 @@ import Link from "next/link";
 import StatCard from "@/components/StatCard";
 import RetirementChart from "@/components/RetirementChart";
 import YearDetailModal from "@/components/YearDetailModal";
+import IncomeYearModal from "@/components/IncomeYearModal";
 import IncomeChart from "@/components/IncomeChart";
 import FanChart from "@/components/FanChart";
 import PlanWizard from "@/components/PlanWizard";
@@ -104,6 +105,7 @@ export default function PlannerApp({
   const [budgetOpen, setBudgetOpen] = useState(false);
   const [lifestageOpen, setLifestageOpen] = useState(false);
   const [selectedAge, setSelectedAge] = useState<number | null>(null);
+  const [incomeAge, setIncomeAge] = useState<number | null>(null);
   const [saveName, setSaveName] = useState("");
   const [pending, startTransition] = useTransition();
   const [notice, setNotice] = useState<string | null>(null);
@@ -646,7 +648,10 @@ export default function PlannerApp({
             {plan.investmentProperty && <LegendDot color="#fb923c" label="Net rent" />}
           </div>
         </div>
-        <IncomeChart result={result} />
+        <IncomeChart result={result} onSelectYear={setIncomeAge} />
+        <p className="mt-2 text-center text-xs text-muted">
+          Tip: click any retirement year to see why your income is that amount.
+        </p>
       </div>
 
       {/* Likelihood (Monte Carlo) */}
@@ -918,6 +923,27 @@ export default function PlannerApp({
               onNext={() => setSelectedAge((a) => (a != null ? Math.min(max, a + 1) : a))}
               canPrev={selectedAge > min}
               canNext={selectedAge < max}
+            />
+          );
+        })()}
+
+      {incomeAge != null &&
+        (() => {
+          const ages = result.rows.map((r) => r.age);
+          const row = result.rows.find((r) => r.age === incomeAge);
+          if (!row) return null;
+          const min = ages[0];
+          const max = ages[ages.length - 1];
+          return (
+            <IncomeYearModal
+              row={row}
+              plan={plan}
+              config={config}
+              onClose={() => setIncomeAge(null)}
+              onPrev={() => setIncomeAge((a) => (a != null ? Math.max(min, a - 1) : a))}
+              onNext={() => setIncomeAge((a) => (a != null ? Math.min(max, a + 1) : a))}
+              canPrev={incomeAge > min}
+              canNext={incomeAge < max}
             />
           );
         })()}

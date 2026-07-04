@@ -52,10 +52,12 @@ export default function IncomeChart({
   result,
   animate = true,
   height = 220,
+  onSelectYear,
 }: {
   result: SimResult;
   animate?: boolean;
   height?: number;
+  onSelectYear?: (age: number) => void;
 }) {
   // Show the full timeline (income is $0 through the accumulation years) so this
   // chart's x-axis lines up with the balance chart above it.
@@ -69,7 +71,15 @@ export default function IncomeChart({
   }
   return (
     <ResponsiveContainer width="100%" height={height}>
-      <AreaChart data={rows} margin={{ top: 8, right: 8, left: 8, bottom: 0 }}>
+      <AreaChart
+        data={rows}
+        margin={{ top: 8, right: 8, left: 8, bottom: 0 }}
+        onClick={(state: { activeLabel?: string | number }) => {
+          const age = Number(state?.activeLabel);
+          if (onSelectYear && Number.isFinite(age)) onSelectYear(age);
+        }}
+        style={onSelectYear ? { cursor: "pointer" } : undefined}
+      >
         <CartesianGrid strokeDasharray="3 3" stroke="#232c40" vertical={false} />
         <XAxis
           dataKey="age"
