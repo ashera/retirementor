@@ -72,6 +72,7 @@ export default function RetirementChart({
   onSelectYear,
   selectedAge,
   animate = true,
+  height = 320,
 }: {
   result: SimResult;
   bands?: SpendingBand[];
@@ -79,6 +80,7 @@ export default function RetirementChart({
   onSelectYear?: (age: number) => void;
   selectedAge?: number | null;
   animate?: boolean;
+  height?: number;
 }) {
   const { retirementAge, depletedAge } = result;
 
@@ -95,7 +97,7 @@ export default function RetirementChart({
   const data = [...byAge.values()].sort((a, b) => a.age - b.age);
 
   return (
-    <ResponsiveContainer width="100%" height={320}>
+    <ResponsiveContainer width="100%" height={height}>
       <AreaChart
         data={data}
         margin={{ top: 8, right: 8, left: 8, bottom: 0 }}

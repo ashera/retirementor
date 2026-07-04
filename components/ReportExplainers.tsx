@@ -24,7 +24,7 @@ function MathBox({
   children?: React.ReactNode;
 }) {
   return (
-    <div className="break-inside-avoid rounded-lg border border-slate-200 bg-slate-50 p-4">
+    <div className="break-inside-avoid rounded-lg border border-slate-200 bg-slate-50 p-3">
       <div className="text-[11px] font-bold uppercase tracking-wide text-slate-700">{title}</div>
       <p className="mt-1 text-xs text-slate-600">{lead}</p>
       {children}
@@ -34,7 +34,7 @@ function MathBox({
 
 function Formula({ children }: { children: React.ReactNode }) {
   return (
-    <pre className="mt-2 overflow-x-auto whitespace-pre-wrap rounded border border-slate-200 bg-white px-3 py-2 font-mono text-[11px] leading-relaxed text-slate-800">
+    <pre className="mt-2 overflow-x-auto whitespace-pre-wrap rounded border border-slate-200 bg-white px-3 py-1.5 font-mono text-[10px] leading-snug text-slate-800">
       {children}
     </pre>
   );
@@ -130,16 +130,16 @@ function GoalDonut({
     { name: "Discretionary", value: discretionary, color: "#db2777" },
   ];
   return (
-    <div className="mt-3 flex items-center gap-4 rounded-lg border border-slate-200 bg-white p-3">
-      <div className="relative h-24 w-24 shrink-0">
-        <PieChart width={96} height={96}>
+    <div className="mt-2 flex items-center gap-4 rounded-lg border border-slate-200 bg-white p-2">
+      <div className="relative h-[76px] w-[76px] shrink-0">
+        <PieChart width={76} height={76}>
           <Pie
             data={pie}
             dataKey="value"
-            cx={44}
-            cy={44}
-            innerRadius={32}
-            outerRadius={46}
+            cx={36}
+            cy={36}
+            innerRadius={25}
+            outerRadius={37}
             startAngle={90}
             endAngle={-270}
             stroke="none"
@@ -151,8 +151,8 @@ function GoalDonut({
           </Pie>
         </PieChart>
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-          <div className="text-base font-bold tabular-nums text-slate-800">{discPct}%</div>
-          <div className="text-[9px] text-slate-500">flex</div>
+          <div className="text-sm font-bold tabular-nums text-slate-800">{discPct}%</div>
+          <div className="text-[8px] text-slate-500">flex</div>
         </div>
       </div>
       <div className="flex-1 space-y-1 text-xs">
@@ -270,7 +270,7 @@ export default function ReportExplainers({
   mc: MonteCarloResult;
 }) {
   return (
-    <div className="grid gap-3 sm:grid-cols-2">
+    <div className="grid gap-2 sm:grid-cols-2">
       <SuperWorkings plan={plan} config={config} result={result} />
       <IncomeGoalWorkings plan={plan} config={config} />
       <PensionWorkings plan={plan} config={config} result={result} />

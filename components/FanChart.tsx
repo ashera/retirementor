@@ -46,10 +46,12 @@ export default function FanChart({
   fan,
   retirementAge,
   agePensionAge,
+  height = 280,
 }: {
   fan: FanPoint[];
   retirementAge: number;
   agePensionAge: number;
+  height?: number;
 }) {
   const data: FanRow[] = fan.map((f) => ({
     age: f.age,
@@ -59,7 +61,7 @@ export default function FanChart({
   }));
 
   return (
-    <ResponsiveContainer width="100%" height={280}>
+    <ResponsiveContainer width="100%" height={height}>
       <AreaChart data={data} margin={{ top: 8, right: 8, left: 8, bottom: 0 }}>
         <defs>
           <linearGradient id="fanFill" x1="0" y1="0" x2="0" y2="1">

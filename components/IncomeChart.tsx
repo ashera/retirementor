@@ -51,9 +51,11 @@ function IncomeTooltip({
 export default function IncomeChart({
   result,
   animate = true,
+  height = 220,
 }: {
   result: SimResult;
   animate?: boolean;
+  height?: number;
 }) {
   // Show the full timeline (income is $0 through the accumulation years) so this
   // chart's x-axis lines up with the balance chart above it.
@@ -66,7 +68,7 @@ export default function IncomeChart({
     );
   }
   return (
-    <ResponsiveContainer width="100%" height={220}>
+    <ResponsiveContainer width="100%" height={height}>
       <AreaChart data={rows} margin={{ top: 8, right: 8, left: 8, bottom: 0 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="#232c40" vertical={false} />
         <XAxis
