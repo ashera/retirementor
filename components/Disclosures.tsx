@@ -49,7 +49,7 @@ export default function Disclosures({ config }: { config: EngineConfig }) {
             Assumptions &amp; limitations
           </button>
           <button
-            onClick={() => window.print()}
+            onClick={() => window.open("/report", "_blank", "noopener")}
             className="font-semibold text-amber-200 underline underline-offset-2 hover:text-amber-100"
           >
             Print / save results
@@ -174,10 +174,10 @@ export default function Disclosures({ config }: { config: EngineConfig }) {
               AFS licensee and read the relevant Product Disclosure Statement.
               You can keep a record of any result using{" "}
               <button
-                onClick={() => window.print()}
+                onClick={() => window.open("/report", "_blank", "noopener")}
                 className="font-semibold text-accent underline underline-offset-2"
               >
-                Print / save
+                the scenario report
               </button>
               .
             </p>
