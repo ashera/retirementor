@@ -1,10 +1,12 @@
 "use client";
 
+import { Cell, Pie, PieChart } from "recharts";
 import type { EngineConfig } from "@/lib/au/config";
 import type { MonteCarloResult } from "@/lib/au/montecarlo";
 import type { RetirementPlan, SimResult, YearRow } from "@/lib/au/types";
 import { totalStartingSuper } from "@/lib/au/types";
 import { retirementGoal } from "@/lib/au/goal";
+import { essentialsFloor } from "@/lib/au/lifestages";
 import { fmtCurrency } from "@/lib/au/format";
 import * as ref from "@/lib/au/scenarios/reference";
 
@@ -96,6 +98,77 @@ Closed form  Bₙ = B₀(1+g)ⁿ + c·(1+g)·((1+g)ⁿ − 1) ÷ g
   );
 }
 
+function GoalLegendRow({ color, label, value }: { color: string; label: string; value: number }) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <span className="flex items-center gap-1.5 text-slate-600">
+        <span className="h-2 w-2 rounded-full" style={{ background: color }} aria-hidden />
+        {label}
+      </span>
+      <span className="font-medium tabular-nums text-slate-800">{money(value)}/yr</span>
+    </div>
+  );
+}
+
+/** Donut of the goal composition — essentials / home loan / discretionary. */
+function GoalDonut({
+  essentials,
+  discretionary,
+  loanCost,
+  estimated,
+}: {
+  essentials: number;
+  discretionary: number;
+  loanCost: number;
+  estimated: boolean;
+}) {
+  const total = essentials + discretionary + loanCost;
+  const discPct = total > 0 ? Math.round((discretionary / total) * 100) : 0;
+  const pie = [
+    { name: "Essentials", value: essentials, color: "#0d9488" },
+    ...(loanCost > 0 ? [{ name: "Home loan", value: loanCost, color: "#f59e0b" }] : []),
+    { name: "Discretionary", value: discretionary, color: "#db2777" },
+  ];
+  return (
+    <div className="mt-3 flex items-center gap-4 rounded-lg border border-slate-200 bg-white p-3">
+      <div className="relative h-24 w-24 shrink-0">
+        <PieChart width={96} height={96}>
+          <Pie
+            data={pie}
+            dataKey="value"
+            cx={44}
+            cy={44}
+            innerRadius={32}
+            outerRadius={46}
+            startAngle={90}
+            endAngle={-270}
+            stroke="none"
+            isAnimationActive={false}
+          >
+            {pie.map((p) => (
+              <Cell key={p.name} fill={p.color} />
+            ))}
+          </Pie>
+        </PieChart>
+        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+          <div className="text-base font-bold tabular-nums text-slate-800">{discPct}%</div>
+          <div className="text-[9px] text-slate-500">flex</div>
+        </div>
+      </div>
+      <div className="flex-1 space-y-1 text-xs">
+        <GoalLegendRow color="#0d9488" label="Essentials" value={essentials} />
+        {loanCost > 0 && <GoalLegendRow color="#f59e0b" label="Home loan" value={loanCost} />}
+        <GoalLegendRow color="#db2777" label="Discretionary (Your Flex)" value={discretionary} />
+        <p className="text-[11px] text-slate-500">
+          Your &ldquo;needs&rdquo; floor{loanCost > 0 ? " (essentials + home loan)" : ""} is{" "}
+          {money(essentials + loanCost)}/yr — the rest is where you can flex.
+          {estimated ? " Split estimated from ASFA." : ""}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 /** Retirement income goal — living costs + any home loan, vs ASFA. */
 function IncomeGoalWorkings({ plan, config }: { plan: RetirementPlan; config: EngineConfig }) {
   const g = retirementGoal(plan);
@@ -106,6 +179,8 @@ function IncomeGoalWorkings({ plan, config }: { plan: RetirementPlan; config: En
     g.living >= comfortable ? "at or above ‘comfortable’"
     : g.living >= modest ? "between ‘modest’ and ‘comfortable’"
     : "below ‘modest’";
+  const { value: essentials, estimated } = essentialsFloor(plan, config);
+  const discretionary = Math.max(0, g.living - essentials);
   return (
     <MathBox
       title="Retirement income goal"
@@ -117,6 +192,7 @@ function IncomeGoalWorkings({ plan, config }: { plan: RetirementPlan; config: En
 
 ASFA (${isCouple ? "couple" : "single"}):  modest ${money(modest)} · comfortable ${money(comfortable)}
 Your living costs are ${band}.`}</Formula>
+      <GoalDonut essentials={essentials} discretionary={discretionary} loanCost={g.loanCost} estimated={estimated} />
     </MathBox>
   );
 }
