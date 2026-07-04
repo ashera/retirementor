@@ -138,6 +138,7 @@ export function simulate(
           agePension: 0,
           rentIncome: 0,
           minDrawdown: 0,
+          minDrawdownParts: [],
           livingSpend: 0,
           mortgageCost: 0,
           mortgageCleared: 0,
@@ -241,10 +242,11 @@ export function simulate(
     if (externalIncome > spending) outside += externalIncome - spending;
 
     // Draw from super first (reduces assessable assets), enforcing minimum drawdown.
-    const minDraw = accessibleIdx.reduce(
-      (s, i) => s + balances[i] * minDrawdownRate(ages[i], config),
-      0,
-    );
+    const minDrawdownParts = accessibleIdx.map((i) => {
+      const rate = minDrawdownRate(ages[i], config);
+      return { age: ages[i], balance: balances[i], rate, amount: balances[i] * rate };
+    });
+    const minDraw = minDrawdownParts.reduce((s, pt) => s + pt.amount, 0);
     const fromSuper = Math.min(Math.max(privateNeed, minDraw), accessibleSuper);
     if (accessibleSuper > EPS && fromSuper > 0) {
       const ratio = fromSuper / accessibleSuper;
@@ -296,6 +298,7 @@ export function simulate(
         agePension: agePensionAmt,
         rentIncome: rentCash,
         minDrawdown: minDraw,
+        minDrawdownParts,
         livingSpend,
         mortgageCost,
         mortgageCleared: mortgageClearedNow,

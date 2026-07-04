@@ -89,10 +89,10 @@ export default function IncomeYearModal({
 
   // Why is the super draw this amount? Uses the engine's actual minimum (summed
   // per person — a couple with an age gap has different rates each).
-  const couple = plan.people.length > 1;
   const privateNeed = Math.max(0, spend - pension - rent);
   const minRate = minDrawdownRate(row.age, config);
   const minDraw = row.breakdown.minDrawdown;
+  const parts = row.breakdown.minDrawdownParts;
   const target = Math.max(privateNeed, minDraw);
   const capped = fromSuper > 1 && fromSuper < target - 1; // hit the accessible-super ceiling
   const minDriven = minDraw > privateNeed + 1 && !capped; // minimum exceeds need → surplus saved
@@ -169,17 +169,34 @@ export default function IncomeYearModal({
                       <DLine label="= Shortfall to fund from savings" value={privateNeed} strong />
                     </div>
                     <div className="border-t border-line pt-1.5 text-slate-300">
-                      {couple ? (
-                        <>Minimum drawdown for your ages: <strong className="text-white">{cur(minDraw)}</strong></>
+                      {parts.length > 1 ? (
+                        <>
+                          <div className="mb-1">Minimum drawdown — a legislated minimum, set for each of you:</div>
+                          <div className="space-y-0.5">
+                            {parts.map((pt, i) => (
+                              <div key={i} className="flex justify-between gap-4 pl-1 text-[11px] text-muted">
+                                <span>
+                                  {i === 0 ? "You" : "Partner"} (age {pt.age}):{" "}
+                                  <strong className="text-slate-200">{(pt.rate * 100).toFixed(0)}%</strong> × {cur(pt.balance)}
+                                </span>
+                                <span className="tabular-nums text-slate-200">{cur(pt.amount)}</span>
+                              </div>
+                            ))}
+                            <div className="flex justify-between gap-4 border-t border-line pt-0.5 font-semibold text-slate-200">
+                              <span>Combined minimum</span>
+                              <span className="tabular-nums">{cur(minDraw)}</span>
+                            </div>
+                          </div>
+                        </>
                       ) : (
                         <>
-                          Minimum drawdown, age {row.age}:{" "}
-                          <strong className="text-white">{(minRate * 100).toFixed(0)}%</strong> ×{" "}
-                          {cur(row.totalSuper)} super = <strong className="text-white">{cur(minDraw)}</strong>
+                          Minimum drawdown, age {parts[0]?.age ?? row.age}:{" "}
+                          <strong className="text-white">{((parts[0]?.rate ?? minRate) * 100).toFixed(0)}%</strong> ×{" "}
+                          {cur(parts[0]?.balance ?? row.totalSuper)} super = <strong className="text-white">{cur(minDraw)}</strong>
                         </>
                       )}
-                      <div className="mt-0.5 text-[11px] text-muted">
-                        A legislated minimum for account-based pensions{couple ? ", set per person" : ""} — the rate steps up with age (4% under 65, rising to 14% at 95+).
+                      <div className="mt-1 text-[11px] text-muted">
+                        For account-based pensions, the minimum rate steps up with age (4% under 65, rising to 14% at 95+).
                       </div>
                     </div>
                     <div className="border-t border-line pt-1.5 text-slate-300">

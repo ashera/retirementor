@@ -159,6 +159,14 @@ export type Phase = "accumulation" | "bridge" | "drawdown" | "pension";
 
 // A full ledger of the money flows behind a single year, so the change in balance
 // can be reconciled: opening + inflows − outflows = closing.
+/** One person's contribution to the legislated minimum super drawdown in a year. */
+export interface MinDrawdownPart {
+  age: number;
+  balance: number; // opening super balance this year
+  rate: number; // legislated minimum rate for this age (fraction)
+  amount: number; // balance × rate
+}
+
 export interface YearBreakdown {
   openingSuper: number;
   openingOutside: number;
@@ -177,6 +185,7 @@ export interface YearBreakdown {
   agePension: number;
   rentIncome: number; // net cash rent from an investment property
   minDrawdown: number; // legislated minimum super drawdown this year (per-person, summed)
+  minDrawdownParts: MinDrawdownPart[]; // the per-person split behind minDrawdown
   // Retirement spending
   livingSpend: number;
   mortgageCost: number;
