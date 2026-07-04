@@ -236,7 +236,10 @@ export const DEFAULT_PLAN: RetirementPlan = {
   spendingStages: deriveStages(55_000),
   investmentReturn: 7,
   returnVolatility: 11,
-  inflation: 2.5,
+  // ASIC RG 276 (Instrument 2022/603) default deflator: CPI 2.5% + a further
+  // 1.2% for rises in community living standards = 3.7%. Results are shown in
+  // today's dollars relative to future living standards. Users can change it.
+  inflation: 3.7,
   lifeExpectancy: 90,
 };
 

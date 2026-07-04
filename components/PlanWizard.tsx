@@ -617,6 +617,7 @@ export default function PlanWizard({
           max={8}
           step={0.1}
           suffix="%"
+          hint="ASIC RG 276 default: CPI 2.5% + 1.2% for rising living standards. Results are in today's dollars."
         />
         <Field
           label="Plan until age"

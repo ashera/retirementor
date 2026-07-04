@@ -7,12 +7,14 @@ const fmt = (n: number) => `$${Math.round(n).toLocaleString()}`;
 const pct = (n: number) => `${+(n * 100).toFixed(2)}%`;
 
 /**
- * ASIC generic-calculator disclosures. Renders a prominent "general
+ * ASIC superannuation-forecast disclosures. Renders a prominent "general
  * information / not advice" statement and an Assumptions & limitations dialog
- * covering the conditions of ASIC Corporations (Generic Calculators)
- * Instrument 2026/41: reasonable assumptions and why, significant limitations
- * and their impact, inflation treatment, no product promotion, and the ability
- * to print/save the results.
+ * covering the conditions of ASIC Corporations (Superannuation Calculators and
+ * Retirement Estimates) Instrument 2022/603 and Regulatory Guide 276: the
+ * mandated default economic assumptions (inflation/living standards, wage
+ * inflation) and that users can change them, results in today's dollars,
+ * significant limitations and their impact, no product promotion, and the
+ * ability to print/save the results.
  */
 export default function Disclosures({ config }: { config: EngineConfig }) {
   const [open, setOpen] = useState(false);
@@ -28,14 +30,16 @@ export default function Disclosures({ config }: { config: EngineConfig }) {
           <strong className="font-semibold text-amber-200">
             General information only — not financial advice.
           </strong>{" "}
-          This is a generic calculator provided under ASIC Corporations (Generic
-          Calculators) Instrument 2026/41. It does <strong>not</strong> take
-          into account your objectives, financial situation or needs, and does
-          not promote any financial product. Results are{" "}
-          <strong>estimates</strong> shown in today&apos;s dollars, based on the
-          assumptions you enter and those listed here — they are not a guarantee
-          of future outcomes. Before making a decision, consider obtaining
-          advice from an Australian Financial Services (AFS) licensee.
+          This superannuation forecast is provided under ASIC Corporations
+          (Superannuation Calculators and Retirement Estimates) Instrument
+          2022/603 and prepared in line with ASIC Regulatory Guide 276. It does{" "}
+          <strong>not</strong> take into account your objectives, financial
+          situation or needs, and does not promote any financial product.
+          Results are <strong>estimates</strong> shown in today&apos;s dollars
+          (deflated by ASIC&apos;s default assumptions), based on the values you
+          enter — they are not a guarantee of future outcomes. Before making a
+          decision, consider obtaining advice from an Australian Financial
+          Services (AFS) licensee.
         </p>
         <div className="mt-2 flex flex-wrap gap-3">
           <button
@@ -75,24 +79,28 @@ export default function Disclosures({ config }: { config: EngineConfig }) {
             </div>
 
             <p className="mt-3 text-muted">
-              This calculator provides general information only and is not
-              personal financial product advice. It does not consider your
-              objectives, financial situation or needs, and does not recommend
-              or promote any specific financial product. Estimates are shown in
-              today&apos;s dollars and are not a guarantee of future results.
-              You can change the key assumptions (including investment return
-              and inflation) on the plan; the settings below are reasonable
-              defaults for illustration using FY{config.financialYear} rules.
+              This superannuation forecast provides general information only and
+              is not personal financial product advice. It does not consider
+              your objectives, financial situation or needs, and does not
+              recommend or promote any specific financial product. Estimates are
+              shown in today&apos;s dollars and are not a guarantee of future
+              results. Default economic assumptions follow ASIC Regulatory Guide
+              276 (Instrument 2022/603); you can change the key assumptions
+              (including investment return and inflation), and the rest use
+              FY{config.financialYear} rules.
             </p>
 
             <h3 className="mt-5 font-semibold text-white">Key assumptions</h3>
             <ul className="mt-2 space-y-1.5 text-slate-300">
               <li>
-                <strong>Inflation &amp; today&apos;s dollars.</strong> Projections
-                run in real terms — every future amount is expressed in
-                today&apos;s dollars so its purchasing power is comparable. You
-                set both the investment return and the inflation rate; the
-                calculator uses the return net of your inflation assumption.
+                <strong>Inflation &amp; today&apos;s dollars (ASIC RG 276).</strong>{" "}
+                Projections run in real terms and every future amount is shown
+                in today&apos;s dollars. The default deflator is ASIC&apos;s
+                mandated <strong>CPI of 2.5%</strong> plus a further{" "}
+                <strong>1.2% for rises in community living standards</strong>{" "}
+                (3.7% combined), consistent with a default wage inflation of
+                3.7% p.a. You can change the inflation rate; the calculator uses
+                your investment return net of it.
               </li>
               <li>
                 <strong>Investment returns</strong> are the rate you enter and

@@ -814,7 +814,8 @@ export default function PlannerApp({
       </div>
 
       <p className="mt-6 text-center text-xs text-muted">
-        Educational estimates only — not financial advice. FY{config.financialYear} figures.
+        General information only — not financial advice. Superannuation forecast
+        under ASIC RG 276 (Instrument 2022/603). FY{config.financialYear} figures.
         {config.deeming.needsVerification &&
           " Deeming rates pending confirmation."}
       </p>

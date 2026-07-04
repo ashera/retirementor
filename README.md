@@ -5,7 +5,11 @@ drawdown, the means-tested Age Pension, early-retirement bridging, mortgages, in
 property, a guided budget planner, Monte Carlo longevity, and an auditor-grade scenario test
 suite. Everything is modelled in **today's dollars with real returns** (FY2026-27 reference data).
 
-> Educational estimates only — not financial advice.
+> General information only — not financial advice. Provided as a superannuation
+> forecast under ASIC Corporations (Superannuation Calculators and Retirement
+> Estimates) Instrument 2022/603 and prepared in line with ASIC Regulatory
+> Guide 276 (default economic assumptions: CPI 2.5% + 1.2% rising living
+> standards = 3.7%, wage inflation 3.7% p.a.; users may change assumptions).
 
 ## Stack
 

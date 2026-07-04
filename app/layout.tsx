@@ -19,15 +19,17 @@ export default function RootLayout({
         <footer className="border-t border-line px-5 py-6 text-center text-xs text-muted">
           <p className="mx-auto max-w-3xl">
             <strong className="text-slate-300">RetireMentor</strong> is a
-            generic financial calculator provided under ASIC Corporations
-            (Generic Calculators) Instrument 2026/41. It provides{" "}
+            superannuation forecast tool provided under ASIC Corporations
+            (Superannuation Calculators and Retirement Estimates) Instrument
+            2022/603 and prepared in line with ASIC Regulatory Guide 276. It
+            provides{" "}
             <strong className="text-slate-300">general information only</strong>{" "}
             and is not personal financial product advice — it does not consider
             your objectives, financial situation or needs, and does not promote
             any financial product. All results are estimates shown in
-            today&apos;s dollars, based on the stated assumptions, and are not a
-            guarantee of future outcomes. Consider obtaining advice from an AFS
-            licensee before making any financial decision.
+            today&apos;s dollars using ASIC&apos;s default economic assumptions,
+            and are not a guarantee of future outcomes. Consider obtaining
+            advice from an AFS licensee before making any financial decision.
           </p>
         </footer>
       </body>
