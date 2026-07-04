@@ -175,12 +175,15 @@ describe(`Stress matrix — ${PLANS.length} plans, universal invariants`, () => 
       const r = simulate(plan, cfg);
       const n = Math.max(0, Math.round(plan.retirementAge - plan.people[0].currentAge));
       const opening = startingSuperBalances(plan);
+      // Accumulation is deflated by WAGE inflation (RG 276 two-stage): CPI + the
+      // living-standards uplift.
+      const wageInfl = plan.inflation + cfg.livingStandardsGrowthPct;
       let expSuper = 0;
       plan.people.forEach((p, i) => {
         const c = ref.netAnnualContribution(p.salary, cfg.sgRate, p.voluntaryConcessional, cfg.concessionalCap, cfg.contributionsTax, p.voluntaryNonConcessional, cfg.nonConcessionalCap);
-        expSuper += ref.superBalanceAt(opening[i], c, plan.investmentReturn, plan.inflation, cfg.superEarningsTaxAccumulation, n);
+        expSuper += ref.superBalanceAt(opening[i], c, plan.investmentReturn, wageInfl, cfg.superEarningsTaxAccumulation, n);
       });
-      const expOutside = ref.outsideBalanceAt(plan.outsideSuper, plan.annualOutsideSavings, plan.investmentReturn, plan.inflation, n);
+      const expOutside = ref.outsideBalanceAt(plan.outsideSuper, plan.annualOutsideSavings, plan.investmentReturn, wageInfl, n);
       if (!near(r.superAtRetirement, expSuper, 1)) fails.push(`${name}: super ${r.superAtRetirement.toFixed(0)} vs ref ${expSuper.toFixed(0)}`);
       const retRow = r.rows.find((x) => x.age === Math.max(...plan.people.map((p) => p.currentAge)) + n)!;
       if (retRow && !near(retRow.outside, expOutside, 1)) fails.push(`${name}: outside ${retRow.outside.toFixed(0)} vs ref ${expOutside.toFixed(0)}`);

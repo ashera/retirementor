@@ -617,7 +617,7 @@ export default function PlanWizard({
           max={8}
           step={0.1}
           suffix="%"
-          hint="ASIC RG 276 default: CPI 2.5% + 1.2% for rising living standards. Results are in today's dollars."
+          hint="CPI (ASIC RG 276 default 2.5%). Two-stage today's-dollars deflation: pre-retirement uses wage inflation of CPI + 1.2%; retirement uses CPI."
         />
         <Field
           label="Plan until age"

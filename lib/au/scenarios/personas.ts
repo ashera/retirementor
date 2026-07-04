@@ -580,5 +580,10 @@ export const PERSONAS: ((config: EngineConfig) => PersonaReport)[] = [
 ];
 
 export function evaluatePersonas(config: EngineConfig): PersonaReport[] {
-  return PERSONAS.map((p) => p(config));
+  // These reference personas isolate the accumulation maths with the RG 276
+  // living-standards uplift switched off, so their inflation-0 runs give exact
+  // closed forms (today's $ = nominal). The two-stage wage/CPI deflator is
+  // exercised numerically by the stress suite instead.
+  const refConfig = { ...config, livingStandardsGrowthPct: 0 };
+  return PERSONAS.map((p) => p(refConfig));
 }

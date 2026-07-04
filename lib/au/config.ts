@@ -71,6 +71,12 @@ export interface EngineConfig {
   preservationAge: number;
   agePensionAge: number;
 
+  // Economic assumptions (ASIC RG 276 two-stage deflation to today's dollars).
+  // Pre-retirement amounts are deflated by WAGE inflation = the plan's CPI
+  // inflation + this rise-in-community-living-standards component; retirement
+  // amounts are deflated by CPI alone. Default 1.2% (CPI 2.5% ⇒ wage 3.7%).
+  livingStandardsGrowthPct: number;
+
   // Minimum account-based pension drawdown, by age band
   minDrawdownBands: MinDrawdownBand[];
 
@@ -118,6 +124,10 @@ export const DEFAULT_CONFIG: EngineConfig = {
 
   preservationAge: 60,
   agePensionAge: 67,
+
+  // ASIC RG 276 default: 1.2% rise in living standards above CPI (CPI 2.5% ⇒
+  // pre-retirement wage inflation of 3.7%).
+  livingStandardsGrowthPct: 1.2,
 
   minDrawdownBands: [
     { minAge: 0, rate: 0.04 },

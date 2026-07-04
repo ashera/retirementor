@@ -30,10 +30,15 @@ export interface RefVersion {
  * fills what's missing — never overrides stored values.
  */
 function withDefaults(data: EngineConfig): EngineConfig {
+  let out = data;
   if (data.asfa && !data.asfa.breakdown) {
-    return { ...data, asfa: { ...data.asfa, breakdown: DEFAULT_CONFIG.asfa.breakdown } };
+    out = { ...out, asfa: { ...out.asfa, breakdown: DEFAULT_CONFIG.asfa.breakdown } };
   }
-  return data;
+  // RG 276 two-stage deflation param, added after the initial seed.
+  if (out.livingStandardsGrowthPct == null) {
+    out = { ...out, livingStandardsGrowthPct: DEFAULT_CONFIG.livingStandardsGrowthPct };
+  }
+  return out;
 }
 
 export async function getActiveConfig(): Promise<EngineConfig> {

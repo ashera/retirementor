@@ -93,14 +93,16 @@ export default function Disclosures({ config }: { config: EngineConfig }) {
             <h3 className="mt-5 font-semibold text-white">Key assumptions</h3>
             <ul className="mt-2 space-y-1.5 text-slate-300">
               <li>
-                <strong>Inflation &amp; today&apos;s dollars (ASIC RG 276).</strong>{" "}
-                Projections run in real terms and every future amount is shown
-                in today&apos;s dollars. The default deflator is ASIC&apos;s
-                mandated <strong>CPI of 2.5%</strong> plus a further{" "}
-                <strong>1.2% for rises in community living standards</strong>{" "}
-                (3.7% combined), consistent with a default wage inflation of
-                3.7% p.a. You can change the inflation rate; the calculator uses
-                your investment return net of it.
+                <strong>Inflation &amp; today&apos;s dollars (ASIC RG 276 two-stage).</strong>{" "}
+                Every future amount is shown in today&apos;s dollars using
+                ASIC&apos;s two-stage deflation:{" "}
+                <strong>before retirement</strong> amounts are deflated by{" "}
+                <strong>wage inflation of 3.7%</strong> (CPI 2.5% + 1.2% for
+                rising community living standards), so your projection keeps pace
+                with living standards; <strong>from retirement onward</strong>{" "}
+                they are deflated by <strong>CPI of 2.5%</strong>. You can change
+                the CPI rate; the calculator uses your investment return net of
+                the relevant deflator in each phase.
               </li>
               <li>
                 <strong>Investment returns</strong> are the rate you enter and

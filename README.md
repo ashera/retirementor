@@ -8,8 +8,10 @@ suite. Everything is modelled in **today's dollars with real returns** (FY2026-2
 > General information only — not financial advice. Provided as a superannuation
 > forecast under ASIC Corporations (Superannuation Calculators and Retirement
 > Estimates) Instrument 2022/603 and prepared in line with ASIC Regulatory
-> Guide 276 (default economic assumptions: CPI 2.5% + 1.2% rising living
-> standards = 3.7%, wage inflation 3.7% p.a.; users may change assumptions).
+> Guide 276. Results use RG 276 two-stage deflation to today's dollars:
+> pre-retirement amounts are deflated by wage inflation (CPI 2.5% + 1.2% rising
+> living standards = 3.7%) and retirement amounts by CPI (2.5%). Users may
+> change assumptions.
 
 ## Stack
 

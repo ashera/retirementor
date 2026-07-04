@@ -41,7 +41,12 @@ export function simulate(
   const preservationAge = config.preservationAge;
   const pensionAge = config.agePensionAge;
 
-  const meanRealReturn = realRate(plan.investmentReturn, plan.inflation);
+  // ASIC RG 276 two-stage deflation: pre-retirement (accumulation) amounts are
+  // expressed in today's dollars via WAGE inflation (CPI + rise in living
+  // standards); from retirement onward via CPI alone.
+  const cpi = plan.inflation;
+  const wageInflation = plan.inflation + (config.livingStandardsGrowthPct ?? 0);
+  const meanRealReturn = realRate(plan.investmentReturn, cpi);
 
   const balances = startingSuperBalances(plan);
   let outside = plan.outsideSuper;
@@ -76,11 +81,13 @@ export function simulate(
 
     // This year's returns (constant mean, or a Monte Carlo draw).
     const nom = nominalReturns ? (nominalReturns[t] ?? plan.investmentReturn) : plan.investmentReturn;
-    const realReturn = realRate(nom, plan.inflation);
+    // Deflate by wage inflation while working (pre-retirement), CPI once retired.
+    const deflator = working ? wageInflation : cpi;
+    const realReturn = realRate(nom, deflator);
     // Super in accumulation pays 15% earnings tax; approximate by taxing the return.
     const superAccumReturn = realRate(
       nom * (1 - config.superEarningsTaxAccumulation),
-      plan.inflation,
+      deflator,
     );
 
     // Balances at the START of this year (on the birthday) — this is what each
