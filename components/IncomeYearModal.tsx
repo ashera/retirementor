@@ -1,7 +1,7 @@
 "use client";
 
 import { fmtCurrency } from "@/lib/au/format";
-import type { EngineConfig } from "@/lib/au/config";
+import { minDrawdownRate, type EngineConfig } from "@/lib/au/config";
 import type { Household, RetirementPlan, YearRow } from "@/lib/au/types";
 
 const cur = (n: number) => fmtCurrency(Math.round(n));
@@ -33,6 +33,15 @@ function Row({
         {sub && <span className="mt-0.5 block pl-[18px] text-[11px] leading-snug text-muted">{sub}</span>}
       </span>
       <span className="shrink-0 text-sm font-semibold tabular-nums text-white">{cur(value)}</span>
+    </div>
+  );
+}
+
+function DLine({ label, value, strong }: { label: string; value: number; strong?: boolean }) {
+  return (
+    <div className={`flex justify-between gap-4 ${strong ? "font-semibold text-slate-200" : "text-muted"}`}>
+      <span>{label}</span>
+      <span className="tabular-nums">{cur(value)}</span>
     </div>
   );
 }
@@ -77,6 +86,13 @@ export default function IncomeYearModal({
   const incomeTest = Math.max(0, side.maxAnnual - Math.max(0, income - side.incomeFreeAreaAnnual) * config.agePension.incomeTaperPerDollar);
   const binding = assetsTest <= incomeTest ? "assets" : "income";
   const belowPensionAge = row.age < config.agePensionAge;
+
+  // Why is the super draw this amount? Re-derive the drawdown rule for this year.
+  const privateNeed = Math.max(0, spend - pension - rent);
+  const minRate = minDrawdownRate(row.age, config);
+  const minDraw = minRate * row.totalSuper; // accessible super ≈ opening balance
+  const minDriven = fromSuper > privateNeed + 1 && minDraw > privateNeed + 1;
+  const capped = fromSuper > 1 && fromSuper < privateNeed - 1;
 
   let pensionReason: string;
   if (belowPensionAge) pensionReason = `Not yet — the Age Pension starts at ${config.agePensionAge}.`;
@@ -129,13 +145,57 @@ export default function IncomeYearModal({
                     <Row color="#fb923c" label="Net rent" sub="Actual rent from your investment property, after costs and loan interest." value={rent} />
                   )}
                   {fromSuper > 0 && (
-                    <Row color="#34d399" label="From your super" sub="Drawn tax-free (you're past 60) to top up to your spending goal — at least the minimum drawdown for your age." value={fromSuper} />
+                    <Row color="#34d399" label="From your super" sub="Drawn tax-free (accessible from 60) — see the working below." value={fromSuper} />
                   )}
                   {fromOutside > 0 && (
                     <Row color="#38bdf8" label="From outside super" sub="Drawn from your savings outside super to cover the rest." value={fromOutside} />
                   )}
                 </div>
               </section>
+
+              {fromSuper > 0 && (
+                <section>
+                  <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted">
+                    How the &ldquo;from your super&rdquo; figure is worked out
+                  </h3>
+                  <div className="space-y-1.5 rounded-xl border border-line bg-panel px-3 py-3 text-xs">
+                    <DLine label="Your spending goal" value={spend} />
+                    <DLine label="− Age Pension" value={pension} />
+                    {rent > 0 && <DLine label="− Net rent" value={rent} />}
+                    <div className="border-t border-line pt-1.5">
+                      <DLine label="= Shortfall to fund from savings" value={privateNeed} strong />
+                    </div>
+                    <div className="border-t border-line pt-1.5 text-slate-300">
+                      Minimum drawdown, age {row.age}:{" "}
+                      <strong className="text-white">{(minRate * 100).toFixed(0)}%</strong> ×{" "}
+                      {cur(row.totalSuper)} super = <strong className="text-white">{cur(minDraw)}</strong>
+                      <div className="mt-0.5 text-[11px] text-muted">
+                        A legislated minimum for account-based pensions — the rate steps up with age (4% under 65, rising to 14% at 95+).
+                      </div>
+                    </div>
+                    <div className="border-t border-line pt-1.5 text-slate-300">
+                      You draw the <strong className="text-white">greater</strong> of the shortfall and the
+                      minimum, capped at your balance →{" "}
+                      <strong className="text-accent">{cur(fromSuper)}</strong> from super.
+                    </div>
+                    {minDriven && (
+                      <p className="text-[11px] text-muted">
+                        The minimum is more than you needed, so the surplus{" "}
+                        {cur(fromSuper - privateNeed)} is added back to your outside savings — not spent.
+                      </p>
+                    )}
+                    {capped && (
+                      <p className="text-[11px] font-medium text-amber-400">
+                        Your super couldn&apos;t cover the full shortfall — the rest came from your outside savings.
+                      </p>
+                    )}
+                  </div>
+                  <p className="mt-1.5 text-[11px] text-muted">
+                    Super is accessible and tax-free from age 60 (your preservation age). Before that,
+                    spending is met from savings outside super instead.
+                  </p>
+                </section>
+              )}
 
               <div className="rounded-xl border border-line bg-panel-2 px-4 py-3 text-xs leading-relaxed text-muted">
                 Each year we draw just enough to meet your spending. The means-tested{" "}
