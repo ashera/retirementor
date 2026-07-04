@@ -385,7 +385,7 @@ export default function PlannerApp({
               <input
                 value={saveName}
                 onChange={(e) => setSaveName(e.target.value)}
-                placeholder="Name this plan"
+                placeholder="Name this scenario"
                 className="w-40 rounded-lg border border-line bg-panel-2 px-3 py-1.5 text-sm text-white outline-none focus:border-accent"
               />
               <button
