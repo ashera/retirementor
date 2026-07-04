@@ -15,7 +15,7 @@ import type { EngineConfig } from "../config";
 import { DEFAULT_PLAN, type Household, type RetirementPlan } from "../types";
 
 export const MONEYSMART_URL =
-  "https://moneysmart.gov.au/retirement-income-and-planning/retirement-planner";
+  "https://moneysmart.gov.au/plan-for-your-retirement/retirement-planner";
 
 export interface MsPerson {
   currentAge: number;
