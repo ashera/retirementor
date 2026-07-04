@@ -6,10 +6,11 @@ import type { RetirementPlan, SimResult } from "@/lib/au/types";
 import type { MonteCarloResult } from "@/lib/au/montecarlo";
 import { retirementGoal } from "@/lib/au/goal";
 import { fmtCurrency } from "@/lib/au/format";
-import RetirementChart from "@/components/RetirementChart";
+import RetirementChart, { type SpendingBand } from "@/components/RetirementChart";
 import IncomeChart from "@/components/IncomeChart";
 import FanChart from "@/components/FanChart";
 import ReportExplainers from "@/components/ReportExplainers";
+import { lifestageBreakdown } from "@/lib/au/lifestages";
 
 const money = (n: number) => fmtCurrency(Math.round(n));
 
@@ -89,6 +90,18 @@ export default function ReportView({
   const people = plan.people;
   const mtg = plan.mortgage;
   const prop = plan.investmentProperty;
+
+  const staged = plan.spendingMode === "stages";
+  const stg = plan.spendingStages;
+  const stageColor: Record<string, string> = { "Go-go": "#0d9488", "Slow-go": "#d97706", "No-go": "#7c3aed" };
+  const bands: SpendingBand[] | undefined = staged
+    ? [
+        { x1: plan.retirementAge, x2: stg.slowGoAge, label: "Go-go Years", fill: "#0d9488" },
+        { x1: stg.slowGoAge, x2: stg.noGoAge, label: "Slow-go Years", fill: "#d97706" },
+        { x1: stg.noGoAge, x2: plan.lifeExpectancy, label: "No-go Years", fill: "#7c3aed" },
+      ].filter((b) => b.x2 > b.x1)
+    : undefined;
+  const ls = staged ? lifestageBreakdown(plan, config) : null;
 
   const inputs: { label: string; value: string }[] = [
     { label: "Household", value: plan.household === "couple" ? "Couple" : "Single" },
@@ -177,7 +190,7 @@ export default function ReportView({
         {/* Charts */}
         <Section title="Balance over time">
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-2">
-            <RetirementChart result={result} animate={false} />
+            <RetirementChart result={result} bands={bands} animate={false} />
           </div>
         </Section>
 
@@ -195,6 +208,57 @@ export default function ReportView({
             Median path with the 10th–90th percentile range, across {mc.iterations.toLocaleString()} simulated return sequences.
           </p>
         </Section>
+
+        {/* Retirement lifestages */}
+        {ls && (
+          <Section title="Retirement lifestages">
+            <p className="mb-2 text-xs text-slate-600">
+              Your spending follows the retirement &ldquo;spending smile&rdquo; — essentials stay
+              flat in today&apos;s dollars while discretionary spending (travel, dining, hobbies)
+              tapers with age. Any home-loan cost is added on top while the loan runs.
+            </p>
+            <table className="w-full border-collapse text-right text-xs tabular-nums">
+              <thead className="text-[10px] uppercase tracking-wide text-slate-500">
+                <tr className="border-b border-slate-300">
+                  <th className="py-1 text-left">Stage</th>
+                  <th className="text-left">Ages</th>
+                  <th>Essentials</th>
+                  <th>Discretionary</th>
+                  <th>Home loan</th>
+                  <th>Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ls.rows.map((r) => (
+                  <tr key={r.key} className="border-b border-slate-100">
+                    <td className="py-1 text-left font-medium text-slate-700">
+                      <span
+                        className="mr-1.5 inline-block h-2 w-2 rounded-full align-middle"
+                        style={{ background: stageColor[r.key] }}
+                      />
+                      {r.key} Years
+                    </td>
+                    <td className="text-left text-slate-500">{r.ageFrom}–{r.ageTo}</td>
+                    <td>{money(r.essentials)}</td>
+                    <td>{money(r.discretionary)}</td>
+                    <td>{r.loan > 0 ? money(r.loan) : "—"}</td>
+                    <td className="font-medium">{money(r.total)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p className="mt-2 text-xs text-slate-500">
+              {ls.estimated
+                ? "Essential/discretionary split estimated from the ASFA Retirement Standard — build a budget for your own category amounts."
+                : "Essential/discretionary split from your budget."}
+              {ls.goal.loanKind === "pi" && ls.goal.payoffAge
+                ? ` The home loan clears at age ${ls.goal.payoffAge}.`
+                : ls.goal.loanKind === "io"
+                  ? " The interest-only loan continues for life."
+                  : ""}
+            </p>
+          </Section>
+        )}
 
         {/* How the numbers are calculated */}
         <Section title="How the key numbers are calculated">

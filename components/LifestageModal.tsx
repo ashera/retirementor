@@ -1,58 +1,72 @@
 "use client";
 
+import type { EngineConfig } from "@/lib/au/config";
 import type { RetirementPlan } from "@/lib/au/types";
 import { fmtCurrency } from "@/lib/au/format";
+import { lifestageBreakdown } from "@/lib/au/lifestages";
 
 const ARTICLE =
   "https://www.caresuper.com.au/members/advice-and-resources/education-hub/how-retirement-goes-from-go-go-to-no-go";
 
+const STAGE_META: Record<string, { color: string; blurb: string }> = {
+  "Go-go": {
+    color: "#34d399",
+    blurb: "The active early years — travel, hobbies, dining out and helping family. Discretionary spending is typically at its highest.",
+  },
+  "Slow-go": {
+    color: "#f59e0b",
+    blurb: "You gradually slow down — less big travel and fewer paid activities — so discretionary spending eases while the essentials stay much the same.",
+  },
+  "No-go": {
+    color: "#a78bfa",
+    blurb: "Life is mostly closer to home, so discretionary spending is at its lowest — though health and aged-care costs can climb later on.",
+  },
+};
+
+function Row({
+  label,
+  value,
+  tone = "muted",
+  strong,
+  border,
+}: {
+  label: string;
+  value: number;
+  tone?: "muted" | "slate" | "amber";
+  strong?: boolean;
+  border?: boolean;
+}) {
+  const valueTone = tone === "amber" ? "text-amber-400" : strong ? "text-white" : "text-slate-200";
+  return (
+    <div className={`flex justify-between gap-4 ${border ? "border-t border-line pt-1" : ""}`}>
+      <span className={strong ? "font-semibold text-slate-200" : "text-muted"}>{label}</span>
+      <span className={`tabular-nums ${strong ? "font-semibold " : ""}${valueTone}`}>
+        {fmtCurrency(value)}/yr
+      </span>
+    </div>
+  );
+}
+
 /**
  * Explains the retirement "spending smile" — the go-go / slow-go / no-go
- * lifestages — with this plan's stage ages and amounts. Opened from the
- * lifestage pill on the Retirement income card.
+ * lifestages — breaking each stage into Essentials, Discretionary and any Home
+ * loan. Opened from the lifestage pill on the Retirement income card.
  */
 export default function LifestageModal({
   open,
   onClose,
   plan,
+  config,
 }: {
   open: boolean;
   onClose: () => void;
   plan: RetirementPlan;
+  config: EngineConfig;
 }) {
   if (!open) return null;
-  const s = plan.spendingStages;
   const staged = plan.spendingMode === "stages";
-
-  const stages = [
-    {
-      key: "Go-go",
-      ageFrom: plan.retirementAge,
-      ageTo: s.slowGoAge,
-      amount: s.goGo,
-      color: "#34d399",
-      blurb:
-        "The active early years — travel, hobbies, dining out and helping family. Discretionary spending is typically at its highest.",
-    },
-    {
-      key: "Slow-go",
-      ageFrom: s.slowGoAge,
-      ageTo: s.noGoAge,
-      amount: s.slowGo,
-      color: "#f59e0b",
-      blurb:
-        "You gradually slow down — less big travel and fewer paid activities — so discretionary spending eases while the essentials stay much the same.",
-    },
-    {
-      key: "No-go",
-      ageFrom: s.noGoAge,
-      ageTo: plan.lifeExpectancy,
-      amount: s.noGo,
-      color: "#a78bfa",
-      blurb:
-        "Life is mostly closer to home, so discretionary spending is at its lowest — though health and aged-care costs can climb later on.",
-    },
-  ];
+  const { rows, essentials, estimated, goal } = lifestageBreakdown(plan, config);
+  const stages = rows.map((r) => ({ ...r, ...STAGE_META[r.key] }));
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
@@ -77,9 +91,10 @@ export default function LifestageModal({
           <p>
             Spending in retirement usually isn&apos;t flat — research on real
             retiree budgets shows it follows a{" "}
-            <strong className="text-white">&ldquo;retirement spending smile&rdquo;</strong>. Most
-            people spend more in the active early years and taper off as they age.
-            Planners describe this in three lifestages:
+            <strong className="text-white">&ldquo;retirement spending smile&rdquo;</strong>.{" "}
+            <strong className="text-slate-200">Essentials stay roughly flat</strong>, while{" "}
+            <strong className="text-slate-200">discretionary</strong> spending
+            (travel, dining, hobbies) tapers as you age:
           </p>
 
           <div className="space-y-2">
@@ -89,47 +104,41 @@ export default function LifestageModal({
                   <div className="flex items-center gap-2">
                     <span className="h-2.5 w-2.5 rounded-full" style={{ background: st.color }} aria-hidden />
                     <span className="font-semibold text-white">{st.key} years</span>
-                    <span className="text-xs text-muted">
-                      ages {st.ageFrom}–{st.ageTo}
-                    </span>
+                    <span className="text-xs text-muted">ages {st.ageFrom}–{st.ageTo}</span>
                   </div>
                   {staged && (
-                    <span className="font-semibold tabular-nums text-accent">
-                      {fmtCurrency(st.amount)}/yr
-                    </span>
+                    <span className="font-semibold tabular-nums text-accent">{fmtCurrency(st.total)}/yr</span>
                   )}
                 </div>
-                <p className="mt-1 text-xs text-muted">{st.blurb}</p>
+                {staged && (
+                  <div className="mt-2 space-y-1 text-[11px]">
+                    <Row label="Essentials" value={essentials} />
+                    <Row label="Discretionary" value={st.discretionary} tone="slate" />
+                    {st.loan > 0 && <Row label="Home loan" value={st.loan} tone="amber" />}
+                    <Row label="Total" value={st.total} strong border />
+                  </div>
+                )}
+                <p className="mt-1.5 text-xs text-muted">{st.blurb}</p>
               </div>
             ))}
           </div>
 
           <p className="text-xs text-muted">
-            In this model, <strong className="text-slate-300">essentials stay roughly flat</strong>{" "}
-            while <strong className="text-slate-300">discretionary</strong> spending (travel, dining,
-            hobbies) steps down through the slow-go and no-go years. Health and
-            aged-care costs, which can rise late in life, are not included.
+            {staged
+              ? estimated
+                ? "The essential/discretionary split is estimated from the ASFA Retirement Standard — build a budget to use your own category amounts."
+                : "The essential/discretionary split comes from your budget."
+              : "Your plan currently uses flat spending — switch to staged spending in “Edit plan” or the budget builder to model the smile."}{" "}
+            Essentials are held flat in today&apos;s dollars; discretionary steps down each stage.
+            {goal.loanKind === "cleared" &&
+              " Your home loan is cleared at retirement with a super lump sum, so it isn't an ongoing cost."}
+            {goal.loanKind === "pi" && goal.payoffAge &&
+              ` Your home loan of ${fmtCurrency(goal.loanCost)}/yr is added on top until it clears at age ${goal.payoffAge}.`}
+            {goal.loanKind === "io" &&
+              ` Your interest-only home loan of ${fmtCurrency(goal.loanCost)}/yr is added on top for life.`}
           </p>
 
-          {staged ? (
-            <p className="rounded-lg border border-line bg-panel px-3 py-2 text-xs text-muted">
-              Your Retirement income goal shows the <strong className="text-accent">Go-go</strong>{" "}
-              figure — the first and highest stage.
-            </p>
-          ) : (
-            <p className="rounded-lg border border-accent/30 bg-accent/5 px-3 py-2 text-xs">
-              Your plan currently uses <strong>flat</strong> spending. Switch to
-              staged spending in &ldquo;Edit plan&rdquo; or the budget builder to
-              model the smile.
-            </p>
-          )}
-
-          <a
-            href={ARTICLE}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-block text-xs text-accent hover:underline"
-          >
+          <a href={ARTICLE} target="_blank" rel="noreferrer" className="inline-block text-xs text-accent hover:underline">
             Read more about go-go / slow-go / no-go →
           </a>
         </div>

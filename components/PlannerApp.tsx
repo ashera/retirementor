@@ -855,6 +855,7 @@ export default function PlannerApp({
         open={lifestageOpen}
         onClose={() => setLifestageOpen(false)}
         plan={plan}
+        config={config}
       />
 
       {selectedAge != null &&
