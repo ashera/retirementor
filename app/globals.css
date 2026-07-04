@@ -31,6 +31,26 @@ body {
   }
 }
 
+/* Guided first-run: each newly revealed step slides gently in. */
+@keyframes reveal {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.reveal {
+  animation: reveal 0.45s ease-out both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    animation: none;
+  }
+}
+
 /* Range slider styling */
 input[type="range"] {
   -webkit-appearance: none;

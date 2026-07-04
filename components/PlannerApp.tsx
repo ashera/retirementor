@@ -14,6 +14,7 @@ import Field from "@/components/Field";
 import Logo from "@/components/Logo";
 import Disclosures from "@/components/Disclosures";
 import LifestageModal from "@/components/LifestageModal";
+import GuidedIntro from "@/components/GuidedIntro";
 import {
   AgePensionExplainer,
   LikelihoodExplainer,
@@ -41,6 +42,7 @@ import {
 
 const STORAGE_KEY = "au-retirement-plan";
 const BASELINE_KEY = "au-retirement-baseline";
+const GUIDED_KEY = "au-retirement-guided"; // marks the first-run guide as seen
 
 function LegendDot({ color, label }: { color: string; label: string }) {
   return (
@@ -96,6 +98,8 @@ export default function PlannerApp({
   // update `plan` only, so the chart can show a "vs saved" ghost line.
   const [baseline, setBaseline] = useState<RetirementPlan>(DEFAULT_PLAN);
   const [configured, setConfigured] = useState(false);
+  const [showGuide, setShowGuide] = useState(false);
+  const [ready, setReady] = useState(false); // false until localStorage decides guide vs dashboard
   const [wizardOpen, setWizardOpen] = useState(false);
   const [budgetOpen, setBudgetOpen] = useState(false);
   const [lifestageOpen, setLifestageOpen] = useState(false);
@@ -116,10 +120,14 @@ export default function PlannerApp({
         setPlan(working);
         setBaseline(rawBase ? { ...DEFAULT_PLAN, ...JSON.parse(rawBase) } : working);
         setConfigured(true);
+      } else if (!localStorage.getItem(GUIDED_KEY) && savedPlans.length === 0) {
+        // Genuine first-run: no working plan, no saved scenarios, guide not yet seen.
+        setShowGuide(true);
       }
     } catch {
       /* ignore malformed storage — fall back to defaults */
     }
+    setReady(true);
   }, []);
 
   const result = useMemo(() => simulate(plan, config), [plan, config]);
@@ -156,6 +164,18 @@ export default function PlannerApp({
     } catch {
       /* ignore */
     }
+  };
+
+  // Leaving the first-run guide: adopt its plan and never show the guide again.
+  const handleGuideExit = (next: RetirementPlan, completed: boolean) => {
+    commit(next);
+    if (completed) setConfigured(true);
+    try {
+      localStorage.setItem(GUIDED_KEY, "1");
+    } catch {
+      /* ignore */
+    }
+    setShowGuide(false);
   };
 
   // Quick-adjust: update the working plan only (baseline stays for the ghost line).
@@ -273,6 +293,21 @@ export default function PlannerApp({
   const spendPhrase = isStaged
     ? `staged spending — go-go ${fmtCurrency(stages.goGo)}, slow-go ${fmtCurrency(stages.slowGo)} from ${stages.slowGoAge}, no-go ${fmtCurrency(stages.noGo)} from ${stages.noGoAge} (go-go is ${benchmark})`
     : `${fmtCurrency(plan.targetSpending)} a year — ${benchmark}`;
+
+  // Brief branded splash while we read localStorage, so the dashboard doesn't
+  // flash before the first-run guide takes over.
+  if (!ready) {
+    return (
+      <main className="flex min-h-screen items-center justify-center">
+        <Logo />
+      </main>
+    );
+  }
+
+  // First-run: gently build up the guided experience instead of the full dashboard.
+  if (showGuide) {
+    return <GuidedIntro config={config} user={user} onExit={handleGuideExit} />;
+  }
 
   return (
     <main className="mx-auto max-w-5xl px-5 py-10">
