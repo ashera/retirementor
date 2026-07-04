@@ -11,6 +11,8 @@ import FanChart from "@/components/FanChart";
 import PlanWizard from "@/components/PlanWizard";
 import BudgetBuilder from "@/components/BudgetBuilder";
 import Field from "@/components/Field";
+import Logo from "@/components/Logo";
+import Disclosures from "@/components/Disclosures";
 import {
   AgePensionExplainer,
   LikelihoodExplainer,
@@ -272,8 +274,10 @@ export default function PlannerApp({
 
   return (
     <main className="mx-auto max-w-5xl px-5 py-10">
-      {/* Top auth bar */}
-      <div className="mb-6 flex items-center justify-end gap-3 text-sm">
+      {/* Top bar: brand left, auth right */}
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3 text-sm">
+        <Logo />
+        <div className="flex items-center gap-3">
         {user ? (
           <>
             {user.isAdmin && (
@@ -312,17 +316,12 @@ export default function PlannerApp({
             </Link>
           </>
         )}
+        </div>
       </div>
 
-      <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
+      <header className="mb-2 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 text-accent">
-            <span className="text-2xl">🦘</span>
-            <span className="text-sm font-semibold uppercase tracking-widest">
-              Australian Retirement Planner
-            </span>
-          </div>
-          <h1 className="mt-2 text-3xl font-bold text-white sm:text-4xl">
+          <h1 className="text-3xl font-bold text-white sm:text-4xl">
             Will your super and the Age Pension last?
           </h1>
           <p className="mt-2 max-w-2xl text-muted">
@@ -337,6 +336,9 @@ export default function PlannerApp({
           {configured ? "Edit plan" : "Get started"}
         </button>
       </header>
+
+      <Disclosures config={config} />
+      <div className="mb-6" />
 
       {/* Saved plans bar */}
       <div className="mb-6 rounded-2xl border border-line bg-panel px-5 py-4">
