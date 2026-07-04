@@ -30,12 +30,17 @@ export function essentialsFloor(
     if (isEssential(c.key)) ess += v;
   }
   const frac = tot > 0 ? ess / tot : 0.75;
-  const floor = Math.min(plan.spendingStages.goGo * frac, plan.spendingStages.noGo);
+  // Reference the plan's actual top-of-retirement spend, and clamp the floor to
+  // the smallest stage (flat plans have a single amount) so discretionary ≥ 0.
+  const staged = plan.spendingMode === "stages";
+  const top = staged ? plan.spendingStages.goGo : plan.targetSpending;
+  const bottom = staged ? plan.spendingStages.noGo : plan.targetSpending;
+  const floor = Math.min(top * frac, bottom);
   return { value: round100(floor), estimated: true };
 }
 
 export interface LifestageRow {
-  key: "Go-go" | "Slow-go" | "No-go";
+  key: "Go-go" | "Slow-go" | "No-go" | "Retirement";
   ageFrom: number;
   ageTo: number;
   living: number; // essentials + discretionary
@@ -49,12 +54,18 @@ export interface LifestageBreakdown {
   rows: LifestageRow[];
   essentials: number;
   estimated: boolean; // true when the essentials split is an ASFA estimate (no budget)
+  staged: boolean; // true = go-go/slow-go/no-go stages; false = flat spending (one row)
   goal: GoalBreakdown;
 }
 
-/** Per-stage Essentials / Discretionary / Home-loan / Total for a plan. */
+/**
+ * Per-stage Essentials / Discretionary / Home-loan / Total for a plan. Staged
+ * plans return the three lifestages; flat plans return a single "Retirement" row
+ * for the whole retirement (spending is constant).
+ */
 export function lifestageBreakdown(plan: RetirementPlan, config: EngineConfig): LifestageBreakdown {
   const s = plan.spendingStages;
+  const staged = plan.spendingMode === "stages";
   const { value: essentials, estimated } = essentialsFloor(plan, config);
   const goal = retirementGoal(plan);
 
@@ -64,11 +75,13 @@ export function lifestageBreakdown(plan: RetirementPlan, config: EngineConfig): 
     return false;
   };
 
-  const defs: Omit<LifestageRow, "essentials" | "discretionary" | "loan" | "total">[] = [
-    { key: "Go-go", ageFrom: plan.retirementAge, ageTo: s.slowGoAge, living: s.goGo },
-    { key: "Slow-go", ageFrom: s.slowGoAge, ageTo: s.noGoAge, living: s.slowGo },
-    { key: "No-go", ageFrom: s.noGoAge, ageTo: plan.lifeExpectancy, living: s.noGo },
-  ];
+  const defs: Omit<LifestageRow, "essentials" | "discretionary" | "loan" | "total">[] = staged
+    ? [
+        { key: "Go-go", ageFrom: plan.retirementAge, ageTo: s.slowGoAge, living: s.goGo },
+        { key: "Slow-go", ageFrom: s.slowGoAge, ageTo: s.noGoAge, living: s.slowGo },
+        { key: "No-go", ageFrom: s.noGoAge, ageTo: plan.lifeExpectancy, living: s.noGo },
+      ]
+    : [{ key: "Retirement", ageFrom: plan.retirementAge, ageTo: plan.lifeExpectancy, living: plan.targetSpending }];
 
   const rows: LifestageRow[] = defs.map((d) => {
     const discretionary = Math.max(0, d.living - essentials);
@@ -76,5 +89,5 @@ export function lifestageBreakdown(plan: RetirementPlan, config: EngineConfig): 
     return { ...d, essentials, discretionary, loan, total: d.living + loan };
   });
 
-  return { rows, essentials, estimated, goal };
+  return { rows, essentials, estimated, staged, goal };
 }

@@ -335,7 +335,7 @@ export default function PlannerApp({
           onClick={() => setWizardOpen(true)}
           className="rounded-lg border border-accent/40 bg-accent/10 px-4 py-2 text-sm font-semibold text-accent transition hover:bg-accent/20"
         >
-          {configured ? "Edit plan" : "Get started"}
+          {configured ? "Edit scenario" : "Get started"}
         </button>
       </header>
 
@@ -347,7 +347,7 @@ export default function PlannerApp({
         {user ? (
           <div className="flex flex-wrap items-center gap-3">
             <span className="text-xs font-semibold uppercase tracking-wide text-muted">
-              Saved plans
+              Saved scenarios
             </span>
             {savedPlans.length === 0 && (
               <span className="text-sm text-muted">None yet — save one →</span>

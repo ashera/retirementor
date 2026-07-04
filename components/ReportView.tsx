@@ -16,8 +16,8 @@ const money = (n: number) => fmtCurrency(Math.round(n));
 
 function BrandMark() {
   return (
-    <div className="flex items-center gap-2.5">
-      <svg viewBox="0 0 64 48" className="h-9 w-auto" aria-hidden>
+    <div className="flex items-center gap-3">
+      <svg viewBox="0 0 64 48" className="h-14 w-auto" aria-hidden>
         <defs>
           <linearGradient id="rep-bridge" x1="0" y1="1" x2="1" y2="0">
             <stop offset="0" stopColor="#0d9488" />
@@ -36,11 +36,11 @@ function BrandMark() {
         />
       </svg>
       <div className="leading-none">
-        <div className="text-lg font-extrabold tracking-tight">
+        <div className="text-3xl font-extrabold tracking-tight">
           <span className="text-teal-600">Retire</span>
           <span className="text-slate-900">Mentor</span>
         </div>
-        <div className="mt-1 text-[8px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+        <div className="mt-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
           Australian Retirement Planner
         </div>
       </div>
@@ -106,7 +106,7 @@ export default function ReportView({
 
   const staged = plan.spendingMode === "stages";
   const stg = plan.spendingStages;
-  const stageColor: Record<string, string> = { "Go-go": "#0d9488", "Slow-go": "#d97706", "No-go": "#7c3aed" };
+  const stageColor: Record<string, string> = { "Go-go": "#0d9488", "Slow-go": "#d97706", "No-go": "#7c3aed", Retirement: "#0d9488" };
   const bands: SpendingBand[] | undefined = staged
     ? [
         { x1: plan.retirementAge, x2: stg.slowGoAge, label: "Go-go Years", fill: "#0d9488" },
@@ -114,7 +114,7 @@ export default function ReportView({
         { x1: stg.noGoAge, x2: plan.lifeExpectancy, label: "No-go Years", fill: "#7c3aed" },
       ].filter((b) => b.x2 > b.x1)
     : undefined;
-  const ls = staged ? lifestageBreakdown(plan, config) : null;
+  const ls = lifestageBreakdown(plan, config);
 
   const inputs: { label: string; value: string }[] = [
     { label: "Household", value: plan.household === "couple" ? "Couple" : "Single" },
@@ -176,7 +176,7 @@ export default function ReportView({
           <BrandMark />
           <div className="text-right text-xs text-slate-500">
             <div className="text-base font-bold text-slate-900">Retirement Plan Report</div>
-            <div className="mt-0.5 font-medium text-slate-700">{name}</div>
+            <div className="mt-0.5 font-medium text-slate-700">What-If Scenario: {name}</div>
             <div>Generated {generatedAt}</div>
             <div>All figures in today&apos;s dollars · FY{config.financialYear} rules</div>
           </div>
@@ -234,7 +234,7 @@ export default function ReportView({
               : ` A “Depletes” marker shows the age your savings run out (${result.depletedAge}).`}
           </Lead>
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-2">
-            <RetirementChart result={result} bands={bands} animate={false} height={225} />
+            <RetirementChart result={result} bands={bands} animate={false} height={200} />
           </div>
         </Section>
 
@@ -255,18 +255,29 @@ export default function ReportView({
             </div>
           </Section>
 
-          {ls && (
-            <Section title="Retirement lifestages">
+          {ls.rows.length > 0 && (
+            <Section title={ls.staged ? "Retirement lifestages" : "Retirement spending"}>
               <Lead>
-                Your spending follows the retirement “spending smile” — essentials
-                stay flat in today&apos;s dollars while discretionary spending
-                (travel, dining, hobbies) tapers with age. Any home-loan cost is
-                added on top while the loan runs.
+                {ls.staged ? (
+                  <>
+                    Your spending follows the retirement “spending smile” —
+                    essentials stay flat in today&apos;s dollars while discretionary
+                    spending (travel, dining, hobbies) tapers with age. Any
+                    home-loan cost is added on top while the loan runs.
+                  </>
+                ) : (
+                  <>
+                    Your plan uses a flat retirement income. Here&apos;s how it
+                    breaks down into essentials, discretionary spending and any
+                    home-loan cost. (Switch to staged spending in the planner to
+                    model the go-go / slow-go / no-go “spending smile”.)
+                  </>
+                )}
               </Lead>
               <table className="w-full border-collapse text-right text-xs tabular-nums">
                 <thead className="text-[10px] uppercase tracking-wide text-slate-500">
                   <tr className="border-b border-slate-300">
-                    <th className="py-1 text-left">Stage</th>
+                    <th className="py-1 text-left">{ls.staged ? "Stage" : "Period"}</th>
                     <th className="text-left">Ages</th>
                     <th>Essentials</th>
                     <th>Discretionary</th>
@@ -282,7 +293,7 @@ export default function ReportView({
                           className="mr-1.5 inline-block h-2 w-2 rounded-full align-middle"
                           style={{ background: stageColor[r.key] }}
                         />
-                        {r.key} Years
+                        {r.key === "Retirement" ? "All retirement" : `${r.key} Years`}
                       </td>
                       <td className="text-left text-slate-500">{r.ageFrom}–{r.ageTo}</td>
                       <td>{money(r.essentials)}</td>

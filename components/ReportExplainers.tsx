@@ -130,16 +130,16 @@ function GoalDonut({
     { name: "Discretionary", value: discretionary, color: "#db2777" },
   ];
   return (
-    <div className="mt-2 flex items-center gap-4 rounded-lg border border-slate-200 bg-white p-2">
-      <div className="relative h-[76px] w-[76px] shrink-0">
-        <PieChart width={76} height={76}>
+    <div className="mt-2 flex items-center gap-3 rounded-lg border border-slate-200 bg-white p-2.5">
+      <div className="relative h-[96px] w-[96px] shrink-0">
+        <PieChart width={96} height={96} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
           <Pie
             data={pie}
             dataKey="value"
-            cx={36}
-            cy={36}
-            innerRadius={25}
-            outerRadius={37}
+            cx={48}
+            cy={48}
+            innerRadius={31}
+            outerRadius={44}
             startAngle={90}
             endAngle={-270}
             stroke="none"
@@ -151,18 +151,17 @@ function GoalDonut({
           </Pie>
         </PieChart>
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-          <div className="text-sm font-bold tabular-nums text-slate-800">{discPct}%</div>
-          <div className="text-[8px] text-slate-500">flex</div>
+          <div className="text-base font-bold tabular-nums text-slate-800">{discPct}%</div>
+          <div className="text-[9px] text-slate-500">flex</div>
         </div>
       </div>
-      <div className="flex-1 space-y-1 text-xs">
+      <div className="min-w-0 flex-1 space-y-1 text-xs">
         <GoalLegendRow color="#0d9488" label="Essentials" value={essentials} />
         {loanCost > 0 && <GoalLegendRow color="#f59e0b" label="Home loan" value={loanCost} />}
-        <GoalLegendRow color="#db2777" label="Discretionary (Your Flex)" value={discretionary} />
-        <p className="text-[11px] text-slate-500">
-          Your &ldquo;needs&rdquo; floor{loanCost > 0 ? " (essentials + home loan)" : ""} is{" "}
-          {money(essentials + loanCost)}/yr — the rest is where you can flex.
-          {estimated ? " Split estimated from ASFA." : ""}
+        <GoalLegendRow color="#db2777" label="Discretionary (flex)" value={discretionary} />
+        <p className="text-[11px] leading-snug text-slate-500">
+          Needs floor{loanCost > 0 ? " (essentials + loan)" : ""} {money(essentials + loanCost)}/yr;
+          the rest is your flex.{estimated ? " Split estimated from ASFA." : ""}
         </p>
       </div>
     </div>
