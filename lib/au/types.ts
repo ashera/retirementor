@@ -176,6 +176,7 @@ export interface YearBreakdown {
   // Retirement income
   agePension: number;
   rentIncome: number; // net cash rent from an investment property
+  minDrawdown: number; // legislated minimum super drawdown this year (per-person, summed)
   // Retirement spending
   livingSpend: number;
   mortgageCost: number;

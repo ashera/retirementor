@@ -87,12 +87,15 @@ export default function IncomeYearModal({
   const binding = assetsTest <= incomeTest ? "assets" : "income";
   const belowPensionAge = row.age < config.agePensionAge;
 
-  // Why is the super draw this amount? Re-derive the drawdown rule for this year.
+  // Why is the super draw this amount? Uses the engine's actual minimum (summed
+  // per person — a couple with an age gap has different rates each).
+  const couple = plan.people.length > 1;
   const privateNeed = Math.max(0, spend - pension - rent);
   const minRate = minDrawdownRate(row.age, config);
-  const minDraw = minRate * row.totalSuper; // accessible super ≈ opening balance
-  const minDriven = fromSuper > privateNeed + 1 && minDraw > privateNeed + 1;
-  const capped = fromSuper > 1 && fromSuper < privateNeed - 1;
+  const minDraw = row.breakdown.minDrawdown;
+  const target = Math.max(privateNeed, minDraw);
+  const capped = fromSuper > 1 && fromSuper < target - 1; // hit the accessible-super ceiling
+  const minDriven = minDraw > privateNeed + 1 && !capped; // minimum exceeds need → surplus saved
 
   let pensionReason: string;
   if (belowPensionAge) pensionReason = `Not yet — the Age Pension starts at ${config.agePensionAge}.`;
@@ -166,11 +169,17 @@ export default function IncomeYearModal({
                       <DLine label="= Shortfall to fund from savings" value={privateNeed} strong />
                     </div>
                     <div className="border-t border-line pt-1.5 text-slate-300">
-                      Minimum drawdown, age {row.age}:{" "}
-                      <strong className="text-white">{(minRate * 100).toFixed(0)}%</strong> ×{" "}
-                      {cur(row.totalSuper)} super = <strong className="text-white">{cur(minDraw)}</strong>
+                      {couple ? (
+                        <>Minimum drawdown for your ages: <strong className="text-white">{cur(minDraw)}</strong></>
+                      ) : (
+                        <>
+                          Minimum drawdown, age {row.age}:{" "}
+                          <strong className="text-white">{(minRate * 100).toFixed(0)}%</strong> ×{" "}
+                          {cur(row.totalSuper)} super = <strong className="text-white">{cur(minDraw)}</strong>
+                        </>
+                      )}
                       <div className="mt-0.5 text-[11px] text-muted">
-                        A legislated minimum for account-based pensions — the rate steps up with age (4% under 65, rising to 14% at 95+).
+                        A legislated minimum for account-based pensions{couple ? ", set per person" : ""} — the rate steps up with age (4% under 65, rising to 14% at 95+).
                       </div>
                     </div>
                     <div className="border-t border-line pt-1.5 text-slate-300">
