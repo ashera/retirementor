@@ -16,7 +16,7 @@ export default function RootLayout({
     <html lang="en">
       <body className="flex min-h-screen flex-col antialiased">
         <div className="flex-1">{children}</div>
-        <footer className="border-t border-line px-5 py-6 text-center text-xs text-muted">
+        <footer className="border-t border-line px-5 py-6 text-center text-xs text-muted print:hidden">
           <p className="mx-auto max-w-3xl">
             <strong className="text-slate-300">RetireMentor</strong> is a
             superannuation forecast tool provided under ASIC Corporations

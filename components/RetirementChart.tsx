@@ -71,12 +71,14 @@ export default function RetirementChart({
   baseline,
   onSelectYear,
   selectedAge,
+  animate = true,
 }: {
   result: SimResult;
   bands?: SpendingBand[];
   baseline?: SimResult | null;
   onSelectYear?: (age: number) => void;
   selectedAge?: number | null;
+  animate?: boolean;
 }) {
   const { retirementAge, depletedAge } = result;
 
@@ -192,6 +194,7 @@ export default function RetirementChart({
           strokeWidth={2}
           fill="url(#superFill)"
           name="Super"
+          isAnimationActive={animate}
         />
         <Area
           type="monotone"
@@ -201,6 +204,7 @@ export default function RetirementChart({
           strokeWidth={2}
           fill="url(#outsideFill)"
           name="Outside super"
+          isAnimationActive={animate}
         />
         {baseline && (
           <Area

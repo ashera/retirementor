@@ -361,6 +361,14 @@ export default function PlannerApp({
                 >
                   {sp.name}
                 </button>
+                <Link
+                  href={`/report/${sp.id}`}
+                  target="_blank"
+                  title={`Open a printable PDF report for ${sp.name}`}
+                  className="rounded px-1 text-muted hover:text-accent"
+                >
+                  ↗ Report
+                </Link>
                 <button
                   onClick={() => handleDelete(sp)}
                   aria-label={`Delete ${sp.name}`}

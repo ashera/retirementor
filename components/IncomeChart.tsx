@@ -48,7 +48,13 @@ function IncomeTooltip({
   );
 }
 
-export default function IncomeChart({ result }: { result: SimResult }) {
+export default function IncomeChart({
+  result,
+  animate = true,
+}: {
+  result: SimResult;
+  animate?: boolean;
+}) {
   // Show the full timeline (income is $0 through the accumulation years) so this
   // chart's x-axis lines up with the balance chart above it.
   const rows = result.rows;
@@ -100,6 +106,7 @@ export default function IncomeChart({ result }: { result: SimResult }) {
           fill="#a78bfa"
           fillOpacity={0.35}
           name="Age Pension"
+          isAnimationActive={animate}
         />
         <Area
           type="stepAfter"
@@ -109,6 +116,7 @@ export default function IncomeChart({ result }: { result: SimResult }) {
           fill="#34d399"
           fillOpacity={0.35}
           name="Super"
+          isAnimationActive={animate}
         />
         <Area
           type="stepAfter"
@@ -118,6 +126,7 @@ export default function IncomeChart({ result }: { result: SimResult }) {
           fill="#38bdf8"
           fillOpacity={0.35}
           name="Outside super"
+          isAnimationActive={animate}
         />
         <Area
           type="stepAfter"
@@ -127,6 +136,7 @@ export default function IncomeChart({ result }: { result: SimResult }) {
           fill="#fb923c"
           fillOpacity={0.35}
           name="Net rent"
+          isAnimationActive={animate}
         />
       </AreaChart>
     </ResponsiveContainer>
