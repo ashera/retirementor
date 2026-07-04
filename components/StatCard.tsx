@@ -18,6 +18,7 @@ interface StatCardProps {
   tag?: string; // small pill next to the value (e.g. the spending stage)
   tagTone?: TagTone; // colour of the pill (default accent/green)
   tagHref?: string; // if set, the pill becomes a link (e.g. "#likelihood") with a scroll cue
+  tagOnClick?: () => void; // if set, the pill becomes a button (e.g. opens a modal)
   tagTitle?: string; // hover tooltip for the linked pill
   explainer?: ReactNode; // optional help affordance shown top-right
   action?: ReactNode; // optional action shown under the value (e.g. a builder entry)
@@ -33,6 +34,7 @@ export default function StatCard({
   tag,
   tagTone = "accent",
   tagHref,
+  tagOnClick,
   tagTitle,
   explainer,
   action,
@@ -75,6 +77,16 @@ export default function StatCard({
                 ↓
               </span>
             </a>
+          ) : tagOnClick ? (
+            <button
+              type="button"
+              onClick={tagOnClick}
+              title={tagTitle ?? "Learn more"}
+              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide transition hover:brightness-125 ${TONE_CLASS[tagTone]}`}
+            >
+              {tag}
+              <span aria-hidden className="opacity-70">ⓘ</span>
+            </button>
           ) : (
             <span
               className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${TONE_CLASS[tagTone]}`}

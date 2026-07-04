@@ -13,6 +13,7 @@ import BudgetBuilder from "@/components/BudgetBuilder";
 import Field from "@/components/Field";
 import Logo from "@/components/Logo";
 import Disclosures from "@/components/Disclosures";
+import LifestageModal from "@/components/LifestageModal";
 import {
   AgePensionExplainer,
   LikelihoodExplainer,
@@ -97,6 +98,7 @@ export default function PlannerApp({
   const [configured, setConfigured] = useState(false);
   const [wizardOpen, setWizardOpen] = useState(false);
   const [budgetOpen, setBudgetOpen] = useState(false);
+  const [lifestageOpen, setLifestageOpen] = useState(false);
   const [selectedAge, setSelectedAge] = useState<number | null>(null);
   const [saveName, setSaveName] = useState("");
   const [pending, startTransition] = useTransition();
@@ -262,9 +264,9 @@ export default function PlannerApp({
 
   const stageBands = isStaged
     ? [
-        { x1: plan.retirementAge, x2: stages.slowGoAge, label: "Go-go", fill: "#34d399" },
-        { x1: stages.slowGoAge, x2: stages.noGoAge, label: "Slow-go", fill: "#f59e0b" },
-        { x1: stages.noGoAge, x2: plan.lifeExpectancy, label: "No-go", fill: "#a78bfa" },
+        { x1: plan.retirementAge, x2: stages.slowGoAge, label: "Go-go Years", fill: "#34d399" },
+        { x1: stages.slowGoAge, x2: stages.noGoAge, label: "Slow-go Years", fill: "#f59e0b" },
+        { x1: stages.noGoAge, x2: plan.lifeExpectancy, label: "No-go Years", fill: "#a78bfa" },
       ].filter((b) => b.x2 > b.x1)
     : undefined;
 
@@ -425,7 +427,9 @@ export default function PlannerApp({
           label="Retirement income goal"
           value={fmtCurrency(goal.total)}
           unit="/yr"
-          tag={goal.loanKind === "none" && isStaged ? "Go-go" : undefined}
+          tag={isStaged ? "Go-go" : undefined}
+          tagOnClick={() => setLifestageOpen(true)}
+          tagTitle="What do go-go, slow-go and no-go mean?"
           sub={goalSub}
           subTone={goal.loanKind !== "none" ? "amber" : "muted"}
           explainer={
@@ -846,6 +850,12 @@ export default function PlannerApp({
           onClose={() => setBudgetOpen(false)}
         />
       )}
+
+      <LifestageModal
+        open={lifestageOpen}
+        onClose={() => setLifestageOpen(false)}
+        plan={plan}
+      />
 
       {selectedAge != null &&
         (() => {
