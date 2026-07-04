@@ -627,6 +627,47 @@ export default function PlanWizard({
           max={105}
           suffix="yrs"
         />
+        {(() => {
+          const fees = draft.fees ?? config.fees;
+          const setFee = (patchFee: Partial<typeof fees>) => patch({ fees: { ...fees, ...patchFee } });
+          return (
+            <div className="space-y-4 rounded-xl border border-line bg-panel-2 p-4">
+              <div className="text-xs font-semibold uppercase tracking-wide text-muted">
+                Super fees (advanced)
+              </div>
+              <Field
+                label="Admin + investment fee"
+                value={fees.adminInvestmentPct}
+                onChange={(v) => setFee({ adminInvestmentPct: v })}
+                min={0}
+                max={3}
+                step={0.05}
+                suffix="%"
+                hint="Combined percentage fee, deducted from your super each year (Moneysmart-style default 0.85%)."
+              />
+              <Field
+                label="Fixed admin fee"
+                value={fees.fixedAdminAnnual}
+                onChange={(v) => setFee({ fixedAdminAnnual: v })}
+                min={0}
+                max={1000}
+                step={1}
+                prefix="$"
+                hint="Fixed dollar member fee per account, per year."
+              />
+              <Field
+                label="Insurance premium"
+                value={fees.insuranceAnnual}
+                onChange={(v) => setFee({ insuranceAnnual: v })}
+                min={0}
+                max={5000}
+                step={10}
+                prefix="$"
+                hint="Default insurance premium deducted while working. Leave at $0 if none."
+              />
+            </div>
+          );
+        })()}
       </div>
     ),
   };

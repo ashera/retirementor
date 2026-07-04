@@ -55,6 +55,17 @@ export interface AgePensionSide {
   assetsFreeArea: { homeowner: number; nonHomeowner: number };
 }
 
+/**
+ * Super fees & premiums, deducted per member account each year (like Moneysmart).
+ * The percentage reduces the investment return; the fixed and insurance amounts
+ * are dollar deductions (insurance only while working).
+ */
+export interface SuperFees {
+  adminInvestmentPct: number; // combined admin + investment fee, % of balance p.a.
+  fixedAdminAnnual: number; // fixed $ member fee per account per year
+  insuranceAnnual: number; // default insurance premium per account per year (accumulation only)
+}
+
 export interface EngineConfig {
   financialYear: string;
 
@@ -76,6 +87,9 @@ export interface EngineConfig {
   // inflation + this rise-in-community-living-standards component; retirement
   // amounts are deflated by CPI alone. Default 1.2% (CPI 2.5% ⇒ wage 3.7%).
   livingStandardsGrowthPct: number;
+
+  // Super fees & premiums (Moneysmart-style), deducted per account each year
+  fees: SuperFees;
 
   // Minimum account-based pension drawdown, by age band
   minDrawdownBands: MinDrawdownBand[];
@@ -128,6 +142,15 @@ export const DEFAULT_CONFIG: EngineConfig = {
   // ASIC RG 276 default: 1.2% rise in living standards above CPI (CPI 2.5% ⇒
   // pre-retirement wage inflation of 3.7%).
   livingStandardsGrowthPct: 1.2,
+
+  // Super fees — indicative Moneysmart-style defaults; tune to the current
+  // Moneysmart figures (APRA-based, updated quarterly). Insurance defaults off
+  // as it's highly individual.
+  fees: {
+    adminInvestmentPct: 0.85,
+    fixedAdminAnnual: 74,
+    insuranceAnnual: 0,
+  },
 
   minDrawdownBands: [
     { minAge: 0, rate: 0.04 },

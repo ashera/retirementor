@@ -120,10 +120,10 @@ describe(`Stress matrix — ${PLANS.length} plans, universal invariants`, () => 
         const b = row.breakdown;
         if (!near(row.total, row.totalSuper + row.outside)) fails.push(`${name} @${row.age}: total≠super+outside`);
         if (row.phase === "accumulation") {
-          if (!near(b.openingSuper + b.contribNet + b.superGrowth, b.closingSuper)) fails.push(`${name} @${row.age}: accum super`);
+          if (!near(b.openingSuper + b.contribNet - b.fees + b.superGrowth, b.closingSuper)) fails.push(`${name} @${row.age}: accum super`);
           if (!near(b.openingOutside + b.savings + b.outsideGrowth, b.closingOutside)) fails.push(`${name} @${row.age}: accum outside`);
         } else {
-          if (!near(b.openingSuper - b.mortgageCleared - row.superDrawn + b.superGrowth, b.closingSuper)) fails.push(`${name} @${row.age}: ret super`);
+          if (!near(b.openingSuper - b.mortgageCleared - row.superDrawn - b.fees + b.superGrowth, b.closingSuper)) fails.push(`${name} @${row.age}: ret super`);
         }
       }
       for (let i = 0; i < r.rows.length - 1; i++) {
@@ -160,7 +160,7 @@ describe(`Stress matrix — ${PLANS.length} plans, universal invariants`, () => 
         const openingTotal = b.openingSuper + b.openingOutside;
         const closingTotal = b.closingSuper + b.closingOutside;
         const growth = b.superGrowth + b.outsideGrowth;
-        const netDrawdown = openingTotal + growth + b.propertyProceeds - b.mortgageCleared - closingTotal;
+        const netDrawdown = openingTotal + growth + b.propertyProceeds - b.mortgageCleared - b.fees - closingTotal;
         if (!near(b.agePension + b.rentIncome + netDrawdown, row.spending, 2)) {
           fails.push(`${name} @${row.age}: pension ${b.agePension.toFixed(0)} + rent ${b.rentIncome.toFixed(0)} + draw ${netDrawdown.toFixed(0)} ≠ spend ${row.spending.toFixed(0)}`);
         }
@@ -181,7 +181,7 @@ describe(`Stress matrix — ${PLANS.length} plans, universal invariants`, () => 
       let expSuper = 0;
       plan.people.forEach((p, i) => {
         const c = ref.netAnnualContribution(p.salary, cfg.sgRate, p.voluntaryConcessional, cfg.concessionalCap, cfg.contributionsTax, p.voluntaryNonConcessional, cfg.nonConcessionalCap);
-        expSuper += ref.superBalanceAt(opening[i], c, plan.investmentReturn, wageInfl, cfg.superEarningsTaxAccumulation, n);
+        expSuper += ref.superBalanceAt(opening[i], c, plan.investmentReturn, wageInfl, cfg.superEarningsTaxAccumulation, n, cfg.fees.adminInvestmentPct, cfg.fees.fixedAdminAnnual + cfg.fees.insuranceAnnual);
       });
       const expOutside = ref.outsideBalanceAt(plan.outsideSuper, plan.annualOutsideSavings, plan.investmentReturn, wageInfl, n);
       if (!near(r.superAtRetirement, expSuper, 1)) fails.push(`${name}: super ${r.superAtRetirement.toFixed(0)} vs ref ${expSuper.toFixed(0)}`);

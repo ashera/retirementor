@@ -37,7 +37,7 @@ describe("Year breakdown ledger", () => {
     const accum = r.rows.filter((x) => x.phase === "accumulation");
     expect(accum.length).toBeGreaterThan(0);
     for (const { breakdown: b } of accum) {
-      expect(near(b.openingSuper + b.contribNet + b.superGrowth, b.closingSuper)).toBe(true);
+      expect(near(b.openingSuper + b.contribNet - b.fees + b.superGrowth, b.closingSuper)).toBe(true);
       expect(near(b.openingOutside + b.savings + b.outsideGrowth, b.closingOutside)).toBe(true);
     }
   });
@@ -47,7 +47,7 @@ describe("Year breakdown ledger", () => {
     const ret = r.rows.filter((x) => x.phase !== "accumulation");
     for (const row of ret) {
       const b = row.breakdown;
-      expect(near(b.openingSuper - b.mortgageCleared - row.superDrawn + b.superGrowth, b.closingSuper)).toBe(true);
+      expect(near(b.openingSuper - b.mortgageCleared - row.superDrawn - b.fees + b.superGrowth, b.closingSuper)).toBe(true);
     }
   });
 
@@ -59,7 +59,7 @@ describe("Year breakdown ledger", () => {
       const closingTotal = b.closingSuper + b.closingOutside;
       const growth = b.superGrowth + b.outsideGrowth;
       // Net money pulled from savings to fund spending (negative = surplus saved).
-      const netDrawdown = openingTotal + growth + b.propertyProceeds - b.mortgageCleared - closingTotal;
+      const netDrawdown = openingTotal + growth + b.propertyProceeds - b.mortgageCleared - b.fees - closingTotal;
       expect(near(b.agePension + b.rentIncome + netDrawdown, row.spending, 2)).toBe(true);
     }
   });

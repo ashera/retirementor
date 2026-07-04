@@ -1,5 +1,7 @@
 // Domain types for the Australian retirement planner.
 
+import type { SuperFees } from "./config";
+
 export type Household = "single" | "couple";
 
 export interface Person {
@@ -109,6 +111,7 @@ export interface RetirementPlan {
   returnVolatility: number; // annual return standard deviation, percent (for Monte Carlo)
   inflation: number; // annual inflation, percent
   lifeExpectancy: number; // simulate until the oldest person reaches this age
+  fees?: SuperFees; // optional per-plan fee override (else the config default applies)
   budget?: RetirementBudget; // optional guided budget that produced targetSpending
   mortgage?: MortgageDetail; // optional home loan carried into retirement
   investmentProperty?: PropertyDetail; // optional income-producing property
@@ -177,9 +180,11 @@ export interface YearBreakdown {
   contribTax: number; // 15% contributions tax withheld
   contribNet: number; // net amount added to super (concessional net + non-concessional)
   savings: number; // added to outside-super this year
-  // Investment growth (super growth is net of any accumulation earnings tax)
+  // Investment growth (super growth is net of accumulation earnings tax AND the
+  // % investment/admin fee; the fixed $ fees + insurance are the `fees` line)
   superGrowth: number;
   outsideGrowth: number;
+  fees: number; // fixed admin + insurance $ deducted from super this year
   earningsTax: number; // approx 15% super earnings tax (accumulation only)
   // Retirement income
   agePension: number;

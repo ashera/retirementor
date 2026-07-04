@@ -138,10 +138,9 @@ export default function Disclosures({ config }: { config: EngineConfig }) {
             </h3>
             <ul className="mt-2 space-y-1.5 text-slate-300">
               <li>
-                <strong>Super fees not modelled</strong> — administration and
-                investment fees are excluded, so balances may be{" "}
-                <em>overstated</em> (typically ~0.5–1% of the balance a year in
-                practice).
+                <strong>Super fees</strong> — a default admin + investment fee,
+                fixed member fee and (if set) insurance premium are deducted each
+                year. Real fees vary by fund; check yours and adjust.
               </li>
               <li>
                 <strong>Division 293 not modelled</strong> — the extra 15% tax

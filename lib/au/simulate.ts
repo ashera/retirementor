@@ -46,6 +46,13 @@ export function simulate(
   // standards); from retirement onward via CPI alone.
   const cpi = plan.inflation;
   const wageInflation = plan.inflation + (config.livingStandardsGrowthPct ?? 0);
+
+  // Super fees (per-plan override, else the config default). The % fee reduces
+  // the investment return; the fixed admin and insurance amounts are $ deductions.
+  const fees = plan.fees ?? config.fees;
+  const feePct = fees?.adminInvestmentPct ?? 0;
+  const fixedAdmin = fees?.fixedAdminAnnual ?? 0;
+  const insurance = fees?.insuranceAnnual ?? 0;
   const meanRealReturn = realRate(plan.investmentReturn, cpi);
 
   const balances = startingSuperBalances(plan);
@@ -83,12 +90,11 @@ export function simulate(
     const nom = nominalReturns ? (nominalReturns[t] ?? plan.investmentReturn) : plan.investmentReturn;
     // Deflate by wage inflation while working (pre-retirement), CPI once retired.
     const deflator = working ? wageInflation : cpi;
-    const realReturn = realRate(nom, deflator);
-    // Super in accumulation pays 15% earnings tax; approximate by taxing the return.
-    const superAccumReturn = realRate(
-      nom * (1 - config.superEarningsTaxAccumulation),
-      deflator,
-    );
+    const realReturn = realRate(nom, deflator); // outside super (no super fee)
+    // Super returns are net of the % investment/admin fee. Accumulation also pays
+    // 15% earnings tax; pension-phase super is tax-free.
+    const superAccumReturn = realRate(nom * (1 - config.superEarningsTaxAccumulation) - feePct, deflator);
+    const superPensionReturn = realRate(nom - feePct, deflator);
 
     // Balances at the START of this year (on the birthday) — this is what each
     // data point plots, so the peak lands on the retirement age, not the year before.
@@ -102,6 +108,7 @@ export function simulate(
       let contribNet = 0;
       let superGrowth = 0;
       let earningsTax = 0;
+      let feesPaid = 0;
       plan.people.forEach((p, i) => {
         const concessional = Math.min(
           p.salary * config.sgRate + p.voluntaryConcessional,
@@ -110,13 +117,17 @@ export function simulate(
         const ncc = Math.min(p.voluntaryNonConcessional, config.nonConcessionalCap);
         const added = concessional * (1 - config.contributionsTax) + ncc;
         balances[i] += added;
+        const fee = fixedAdmin + insurance; // fixed admin + insurance while working
+        balances[i] -= fee;
         const beforeGrowth = balances[i];
         balances[i] *= 1 + superAccumReturn;
         contribGross += concessional;
         contribTax += concessional * config.contributionsTax;
         contribNet += added;
+        feesPaid += fee;
         superGrowth += beforeGrowth * superAccumReturn;
-        earningsTax += beforeGrowth * (realReturn - superAccumReturn); // vs a tax-free pool
+        // Isolate the earnings tax (vs a tax-free, same-fee pool).
+        earningsTax += beforeGrowth * (superPensionReturn - superAccumReturn);
       });
       const savings = plan.annualOutsideSavings;
       const outsideGrowth = (startOutside + savings) * realReturn;
@@ -134,6 +145,7 @@ export function simulate(
           savings,
           superGrowth,
           outsideGrowth,
+          fees: feesPaid,
           earningsTax: Math.max(0, earningsTax),
           agePension: 0,
           rentIncome: 0,
@@ -265,10 +277,15 @@ export function simulate(
 
     const funded = externalIncome + fromSuper + outsideDrawn + EPS >= spending;
 
-    // Grow remaining pools. Pension-phase super (≥ preservation age) is tax-free.
+    // Deduct the fixed admin fee (no insurance in retirement), then grow. Pension-
+    // phase super (≥ preservation age) is tax-free; both are net of the % fee.
     let superGrowth = 0;
+    let feesPaid = 0;
     plan.people.forEach((_, i) => {
-      const rate = ages[i] >= preservationAge ? realReturn : superAccumReturn;
+      const fee = Math.min(fixedAdmin, Math.max(0, balances[i]));
+      balances[i] -= fee;
+      feesPaid += fee;
+      const rate = ages[i] >= preservationAge ? superPensionReturn : superAccumReturn;
       superGrowth += balances[i] * rate;
       balances[i] *= 1 + rate;
     });
@@ -294,6 +311,7 @@ export function simulate(
         savings: 0,
         superGrowth,
         outsideGrowth,
+        fees: feesPaid,
         earningsTax: 0,
         agePension: agePensionAmt,
         rentIncome: rentCash,

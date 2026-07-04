@@ -41,7 +41,11 @@ export function netAnnualContribution(
   return concessional * (1 - contribTax) + ncc;
 }
 
-/** Super balance after `years` of accumulation (15% earnings tax on returns). */
+/**
+ * Super balance after `years` of accumulation (15% earnings tax on returns).
+ * `feePct` reduces the return (admin+investment fee); `annualDeduction` is the
+ * fixed admin + insurance $ removed each year.
+ */
 export function superBalanceAt(
   opening: number,
   netContrib: number,
@@ -49,9 +53,11 @@ export function superBalanceAt(
   inflationPct: number,
   earningsTaxRate: number,
   years: number,
+  feePct = 0,
+  annualDeduction = 0,
 ): number {
-  const g = realRate(nominalReturnPct * (1 - earningsTaxRate), inflationPct);
-  return futureValue(opening, netContrib, g, years);
+  const g = realRate(nominalReturnPct * (1 - earningsTaxRate) - feePct, inflationPct);
+  return futureValue(opening, netContrib - annualDeduction, g, years);
 }
 
 /** Outside-super balance after `years` (no earnings tax). */

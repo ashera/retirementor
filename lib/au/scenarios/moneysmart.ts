@@ -111,11 +111,14 @@ export interface WorksheetLine {
 }
 
 /** Field-by-field instructions for entering the persona into Moneysmart. */
-export function worksheet(input: MsPlanInput): { align: string[]; lines: WorksheetLine[] } {
+export function worksheet(input: MsPlanInput, config: EngineConfig): { align: string[]; lines: WorksheetLine[] } {
+  const f = config.fees;
+  const ls = config.livingStandardsGrowthPct ?? 0;
+  const wage = input.inflation + ls;
   const align: string[] = [
     `Open the assumptions/advanced panel and set the investment return to ${input.investmentReturn}% (both before and after retirement).`,
-    "Set admin & investment fees to 0% and insurance premiums to $0 — this model excludes them, so Moneysmart must too for a fair comparison.",
-    `Set inflation (CPI) and wage growth both to ${input.inflation}% so contributions stay constant in real terms, matching this model.`,
+    `Set the admin + investment fee to ${f.adminInvestmentPct}%, the fixed admin fee to ${fmtCurrency(f.fixedAdminAnnual)}/yr and insurance to ${fmtCurrency(f.insuranceAnnual)}/yr — this model now uses the same fee assumptions.`,
+    `Leave inflation at CPI ${input.inflation}% and rising living standards at ${ls}% (so wage growth ≈ ${wage.toFixed(1)}%) — this model uses the same RG 276 two-stage deflation, so don't force wage growth down to CPI.`,
     "View results in today's dollars.",
   ];
 

@@ -89,7 +89,9 @@ function superCheckpoint(
   actual: number, config: EngineConfig,
 ): CheckpointResult {
   const et = config.superEarningsTaxAccumulation;
-  const g = ref.realRate(nomReturn * (1 - et), infl);
+  const feePct = config.fees?.adminInvestmentPct ?? 0;
+  const deduction = (config.fees?.fixedAdminAnnual ?? 0) + (config.fees?.insuranceAnnual ?? 0);
+  const g = ref.realRate(nomReturn * (1 - et) - feePct, infl);
   let total = 0;
   const parts: string[] = [];
   for (const { name, person } of people) {
@@ -97,14 +99,14 @@ function superCheckpoint(
       person.salary, config.sgRate, person.voluntaryConcessional, config.concessionalCap,
       config.contributionsTax, person.voluntaryNonConcessional, config.nonConcessionalCap,
     );
-    const fv = ref.superBalanceAt(person.superBalance, c, nomReturn, infl, et, years);
+    const fv = ref.superBalanceAt(person.superBalance, c, nomReturn, infl, et, years, feePct, deduction);
     total += fv;
     parts.push(
-      `${name}: B₀ ${m(person.superBalance)}, net contribution min($${person.salary.toLocaleString()}×${(config.sgRate * 100).toFixed(0)}%, cap)×(1−${(config.contributionsTax * 100).toFixed(0)}%) = ${m(c)}/yr → ${m(fv)}`,
+      `${name}: B₀ ${m(person.superBalance)}, net contribution min($${person.salary.toLocaleString()}×${(config.sgRate * 100).toFixed(0)}%, cap)×(1−${(config.contributionsTax * 100).toFixed(0)}%) = ${m(c)}/yr, less ${m(deduction)} fees → ${m(fv)}`,
     );
   }
   const workings =
-    `Add-then-grow closed form, real growth g = ${nomReturn}%×(1−${(et * 100).toFixed(0)}% earnings tax) = ${(g * 100).toFixed(2)}%, over ${years} years. ` +
+    `Add-then-grow closed form, real growth g = (${nomReturn}%×(1−${(et * 100).toFixed(0)}% earnings tax) − ${feePct}% fee) = ${(g * 100).toFixed(2)}%, over ${years} years. ` +
     parts.join("; ") + (people.length > 1 ? `; combined ${m(total)}.` : ".");
   return moneyCheck(
     "Super at retirement", `Age ${config.agePensionAge}`,

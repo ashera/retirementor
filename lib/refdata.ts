@@ -38,6 +38,10 @@ function withDefaults(data: EngineConfig): EngineConfig {
   if (out.livingStandardsGrowthPct == null) {
     out = { ...out, livingStandardsGrowthPct: DEFAULT_CONFIG.livingStandardsGrowthPct };
   }
+  // Super fees, added after the initial seed.
+  if (out.fees == null) {
+    out = { ...out, fees: DEFAULT_CONFIG.fees };
+  }
   return out;
 }
 

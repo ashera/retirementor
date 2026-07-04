@@ -19,7 +19,13 @@ const plan = (over: Partial<RetirementPlan> = {}): RetirementPlan => ({
 
 describe("Money lasts & depletion", () => {
   it("a comfortable plan lasts to life expectancy", () => {
-    const r = simulate(plan({ targetSpending: 45_000 }), cfg);
+    const r = simulate(
+      plan({
+        targetSpending: 45_000,
+        people: [{ currentAge: 55, superBalance: 550_000, salary: 90_000, voluntaryConcessional: 0, voluntaryNonConcessional: 0 }],
+      }),
+      cfg,
+    );
     expect(r.lastsToLifeExpectancy).toBe(true);
     expect(r.depletedAge).toBeNull();
   });

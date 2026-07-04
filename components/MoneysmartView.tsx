@@ -142,7 +142,7 @@ export default function MoneysmartView({
   const [saved, setSaved] = useState<string | null>(null);
 
   const app = useMemo(() => computeAppPoints(input, config), [input, config]);
-  const sheet = useMemo(() => worksheet(input), [input]);
+  const sheet = useMemo(() => worksheet(input, config), [input, config]);
 
   const set = (patch: Partial<MsPlanInput>) => setInput((p) => ({ ...p, ...patch }));
   const setPerson = (i: number, patch: Partial<MsPlanInput["people"][number]>) =>

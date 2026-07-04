@@ -51,6 +51,11 @@ export const PARAM_DESCRIPTORS: ParamDescriptor[] = [
   { key: "transfer_balance_cap", label: "Transfer balance cap", category: "Superannuation", path: "transferBalanceCap", unit: "aud", sourceKey: "ato-rates" },
   { key: "tsb_ncc_threshold", label: "TSB threshold (NCC nil)", category: "Superannuation", path: "totalSuperBalanceNccThreshold", unit: "aud", sourceKey: "ato-rates" },
 
+  // Super fees (Moneysmart-style defaults)
+  { key: "fees_admin_investment_pct", label: "Admin + investment fee", category: "Super fees", path: "fees.adminInvestmentPct", unit: "percent", sourceKey: "ms-tax" },
+  { key: "fees_fixed_admin", label: "Fixed admin fee (per account)", category: "Super fees", path: "fees.fixedAdminAnnual", unit: "aud", sourceKey: "ms-tax" },
+  { key: "fees_insurance", label: "Default insurance premium", category: "Super fees", path: "fees.insuranceAnnual", unit: "aud", sourceKey: "ms-tax" },
+
   // Ages
   { key: "preservation_age", label: "Preservation age", category: "Ages", path: "preservationAge", unit: "age", sourceKey: "ms-preserve" },
   { key: "age_pension_age", label: "Age Pension age", category: "Ages", path: "agePensionAge", unit: "age", sourceKey: "sa-rates" },

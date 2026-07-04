@@ -112,8 +112,10 @@ export function SuperAtRetirementExplainer({
   const concGross = contribRows.reduce((s, r) => s + r.conc, 0);
   const netContrib = contribRows.reduce((s, r) => s + r.net, 0);
 
+  const fees = plan.fees ?? config.fees;
+  const feePct = fees?.adminInvestmentPct ?? 0;
   const nominalAfterTax =
-    plan.investmentReturn * (1 - config.superEarningsTaxAccumulation);
+    plan.investmentReturn * (1 - config.superEarningsTaxAccumulation) - feePct;
   // Accumulation is deflated by WAGE inflation (RG 276 two-stage): CPI + the
   // rise in community living standards.
   const wageInflation = plan.inflation + (config.livingStandardsGrowthPct ?? 0);
@@ -217,7 +219,7 @@ export function SuperAtRetirementExplainer({
           </p>
           <div className="space-y-1 font-mono text-[11px] text-slate-200">
             <div>
-              = (1 + {plan.investmentReturn}% × (1 − {earningsTaxPct.toFixed(0)}%))
+              = (1 + {plan.investmentReturn}% × (1 − {earningsTaxPct.toFixed(0)}%) − {feePct}% fee)
               ÷ (1 + {wageInflation}%) − 1
             </div>
             <div>
@@ -228,7 +230,7 @@ export function SuperAtRetirementExplainer({
           <ul className="mt-2 list-disc space-y-1 pl-4">
             <li>
               {plan.investmentReturn}% nominal return, less{" "}
-              {earningsTaxPct.toFixed(0)}% earnings tax →{" "}
+              {earningsTaxPct.toFixed(0)}% earnings tax and the {feePct}% fee →{" "}
               {nominalAfterTax.toFixed(2)}%
             </li>
             <li>

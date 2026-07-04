@@ -71,7 +71,7 @@ export default function YearDetailModal({
   const spending = b.livingSpend + b.mortgageCost;
 
   // Net money pulled from savings to fund spending (negative = surplus saved).
-  const netDrawdown = openingTotal + growth + b.propertyProceeds - b.mortgageCleared - closingTotal;
+  const netDrawdown = openingTotal + growth + b.propertyProceeds - b.mortgageCleared - b.fees - closingTotal;
   const shortfall = Math.max(0, spending - (b.agePension + b.rentIncome + netDrawdown));
 
   const fundingParts: string[] = [];
@@ -152,6 +152,14 @@ export default function YearDetailModal({
               value={money(growth)}
               tone="text-emerald-400"
             />
+            {b.fees > 0 && (
+              <Line
+                label="Super fees"
+                sub="fixed admin + insurance (the % investment fee is already netted from the growth above)"
+                value={money(-b.fees)}
+                tone="text-amber-400"
+              />
+            )}
             {isWorking && (
               <>
                 <Line

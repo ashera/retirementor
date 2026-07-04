@@ -43,8 +43,11 @@ function Formula({ children }: { children: React.ReactNode }) {
 /** Super at retirement — the geometric closed form with wage-inflation deflation. */
 function SuperWorkings({ plan, config, result }: { plan: RetirementPlan; config: EngineConfig; result: SimResult }) {
   const et = config.superEarningsTaxAccumulation;
+  const feesCfg = plan.fees ?? config.fees;
+  const feePct = feesCfg?.adminInvestmentPct ?? 0;
+  const annualFee = (feesCfg?.fixedAdminAnnual ?? 0) + (feesCfg?.insuranceAnnual ?? 0);
   const wage = plan.inflation + (config.livingStandardsGrowthPct ?? 0);
-  const nomAfterTax = plan.investmentReturn * (1 - et);
+  const nomAfterTax = plan.investmentReturn * (1 - et) - feePct;
   const g = (1 + nomAfterTax / 100) / (1 + wage / 100) - 1;
   const years = Math.max(0, Math.round(plan.retirementAge - plan.people[0].currentAge));
   const startSuper = totalStartingSuper(plan);
@@ -54,7 +57,7 @@ function SuperWorkings({ plan, config, result }: { plan: RetirementPlan; config:
       ref.netAnnualContribution(
         p.salary, config.sgRate, p.voluntaryConcessional, config.concessionalCap,
         config.contributionsTax, p.voluntaryNonConcessional, config.nonConcessionalCap,
-      ),
+      ) - annualFee,
     0,
   );
   const gp = Math.pow(1 + g, years);
@@ -71,10 +74,10 @@ function SuperWorkings({ plan, config, result }: { plan: RetirementPlan; config:
         </>
       }
     >
-      <Formula>{`Real growth g = (1 + ${plan.investmentReturn}% × (1 − ${(et * 100).toFixed(0)}% earnings tax)) ÷ (1 + ${pctN(wage)} wage inflation) − 1
+      <Formula>{`Real growth g = (1 + ${plan.investmentReturn}% × (1 − ${(et * 100).toFixed(0)}% tax) − ${feePct}% fee) ÷ (1 + ${pctN(wage)} wage inflation) − 1
             = ${pct(g)}
 
-Contributions/yr  c = SG ${(config.sgRate * 100).toFixed(0)}% × salary (+ voluntary), capped, net of ${(config.contributionsTax * 100).toFixed(0)}% tax
+Contributions/yr  c = SG ${(config.sgRate * 100).toFixed(0)}% × salary (+ voluntary), capped, net of ${(config.contributionsTax * 100).toFixed(0)}% tax${annualFee > 0 ? ` less ${money(annualFee)} fees` : ""}
             c ≈ ${money(netContrib)}/yr
 
 Closed form  Bₙ = B₀(1+g)ⁿ + c·(1+g)·((1+g)ⁿ − 1) ÷ g
