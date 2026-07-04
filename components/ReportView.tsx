@@ -9,6 +9,7 @@ import { fmtCurrency } from "@/lib/au/format";
 import RetirementChart from "@/components/RetirementChart";
 import IncomeChart from "@/components/IncomeChart";
 import FanChart from "@/components/FanChart";
+import ReportExplainers from "@/components/ReportExplainers";
 
 const money = (n: number) => fmtCurrency(Math.round(n));
 
@@ -193,6 +194,11 @@ export default function ReportView({
           <p className="mt-1.5 text-xs text-slate-500">
             Median path with the 10th–90th percentile range, across {mc.iterations.toLocaleString()} simulated return sequences.
           </p>
+        </Section>
+
+        {/* How the numbers are calculated */}
+        <Section title="How the key numbers are calculated">
+          <ReportExplainers plan={plan} config={config} result={result} mc={mc} />
         </Section>
 
         {/* Inputs */}

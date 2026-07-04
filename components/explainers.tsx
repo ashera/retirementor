@@ -114,8 +114,11 @@ export function SuperAtRetirementExplainer({
 
   const nominalAfterTax =
     plan.investmentReturn * (1 - config.superEarningsTaxAccumulation);
+  // Accumulation is deflated by WAGE inflation (RG 276 two-stage): CPI + the
+  // rise in community living standards.
+  const wageInflation = plan.inflation + (config.livingStandardsGrowthPct ?? 0);
   const realAccum =
-    (1 + nominalAfterTax / 100) / (1 + plan.inflation / 100) - 1;
+    (1 + nominalAfterTax / 100) / (1 + wageInflation / 100) - 1;
 
   // Split the projected balance into "existing super grown" vs "from contributions".
   const growthOfStart = currentSuper * Math.pow(1 + realAccum, years);
@@ -207,16 +210,18 @@ export function SuperAtRetirementExplainer({
         >
           <p className="mb-2">
             Your super&apos;s return, stripped of the {earningsTaxPct.toFixed(0)}%
-            tax on earnings and of inflation — a real, today&apos;s-dollars
-            growth rate.
+            tax on earnings and of <strong>wage inflation</strong> — a real,
+            today&apos;s-dollars growth rate. Before retirement, ASIC RG 276
+            deflates by wage inflation ({wageInflation}% = CPI {plan.inflation}% +{" "}
+            {(config.livingStandardsGrowthPct ?? 0)}% living standards).
           </p>
           <div className="space-y-1 font-mono text-[11px] text-slate-200">
             <div>
               = (1 + {plan.investmentReturn}% × (1 − {earningsTaxPct.toFixed(0)}%))
-              ÷ (1 + {plan.inflation}%) − 1
+              ÷ (1 + {wageInflation}%) − 1
             </div>
             <div>
-              = (1 + {nominalAfterTax.toFixed(2)}%) ÷ (1 + {plan.inflation}%) − 1
+              = (1 + {nominalAfterTax.toFixed(2)}%) ÷ (1 + {wageInflation}%) − 1
             </div>
             <div>= {fmtPercent(realAccum)}</div>
           </div>
@@ -227,7 +232,7 @@ export function SuperAtRetirementExplainer({
               {nominalAfterTax.toFixed(2)}%
             </li>
             <li>
-              then adjusted for {plan.inflation}% inflation → {fmtPercent(realAccum)}
+              then adjusted for {wageInflation}% wage inflation → {fmtPercent(realAccum)}
             </li>
           </ul>
         </InlineExplainer>
