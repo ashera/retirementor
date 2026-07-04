@@ -19,6 +19,11 @@ import IncomeChart from "@/components/IncomeChart";
 import FanChart from "@/components/FanChart";
 import Field from "@/components/Field";
 import Logo from "@/components/Logo";
+import {
+  AgePensionExplainer,
+  LikelihoodExplainer,
+  SuperAtRetirementExplainer,
+} from "@/components/explainers";
 
 const PHASES = 4;
 const money = (n: number) => fmtCurrency(Math.round(n));
@@ -91,6 +96,7 @@ export default function GuidedIntro({
   const [oSpend, setOSpend] = useState<number | null>(null);
   const [staged, setStaged] = useState(false);
   const [homeowner, setHomeowner] = useState(true);
+  const [outsideSuper, setOutsideSuper] = useState(0);
   // Phase 4 — reliability
   const [oVol, setOVol] = useState<number | null>(null);
 
@@ -132,7 +138,7 @@ export default function GuidedIntro({
       jointSuperBalance: joint,
       jointSuperSplit: 50,
       homeowner,
-      outsideSuper: 0,
+      outsideSuper,
       annualOutsideSavings: 0,
       retirementAge: retireAge,
       spendingMode: staged ? "stages" : "flat",
@@ -144,7 +150,7 @@ export default function GuidedIntro({
       lifeExpectancy: 90,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [couple, mode, age1, age2, super1, super2, joint, sal1, sal2, homeowner, retireAge, staged, targetSpending, invReturn, volatility]);
+  }, [couple, mode, age1, age2, super1, super2, joint, sal1, sal2, homeowner, outsideSuper, retireAge, staged, targetSpending, invReturn, volatility]);
 
   const result = useMemo(() => simulate(plan, config), [plan, config]);
   const mc = useMemo(() => runMonteCarlo(plan, config), [plan, config]);
@@ -290,7 +296,10 @@ export default function GuidedIntro({
       {step >= 4 && (
         <Panel>
           <div className="text-xs font-semibold uppercase tracking-wide text-accent">Phase 2 · Growth</div>
-          <h2 className="mt-1 text-lg font-bold text-white">Your super at retirement</h2>
+          <h2 className="mt-1 flex items-center gap-2 text-lg font-bold text-white">
+            Your super at retirement
+            <SuperAtRetirementExplainer plan={plan} config={config} result={result} />
+          </h2>
           <p className="mt-1 text-sm text-muted">
             This projects your super forward. The big levers are your income (which
             drives contributions), your investment return, and when you retire.
@@ -315,14 +324,18 @@ export default function GuidedIntro({
       {step >= 5 && (
         <Panel>
           <div className="text-xs font-semibold uppercase tracking-wide text-accent">Phase 3 · Income</div>
-          <h2 className="mt-1 text-lg font-bold text-white">Your retirement income</h2>
+          <h2 className="mt-1 flex items-center gap-2 text-lg font-bold text-white">
+            Your retirement income
+            <AgePensionExplainer plan={plan} config={config} result={result} />
+          </h2>
           <p className="mt-1 text-sm text-muted">
             How much you&apos;d like to spend, and where it comes from. In retirement
             the government <strong className="text-slate-200">Age Pension</strong>{" "}
-            tops up your own savings as they reduce.
+            tops up your own savings as they reduce (tap the ? to see how it works).
           </p>
           <div className="mt-4 space-y-4">
             <Field label="Yearly spending goal" value={targetSpending} onChange={(v) => setOSpend(v)} min={20_000} max={200_000} step={1_000} prefix="$" hint={`ASFA 'comfortable' for a ${couple ? "couple" : "single"} is about ${money(comfortable)}/yr.`} />
+            <Field label="Savings outside super" value={outsideSuper} onChange={setOutsideSuper} min={0} max={3_000_000} step={5_000} prefix="$" hint="Bank, shares, offset — anything outside super you'd draw on. Leave at $0 if none." />
             <div>
               <span className="text-sm font-medium text-slate-200">Spend evenly, or more in the early years?</span>
               <div className="mt-2">
@@ -349,8 +362,8 @@ export default function GuidedIntro({
           </div>
           <p className={`mt-3 rounded-xl border border-line bg-panel-2 px-4 py-3 text-sm ${tone}`}>
             {lasts
-              ? `With your super and the Age Pension, your money lasts to ${plan.lifeExpectancy} and beyond.`
-              : `With your super and the Age Pension, your money lasts to about age ${result.depletedAge}. Try spending a little less, or retiring later.`}
+              ? `On a steady, average return, your super, savings and the Age Pension keep you going to ${plan.lifeExpectancy} and beyond. Real returns rise and fall, though — we'll stress-test that next.`
+              : `On a steady, average return, this stretches to about age ${result.depletedAge} before leaning fully on the Age Pension. A little less spending or a later retirement helps — and next we'll see how market ups and downs affect it.`}
           </p>
           {step === 5 && <Actions label="How reliable is this? →" onClick={next} />}
         </Panel>
@@ -360,17 +373,26 @@ export default function GuidedIntro({
       {step >= 6 && (
         <Panel>
           <div className="text-xs font-semibold uppercase tracking-wide text-accent">Phase 4 · Reliability</div>
-          <h2 className="mt-1 text-lg font-bold text-white">How reliable is this?</h2>
+          <h2 className="mt-1 flex items-center gap-2 text-lg font-bold text-white">
+            How reliable is this?
+            <LikelihoodExplainer plan={plan} mc={mc} />
+          </h2>
           <p className="mt-1 text-sm text-muted">
-            The projection so far assumes a steady return every year — but markets go
-            up and down. A bad run early in retirement hurts most. We test your plan
-            against {mc.iterations.toLocaleString()} possible futures.
+            The picture so far assumed a steady return every year. Real markets go up
+            and down, and a rough patch early in retirement hurts most — so we replay
+            your plan through {mc.iterations.toLocaleString()} possible futures, good
+            and bad.
           </p>
           <div className="mt-3">
             <FanChart fan={mc.fan} retirementAge={result.retirementAge} agePensionAge={result.agePensionAge} height={200} />
           </div>
           <p className={`mt-2 text-center text-sm ${tone}`}>
-            Your money lasts in about <strong>{successPct} of every 100</strong> futures.
+            Your target is fully covered in about <strong>{successPct} of every 100</strong> of them.
+          </p>
+          <p className="mx-auto mt-2 max-w-md text-center text-xs text-muted">
+            And you&apos;re not left with nothing in the rest: the Age Pension is
+            always there as a floor, so a &ldquo;miss&rdquo; means dropping below your
+            target lifestyle for a while — not running out of income.
           </p>
           <div className="mt-4 max-w-xs">
             <Field label="How bumpy are markets?" value={volatility} onChange={(v) => setOVol(v)} min={0} max={20} step={1} suffix="%" hint="Volatility. A diversified balanced/growth fund is roughly 9–13%." />
