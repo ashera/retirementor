@@ -101,6 +101,9 @@ export default function PlannerApp({
   const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
+    // Restore a previously configured plan if one exists. First-time visitors
+    // just see the planner pre-filled with sensible defaults and the
+    // "Get started" button — we don't auto-launch the wizard.
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
@@ -109,11 +112,9 @@ export default function PlannerApp({
         setPlan(working);
         setBaseline(rawBase ? { ...DEFAULT_PLAN, ...JSON.parse(rawBase) } : working);
         setConfigured(true);
-      } else {
-        setWizardOpen(true);
       }
     } catch {
-      setWizardOpen(true);
+      /* ignore malformed storage — fall back to defaults */
     }
   }, []);
 
