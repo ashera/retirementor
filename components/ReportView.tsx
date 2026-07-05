@@ -220,12 +220,12 @@ export default function ReportView({
         {/* ───────── PAGE 1: Your inputs · Summary · Balance over time ───────── */}
         <Section title="Your inputs">
           <Lead>
-            This report is built entirely from the details below. Adjust any of
-            them in the planner and regenerate the report to see the effect.
+            Everything below drives this report — change any of it in the planner
+            and regenerate.
           </Lead>
-          <dl className="grid grid-cols-1 gap-x-8 gap-y-1.5 text-sm sm:grid-cols-2">
+          <dl className="grid grid-cols-1 gap-x-8 gap-y-0 text-xs sm:grid-cols-2">
             {inputs.map((it) => (
-              <div key={it.label} className="flex justify-between gap-4 border-b border-slate-100 py-1">
+              <div key={it.label} className="flex justify-between gap-4 border-b border-slate-100 py-0.5">
                 <dt className="text-slate-500">{it.label}</dt>
                 <dd className="text-right font-medium text-slate-800">{it.value}</dd>
               </div>
@@ -258,15 +258,14 @@ export default function ReportView({
 
         <Section title="Balance over time">
           <Lead>
-            This chart tracks your total savings year by year — superannuation
-            (green) stacked on savings outside super (blue). Balances build through
-            your working years, peak around retirement, then draw down to fund your
-            spending. The dashed markers show when you retire and when the Age
-            Pension begins
-            {bands ? "; the shaded bands mark the go-go / slow-go / no-go spending stages" : ""}.
+            Total savings year by year — super (green) stacked on savings outside
+            super (blue): they build through your working years, peak near
+            retirement, then draw down. Dashed markers show retirement and Age
+            Pension age
+            {bands ? "; shaded bands mark the go-go / slow-go / no-go stages" : ""}.
             {result.lastsToLifeExpectancy
               ? " Your balance lasts the whole plan."
-              : ` A “Depletes” marker shows the age your savings run out (${result.depletedAge}).`}
+              : ` The “Depletes” marker is where savings run out (${result.depletedAge}).`}
           </Lead>
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-2">
             <RetirementChart result={result} bands={bands} animate={false} height={200} wageInflationPct={wageInfl} cpiPct={plan.inflation} />
