@@ -1,10 +1,48 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { SITE_URL, SITE_NAME, SITE_TAGLINE, SITE_DESCRIPTION } from "@/lib/site";
+
+const title = `${SITE_NAME} — ${SITE_TAGLINE}`;
 
 export const metadata: Metadata = {
-  title: "RetireMentor — Australian Retirement Planner",
-  description:
-    "Model your superannuation, the means-tested Age Pension, and early retirement — using current Australian rules. Generic financial calculator; general information only, not financial advice.",
+  metadataBase: new URL(SITE_URL),
+  title: { default: title, template: `%s · ${SITE_NAME}` },
+  description: SITE_DESCRIPTION,
+  applicationName: SITE_NAME,
+  keywords: [
+    "retirement calculator Australia",
+    "superannuation calculator",
+    "Age Pension calculator",
+    "will my super last",
+    "early retirement Australia",
+    "retirement planner",
+    "super projection",
+    "how much super do I need",
+  ],
+  authors: [{ name: SITE_NAME }],
+  creator: SITE_NAME,
+  publisher: SITE_NAME,
+  category: "finance",
+  alternates: { canonical: "/" },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: { index: true, follow: true, "max-image-preview": "large", "max-snippet": -1 },
+  },
+  openGraph: {
+    type: "website",
+    url: SITE_URL,
+    siteName: SITE_NAME,
+    title,
+    description: SITE_DESCRIPTION,
+    locale: "en_AU",
+  },
+  twitter: { card: "summary_large_image", title, description: SITE_DESCRIPTION },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#0a0e1a",
+  colorScheme: "dark",
 };
 
 export default function RootLayout({
@@ -13,7 +51,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="en-AU">
       <body className="flex min-h-screen flex-col antialiased">
         <div className="flex-1">{children}</div>
         <footer className="border-t border-line px-5 py-6 text-center text-xs text-muted print:hidden">

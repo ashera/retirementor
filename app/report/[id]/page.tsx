@@ -7,7 +7,7 @@ import { runMonteCarlo } from "@/lib/au/montecarlo";
 import { DEFAULT_PLAN, type RetirementPlan } from "@/lib/au/types";
 import ReportView from "@/components/ReportView";
 
-export const metadata = { title: "Retirement Plan Report — RetireMentor" };
+export const metadata = { title: "Retirement plan report", robots: { index: false, follow: false } };
 export const dynamic = "force-dynamic";
 
 export default async function ReportPage({
