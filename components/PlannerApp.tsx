@@ -420,7 +420,7 @@ export default function PlannerApp({
             early-retirement bridge — all in today&apos;s dollars, FY{config.financialYear} rules.
           </p>
         </div>
-        {configured ? (
+        {configured &&
           (() => {
             const comp = planCompleteness(plan);
             return (
@@ -438,15 +438,7 @@ export default function PlannerApp({
                 </div>
               </button>
             );
-          })()
-        ) : (
-          <button
-            onClick={() => setWizardOpen(true)}
-            className="rounded-lg border border-accent/40 bg-accent/10 px-4 py-2 text-sm font-semibold text-accent transition hover:bg-accent/20"
-          >
-            Get started
-          </button>
-        )}
+          })()}
       </header>
 
       <Disclosures config={config} />
@@ -1112,8 +1104,9 @@ export default function PlannerApp({
           );
         })()}
 
-      {/* Guest reset — signed-out users can wipe local data and start fresh. */}
-      {!user && (
+      {/* Guest reset — once a signed-out user has built a plan they can wipe it
+          and start fresh. Hidden in the empty first-visit state (nothing to clear). */}
+      {!user && configured && (
         <div className="mt-10 border-t border-line pt-4 text-center">
           <button
             onClick={startOver}
