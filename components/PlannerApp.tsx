@@ -36,6 +36,8 @@ import {
 import { simulate } from "@/lib/au/simulate";
 import type { EngineConfig } from "@/lib/au/config";
 import { fmtCurrency } from "@/lib/au/format";
+import { planCompleteness } from "@/lib/au/completeness";
+import CompletenessRing from "@/components/CompletenessRing";
 import {
   DEFAULT_PLAN,
   spendingRange,
@@ -385,12 +387,33 @@ export default function PlannerApp({
             early-retirement bridge — all in today&apos;s dollars, FY{config.financialYear} rules.
           </p>
         </div>
-        <button
-          onClick={() => setWizardOpen(true)}
-          className="rounded-lg border border-accent/40 bg-accent/10 px-4 py-2 text-sm font-semibold text-accent transition hover:bg-accent/20"
-        >
-          {configured ? "Edit scenario" : "Get started"}
-        </button>
+        {configured ? (
+          (() => {
+            const comp = planCompleteness(plan);
+            return (
+              <button
+                onClick={() => setWizardOpen(true)}
+                title="Edit scenario — add detail for a sharper model"
+                className="flex items-center gap-3 rounded-xl border border-line bg-panel px-3 py-2 text-left transition hover:border-accent/40"
+              >
+                <CompletenessRing pct={comp.pct} size={38} />
+                <div>
+                  <div className="text-sm font-semibold text-white">{comp.tier}</div>
+                  <div className="text-xs text-accent">
+                    {comp.pct < 100 ? "Edit scenario · add detail →" : "Edit scenario →"}
+                  </div>
+                </div>
+              </button>
+            );
+          })()
+        ) : (
+          <button
+            onClick={() => setWizardOpen(true)}
+            className="rounded-lg border border-accent/40 bg-accent/10 px-4 py-2 text-sm font-semibold text-accent transition hover:bg-accent/20"
+          >
+            Get started
+          </button>
+        )}
       </header>
 
       <Disclosures config={config} />

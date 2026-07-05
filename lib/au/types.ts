@@ -115,6 +115,10 @@ export interface RetirementPlan {
   budget?: RetirementBudget; // optional guided budget that produced targetSpending
   mortgage?: MortgageDetail; // optional home loan carried into retirement
   investmentProperty?: PropertyDetail; // optional income-producing property
+  // Which optional sections the user has explicitly answered in the wizard (incl.
+  // "none"), so plan-completeness can reach 100% honestly and the dashboard ring
+  // matches the wizard. Not used by the engine.
+  answered?: { contributions?: boolean; outside?: boolean; property?: boolean };
 }
 
 /** Household spending for a given age, honouring the flat/staged mode. */

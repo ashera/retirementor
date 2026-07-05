@@ -26,9 +26,17 @@ const full: RetirementPlan = {
   investmentProperty: { value: 620_000, growthReal: 2, grossYield: 4, costRatio: 28, loanBalance: 200_000, loanRate: 6, purchasePrice: 350_000, strategy: "hold", sellAtAge: 75 },
 };
 
+const couple: RetirementPlan = {
+  ...full,
+  household: "couple",
+  people: [full.people[0], { currentAge: 40, superBalance: 150_000, salary: 70_000, voluntaryConcessional: 0, voluntaryNonConcessional: 0 }],
+};
+
+const CASES: Record<string, RetirementPlan> = { mid, full, couple };
+
 function Inner() {
   const c = useSearchParams().get("case") ?? "mid";
-  return <PlanWizard initial={c === "full" ? full : mid} configured config={config} onComplete={() => {}} onClose={() => {}} />;
+  return <PlanWizard initial={CASES[c] ?? mid} configured config={config} onComplete={() => {}} onClose={() => {}} />;
 }
 
 export default function WizardPreview() {

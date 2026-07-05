@@ -2,11 +2,13 @@
 
 import { useState, type ReactNode } from "react";
 import Field from "@/components/Field";
+import CompletenessRing from "@/components/CompletenessRing";
 import InlineExplainer from "@/components/InlineExplainer";
 import { simulate } from "@/lib/au/simulate";
 import type { EngineConfig } from "@/lib/au/config";
 import { fmtCompact, fmtCurrency } from "@/lib/au/format";
 import { incomeTestRent, netEquity, netRentCash } from "@/lib/au/property";
+import { planCompleteness } from "@/lib/au/completeness";
 import {
   DEFAULT_PARTNER,
   DEFAULT_PLAN,
@@ -46,41 +48,6 @@ interface PlanWizardProps {
 }
 
 type OptMode = "no" | "yes";
-
-/** A circular "how complete is your plan" meter. `size` in px (header uses 44). */
-function CompletenessRing({ pct, size = 44 }: { pct: number; size?: number }) {
-  const big = size >= 80;
-  const stroke = big ? 7 : 4;
-  const r = (size - stroke) / 2 - 1;
-  const circ = 2 * Math.PI * r;
-  const offset = circ * (1 - Math.max(0, Math.min(100, pct)) / 100);
-  const c = size / 2;
-  return (
-    <div className="relative shrink-0" style={{ width: size, height: size }} aria-label={`Plan ${pct}% complete`}>
-      <svg viewBox={`0 0 ${size} ${size}`} width={size} height={size} className="-rotate-90">
-        <circle cx={c} cy={c} r={r} fill="none" stroke="#232c40" strokeWidth={stroke} />
-        <circle
-          cx={c}
-          cy={c}
-          r={r}
-          fill="none"
-          stroke="#34d399"
-          strokeWidth={stroke}
-          strokeLinecap="round"
-          strokeDasharray={circ}
-          strokeDashoffset={offset}
-          className="transition-[stroke-dashoffset] duration-500 ease-out"
-        />
-      </svg>
-      <div className="absolute inset-0 flex items-center justify-center leading-none">
-        <span className="font-bold tabular-nums text-white">
-          <span className={big ? "text-[30px]" : "text-[11px]"}>{pct}</span>
-          {big && <span className="align-top text-sm font-semibold text-muted">%</span>}
-        </span>
-      </div>
-    </div>
-  );
-}
 
 // Per-step presentation for the overview hub: accent colour, a line icon, and a
 // one-line reason the step exists (mirrors the budget-builder category cards).
@@ -195,20 +162,29 @@ export default function PlanWizard({
   // the incoming plan; drives the completeness meter and reveals the fields.
   const hasContrib = initial.people.some((p) => p.voluntaryConcessional > 0 || p.voluntaryNonConcessional > 0);
   const hasOutside = initial.outsideSuper > 0 || initial.annualOutsideSavings > 0;
-  const [contribMode, setContribMode] = useState<OptMode | undefined>(hasContrib ? "yes" : undefined);
-  const [outsideMode, setOutsideMode] = useState<OptMode | undefined>(hasOutside ? "yes" : undefined);
-  const [propMode, setPropMode] = useState<OptMode | undefined>(initial.investmentProperty ? "yes" : undefined);
+  // Recover the yes/no answer from data + the persisted `answered` flags.
+  const [contribMode, setContribMode] = useState<OptMode | undefined>(hasContrib ? "yes" : initial.answered?.contributions ? "no" : undefined);
+  const [outsideMode, setOutsideMode] = useState<OptMode | undefined>(hasOutside ? "yes" : initial.answered?.outside ? "no" : undefined);
+  const [propMode, setPropMode] = useState<OptMode | undefined>(initial.investmentProperty ? "yes" : initial.answered?.property ? "no" : undefined);
 
   const patch = (p: Partial<RetirementPlan>) =>
     setDraft((prev) => ({ ...prev, ...p }));
 
   const answerContributions = (v: OptMode) => {
     setContribMode(v);
-    if (v === "no") setDraft((prev) => ({ ...prev, people: prev.people.map((pp) => ({ ...pp, voluntaryConcessional: 0, voluntaryNonConcessional: 0 })) }));
+    setDraft((prev) => ({
+      ...prev,
+      answered: { ...prev.answered, contributions: true },
+      ...(v === "no" ? { people: prev.people.map((pp) => ({ ...pp, voluntaryConcessional: 0, voluntaryNonConcessional: 0 })) } : {}),
+    }));
   };
   const answerOutside = (v: OptMode) => {
     setOutsideMode(v);
-    if (v === "no") setDraft((prev) => ({ ...prev, outsideSuper: 0, annualOutsideSavings: 0 }));
+    setDraft((prev) => ({
+      ...prev,
+      answered: { ...prev.answered, outside: true },
+      ...(v === "no" ? { outsideSuper: 0, annualOutsideSavings: 0 } : {}),
+    }));
   };
 
   const setPerson =
@@ -461,6 +437,7 @@ export default function PlanWizard({
           onChange={(v) => {
             setPropMode(v === "yes" ? "yes" : "no");
             toggleProperty(v === "yes");
+            setDraft((prev) => ({ ...prev, answered: { ...prev.answered, property: true } }));
           }}
         />
 
@@ -906,41 +883,19 @@ export default function PlanWizard({
   const current = steps[safeStep];
   const isLast = safeStep === steps.length - 1;
 
-  // ── Completeness meter — measures what the user has TOLD us, not steps clicked.
-  // Core sections gate the tier; Assumptions is a bonus ★, not part of the score.
-  const p0 = draft.people[0];
-  const p1 = draft.people[1];
-  const goalSet = draft.retirementAge > 0 && (draft.spendingMode === "stages" ? draft.spendingStages.goGo > 0 : draft.targetSpending > 0);
-  const sectionState: Record<string, { core: boolean; optional: boolean; complete: boolean; label: string }> = {
-    household: { core: true, optional: false, complete: true, label: "household" },
-    you: { core: true, optional: false, complete: p0.superBalance > 0 || p0.salary > 0, label: "your details" },
-    ...(isCouple ? { partner: { core: true, optional: false, complete: !!p1 && (p1.superBalance > 0 || p1.salary > 0), label: "your partner" } } : {}),
-    contributions: { core: false, optional: true, complete: contribMode !== undefined, label: "extra contributions" },
-    outside: { core: false, optional: true, complete: outsideMode !== undefined, label: "outside savings" },
-    property: { core: false, optional: true, complete: propMode !== undefined, label: "a property" },
-    goal: { core: true, optional: false, complete: goalSet, label: "retirement goal" },
-  };
-  const scored = Object.values(sectionState);
-  const completeCount = scored.filter((s) => s.complete).length;
-  const total = scored.length;
-  const pct = Math.round((completeCount / total) * 100);
-  const coreComplete = scored.every((s) => !s.core || s.complete);
-  const enrichDone = scored.filter((s) => s.optional && s.complete).length;
-  const tier = !coreComplete
-    ? "Sketch"
-    : pct === 100
-      ? "Complete picture"
-      : enrichDone === 0
-        ? "Working model"
-        : "Detailed";
+  // ── Completeness meter — shared with the dashboard (measures what the user has
+  // TOLD us, not steps clicked). Assumptions is a bonus ★, not part of the score.
+  const comp = planCompleteness(draft);
+  const { pct, tier, completeCount, total } = comp;
+  const sectionState = comp.byKey;
   const tuned =
     draft.investmentReturn !== DEFAULT_PLAN.investmentReturn ||
     draft.inflation !== DEFAULT_PLAN.inflation ||
     draft.lifeExpectancy !== DEFAULT_PLAN.lifeExpectancy ||
     (!!draft.fees && JSON.stringify(draft.fees) !== JSON.stringify(config.fees));
   // The nudge: point at the essentials first, then the first open enrichment.
-  const gap = scored.find((s) => s.core && !s.complete) ?? scored.find((s) => s.optional && !s.complete);
-  const gapStepIndex = gap ? steps.findIndex((s) => sectionState[s.key]?.label === gap.label) : -1;
+  const gap = comp.gapKey ? comp.byKey[comp.gapKey] : null;
+  const gapStepIndex = comp.gapKey ? steps.findIndex((s) => s.key === comp.gapKey) : -1;
 
   // Overview-card values & status per step.
   const contribTotal = draft.people.reduce((s, pp) => s + pp.voluntaryConcessional + pp.voluntaryNonConcessional, 0);
@@ -1016,9 +971,9 @@ export default function PlanWizard({
                       key={s.key}
                       type="button"
                       onClick={() => goToStep(i)}
-                      className="flex w-full items-center gap-3 rounded-xl border border-line bg-panel-2/60 px-3 py-1.5 text-left transition hover:border-accent/40"
+                      className="flex w-full items-center gap-3 rounded-xl border border-line bg-panel-2/60 px-3 py-1 text-left transition hover:border-accent/40"
                     >
-                      <StepIcon stepKey={s.key} size={20} />
+                      <StepIcon stepKey={s.key} size={18} />
                       <div className="min-w-0 flex-1">
                         <div className="text-sm font-semibold text-white">{s.nav}</div>
                         <div className="truncate text-xs text-muted">{STEP_META[s.key]?.desc}</div>
