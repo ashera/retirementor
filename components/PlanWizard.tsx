@@ -848,7 +848,7 @@ export default function PlanWizard({
                 <CompletenessRing pct={pct} size={88} />
                 <div className="mt-2 text-sm font-semibold text-accent">{tier}</div>
                 <div className="text-xs text-muted">
-                  {completeCount} of {total} details told{tuned ? " · ★ fine-tuned" : ""}
+                  {completeCount} of {total} details provided{tuned ? " · ★ fine-tuned" : ""}
                 </div>
                 <p className="mt-1 text-xs text-muted">Tap a section to add detail.</p>
               </div>
@@ -902,7 +902,7 @@ export default function PlanWizard({
                 {current.title}
               </h2>
               <div className="mt-0.5 text-xs font-medium text-accent transition-colors">
-                {tier} · {completeCount}/{total} details told{tuned ? " · ★ fine-tuned" : ""}
+                {tier} · {completeCount}/{total} details provided{tuned ? " · ★ fine-tuned" : ""}
               </div>
             </div>
           </div>
