@@ -117,13 +117,35 @@ export default function ReportView({
     : undefined;
   const ls = lifestageBreakdown(plan, config);
 
-  // Per-category budget breakdown (only when the user has built a budget) —
-  // essentials first, then discretionary, with the household-level amounts they
-  // set. Shown per month on the report below the spending table.
-  const budgetCats = plan.budget?.categories;
-  const budgetRows = budgetCats
-    ? BUDGET_CATEGORY_META.map((m) => ({ key: m.key, label: m.label, hint: m.hint, essential: m.essential, annual: budgetCats[m.key] ?? 0 })).filter((r) => r.annual > 0)
-    : [];
+  // Per-category budget breakdown for the report, below the spending table.
+  // When the user has built a budget we show their own category amounts;
+  // otherwise we fall back to the ASFA Retirement Standard category shares,
+  // scaled so the essential/discretionary subtotals match the lifestage table's
+  // essentials and go-go discretionary (so the two tables stay consistent).
+  const budgetEstimated = !plan.budget;
+  const budgetRows = (() => {
+    if (plan.budget) {
+      const cats = plan.budget.categories;
+      return BUDGET_CATEGORY_META.map((m) => ({ key: m.key, label: m.label, essential: m.essential, annual: cats[m.key] ?? 0 })).filter((r) => r.annual > 0);
+    }
+    const hh = plan.household === "couple" ? "couple" : "single";
+    const asfaByKey = new Map(config.asfa.breakdown.categories.map((a) => [a.key, a.comfortable[hh]]));
+    const raw = BUDGET_CATEGORY_META.map((m) => ({ key: m.key, label: m.label, essential: m.essential, base: asfaByKey.get(m.key) ?? 0 }));
+    const rawEss = raw.filter((r) => r.essential).reduce((s, r) => s + r.base, 0);
+    const rawDisc = raw.filter((r) => !r.essential).reduce((s, r) => s + r.base, 0);
+    const essTarget = ls.essentials;
+    const discTarget = Math.max(0, ls.rows[0]?.discretionary ?? 0);
+    return raw
+      .map((r) => ({
+        key: r.key,
+        label: r.label,
+        essential: r.essential,
+        annual: r.essential
+          ? rawEss > 0 ? (r.base * essTarget) / rawEss : 0
+          : rawDisc > 0 ? (r.base * discTarget) / rawDisc : 0,
+      }))
+      .filter((r) => r.annual > 0);
+  })();
   const essRows = budgetRows.filter((r) => r.essential);
   const discRows = budgetRows.filter((r) => !r.essential);
   const essTotal = essRows.reduce((s, r) => s + r.annual, 0);
@@ -331,10 +353,11 @@ export default function ReportView({
           )}
 
           {budgetRows.length > 0 && (
-            <Section title="Your monthly budget by category">
+            <Section title={budgetEstimated ? "Estimated monthly budget by category" : "Your monthly budget by category"}>
               <Lead>
-                The category amounts behind your budget, at the full (go-go)
-                level and shown per month.{" "}
+                {budgetEstimated
+                  ? "You haven't built a detailed budget, so these are the ASFA Retirement Standard category amounts scaled to your plan's spending, shown per month. "
+                  : "The category amounts behind your budget, at the full (go-go) level and shown per month. "}
                 {ls.staged
                   ? "Essentials hold steady through retirement; discretionary spending tapers in the slow-go and no-go years (see the table above)."
                   : "This is your flat retirement budget."}
@@ -392,9 +415,10 @@ export default function ReportView({
                 </tbody>
               </table>
               <p className="mt-2 text-xs text-slate-500">
-                Household-level amounts you set in the budget builder
-                {plan.household === "couple" ? " (combined for the couple)" : ""}. Any
-                home-loan cost is shown separately in the spending table above, not here.
+                {budgetEstimated
+                  ? "Estimated from the ASFA Retirement Standard (comfortable) and scaled to your plan — build a budget in the planner for your own category amounts."
+                  : `Household-level amounts you set in the budget builder${plan.household === "couple" ? " (combined for the couple)" : ""}.`}{" "}
+                Any home-loan cost is shown separately in the spending table above, not here.
               </p>
             </Section>
           )}
