@@ -604,7 +604,7 @@ export default function PlannerApp({
               </span>
               <a
                 href="#likelihood"
-                title="See why — jump to the likelihood breakdown"
+                title={`${successPct}% likely to last to your planning age of ${plan.lifeExpectancy} — tap for the breakdown`}
                 className={`group inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold transition hover:brightness-125 ${
                   successTone === "accent"
                     ? "bg-emerald-500/15 text-emerald-400"
@@ -613,7 +613,7 @@ export default function PlannerApp({
                       : "bg-red-500/15 text-red-400"
                 }`}
               >
-                {successPct}% success
+                {successPct}% likely to last to {plan.lifeExpectancy}
                 <span
                   aria-hidden
                   className="transition-transform group-hover:translate-y-0.5"
