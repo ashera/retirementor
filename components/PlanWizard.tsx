@@ -44,6 +44,9 @@ interface PlanWizardProps {
   onComplete: (plan: RetirementPlan) => void;
   /** Called on every "Next" so the host can save progress as the user advances. */
   onProgress?: (plan: RetirementPlan) => void;
+  /** Open the budget builder (saving the current draft first) — the spending
+   *  source of truth when a detailed budget exists. */
+  onEditBudget?: (plan: RetirementPlan) => void;
   onClose: () => void;
 }
 
@@ -151,6 +154,7 @@ export default function PlanWizard({
   config,
   onComplete,
   onProgress,
+  onEditBudget,
   onClose,
 }: PlanWizardProps) {
   const [draft, setDraft] = useState<RetirementPlan>(initial);
@@ -618,6 +622,45 @@ export default function PlanWizard({
           }
         />
 
+        {draft.budget ? (
+          // A detailed budget is the source of truth for spending — defer to it
+          // rather than let the wizard silently desync targetSpending/stages.
+          <div className="space-y-3">
+            <div className="rounded-xl border border-line bg-panel-2 p-4">
+              <div className="text-xs font-semibold uppercase tracking-wide text-muted">Spending — from your budget</div>
+              <div className="mt-1 text-lg font-bold text-white">
+                {draft.spendingMode === "stages"
+                  ? `${fmtCurrency(draft.spendingStages.goGo)}/yr go-go`
+                  : `${fmtCurrency(draft.targetSpending)}/yr`}
+              </div>
+              {draft.spendingMode === "stages" && (
+                <div className="mt-0.5 text-xs text-muted">
+                  {fmtCurrency(draft.spendingStages.goGo)} → {fmtCurrency(draft.spendingStages.slowGo)} → {fmtCurrency(draft.spendingStages.noGo)} as you age
+                </div>
+              )}
+              <p className="mt-2 text-xs text-muted">
+                Your retirement spending comes from the detailed budget you built, so it stays
+                consistent across the app. Edit it there, or switch to a simple target.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => onEditBudget?.(draft)}
+                className="rounded-lg border border-accent/40 bg-accent/10 px-3 py-1.5 text-xs font-semibold text-accent transition hover:bg-accent/20"
+              >
+                Edit your budget →
+              </button>
+              <button
+                type="button"
+                onClick={() => patch({ budget: undefined })}
+                className="rounded-lg border border-line bg-panel-2 px-3 py-1.5 text-xs text-slate-200 transition hover:border-accent/50"
+              >
+                Switch to a simple target
+              </button>
+            </div>
+          </div>
+        ) : (
         <div>
           <div className="mb-3 flex items-center justify-between gap-3">
             <span className="text-sm font-medium text-slate-200">
@@ -722,7 +765,15 @@ export default function PlanWizard({
               />
             </div>
           )}
+          <button
+            type="button"
+            onClick={() => onEditBudget?.(draft)}
+            className="mt-4 text-xs font-medium text-accent hover:underline"
+          >
+            Prefer a detailed, category-by-category budget? Build one →
+          </button>
         </div>
+        )}
       </div>
     ),
   };

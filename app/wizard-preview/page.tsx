@@ -5,6 +5,7 @@ import { notFound, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import PlanWizard from "@/components/PlanWizard";
 import { DEFAULT_CONFIG as config } from "@/lib/au/config";
+import { budgetToStages, budgetTotal, presetCategories } from "@/lib/au/budget";
 import { DEFAULT_PLAN, type RetirementPlan } from "@/lib/au/types";
 
 const mid: RetirementPlan = {
@@ -32,7 +33,16 @@ const couple: RetirementPlan = {
   people: [full.people[0], { currentAge: 40, superBalance: 150_000, salary: 70_000, voluntaryConcessional: 0, voluntaryNonConcessional: 0 }],
 };
 
-const CASES: Record<string, RetirementPlan> = { mid, full, couple };
+const budgetCats = presetCategories(config, "single", true, "comfortable");
+const budgeted: RetirementPlan = {
+  ...full,
+  spendingMode: "stages",
+  spendingStages: budgetToStages(config, budgetCats),
+  targetSpending: budgetTotal(budgetCats),
+  budget: { tenure: "own", lifestyle: "comfortable", categories: budgetCats, applyPhases: true },
+};
+
+const CASES: Record<string, RetirementPlan> = { mid, full, couple, budgeted };
 
 function Inner() {
   const c = useSearchParams().get("case") ?? "mid";

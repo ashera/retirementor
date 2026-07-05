@@ -960,6 +960,12 @@ export default function PlannerApp({
             setPlan(d);
             persistWorking(d);
           }}
+          onEditBudget={(d) => {
+            setPlan(d);
+            persistWorking(d);
+            setWizardOpen(false);
+            setBudgetOpen(true);
+          }}
           onClose={() => setWizardOpen(false)}
         />
       )}
