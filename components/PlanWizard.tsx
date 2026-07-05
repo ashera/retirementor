@@ -43,6 +43,67 @@ interface PlanWizardProps {
   onClose: () => void;
 }
 
+type OptMode = "no" | "yes";
+
+/** A small circular "how complete is your plan" meter shown in the header. */
+function CompletenessRing({ pct }: { pct: number }) {
+  const r = 17;
+  const circ = 2 * Math.PI * r;
+  const offset = circ * (1 - Math.max(0, Math.min(100, pct)) / 100);
+  return (
+    <div className="relative h-11 w-11 shrink-0" aria-label={`Plan ${pct}% complete`}>
+      <svg viewBox="0 0 44 44" className="h-11 w-11 -rotate-90">
+        <circle cx="22" cy="22" r={r} fill="none" stroke="#232c40" strokeWidth="4" />
+        <circle
+          cx="22"
+          cy="22"
+          r={r}
+          fill="none"
+          stroke="#34d399"
+          strokeWidth="4"
+          strokeLinecap="round"
+          strokeDasharray={circ}
+          strokeDashoffset={offset}
+          className="transition-[stroke-dashoffset] duration-500 ease-out"
+        />
+      </svg>
+      <div className="absolute inset-0 flex items-center justify-center text-[11px] font-bold tabular-nums text-white">
+        {pct}
+      </div>
+    </div>
+  );
+}
+
+/** "No / Yes" answer for an optional section, so it can reach a definite state. */
+function OptionalAnswer({
+  question,
+  hint,
+  mode,
+  onChange,
+}: {
+  question: string;
+  hint?: string;
+  mode: OptMode | undefined;
+  onChange: (v: OptMode) => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-xl border border-line bg-panel-2 px-4 py-3">
+      <div>
+        <span className="text-sm font-medium text-slate-200">{question}</span>
+        {hint && <p className="text-xs text-muted">{hint}</p>}
+      </div>
+      <Segmented
+        value={(mode ?? "") as OptMode}
+        options={[
+          { value: "no" as OptMode, label: "No" },
+          { value: "yes" as OptMode, label: "Yes" },
+        ]}
+        onChange={onChange}
+      />
+    </div>
+  );
+}
+
 function Segmented<T extends string>({
   value,
   options,
@@ -81,8 +142,26 @@ export default function PlanWizard({
   const [draft, setDraft] = useState<RetirementPlan>(initial);
   const [step, setStep] = useState(0);
 
+  // Explicit "have you told us?" state for the optional sections that otherwise
+  // default to $0 (so we can't tell "none" from "not answered yet"). Seeded from
+  // the incoming plan; drives the completeness meter and reveals the fields.
+  const hasContrib = initial.people.some((p) => p.voluntaryConcessional > 0 || p.voluntaryNonConcessional > 0);
+  const hasOutside = initial.outsideSuper > 0 || initial.annualOutsideSavings > 0;
+  const [contribMode, setContribMode] = useState<OptMode | undefined>(hasContrib ? "yes" : undefined);
+  const [outsideMode, setOutsideMode] = useState<OptMode | undefined>(hasOutside ? "yes" : undefined);
+  const [propMode, setPropMode] = useState<OptMode | undefined>(initial.investmentProperty ? "yes" : undefined);
+
   const patch = (p: Partial<RetirementPlan>) =>
     setDraft((prev) => ({ ...prev, ...p }));
+
+  const answerContributions = (v: OptMode) => {
+    setContribMode(v);
+    if (v === "no") setDraft((prev) => ({ ...prev, people: prev.people.map((pp) => ({ ...pp, voluntaryConcessional: 0, voluntaryNonConcessional: 0 })) }));
+  };
+  const answerOutside = (v: OptMode) => {
+    setOutsideMode(v);
+    if (v === "no") setDraft((prev) => ({ ...prev, outsideSuper: 0, annualOutsideSavings: 0 }));
+  };
 
   const setPerson =
     (i: number, key: keyof Person) => (value: number) =>
@@ -147,6 +226,7 @@ export default function PlanWizard({
 
   // Build steps dynamically (partner step only for couples).
   const personStep = (i: number, title: string, subtitle: string) => ({
+    key: i === 0 ? "you" : "partner",
     nav: i === 0 ? "You" : "Partner",
     title,
     subtitle,
@@ -211,12 +291,22 @@ export default function PlanWizard({
   });
 
   const contributionsStep = {
+    key: "contributions",
     nav: "Super",
     title: "Extra super contributions",
     subtitle: "Voluntary contributions on top of the 12% your employer pays.",
     body: (
       <div className="space-y-6">
-        {draft.people.map((person, i) => (
+        <OptionalAnswer
+          question="Do you add extra to super?"
+          hint="On top of the 12% Super Guarantee your employer pays."
+          mode={contribMode}
+          onChange={answerContributions}
+        />
+        {contribMode === "no" && (
+          <p className="text-xs text-muted">Just the employer Super Guarantee, then — you can change this anytime.</p>
+        )}
+        {contribMode === "yes" && draft.people.map((person, i) => (
           <div key={i} className="space-y-6">
             {isCouple && (
               <div className="text-xs font-semibold uppercase tracking-wide text-accent">
@@ -249,30 +339,44 @@ export default function PlanWizard({
   };
 
   const outsideStep = {
+    key: "outside",
     nav: "Savings",
     title: "Savings outside super",
     subtitle:
       "Investments you can access any time — these fund an early-retirement bridge before super unlocks at 60.",
     body: (
       <div className="space-y-6">
-        <Field
-          label="Current outside-super investments"
-          value={draft.outsideSuper}
-          onChange={(v) => patch({ outsideSuper: v })}
-          min={0}
-          max={5_000_000}
-          step={1000}
-          prefix="$"
+        <OptionalAnswer
+          question="Any savings outside super?"
+          hint="Shares, savings, an offset — anything you can access before 60."
+          mode={outsideMode}
+          onChange={answerOutside}
         />
-        <Field
-          label="Added each year (while working)"
-          value={draft.annualOutsideSavings}
-          onChange={(v) => patch({ annualOutsideSavings: v })}
-          min={0}
-          max={200_000}
-          step={500}
-          prefix="$"
-        />
+        {outsideMode === "no" && (
+          <p className="text-xs text-muted">No outside-super savings recorded — you can add them anytime.</p>
+        )}
+        {outsideMode === "yes" && (
+          <>
+            <Field
+              label="Current outside-super investments"
+              value={draft.outsideSuper}
+              onChange={(v) => patch({ outsideSuper: v })}
+              min={0}
+              max={5_000_000}
+              step={1000}
+              prefix="$"
+            />
+            <Field
+              label="Added each year (while working)"
+              value={draft.annualOutsideSavings}
+              onChange={(v) => patch({ annualOutsideSavings: v })}
+              min={0}
+              max={200_000}
+              step={500}
+              prefix="$"
+            />
+          </>
+        )}
       </div>
     ),
   };
@@ -293,6 +397,7 @@ export default function PlanWizard({
     }));
 
   const propertyStep = {
+    key: "property",
     nav: "Property",
     title: "Investment property",
     subtitle:
@@ -300,12 +405,15 @@ export default function PlanWizard({
     body: (
       <div className="space-y-5">
         <Segmented
-          value={p ? "yes" : "no"}
+          value={(propMode ?? "") as "no" | "yes"}
           options={[
             { value: "no", label: "None" },
             { value: "yes", label: "I have one" },
           ]}
-          onChange={(v) => toggleProperty(v === "yes")}
+          onChange={(v) => {
+            setPropMode(v === "yes" ? "yes" : "no");
+            toggleProperty(v === "yes");
+          }}
         />
 
         {p && (
@@ -465,6 +573,7 @@ export default function PlanWizard({
 
   const stages = draft.spendingStages;
   const goalStep = {
+    key: "goal",
     nav: "Goal",
     title: "Your retirement goal",
     subtitle: "When you want to stop working and how much you'll spend.",
@@ -594,6 +703,7 @@ export default function PlanWizard({
   };
 
   const assumptionsStep = {
+    key: "assumptions",
     nav: "Assumptions",
     title: "Assumptions",
     subtitle: "The long-run numbers behind the projection.",
@@ -673,6 +783,7 @@ export default function PlanWizard({
   };
 
   const householdStep = {
+    key: "household",
     nav: "Household",
     title: "Your household",
     subtitle: "Age Pension rates and means-test thresholds differ for singles and couples.",
@@ -732,7 +843,7 @@ export default function PlanWizard({
     ),
   };
 
-  const steps: { nav: string; title: string; subtitle: string; body: ReactNode }[] = [
+  const steps: { key: string; nav: string; title: string; subtitle: string; body: ReactNode }[] = [
     householdStep,
     personStep(0, isCouple ? "About you" : "About you", "Where you're starting from today."),
     ...(isCouple ? [personStep(1, "About your partner", "Your partner's starting point.")] : []),
@@ -747,6 +858,42 @@ export default function PlanWizard({
   const current = steps[safeStep];
   const isLast = safeStep === steps.length - 1;
 
+  // ── Completeness meter — measures what the user has TOLD us, not steps clicked.
+  // Core sections gate the tier; Assumptions is a bonus ★, not part of the score.
+  const p0 = draft.people[0];
+  const p1 = draft.people[1];
+  const goalSet = draft.retirementAge > 0 && (draft.spendingMode === "stages" ? draft.spendingStages.goGo > 0 : draft.targetSpending > 0);
+  const sectionState: Record<string, { core: boolean; optional: boolean; complete: boolean; label: string }> = {
+    household: { core: true, optional: false, complete: true, label: "household" },
+    you: { core: true, optional: false, complete: p0.superBalance > 0 || p0.salary > 0, label: "your details" },
+    ...(isCouple ? { partner: { core: true, optional: false, complete: !!p1 && (p1.superBalance > 0 || p1.salary > 0), label: "your partner" } } : {}),
+    contributions: { core: false, optional: true, complete: contribMode !== undefined, label: "extra contributions" },
+    outside: { core: false, optional: true, complete: outsideMode !== undefined, label: "outside savings" },
+    property: { core: false, optional: true, complete: propMode !== undefined, label: "an investment property" },
+    goal: { core: true, optional: false, complete: goalSet, label: "retirement goal" },
+  };
+  const scored = Object.values(sectionState);
+  const completeCount = scored.filter((s) => s.complete).length;
+  const total = scored.length;
+  const pct = Math.round((completeCount / total) * 100);
+  const coreComplete = scored.every((s) => !s.core || s.complete);
+  const enrichDone = scored.filter((s) => s.optional && s.complete).length;
+  const tier = !coreComplete
+    ? "Sketch"
+    : pct === 100
+      ? "Complete picture"
+      : enrichDone === 0
+        ? "Working model"
+        : "Detailed";
+  const tuned =
+    draft.investmentReturn !== DEFAULT_PLAN.investmentReturn ||
+    draft.inflation !== DEFAULT_PLAN.inflation ||
+    draft.lifeExpectancy !== DEFAULT_PLAN.lifeExpectancy ||
+    (!!draft.fees && JSON.stringify(draft.fees) !== JSON.stringify(config.fees));
+  // The nudge: point at the essentials first, then the first open enrichment.
+  const gap = scored.find((s) => s.core && !s.complete) ?? scored.find((s) => s.optional && !s.complete);
+  const gapStepIndex = gap ? steps.findIndex((s) => sectionState[s.key]?.label === gap.label) : -1;
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
@@ -758,44 +905,57 @@ export default function PlanWizard({
         onClick={onClose}
       />
       <div className="relative z-10 flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-line bg-panel shadow-2xl">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-line px-6 py-4">
-          <div>
-            <div className="text-xs font-semibold uppercase tracking-widest text-accent">
-              Step {safeStep + 1} of {steps.length}
+        {/* Header — completeness ring + tier, with the current step title */}
+        <div className="flex items-center justify-between gap-3 border-b border-line px-6 py-4">
+          <div className="flex min-w-0 items-center gap-3">
+            <CompletenessRing pct={pct} />
+            <div className="min-w-0">
+              <h2 className="truncate text-lg font-bold leading-tight text-white">
+                {current.title}
+              </h2>
+              <div className="mt-0.5 text-xs font-medium text-accent transition-colors">
+                {tier} · {completeCount}/{total} details told{tuned ? " · ★ fine-tuned" : ""}
+              </div>
             </div>
-            <h2 className="mt-0.5 text-lg font-bold text-white">
-              {current.title}
-            </h2>
           </div>
           <button
             onClick={onClose}
             aria-label="Close"
-            className="rounded-lg p-1.5 text-muted transition hover:bg-panel-2 hover:text-white"
+            className="shrink-0 rounded-lg p-1.5 text-muted transition hover:bg-panel-2 hover:text-white"
           >
             ✕
           </button>
         </div>
 
-        {/* Step navigation — click any step to jump straight to it */}
+        {/* Step navigation — each pill shows its state: ✓ told us, ＋ opportunity */}
         <div className="flex flex-wrap gap-1.5 px-6 pt-4">
-          {steps.map((s, i) => (
-            <button
-              key={i}
-              type="button"
-              onClick={() => setStep(i)}
-              aria-current={i === safeStep ? "step" : undefined}
-              className={`rounded-full px-2.5 py-1 text-xs font-medium transition ${
-                i === safeStep
-                  ? "bg-accent text-ink"
-                  : i < safeStep
-                    ? "bg-accent/15 text-accent hover:bg-accent/25"
-                    : "bg-panel-2 text-muted hover:text-white"
-              }`}
-            >
-              {s.nav}
-            </button>
-          ))}
+          {steps.map((s, i) => {
+            const sec = sectionState[s.key];
+            const isCurrent = i === safeStep;
+            // Assumptions is a bonus (★ when fine-tuned) — never an amber "＋" gap.
+            const isAssump = s.key === "assumptions";
+            const complete = isAssump ? tuned : sec?.complete;
+            const opportunity = !isAssump && !complete && sec?.optional;
+            const cls = isCurrent
+              ? "bg-accent text-ink"
+              : complete
+                ? "bg-accent/15 text-accent hover:bg-accent/25"
+                : opportunity
+                  ? "border border-dashed border-amber-400/40 text-amber-300/90 hover:text-amber-200"
+                  : "bg-panel-2 text-muted hover:text-white";
+            const mark = isCurrent ? "" : isAssump ? (tuned ? "★ " : "") : complete ? "✓ " : opportunity ? "＋ " : "";
+            return (
+              <button
+                key={i}
+                type="button"
+                onClick={() => setStep(i)}
+                aria-current={isCurrent ? "step" : undefined}
+                className={`rounded-full px-2.5 py-1 text-xs font-medium transition ${cls}`}
+              >
+                {mark}{s.nav}
+              </button>
+            );
+          })}
         </div>
 
         {/* Body (scrolls) */}
@@ -803,6 +963,30 @@ export default function PlanWizard({
           <p className="mb-5 text-sm text-muted">{current.subtitle}</p>
           {current.body}
         </div>
+
+        {/* Completeness nudge — celebrate at 100%, else point at the next gap */}
+        {pct === 100 ? (
+          <div className="mx-6 mb-2 rounded-xl border border-accent/30 bg-accent/10 px-4 py-2.5 text-center text-xs font-medium text-accent">
+            ✓ Complete picture — that&apos;s as detailed as your model gets.
+          </div>
+        ) : gap ? (
+          <div className="mx-6 mb-2">
+            <button
+              type="button"
+              onClick={() => gapStepIndex >= 0 && setStep(gapStepIndex)}
+              className="flex w-full items-center justify-between gap-2 rounded-xl border border-line bg-panel-2 px-4 py-2.5 text-left text-xs transition hover:border-accent/40"
+            >
+              <span className="text-slate-300">
+                {gap.core ? (
+                  <>Add <span className="font-semibold text-white">{gap.label}</span> to finish the essentials</>
+                ) : (
+                  <>＋ Add <span className="font-semibold text-white">{gap.label}</span> for a sharper model</>
+                )}
+              </span>
+              <span className="shrink-0 font-semibold text-accent">→</span>
+            </button>
+          </div>
+        ) : null}
 
         {/* Live preview */}
         <div className="mx-6 mb-2 flex items-center justify-between rounded-xl border border-line bg-panel-2 px-4 py-3">
