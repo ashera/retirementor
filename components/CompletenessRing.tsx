@@ -44,7 +44,10 @@ export default function CompletenessRing({ pct, size = 44 }: { pct: number; size
         <circle cx={c} cy={c} r={r} fill="none" stroke="#34d399" strokeWidth={stroke} strokeLinecap="round" strokeDasharray={circ} strokeDashoffset={offset} />
       </svg>
       <div className="absolute inset-0 flex items-center justify-center leading-none">
-        <span className={`font-bold tabular-nums text-white ${fontClass}`}>{display}</span>
+        <span className={`font-bold tabular-nums text-white ${fontClass}`}>
+          {display}
+          {big && <span className="align-top text-base font-semibold text-muted">%</span>}
+        </span>
       </div>
     </div>
   );

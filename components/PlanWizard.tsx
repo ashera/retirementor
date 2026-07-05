@@ -3,6 +3,7 @@
 import { useState, type ReactNode } from "react";
 import Field from "@/components/Field";
 import CompletenessRing from "@/components/CompletenessRing";
+import BudgetBuilder from "@/components/BudgetBuilder";
 import InlineExplainer from "@/components/InlineExplainer";
 import { simulate } from "@/lib/au/simulate";
 import type { EngineConfig } from "@/lib/au/config";
@@ -39,9 +40,6 @@ interface PlanWizardProps {
   onComplete: (plan: RetirementPlan) => void;
   /** Called on every "Next" so the host can save progress as the user advances. */
   onProgress?: (plan: RetirementPlan) => void;
-  /** Open the budget builder (saving the current draft first) — the spending
-   *  source of truth when a detailed budget exists. */
-  onEditBudget?: (plan: RetirementPlan) => void;
   onClose: () => void;
 }
 
@@ -149,12 +147,12 @@ export default function PlanWizard({
   config,
   onComplete,
   onProgress,
-  onEditBudget,
   onClose,
 }: PlanWizardProps) {
   const [draft, setDraft] = useState<RetirementPlan>(initial);
   const [step, setStep] = useState(0);
   const [view, setView] = useState<"summary" | "step">("summary");
+  const [budgetOpen, setBudgetOpen] = useState(false); // budget builder, nested over the wizard
 
   // Explicit "have you told us?" state for the optional sections that otherwise
   // default to $0 (so we can't tell "none" from "not answered yet"). Seeded from
@@ -610,7 +608,7 @@ export default function PlanWizard({
         </div>
         <button
           type="button"
-          onClick={() => onEditBudget?.(draft)}
+          onClick={() => setBudgetOpen(true)}
           className="w-full rounded-lg border border-accent/40 bg-accent/10 px-4 py-2.5 text-sm font-semibold text-accent transition hover:bg-accent/20"
         >
           {draft.budget ? "Edit your spending budget →" : "Set your retirement spending →"}
@@ -1034,6 +1032,20 @@ export default function PlanWizard({
         </>
         )}
       </div>
+
+      {/* Budget builder, nested over the wizard — applies back to the draft and
+          returns here on close, so spending stays in one place. */}
+      {budgetOpen && (
+        <BudgetBuilder
+          plan={draft}
+          config={config}
+          onApply={(update) => {
+            setDraft((prev) => ({ ...prev, ...update }));
+            setBudgetOpen(false);
+          }}
+          onClose={() => setBudgetOpen(false)}
+        />
+      )}
     </div>
   );
 }
