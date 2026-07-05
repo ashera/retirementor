@@ -5,6 +5,7 @@
 
 import { simulate } from "./simulate";
 import { lifestageBreakdown } from "./lifestages";
+import { budgetToStages, budgetTotal, isEssential } from "./budget";
 import type { EngineConfig } from "./config";
 import type { RetirementPlan } from "./types";
 
@@ -156,31 +157,84 @@ export interface SpendingTrim {
  * `essentials + d × discretionary`, and we solve for the largest `d` that still
  * lasts. If even `d = 0` (essentials only) can't last, the trim is infeasible —
  * a signal that saving more / retiring later is needed, not belt-tightening.
+ *
+ * When the plan has a built budget, the trim scales the DISCRETIONARY budget
+ * categories (essentials untouched) and re-derives spending from them, so the
+ * returned patch keeps `plan.budget` in lockstep with the spending it applies —
+ * the budget builder and the engine never disagree.
  */
 export function trimSpending(plan: RetirementPlan, config: EngineConfig): SpendingTrim {
   const bd = lifestageBreakdown(plan, config);
   const essentials = bd.essentials;
   const staged = bd.staged;
   const s = plan.spendingStages;
+  const budget = plan.budget;
 
+  // Discretionary budget categories scaled to fraction d (essentials unchanged).
+  const scaleCategories = (d: number): Record<string, number> => {
+    const out: Record<string, number> = {};
+    for (const [k, v] of Object.entries(budget!.categories)) {
+      out[k] = isEssential(k) ? v : Math.round(v * d);
+    }
+    return out;
+  };
+
+  // The plan at discretionary-keep fraction d. With a budget, re-derive spending
+  // from the scaled categories (so it matches exactly what the builder produces);
+  // otherwise scale the staged/flat living amounts around the essentials floor.
   const scaleDisc = (living: number, d: number) => essentials + d * Math.max(0, living - essentials);
-  const planAt = (d: number): RetirementPlan =>
-    staged
+  const planAt = (d: number): RetirementPlan => {
+    if (budget) {
+      const categories = scaleCategories(d);
+      const applyPhases = budget.applyPhases;
+      const next: RetirementPlan = {
+        ...plan,
+        budget: { ...budget, categories },
+        targetSpending: budgetTotal(categories),
+        spendingMode: applyPhases ? "stages" : "flat",
+      };
+      if (applyPhases) next.spendingStages = budgetToStages(config, categories);
+      return next;
+    }
+    return staged
       ? { ...plan, spendingStages: { ...s, goGo: scaleDisc(s.goGo, d), slowGo: scaleDisc(s.slowGo, d), noGo: scaleDisc(s.noGo, d) } }
       : { ...plan, targetSpending: scaleDisc(plan.targetSpending, d) };
+  };
+
+  // The spending patch for fraction d (what actually gets applied).
+  const patchAt = (d: number): Partial<RetirementPlan> => {
+    if (budget) {
+      const categories = scaleCategories(d);
+      const applyPhases = budget.applyPhases;
+      return {
+        budget: { ...budget, categories },
+        targetSpending: budgetTotal(categories),
+        spendingMode: applyPhases ? "stages" : "flat",
+        ...(applyPhases ? { spendingStages: budgetToStages(config, categories) } : {}),
+      };
+    }
+    const trimmedLiving = (living: number) => floorTo(scaleDisc(living, d), 100);
+    return staged
+      ? { spendingStages: { ...s, goGo: trimmedLiving(s.goGo), slowGo: trimmedLiving(s.slowGo), noGo: trimmedLiving(s.noGo) } }
+      : { targetSpending: trimmedLiving(plan.targetSpending) };
+  };
 
   const applicable = !lasts(plan, config);
   const d = solveThreshold((dd) => lasts(planAt(dd), config), 0, 1, false, 0.004);
   const feasible = applicable && d != null;
   const dd = d ?? 0;
+  const patch = patchAt(dd);
 
-  // Applied amounts: discretionary cut to fraction dd, floored to $100 (so it
-  // sits at/under the boundary and genuinely lasts). Essentials are a $100
-  // multiple already, so the total never dips below the essentials floor.
-  const trimmedLiving = (living: number) => floorTo(scaleDisc(living, dd), 100);
-
+  // Per-stage view: hold essentials flat, read the after-living from the applied
+  // spending (stages when phased, else the flat target for the single row).
+  const afterStages = patch.spendingStages;
+  const afterTarget = patch.targetSpending;
+  const afterLiving = (key: string): number => {
+    if (afterStages) return key === "Go-go" ? afterStages.goGo : key === "Slow-go" ? afterStages.slowGo : afterStages.noGo;
+    return afterTarget ?? 0;
+  };
   const stages: TrimStageView[] = bd.rows.map((r) => {
-    const totalAfter = feasible ? trimmedLiving(r.living) : essentials;
+    const totalAfter = feasible ? afterLiving(r.key) : essentials;
     return {
       key: r.key,
       ageFrom: r.ageFrom,
@@ -191,10 +245,6 @@ export function trimSpending(plan: RetirementPlan, config: EngineConfig): Spendi
       totalAfter,
     };
   });
-
-  const patch: Partial<RetirementPlan> = staged
-    ? { spendingStages: { ...s, goGo: trimmedLiving(s.goGo), slowGo: trimmedLiving(s.slowGo), noGo: trimmedLiving(s.noGo) } }
-    : { targetSpending: trimmedLiving(plan.targetSpending) };
 
   return {
     applicable,
