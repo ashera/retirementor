@@ -25,6 +25,8 @@ import type {
 import Field from "@/components/Field";
 import BudgetCategoryIcon, { CATEGORY_COLOR } from "@/components/BudgetCategoryIcon";
 import TrimSpendingModal from "@/components/TrimSpendingModal";
+import BoostSpendingModal from "@/components/BoostSpendingModal";
+import { boostSpending } from "@/lib/au/goalseek";
 
 function defaultMortgage(oldestAtRetire: number): MortgageDetail {
   const balance = 180_000;
@@ -110,11 +112,15 @@ export default function BudgetBuilder({ plan, config, onApply, onClose }: Budget
   // The working plan carrying the in-progress budget, so the trim can scale the
   // discretionary categories (and we apply the result straight back into them).
   const [trimOpen, setTrimOpen] = useState(false);
+  const [boostOpen, setBoostOpen] = useState(false);
   const budgetPlan = useMemo(
     () => ({ ...workingPlan, budget: { tenure, lifestyle, categories, applyPhases } }),
     [workingPlan, tenure, lifestyle, categories, applyPhases],
   );
-  const applyTrim = (patch: Partial<RetirementPlan>) => {
+  // Cheap when the budget doesn't last (boostSpending short-circuits after one
+  // sim); the ~binary-search cost is only paid when there's genuine headroom.
+  const boost = useMemo(() => boostSpending(budgetPlan, config), [budgetPlan, config]);
+  const applyBudgetPatch = (patch: Partial<RetirementPlan>) => {
     if (patch.budget?.categories) setCategories(patch.budget.categories);
   };
 
@@ -351,6 +357,8 @@ export default function BudgetBuilder({ plan, config, onApply, onClose }: Budget
               stages={stages}
               mortgage={activeMortgage}
               onTrim={() => setTrimOpen(true)}
+              onBoost={() => setBoostOpen(true)}
+              canBoost={boost.hasHeadroom}
             />
           )}
         </div>
@@ -375,11 +383,21 @@ export default function BudgetBuilder({ plan, config, onApply, onClose }: Budget
       <TrimSpendingModal
         open={trimOpen}
         onClose={() => setTrimOpen(false)}
-        onApply={applyTrim}
+        onApply={applyBudgetPatch}
         plan={budgetPlan}
         config={config}
         result={impact}
         applyLabel="Trim my budget"
+      />
+
+      <BoostSpendingModal
+        open={boostOpen}
+        onClose={() => setBoostOpen(false)}
+        onApply={applyBudgetPatch}
+        plan={budgetPlan}
+        config={config}
+        result={impact}
+        applyLabel="Boost my budget"
       />
     </div>
   );
@@ -949,6 +967,8 @@ function PayoffStep({
   stages,
   mortgage,
   onTrim,
+  onBoost,
+  canBoost,
 }: {
   total: number;
   essential: number;
@@ -960,6 +980,8 @@ function PayoffStep({
   stages: SpendingStages;
   mortgage: MortgageDetail | undefined;
   onTrim: () => void;
+  onBoost: () => void;
+  canBoost: boolean;
 }) {
   const hh = plan.household;
   const comfortable = config.asfa.comfortable[hh];
@@ -1059,7 +1081,17 @@ function PayoffStep({
         }`}
       >
         {impact.lastsToLifeExpectancy ? (
-          <>On this budget your money lasts to {plan.lifeExpectancy}+ 🎉</>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span>On this budget your money lasts to {plan.lifeExpectancy}+ 🎉</span>
+            {canBoost && (
+              <button
+                onClick={onBoost}
+                className="shrink-0 rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-ink transition hover:bg-accent-soft"
+              >
+                📈 Help me spend more
+              </button>
+            )}
+          </div>
         ) : (
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span>
