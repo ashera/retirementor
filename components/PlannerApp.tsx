@@ -53,15 +53,16 @@ const BASELINE_KEY = "au-retirement-baseline";
 const BASELINE_NAME_KEY = "au-retirement-baseline-name"; // label for the ghost line
 
 // A blank starting point for a first-time visitor's "Enter my details" wizard:
-// personal figures start empty (NaN renders as a blank Field) rather than
-// prepopulated, so nothing looks like the user's data until they type it.
+// the personal figures (age, super, salary) start empty (NaN renders as a blank
+// Field) so nothing looks like the user's data until they type it. Spending and
+// retirement age keep sensible defaults so a first-timer can finish quickly
+// without first building a budget — they can still refine them afterwards.
 const BLANK_STARTER: RetirementPlan = {
   ...DEFAULT_PLAN,
   people: [{ ...DEFAULT_PLAN.people[0], currentAge: NaN, superBalance: NaN, salary: NaN }],
   superMode: "individual",
   outsideSuper: 0,
   annualOutsideSavings: 0,
-  targetSpending: NaN,
 };
 
 function LegendDot({ color, label }: { color: string; label: string }) {
