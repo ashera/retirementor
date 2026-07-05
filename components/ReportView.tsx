@@ -412,23 +412,20 @@ export default function ReportView({
         <div className="break-before-page">
           <Section title={`Range of outcomes — ${successPct}% of simulations fund the whole plan`}>
             <Lead>
-              The earlier projections assume a steady return, but real markets are
-              volatile — and a poor run of returns early in retirement does
-              disproportionate damage (&ldquo;sequencing risk&rdquo;). Running your
-              plan across {mc.iterations.toLocaleString()} random return sequences,
-              the line is the median outcome and the band the 10th–90th percentile
-              range.
+              Real markets are volatile, and a poor run of returns early in
+              retirement does outsized damage (&ldquo;sequencing risk&rdquo;). Across{" "}
+              {mc.iterations.toLocaleString()} random return sequences, the line is
+              the median outcome and the band the 10th–90th percentile.
             </Lead>
             <div className="rounded-lg border border-slate-200 bg-slate-50 p-2">
-              <FanChart fan={mc.fan} retirementAge={result.retirementAge} agePensionAge={result.agePensionAge} height={125} />
+              <FanChart fan={mc.fan} retirementAge={result.retirementAge} agePensionAge={result.agePensionAge} height={108} />
             </div>
           </Section>
 
           <Section title="How the key numbers are calculated">
             <Lead>
               Every headline figure comes from transparent, auditable formulas — the
-              same closed-form calculations used to independently verify the engine.
-              The working behind each number is shown below.
+              same ones used to independently verify the engine.
             </Lead>
             <ReportExplainers plan={plan} config={config} result={result} mc={mc} />
           </Section>
