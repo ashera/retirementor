@@ -47,32 +47,74 @@ interface PlanWizardProps {
 
 type OptMode = "no" | "yes";
 
-/** A small circular "how complete is your plan" meter shown in the header. */
-function CompletenessRing({ pct }: { pct: number }) {
-  const r = 17;
+/** A circular "how complete is your plan" meter. `size` in px (header uses 44). */
+function CompletenessRing({ pct, size = 44 }: { pct: number; size?: number }) {
+  const big = size >= 80;
+  const stroke = big ? 7 : 4;
+  const r = (size - stroke) / 2 - 1;
   const circ = 2 * Math.PI * r;
   const offset = circ * (1 - Math.max(0, Math.min(100, pct)) / 100);
+  const c = size / 2;
   return (
-    <div className="relative h-11 w-11 shrink-0" aria-label={`Plan ${pct}% complete`}>
-      <svg viewBox="0 0 44 44" className="h-11 w-11 -rotate-90">
-        <circle cx="22" cy="22" r={r} fill="none" stroke="#232c40" strokeWidth="4" />
+    <div className="relative shrink-0" style={{ width: size, height: size }} aria-label={`Plan ${pct}% complete`}>
+      <svg viewBox={`0 0 ${size} ${size}`} width={size} height={size} className="-rotate-90">
+        <circle cx={c} cy={c} r={r} fill="none" stroke="#232c40" strokeWidth={stroke} />
         <circle
-          cx="22"
-          cy="22"
+          cx={c}
+          cy={c}
           r={r}
           fill="none"
           stroke="#34d399"
-          strokeWidth="4"
+          strokeWidth={stroke}
           strokeLinecap="round"
           strokeDasharray={circ}
           strokeDashoffset={offset}
           className="transition-[stroke-dashoffset] duration-500 ease-out"
         />
       </svg>
-      <div className="absolute inset-0 flex items-center justify-center text-[11px] font-bold tabular-nums text-white">
-        {pct}
+      <div className="absolute inset-0 flex items-baseline justify-center font-bold tabular-nums text-white">
+        <span className={big ? "text-3xl" : "text-[11px]"}>{pct}</span>
+        {big && <span className="text-sm text-muted">%</span>}
       </div>
     </div>
+  );
+}
+
+// Per-step presentation for the overview hub: accent colour, a line icon, and a
+// one-line reason the step exists (mirrors the budget-builder category cards).
+const STEP_META: Record<string, { color: string; desc: string }> = {
+  household: { color: "#34d399", desc: "Sets your Age Pension rates and means-test thresholds." },
+  you: { color: "#38bdf8", desc: "Your age, super and salary — the starting point." },
+  partner: { color: "#818cf8", desc: "Your partner's age, super and salary." },
+  contributions: { color: "#fbbf24", desc: "Extra super you add beyond the employer 12%." },
+  outside: { color: "#a78bfa", desc: "Savings you can use before super unlocks at 60." },
+  property: { color: "#fb923c", desc: "An investment property is counted by the Age Pension." },
+  goal: { color: "#fb7185", desc: "When you retire and how much you'll spend." },
+  assumptions: { color: "#22d3ee", desc: "Long-run return, inflation and fees." },
+};
+
+function StepIcon({ stepKey, size = 22 }: { stepKey: string; size?: number }) {
+  const color = STEP_META[stepKey]?.color ?? "#94a3b8";
+  const paths: Record<string, ReactNode> = {
+    household: (<><path d="M3 11.5 12 4l9 7.5" /><path d="M5.5 10v10h13V10" /><path d="M10 20v-5h4v5" /></>),
+    you: (<><circle cx="12" cy="8" r="3.2" /><path d="M5.5 20a6.5 6.5 0 0 1 13 0" /></>),
+    partner: (<><circle cx="9" cy="8" r="2.6" /><circle cx="16" cy="9" r="2.2" /><path d="M4 20a5 5 0 0 1 10 0" /><path d="M14.5 20a4.2 4.2 0 0 1 5.5-4" /></>),
+    contributions: (<><path d="M12 21V7" /><path d="M7 12l5-5 5 5" /><path d="M5 4h14" /></>),
+    outside: (<><rect x="3.5" y="7" width="17" height="12" rx="2" /><path d="M3.5 11h17" /><circle cx="16" cy="15" r="1.4" /></>),
+    property: (<><path d="M4 21V6l7-3v18" /><path d="M11 21V9l8 3v9" /><path d="M7 9v0M7 13v0M7 17v0M15 14v0M15 18v0" /></>),
+    goal: (<><circle cx="12" cy="12" r="8" /><circle cx="12" cy="12" r="4" /><circle cx="12" cy="12" r="1" /></>),
+    assumptions: (<><path d="M4 7h10" /><path d="M18 7h2" /><circle cx="16" cy="7" r="2" /><path d="M4 17h2" /><path d="M10 17h10" /><circle cx="8" cy="17" r="2" /></>),
+  };
+  return (
+    <span
+      className="inline-flex shrink-0 items-center justify-center rounded-xl"
+      style={{ backgroundColor: `${color}1f`, width: size + 18, height: size + 18 }}
+      aria-hidden
+    >
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round">
+        {paths[stepKey] ?? <circle cx="12" cy="12" r="8" />}
+      </svg>
+    </span>
   );
 }
 
@@ -144,6 +186,7 @@ export default function PlanWizard({
 }: PlanWizardProps) {
   const [draft, setDraft] = useState<RetirementPlan>(initial);
   const [step, setStep] = useState(0);
+  const [view, setView] = useState<"summary" | "step">("summary");
 
   // Explicit "have you told us?" state for the optional sections that otherwise
   // default to $0 (so we can't tell "none" from "not answered yet"). Seeded from
@@ -897,6 +940,30 @@ export default function PlanWizard({
   const gap = scored.find((s) => s.core && !s.complete) ?? scored.find((s) => s.optional && !s.complete);
   const gapStepIndex = gap ? steps.findIndex((s) => sectionState[s.key]?.label === gap.label) : -1;
 
+  // Overview-card values & status per step.
+  const contribTotal = draft.people.reduce((s, pp) => s + pp.voluntaryConcessional + pp.voluntaryNonConcessional, 0);
+  const stepValue = (key: string): string => {
+    switch (key) {
+      case "household": return `${isCouple ? "Couple" : "Single"} · ${draft.homeowner ? "Owner" : "Renter"}`;
+      case "you": return `${fmtCurrency(draft.superMode === "joint" ? draft.jointSuperBalance : draft.people[0].superBalance)} super`;
+      case "partner": return draft.people[1] ? `${fmtCurrency(draft.people[1].superBalance)} super` : "";
+      case "contributions": return contribMode === undefined ? "Not set yet" : contribMode === "no" ? "None" : `${fmtCurrency(contribTotal)}/yr`;
+      case "outside": return outsideMode === undefined ? "Not set yet" : outsideMode === "no" ? "None" : fmtCurrency(draft.outsideSuper);
+      case "property": return propMode === undefined ? "Not set yet" : propMode === "no" ? "None" : "Included";
+      case "goal": return `${fmtCurrency(draft.spendingMode === "stages" ? draft.spendingStages.goGo : draft.targetSpending)}/yr · retire ${draft.retirementAge}`;
+      case "assumptions": return `${draft.investmentReturn}% · CPI ${draft.inflation}% · to ${draft.lifeExpectancy}`;
+      default: return "";
+    }
+  };
+  const stepStatus = (key: string): { text: string; tone: string } => {
+    if (key === "assumptions") return tuned ? { text: "★ Tuned", tone: "text-cyan-300" } : { text: "Defaults", tone: "text-muted" };
+    const sec = sectionState[key];
+    if (sec?.complete) return { text: "✓ Done", tone: "text-accent" };
+    if (sec?.optional) return { text: "＋ Add", tone: "text-amber-300" };
+    return { text: "Needs info", tone: "text-amber-300" };
+  };
+  const goToStep = (i: number) => { setStep(i); setView("step"); };
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
@@ -908,6 +975,67 @@ export default function PlanWizard({
         onClick={onClose}
       />
       <div className="relative z-10 flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-line bg-panel shadow-2xl">
+        {view === "summary" ? (
+          <>
+            {/* Overview header */}
+            <div className="flex items-center justify-between border-b border-line px-6 py-4">
+              <h2 className="text-lg font-bold text-white">Your plan overview</h2>
+              <button onClick={onClose} aria-label="Close" className="rounded-lg p-1.5 text-muted transition hover:bg-panel-2 hover:text-white">✕</button>
+            </div>
+
+            {/* Big progress donut + a card per section (budget-builder style) */}
+            <div className="h-[420px] max-h-[calc(90vh-150px)] overflow-y-auto px-6 py-6">
+              <div className="flex flex-col items-center text-center">
+                <CompletenessRing pct={pct} size={104} />
+                <div className="mt-3 text-sm font-semibold text-accent">{tier}</div>
+                <div className="text-xs text-muted">
+                  {completeCount} of {total} details told{tuned ? " · ★ fine-tuned" : ""}
+                </div>
+                <p className="mt-2 max-w-xs text-xs text-muted">
+                  The more you tell us, the sharper your projection. Tap a section to fill it in.
+                </p>
+              </div>
+
+              <div className="mt-6 space-y-2">
+                {steps.map((s, i) => {
+                  const st = stepStatus(s.key);
+                  return (
+                    <button
+                      key={s.key}
+                      type="button"
+                      onClick={() => goToStep(i)}
+                      className="flex w-full items-center gap-3 rounded-xl border border-line bg-panel-2/60 px-3 py-2.5 text-left transition hover:border-accent/40"
+                    >
+                      <StepIcon stepKey={s.key} />
+                      <div className="min-w-0 flex-1">
+                        <div className="font-semibold text-white">{s.nav}</div>
+                        <div className="truncate text-xs text-muted">{STEP_META[s.key]?.desc}</div>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <div className="text-sm font-semibold tabular-nums text-white">{stepValue(s.key)}</div>
+                        <div className={`text-[11px] font-semibold ${st.tone}`}>{st.text}</div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Overview footer */}
+            <div className="flex items-center justify-between gap-3 border-t border-line px-6 py-4">
+              <button onClick={onClose} className="rounded-lg px-4 py-2 text-sm font-medium text-muted transition hover:text-white">
+                Cancel
+              </button>
+              <button
+                onClick={() => (gapStepIndex >= 0 ? goToStep(gapStepIndex) : onComplete(draft))}
+                className="rounded-lg bg-accent px-5 py-2 text-sm font-semibold text-ink transition hover:bg-accent-soft"
+              >
+                {gapStepIndex >= 0 ? "Add missing details →" : configured ? "Update plan" : "See my plan"}
+              </button>
+            </div>
+          </>
+        ) : (
+        <>
         {/* Header — completeness ring + tier, with the current step title */}
         <div className="flex items-center justify-between gap-3 border-b border-line px-6 py-4">
           <div className="flex min-w-0 items-center gap-3">
@@ -932,6 +1060,14 @@ export default function PlanWizard({
 
         {/* Step navigation — each pill shows its state: ✓ told us, ＋ opportunity */}
         <div className="flex flex-wrap gap-1.5 px-6 pt-4">
+          <button
+            type="button"
+            onClick={() => setView("summary")}
+            className="rounded-full bg-panel-2 px-2.5 py-1 text-xs font-medium text-muted transition hover:text-white"
+            title="Back to overview"
+          >
+            ☰ Overview
+          </button>
           {steps.map((s, i) => {
             const sec = sectionState[s.key];
             const isCurrent = i === safeStep;
@@ -1017,10 +1153,10 @@ export default function PlanWizard({
         {/* Footer */}
         <div className="flex items-center justify-between gap-3 border-t border-line px-6 py-4">
           <button
-            onClick={() => (safeStep === 0 ? onClose() : setStep(safeStep - 1))}
+            onClick={() => (safeStep === 0 ? setView("summary") : setStep(safeStep - 1))}
             className="rounded-lg px-4 py-2 text-sm font-medium text-muted transition hover:text-white"
           >
-            {safeStep === 0 ? "Cancel" : "← Back"}
+            {safeStep === 0 ? "← Overview" : "← Back"}
           </button>
           <button
             onClick={() => {
@@ -1036,6 +1172,8 @@ export default function PlanWizard({
             {isLast ? (configured ? "Update plan" : "See my plan") : "Next →"}
           </button>
         </div>
+        </>
+        )}
       </div>
     </div>
   );
