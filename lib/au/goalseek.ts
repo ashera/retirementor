@@ -4,6 +4,7 @@
 // is a handful of deterministic simulate() calls via binary search.
 
 import { simulate } from "./simulate";
+import { lifestageBreakdown } from "./lifestages";
 import type { EngineConfig } from "./config";
 import type { RetirementPlan } from "./types";
 
@@ -119,5 +120,91 @@ export function whatWillItTake(
     maxSpend,
     extraSavings,
     retireAge,
+  };
+}
+
+// ── Essentials-protected spending trim ───────────────────────────────────────
+
+const floorTo = (v: number, step: number) => Math.max(0, Math.floor(v / step) * step);
+
+export interface TrimStageView {
+  key: string;
+  ageFrom: number;
+  ageTo: number;
+  discBefore: number;
+  discAfter: number;
+  totalBefore: number; // living (essentials + discretionary), before
+  totalAfter: number; // living, after
+}
+
+export interface SpendingTrim {
+  applicable: boolean; // the plan doesn't already last, so a trim is relevant
+  feasible: boolean; // cutting discretionary (down to the essentials floor) can make it last
+  essentials: number; // the flat essentials floor — held constant, never trimmed
+  essentialsEstimated: boolean; // true when estimated from ASFA (no user budget)
+  discretionaryKeptPct: number; // 0–100, share of discretionary retained after the trim
+  loanCost: number; // ongoing home-loan cost, left untouched
+  patch: Partial<RetirementPlan>; // the spending change to apply (meaningful when feasible)
+  stages: TrimStageView[]; // one row (flat) or three (staged)
+  depletedAgeIfEssentialsOnly: number | null; // when infeasible: where essentials-only still runs out
+}
+
+/**
+ * Trim the budget so it lasts to life expectancy by cutting ONLY the
+ * discretionary spend and holding the essentials floor flat. Essentials come
+ * from the user's budget (or an ASFA estimate); each stage is
+ * `essentials + d × discretionary`, and we solve for the largest `d` that still
+ * lasts. If even `d = 0` (essentials only) can't last, the trim is infeasible —
+ * a signal that saving more / retiring later is needed, not belt-tightening.
+ */
+export function trimSpending(plan: RetirementPlan, config: EngineConfig): SpendingTrim {
+  const bd = lifestageBreakdown(plan, config);
+  const essentials = bd.essentials;
+  const staged = bd.staged;
+  const s = plan.spendingStages;
+
+  const scaleDisc = (living: number, d: number) => essentials + d * Math.max(0, living - essentials);
+  const planAt = (d: number): RetirementPlan =>
+    staged
+      ? { ...plan, spendingStages: { ...s, goGo: scaleDisc(s.goGo, d), slowGo: scaleDisc(s.slowGo, d), noGo: scaleDisc(s.noGo, d) } }
+      : { ...plan, targetSpending: scaleDisc(plan.targetSpending, d) };
+
+  const applicable = !lasts(plan, config);
+  const d = solveThreshold((dd) => lasts(planAt(dd), config), 0, 1, false, 0.004);
+  const feasible = applicable && d != null;
+  const dd = d ?? 0;
+
+  // Applied amounts: discretionary cut to fraction dd, floored to $100 (so it
+  // sits at/under the boundary and genuinely lasts). Essentials are a $100
+  // multiple already, so the total never dips below the essentials floor.
+  const trimmedLiving = (living: number) => floorTo(scaleDisc(living, dd), 100);
+
+  const stages: TrimStageView[] = bd.rows.map((r) => {
+    const totalAfter = feasible ? trimmedLiving(r.living) : essentials;
+    return {
+      key: r.key,
+      ageFrom: r.ageFrom,
+      ageTo: r.ageTo,
+      discBefore: r.discretionary,
+      discAfter: Math.max(0, totalAfter - essentials),
+      totalBefore: r.living,
+      totalAfter,
+    };
+  });
+
+  const patch: Partial<RetirementPlan> = staged
+    ? { spendingStages: { ...s, goGo: trimmedLiving(s.goGo), slowGo: trimmedLiving(s.slowGo), noGo: trimmedLiving(s.noGo) } }
+    : { targetSpending: trimmedLiving(plan.targetSpending) };
+
+  return {
+    applicable,
+    feasible,
+    essentials,
+    essentialsEstimated: bd.estimated,
+    discretionaryKeptPct: Math.round(dd * 100),
+    loanCost: bd.goal.loanCost,
+    patch,
+    stages,
+    depletedAgeIfEssentialsOnly: simulate(planAt(0), config).depletedAge,
   };
 }

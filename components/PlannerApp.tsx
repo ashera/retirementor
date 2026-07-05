@@ -840,11 +840,11 @@ export default function PlannerApp({
           Each lever on its own, on the central (average-return) projection —
           combine them, or check the likelihood above for the odds.
         </p>
-        {gs.maxSpend != null && gs.maxSpend < gs.currentSpend && (
+        {!gs.lasts && (
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
             <p className="text-sm text-slate-300">
-              Want the app to do it for you? Trim the budget to the amount that
-              lasts to age {plan.lifeExpectancy}.
+              Want the app to do it for you? Trim discretionary spending — keeping
+              your essentials — to make your money last to age {plan.lifeExpectancy}.
             </p>
             <button
               onClick={() => setTrimOpen(true)}
@@ -861,13 +861,11 @@ export default function PlannerApp({
         onClose={() => setTrimOpen(false)}
         onApply={(patch) => {
           quickAdjust(patch);
-          setNotice("Spending trimmed to make your money last to life expectancy.");
+          setNotice("Spending trimmed (essentials kept) to make your money last to life expectancy.");
         }}
         plan={plan}
         config={config}
         result={result}
-        gs={gs}
-        loanCost={goal.loanCost}
       />
 
       {/* Assumptions summary */}
