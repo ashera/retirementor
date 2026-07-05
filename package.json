@@ -12,7 +12,8 @@
     "lint": "next lint",
     "db:migrate": "tsx scripts/migrate.ts",
     "test": "vitest run",
-    "test:record": "node scripts/run-tests.mjs"
+    "test:record": "node scripts/run-tests.mjs",
+    "measure:report": "node scripts/measure-report.mjs"
   },
   "dependencies": {
     "@types/pg": "^8.20.0",
