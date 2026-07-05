@@ -12,13 +12,10 @@ import { planCompleteness } from "@/lib/au/completeness";
 import {
   DEFAULT_PARTNER,
   DEFAULT_PLAN,
-  deriveStages,
   type Household,
   type Person,
   type PropertyDetail,
   type RetirementPlan,
-  type SpendingMode,
-  type SpendingStages,
   type SuperMode,
 } from "@/lib/au/types";
 
@@ -34,8 +31,6 @@ const DEFAULT_PROPERTY: PropertyDetail = {
   sellAtAge: 75,
 };
 
-const STAGES_ARTICLE =
-  "https://www.caresuper.com.au/members/advice-and-resources/education-hub/how-retirement-goes-from-go-go-to-no-go";
 
 interface PlanWizardProps {
   initial: RetirementPlan;
@@ -199,30 +194,6 @@ export default function PlanWizard({
         );
         return { ...prev, people };
       });
-
-  const setStage = (key: keyof SpendingStages) => (value: number) =>
-    setDraft((prev) => ({
-      ...prev,
-      spendingStages: { ...prev.spendingStages, [key]: value },
-    }));
-
-  const setSpendingMode = (mode: SpendingMode) =>
-    setDraft((prev) => {
-      if (mode === "stages") {
-        const untouched =
-          JSON.stringify(prev.spendingStages) ===
-          JSON.stringify(DEFAULT_PLAN.spendingStages);
-        return {
-          ...prev,
-          spendingMode: mode,
-          // Seed stages from the flat amount the first time (until they're edited).
-          spendingStages: untouched
-            ? deriveStages(prev.targetSpending)
-            : prev.spendingStages,
-        };
-      }
-      return { ...prev, spendingMode: mode };
-    });
 
   const setHousehold = (household: Household) =>
     setDraft((prev) => {
@@ -595,12 +566,6 @@ export default function PlanWizard({
     ),
   };
 
-  const comfortable = isCouple
-    ? config.asfa.comfortable.couple
-    : config.asfa.comfortable.single;
-  const modest = isCouple ? config.asfa.modest.couple : config.asfa.modest.single;
-
-  const stages = draft.spendingStages;
   const goalStep = {
     key: "goal",
     nav: "Goal",
@@ -622,158 +587,34 @@ export default function PlanWizard({
           }
         />
 
-        {draft.budget ? (
-          // A detailed budget is the source of truth for spending — defer to it
-          // rather than let the wizard silently desync targetSpending/stages.
-          <div className="space-y-3">
-            <div className="rounded-xl border border-line bg-panel-2 p-4">
-              <div className="text-xs font-semibold uppercase tracking-wide text-muted">Spending — from your budget</div>
-              <div className="mt-1 text-lg font-bold text-white">
-                {draft.spendingMode === "stages"
-                  ? `${fmtCurrency(draft.spendingStages.goGo)}/yr go-go`
-                  : `${fmtCurrency(draft.targetSpending)}/yr`}
-              </div>
-              {draft.spendingMode === "stages" && (
-                <div className="mt-0.5 text-xs text-muted">
-                  {fmtCurrency(draft.spendingStages.goGo)} → {fmtCurrency(draft.spendingStages.slowGo)} → {fmtCurrency(draft.spendingStages.noGo)} as you age
-                </div>
-              )}
-              <p className="mt-2 text-xs text-muted">
-                Your retirement spending comes from the detailed budget you built, so it stays
-                consistent across the app. Edit it there, or switch to a simple target.
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => onEditBudget?.(draft)}
-                className="rounded-lg border border-accent/40 bg-accent/10 px-3 py-1.5 text-xs font-semibold text-accent transition hover:bg-accent/20"
-              >
-                Edit your budget →
-              </button>
-              <button
-                type="button"
-                onClick={() => patch({ budget: undefined })}
-                className="rounded-lg border border-line bg-panel-2 px-3 py-1.5 text-xs text-slate-200 transition hover:border-accent/50"
-              >
-                Switch to a simple target
-              </button>
-            </div>
+        {/* Spending is set exclusively in the budget builder — one source of
+            truth, so the wizard and budget can never disagree. */}
+        <div className="rounded-xl border border-line bg-panel-2 p-4">
+          <div className="text-xs font-semibold uppercase tracking-wide text-muted">Retirement spending</div>
+          <div className="mt-1 text-lg font-bold text-white">
+            {draft.spendingMode === "stages"
+              ? `${fmtCurrency(draft.spendingStages.goGo)}/yr go-go`
+              : `${fmtCurrency(draft.targetSpending)}/yr`}
           </div>
-        ) : (
-        <div>
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <span className="text-sm font-medium text-slate-200">
-              Spending plan
-            </span>
-            <Segmented
-              value={draft.spendingMode}
-              onChange={setSpendingMode}
-              options={[
-                { value: "flat", label: "Flat" },
-                { value: "stages", label: "Stages" },
-              ]}
-            />
-          </div>
-
-          {draft.spendingMode === "flat" ? (
-            <div className="space-y-4">
-              <Field
-                label="Target annual spending"
-                value={draft.targetSpending}
-                onChange={(v) => patch({ targetSpending: v })}
-                min={20_000}
-                max={200_000}
-                step={1000}
-                prefix="$"
-              />
-              <div className="flex flex-wrap gap-2">
-                <button
-                  onClick={() => patch({ targetSpending: modest })}
-                  className="rounded-lg border border-line bg-panel-2 px-3 py-1.5 text-xs text-slate-200 hover:border-accent/50"
-                >
-                  ASFA modest {fmtCurrency(modest)}
-                </button>
-                <button
-                  onClick={() => patch({ targetSpending: comfortable })}
-                  className="rounded-lg border border-line bg-panel-2 px-3 py-1.5 text-xs text-slate-200 hover:border-accent/50"
-                >
-                  ASFA comfortable {fmtCurrency(comfortable)}
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-5">
-              <p className="text-xs text-muted">
-                The{" "}
-                <a
-                  href={STAGES_ARTICLE}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-accent hover:underline"
-                >
-                  go-go, slow-go, no-go
-                </a>{" "}
-                approach steps spending down as you age — most active early,
-                quieter later. Amounts and ages are editable.
-              </p>
-              <Field
-                label="Go-go spend"
-                value={stages.goGo}
-                onChange={setStage("goGo")}
-                min={15_000}
-                max={200_000}
-                step={1000}
-                prefix="$"
-                hint={`Active years, retirement to age ${stages.slowGoAge}.`}
-              />
-              <Field
-                label="Slow-go spend"
-                value={stages.slowGo}
-                onChange={setStage("slowGo")}
-                min={15_000}
-                max={200_000}
-                step={1000}
-                prefix="$"
-                hint={`From age ${stages.slowGoAge} to ${stages.noGoAge}.`}
-              />
-              <Field
-                label="No-go spend"
-                value={stages.noGo}
-                onChange={setStage("noGo")}
-                min={15_000}
-                max={200_000}
-                step={1000}
-                prefix="$"
-                hint={`From age ${stages.noGoAge}.`}
-              />
-              <Field
-                label="Slow-go starts at"
-                value={stages.slowGoAge}
-                onChange={setStage("slowGoAge")}
-                min={65}
-                max={85}
-                suffix="yrs"
-              />
-              <Field
-                label="No-go starts at"
-                value={stages.noGoAge}
-                onChange={setStage("noGoAge")}
-                min={70}
-                max={95}
-                suffix="yrs"
-              />
+          {draft.spendingMode === "stages" && (
+            <div className="mt-0.5 text-xs text-muted">
+              {fmtCurrency(draft.spendingStages.goGo)} → {fmtCurrency(draft.spendingStages.slowGo)} → {fmtCurrency(draft.spendingStages.noGo)} as you age
             </div>
           )}
-          <button
-            type="button"
-            onClick={() => onEditBudget?.(draft)}
-            className="mt-4 text-xs font-medium text-accent hover:underline"
-          >
-            Prefer a detailed, category-by-category budget? Build one →
-          </button>
+          <p className="mt-2 text-xs text-muted">
+            {draft.budget
+              ? "From the detailed budget you built."
+              : "Pick a lifestyle preset or fine-tune each category in the budget builder."}{" "}
+            Spending lives in one place, so it stays consistent across the app.
+          </p>
         </div>
-        )}
+        <button
+          type="button"
+          onClick={() => onEditBudget?.(draft)}
+          className="w-full rounded-lg border border-accent/40 bg-accent/10 px-4 py-2.5 text-sm font-semibold text-accent transition hover:bg-accent/20"
+        >
+          {draft.budget ? "Edit your spending budget →" : "Set your retirement spending →"}
+        </button>
       </div>
     ),
   };
