@@ -126,9 +126,14 @@ describe(`Stress matrix — ${PLANS.length} plans, universal invariants`, () => 
           if (!near(b.openingSuper - b.mortgageCleared - row.superDrawn - b.fees + b.superGrowth, b.closingSuper)) fails.push(`${name} @${row.age}: ret super`);
         }
       }
+      // The stock is re-expressed wage-real → CPI-real at the retirement boundary
+      // (RG 276 two-stage), so closing×wedge chains to the next opening there.
+      const n = Math.max(0, Math.round(plan.retirementAge - plan.people[0].currentAge));
+      const wedge = Math.pow((1 + (plan.inflation + cfg.livingStandardsGrowthPct) / 100) / (1 + plan.inflation / 100), n);
       for (let i = 0; i < r.rows.length - 1; i++) {
-        if (!near(r.rows[i].breakdown.closingSuper, r.rows[i + 1].breakdown.openingSuper)) fails.push(`${name} chain super @${r.rows[i].age}`);
-        if (!near(r.rows[i].breakdown.closingOutside, r.rows[i + 1].breakdown.openingOutside)) fails.push(`${name} chain outside @${r.rows[i].age}`);
+        const f = r.rows[i].phase === "accumulation" && r.rows[i + 1].phase !== "accumulation" ? wedge : 1;
+        if (!near(r.rows[i].breakdown.closingSuper * f, r.rows[i + 1].breakdown.openingSuper)) fails.push(`${name} chain super @${r.rows[i].age}`);
+        if (!near(r.rows[i].breakdown.closingOutside * f, r.rows[i + 1].breakdown.openingOutside)) fails.push(`${name} chain outside @${r.rows[i].age}`);
       }
     }
     expect(fails.slice(0, 25)).toEqual([]);
@@ -178,15 +183,18 @@ describe(`Stress matrix — ${PLANS.length} plans, universal invariants`, () => 
       // Accumulation is deflated by WAGE inflation (RG 276 two-stage): CPI + the
       // living-standards uplift.
       const wageInfl = plan.inflation + cfg.livingStandardsGrowthPct;
+      // Accumulation is wage-real; at retirement the stock is re-expressed to
+      // CPI-real (RG 276 two-stage) — scale the closed form by the same wedge.
+      const wedge = Math.pow((1 + wageInfl / 100) / (1 + plan.inflation / 100), n);
       let expSuper = 0;
       plan.people.forEach((p, i) => {
         const c = ref.netAnnualContribution(p.salary, cfg.sgRate, p.voluntaryConcessional, cfg.concessionalCap, cfg.contributionsTax, p.voluntaryNonConcessional, cfg.nonConcessionalCap, cfg.div293Threshold, cfg.div293ExtraTaxRate);
         expSuper += ref.superBalanceAt(opening[i], c, plan.investmentReturn, wageInfl, cfg.superEarningsTaxAccumulation, n, cfg.fees.adminInvestmentPct, cfg.fees.fixedAdminAnnual + cfg.fees.insuranceAnnual);
       });
       const expOutside = ref.outsideBalanceAt(plan.outsideSuper, plan.annualOutsideSavings, plan.investmentReturn, wageInfl, n);
-      if (!near(r.superAtRetirement, expSuper, 1)) fails.push(`${name}: super ${r.superAtRetirement.toFixed(0)} vs ref ${expSuper.toFixed(0)}`);
+      if (!near(r.superAtRetirement, expSuper * wedge, 1)) fails.push(`${name}: super ${r.superAtRetirement.toFixed(0)} vs ref ${(expSuper * wedge).toFixed(0)}`);
       const retRow = r.rows.find((x) => x.age === Math.max(...plan.people.map((p) => p.currentAge)) + n)!;
-      if (retRow && !near(retRow.outside, expOutside, 1)) fails.push(`${name}: outside ${retRow.outside.toFixed(0)} vs ref ${expOutside.toFixed(0)}`);
+      if (retRow && !near(retRow.outside, expOutside * wedge, 1)) fails.push(`${name}: outside ${retRow.outside.toFixed(0)} vs ref ${(expOutside * wedge).toFixed(0)}`);
     }
     expect(fails.slice(0, 25)).toEqual([]);
   });

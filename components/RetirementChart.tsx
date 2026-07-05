@@ -73,6 +73,8 @@ export default function RetirementChart({
   selectedAge,
   animate = true,
   height = 320,
+  wageInflationPct,
+  cpiPct,
 }: {
   result: SimResult;
   bands?: SpendingBand[];
@@ -81,14 +83,38 @@ export default function RetirementChart({
   selectedAge?: number | null;
   animate?: boolean;
   height?: number;
+  // RG 276 two-stage deflators. When supplied (and wage ≠ CPI) the whole balance
+  // line is drawn on a single CPI basis so it stays continuous through retirement.
+  wageInflationPct?: number;
+  cpiPct?: number;
 }) {
   const { retirementAge, depletedAge } = result;
 
+  // The engine expresses accumulation in wage-indexed dollars and re-bases the
+  // stock to CPI dollars at retirement (retiree spending and the Age Pension both
+  // index to CPI). For one continuous trajectory we show the whole line on the
+  // CPI basis: scale each accumulation point by ((1+wage)/(1+CPI))^t (t = years
+  // from the start). Endpoints — today's balance and the retirement figure — are
+  // unchanged; only the intermediate accumulation years lift onto the CPI basis.
+  const wage = wageInflationPct ?? 0;
+  const cpi = cpiPct ?? 0;
+  const smooth = Math.abs(wage - cpi) > 1e-9;
+  const cpiBasis = (rows: readonly YearRow[]): YearRow[] => {
+    if (!smooth || rows.length === 0) return rows as YearRow[];
+    const first = rows[0].age;
+    const step = (1 + wage / 100) / (1 + cpi / 100);
+    return rows.map((r) => {
+      if (r.phase !== "accumulation") return r;
+      const f = Math.pow(step, r.age - first);
+      return { ...r, totalSuper: r.totalSuper * f, outside: r.outside * f, total: r.total * f };
+    });
+  };
+
   // Merge current + baseline rows by age so the ghost line can span its own range.
   const byAge = new Map<number, ChartRow>();
-  for (const r of result.rows) byAge.set(r.age, { ...r });
+  for (const r of cpiBasis(result.rows)) byAge.set(r.age, { ...r });
   if (baseline) {
-    for (const r of baseline.rows) {
+    for (const r of cpiBasis(baseline.rows)) {
       const e = byAge.get(r.age);
       if (e) e.baselineTotal = r.total;
       else byAge.set(r.age, { age: r.age, baselineTotal: r.total });

@@ -234,7 +234,7 @@ export default function ReportView({
               : ` A “Depletes” marker shows the age your savings run out (${result.depletedAge}).`}
           </Lead>
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-2">
-            <RetirementChart result={result} bands={bands} animate={false} height={200} />
+            <RetirementChart result={result} bands={bands} animate={false} height={200} wageInflationPct={wageInfl} cpiPct={plan.inflation} />
           </div>
         </Section>
 
@@ -400,7 +400,9 @@ export default function ReportView({
                   <li>
                     Two-stage deflation to today&apos;s dollars: pre-retirement by
                     wage inflation {wageInfl}% (CPI {plan.inflation}% + {config.livingStandardsGrowthPct ?? 0}%
-                    living standards), retirement by CPI {plan.inflation}%.
+                    living standards), retirement by CPI {plan.inflation}%. The
+                    balance at retirement and every figure after it are shown in
+                    CPI dollars.
                   </li>
                   <li>Investment return {plan.investmentReturn}% p.a. (nominal); applied net of the deflator.</li>
                   <li>

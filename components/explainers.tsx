@@ -122,12 +122,15 @@ export function SuperAtRetirementExplainer({
   const realAccum =
     (1 + nominalAfterTax / 100) / (1 + wageInflation / 100) - 1;
 
-  // Split the projected balance into "existing super grown" vs "from contributions".
+  // RG 276 two-stage: the balance accumulates in wage-indexed today's dollars,
+  // then is re-expressed in retirement (CPI) dollars at retirement. Do the
+  // existing-vs-contributions split in wage dollars, then apply that single
+  // rebasing step to reach the headline figure.
+  const rebase = Math.pow((1 + wageInflation / 100) / (1 + plan.inflation / 100), years);
+  const showRebase = Math.abs(rebase - 1) > 1e-6;
+  const projectedWageReal = rebase > 0 ? result.superAtRetirement / rebase : result.superAtRetirement;
   const growthOfStart = currentSuper * Math.pow(1 + realAccum, years);
-  const fromContributions = Math.max(
-    0,
-    result.superAtRetirement - growthOfStart,
-  );
+  const fromContributions = Math.max(0, projectedWageReal - growthOfStart);
 
   return (
     <Explainer title="Super at retirement">
@@ -247,6 +250,14 @@ export function SuperAtRetirementExplainer({
             The result of compounding your super year by year for {years} years
             — your starting balance and each year&apos;s net contributions both
             growing at the {fmtPercent(realAccum)} real rate.
+            {showRebase && (
+              <>
+                {" "}The running total is in wage-indexed dollars; at retirement
+                it&apos;s re-expressed in <strong>retirement (CPI) dollars</strong>
+                {" "}— the basis every retirement figure (spending, Age Pension)
+                uses.
+              </>
+            )}
           </p>
           <div className="space-y-1">
             <div className="flex justify-between gap-4">
@@ -262,11 +273,23 @@ export function SuperAtRetirementExplainer({
               </span>
             </div>
             <div className="flex justify-between gap-4 border-t border-accent/20 pt-1">
-              <span className="text-white">Together</span>
+              <span className={showRebase ? "" : "text-white"}>
+                {showRebase ? "Subtotal (wage-indexed dollars)" : "Together"}
+              </span>
               <span className="font-semibold tabular-nums text-white">
-                ≈ {fmtCurrency(result.superAtRetirement)}
+                ≈ {fmtCurrency(showRebase ? projectedWageReal : result.superAtRetirement)}
               </span>
             </div>
+            {showRebase && (
+              <div className="flex justify-between gap-4 border-t border-accent/20 pt-1">
+                <span className="text-white">
+                  In retirement (CPI) dollars ×({wageInflation}% vs {plan.inflation}%)^{years}
+                </span>
+                <span className="font-semibold tabular-nums text-white">
+                  ≈ {fmtCurrency(result.superAtRetirement)}
+                </span>
+              </div>
+            )}
           </div>
         </InlineExplainer>
       </div>

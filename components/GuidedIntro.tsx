@@ -305,7 +305,7 @@ export default function GuidedIntro({
             drives contributions), your investment return, and when you retire.
           </p>
           <div className="mt-3">
-            <RetirementChart result={result} animate height={230} />
+            <RetirementChart result={result} animate height={230} wageInflationPct={plan.inflation + (config.livingStandardsGrowthPct ?? 0)} cpiPct={plan.inflation} />
           </div>
           <p className="mt-2 text-center text-sm">
             Projected super at retirement: <strong className="text-accent">{money(result.superAtRetirement)}</strong> at age {result.retirementAge}

@@ -100,9 +100,12 @@ export default function Disclosures({ config }: { config: EngineConfig }) {
                 <strong>wage inflation of 3.7%</strong> (CPI 2.5% + 1.2% for
                 rising community living standards), so your projection keeps pace
                 with living standards; <strong>from retirement onward</strong>{" "}
-                they are deflated by <strong>CPI of 2.5%</strong>. You can change
-                the CPI rate; the calculator uses your investment return net of
-                the relevant deflator in each phase.
+                they are deflated by <strong>CPI of 2.5%</strong> — so your
+                projected super at retirement (the start of the retirement phase)
+                and every figure after it are expressed in CPI dollars, consistent
+                with how retiree spending and the Age Pension are indexed. You can
+                change the CPI rate; the calculator uses your investment return net
+                of the relevant deflator in each phase.
               </li>
               <li>
                 <strong>Investment returns</strong> are the rate you enter and

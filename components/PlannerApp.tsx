@@ -543,6 +543,8 @@ export default function PlannerApp({
           baseline={baselineResult}
           onSelectYear={setSelectedAge}
           selectedAge={selectedAge}
+          wageInflationPct={plan.inflation + (config.livingStandardsGrowthPct ?? 0)}
+          cpiPct={plan.inflation}
         />
         <p className="mt-2 text-center text-xs text-muted">
           Tip: click any year for a full breakdown of income, tax and spending.

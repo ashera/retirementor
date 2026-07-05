@@ -23,12 +23,18 @@ const near = (a: number, b: number, tol = 1) => Math.abs(a - b) <= tol;
 
 describe("Year breakdown ledger", () => {
   it("every year's closing balance chains to the next year's opening", () => {
-    const r = simulate(plan(), cfg);
+    const p = plan();
+    const r = simulate(p, cfg);
+    // The stock is re-expressed wage-real → CPI-real at the retirement boundary
+    // (RG 276 two-stage), so closing×wedge chains to the next opening there.
+    const n = Math.max(0, Math.round(p.retirementAge - p.people[0].currentAge));
+    const wedge = Math.pow((1 + (p.inflation + cfg.livingStandardsGrowthPct) / 100) / (1 + p.inflation / 100), n);
     for (let i = 0; i < r.rows.length - 1; i++) {
       const a = r.rows[i].breakdown;
       const b = r.rows[i + 1].breakdown;
-      expect(near(a.closingSuper, b.openingSuper)).toBe(true);
-      expect(near(a.closingOutside, b.openingOutside)).toBe(true);
+      const f = r.rows[i].phase === "accumulation" && r.rows[i + 1].phase !== "accumulation" ? wedge : 1;
+      expect(near(a.closingSuper * f, b.openingSuper)).toBe(true);
+      expect(near(a.closingOutside * f, b.openingOutside)).toBe(true);
     }
   });
 

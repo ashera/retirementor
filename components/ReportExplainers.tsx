@@ -61,8 +61,16 @@ function SuperWorkings({ plan, config, result }: { plan: RetirementPlan; config:
     0,
   );
   const gp = Math.pow(1 + g, years);
+  // RG 276 two-stage: accumulate in wage-indexed dollars, then re-express in
+  // retirement (CPI) dollars at retirement. Split in wage dollars, then rebase.
+  const rebase = Math.pow((1 + wage / 100) / (1 + plan.inflation / 100), years);
+  const showRebase = Math.abs(rebase - 1) > 1e-6;
+  const projectedWageReal = rebase > 0 ? result.superAtRetirement / rebase : result.superAtRetirement;
   const growthOfStart = startSuper * gp;
-  const fromContrib = Math.max(0, result.superAtRetirement - growthOfStart);
+  const fromContrib = Math.max(0, projectedWageReal - growthOfStart);
+  const rebaseLine = showRebase
+    ? `\n            ≈ ${money(projectedWageReal)}  (wage-indexed dollars)\nRebase to retirement (CPI) dollars  × (1+${pctN(wage)})^${years} ÷ (1+${plan.inflation}%)^${years}\n            ≈ ${money(result.superAtRetirement)}`
+    : `\n            ≈ ${money(result.superAtRetirement)}`;
 
   return (
     <MathBox
@@ -70,7 +78,8 @@ function SuperWorkings({ plan, config, result }: { plan: RetirementPlan; config:
       lead={
         <>
           Projected by compounding your {plan.people.length > 1 ? "combined " : ""}super for {years}{" "}
-          years — starting balance and each year&apos;s net contributions growing at a real (today&apos;s-dollar) rate.
+          years — starting balance and each year&apos;s net contributions growing at a real (today&apos;s-dollar) rate
+          {showRebase ? ", then re-expressed in retirement (CPI) dollars" : ""}.
         </>
       }
     >
@@ -81,8 +90,7 @@ Contributions/yr  c = SG ${(config.sgRate * 100).toFixed(0)}% × salary (+ volun
             c ≈ ${money(netContrib)}/yr
 
 Closed form  Bₙ = B₀(1+g)ⁿ + c·(1+g)·((1+g)ⁿ − 1) ÷ g
-            = ${money(startSuper)}·(1+${pct(g)})^${years} + ${money(netContrib)}·…
-            ≈ ${money(result.superAtRetirement)}`}</Formula>
+            = ${money(startSuper)}·(1+${pct(g)})^${years} + ${money(netContrib)}·…${rebaseLine}`}</Formula>
       <div className="mt-2 space-y-0.5 text-xs text-slate-600">
         <div className="flex justify-between gap-4">
           <span>{money(startSuper)} today grows to</span>
@@ -93,9 +101,15 @@ Closed form  Bₙ = B₀(1+g)ⁿ + c·(1+g)·((1+g)ⁿ − 1) ÷ g
           <span className="font-semibold tabular-nums text-slate-800">≈ {money(fromContrib)}</span>
         </div>
         <div className="flex justify-between gap-4 border-t border-slate-200 pt-0.5">
-          <span className="font-semibold text-slate-700">Together</span>
-          <span className="font-semibold tabular-nums text-slate-800">≈ {money(result.superAtRetirement)}</span>
+          <span className="font-semibold text-slate-700">{showRebase ? "Subtotal (wage-indexed)" : "Together"}</span>
+          <span className="font-semibold tabular-nums text-slate-800">≈ {money(showRebase ? projectedWageReal : result.superAtRetirement)}</span>
         </div>
+        {showRebase && (
+          <div className="flex justify-between gap-4 border-t border-slate-200 pt-0.5">
+            <span className="font-semibold text-slate-700">In retirement (CPI) dollars</span>
+            <span className="font-semibold tabular-nums text-slate-800">≈ {money(result.superAtRetirement)}</span>
+          </div>
+        )}
       </div>
     </MathBox>
   );

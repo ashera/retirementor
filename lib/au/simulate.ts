@@ -96,6 +96,21 @@ export function simulate(
     const superAccumReturn = realRate(nom * (1 - config.superEarningsTaxAccumulation) - feePct, deflator);
     const superPensionReturn = realRate(nom - feePct, deflator);
 
+    // RG 276 two-stage boundary. The accumulation trajectory is expressed in
+    // WAGE-deflated today's dollars; everything from retirement onward is
+    // expressed in CPI today's dollars (retiree spending AND the Age Pension
+    // thresholds both index to CPI, not wages). So as we cross into retirement we
+    // re-express the accumulated stock from wage-real to CPI-real. This is exact:
+    // the wage deflator was applied uniformly across the `retireOffset` working
+    // years, so nominal/(1+wage)ⁿ becomes nominal/(1+cpi)ⁿ by scaling the whole
+    // pool by ((1+wage)/(1+cpi))ⁿ. It also makes the means test assess the same
+    // CPI-real balance the retiree actually holds. (No-op when wage == cpi.)
+    if (t === retireOffset && retireOffset > 0) {
+      const rebase = Math.pow((1 + wageInflation / 100) / (1 + cpi / 100), retireOffset);
+      for (let i = 0; i < balances.length; i++) balances[i] *= rebase;
+      outside *= rebase;
+    }
+
     // Balances at the START of this year (on the birthday) — this is what each
     // data point plots, so the peak lands on the retirement age, not the year before.
     const startSuper = sum(balances);
