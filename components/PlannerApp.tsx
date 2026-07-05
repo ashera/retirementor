@@ -16,6 +16,7 @@ import Logo from "@/components/Logo";
 import Disclosures from "@/components/Disclosures";
 import LifestageModal from "@/components/LifestageModal";
 import GuidedIntro from "@/components/GuidedIntro";
+import GetStartedPanel from "@/components/GetStartedPanel";
 import {
   AgePensionExplainer,
   LikelihoodExplainer,
@@ -50,7 +51,6 @@ import {
 const STORAGE_KEY = "au-retirement-plan";
 const BASELINE_KEY = "au-retirement-baseline";
 const BASELINE_NAME_KEY = "au-retirement-baseline-name"; // label for the ghost line
-const GUIDED_KEY = "au-retirement-guided"; // marks the first-run guide as seen
 
 function LegendDot({ color, label }: { color: string; label: string }) {
   return (
@@ -123,9 +123,9 @@ export default function PlannerApp({
   const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
-    // Restore a previously configured plan if one exists. First-time visitors
-    // just see the planner pre-filled with sensible defaults and the
-    // "Get started" button — we don't auto-launch the wizard.
+    // Restore a previously built plan if one exists. If there's no plan yet, the
+    // dashboard shows the Get-started panel (no fabricated projection) until the
+    // user builds one via the guide/editor or loads a saved scenario.
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
@@ -135,12 +135,9 @@ export default function PlannerApp({
         setBaseline(rawBase ? { ...DEFAULT_PLAN, ...JSON.parse(rawBase) } : working);
         setBaselineName(localStorage.getItem(BASELINE_NAME_KEY) || null);
         setConfigured(true);
-      } else if (!localStorage.getItem(GUIDED_KEY) && savedPlans.length === 0) {
-        // Genuine first-run: no working plan, no saved scenarios, guide not yet seen.
-        setShowGuide(true);
       }
     } catch {
-      /* ignore malformed storage — fall back to defaults */
+      /* ignore malformed storage — fall back to the empty Get-started state */
     }
     setReady(true);
   }, []);
@@ -188,14 +185,13 @@ export default function PlannerApp({
     }
   };
 
-  // Leaving the first-run guide: adopt its plan and never show the guide again.
+  // Leaving the first-run guide. Only adopt the plan when the user actually
+  // completed it — skipping returns to the Get-started panel rather than seeding
+  // the dashboard with example numbers.
   const handleGuideExit = (next: RetirementPlan, completed: boolean) => {
-    commit(next);
-    if (completed) setConfigured(true);
-    try {
-      localStorage.setItem(GUIDED_KEY, "1");
-    } catch {
-      /* ignore */
+    if (completed) {
+      commit(next);
+      setConfigured(true);
     }
     setShowGuide(false);
   };
@@ -463,21 +459,23 @@ export default function PlannerApp({
                 </button>
               </span>
             ))}
-            <div className="ml-auto flex items-center gap-2">
-              <input
-                value={saveName}
-                onChange={(e) => setSaveName(e.target.value)}
-                placeholder="Name this scenario"
-                className="w-40 rounded-lg border border-line bg-panel-2 px-3 py-1.5 text-sm text-white outline-none focus:border-accent"
-              />
-              <button
-                onClick={handleSave}
-                disabled={pending}
-                className="rounded-lg bg-accent px-3 py-1.5 text-sm font-semibold text-ink transition hover:bg-accent-soft disabled:opacity-60"
-              >
-                Save current
-              </button>
-            </div>
+            {configured && (
+              <div className="ml-auto flex items-center gap-2">
+                <input
+                  value={saveName}
+                  onChange={(e) => setSaveName(e.target.value)}
+                  placeholder="Name this scenario"
+                  className="w-40 rounded-lg border border-line bg-panel-2 px-3 py-1.5 text-sm text-white outline-none focus:border-accent"
+                />
+                <button
+                  onClick={handleSave}
+                  disabled={pending}
+                  className="rounded-lg bg-accent px-3 py-1.5 text-sm font-semibold text-ink transition hover:bg-accent-soft disabled:opacity-60"
+                >
+                  Save current
+                </button>
+              </div>
+            )}
           </div>
         ) : (
           <p className="text-sm text-muted">
@@ -499,6 +497,10 @@ export default function PlannerApp({
         </div>
       </div>
 
+      {/* The projection only renders once the user has actually built a plan.
+          Before that we show the Get-started panel — never fabricated numbers. */}
+      {configured ? (
+        <>
       {/* Stat cards */}
       <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
@@ -990,6 +992,13 @@ export default function PlannerApp({
         {config.deeming.needsVerification &&
           " Deeming rates pending confirmation."}
       </p>
+        </>
+      ) : (
+        <GetStartedPanel
+          onGuide={() => setShowGuide(true)}
+          onWizard={() => setWizardOpen(true)}
+        />
+      )}
 
       {wizardOpen && (
         <PlanWizard
