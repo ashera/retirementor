@@ -276,42 +276,27 @@ export default function ReportView({
         <div className="break-before-page">
           <Section title="Retirement income sources">
             <Lead>
-              Once you retire, your spending is funded from several sources. This
-              chart shows the mix each year: tax-free drawdowns from super (green),
-              withdrawals from savings outside super (blue), any net rent from an
-              investment property (orange), and — from Age Pension age — the
-              means-tested Age Pension (purple) topping up the rest. As your
-              assessable assets fall with drawdown, the Age Pension typically grows
-              to fill the gap.
+              How your spending is funded each year: tax-free super drawdowns
+              (green), withdrawals from outside super (blue), any net property rent
+              (orange), and — from Age Pension age — the means-tested Age Pension
+              (purple). As assets draw down, the pension typically grows to fill the gap.
             </Lead>
             <div className="rounded-lg border border-slate-200 bg-slate-50 p-2">
-              <IncomeChart result={result} animate={false} height={190} />
+              <IncomeChart result={result} animate={false} height={175} />
             </div>
           </Section>
 
           {ls.rows.length > 0 && (
             <Section title={ls.staged ? "Retirement lifestages" : "Retirement spending"}>
               <Lead>
-                {ls.staged ? (
-                  <>
-                    Your spending follows the retirement “spending smile” —
-                    essentials stay flat in today&apos;s dollars while discretionary
-                    spending (travel, dining, hobbies) tapers with age. Any
-                    home-loan cost is added on top while the loan runs.
-                  </>
-                ) : (
-                  <>
-                    Your plan uses a flat retirement income. Here&apos;s how it
-                    breaks down into essentials, discretionary spending and any
-                    home-loan cost. (Switch to staged spending in the planner to
-                    model the go-go / slow-go / no-go “spending smile”.)
-                  </>
-                )}
+                {ls.staged
+                  ? "Your spending follows the retirement “spending smile” — essentials stay flat while discretionary (travel, dining, hobbies) tapers with age; any home-loan cost sits on top."
+                  : "Your flat retirement income, split into essentials, discretionary spending and any home-loan cost. (Switch to staged spending in the planner to model the go-go / slow-go / no-go “spending smile”.)"}
               </Lead>
               <table className="w-full border-collapse text-right text-xs tabular-nums">
                 <thead className="text-[10px] uppercase tracking-wide text-slate-500">
                   <tr className="border-b border-slate-300">
-                    <th className="py-1 text-left">{ls.staged ? "Stage" : "Period"}</th>
+                    <th className="py-0.5 text-left">{ls.staged ? "Stage" : "Period"}</th>
                     <th className="text-left">Ages</th>
                     <th>Essentials</th>
                     <th>Discretionary</th>
@@ -322,7 +307,7 @@ export default function ReportView({
                 <tbody>
                   {ls.rows.map((r) => (
                     <tr key={r.key} className="border-b border-slate-100">
-                      <td className="py-1 text-left font-medium text-slate-700">
+                      <td className="py-0.5 text-left font-medium text-slate-700">
                         <span
                           className="mr-1.5 inline-block h-2 w-2 rounded-full align-middle"
                           style={{ background: stageColor[r.key] }}
@@ -364,50 +349,50 @@ export default function ReportView({
               <table className="w-full border-collapse text-right text-xs tabular-nums">
                 <thead className="text-[10px] uppercase tracking-wide text-slate-500">
                   <tr className="border-b border-slate-300">
-                    <th className="py-1 text-left">Category</th>
+                    <th className="py-0.5 text-left">Category</th>
                     <th>Per month</th>
                     <th>Per year</th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr className="bg-slate-50">
-                    <td className="py-1 text-left font-semibold text-slate-700" colSpan={3}>
+                    <td className="py-0.5 text-left font-semibold text-slate-700" colSpan={3}>
                       <span className="mr-1.5 inline-block h-2 w-2 rounded-full align-middle" style={{ background: "#0ea5e9" }} />
                       Essentials
                     </td>
                   </tr>
                   {essRows.map((r) => (
                     <tr key={r.key} className="border-b border-slate-100">
-                      <td className="py-1 pl-4 text-left text-slate-700">{r.label}</td>
+                      <td className="py-0.5 pl-4 text-left text-slate-700">{r.label}</td>
                       <td>{money(r.annual / 12)}</td>
                       <td className="text-slate-500">{money(r.annual)}</td>
                     </tr>
                   ))}
                   <tr className="border-b border-slate-200">
-                    <td className="py-1 pl-4 text-left font-medium text-slate-600">Essentials subtotal</td>
+                    <td className="py-0.5 pl-4 text-left font-medium text-slate-600">Essentials subtotal</td>
                     <td className="font-medium">{money(essTotal / 12)}</td>
                     <td className="text-slate-500">{money(essTotal)}</td>
                   </tr>
                   <tr className="bg-slate-50">
-                    <td className="py-1 text-left font-semibold text-slate-700" colSpan={3}>
+                    <td className="py-0.5 text-left font-semibold text-slate-700" colSpan={3}>
                       <span className="mr-1.5 inline-block h-2 w-2 rounded-full align-middle" style={{ background: "#f472b6" }} />
                       Discretionary
                     </td>
                   </tr>
                   {discRows.map((r) => (
                     <tr key={r.key} className="border-b border-slate-100">
-                      <td className="py-1 pl-4 text-left text-slate-700">{r.label}</td>
+                      <td className="py-0.5 pl-4 text-left text-slate-700">{r.label}</td>
                       <td>{money(r.annual / 12)}</td>
                       <td className="text-slate-500">{money(r.annual)}</td>
                     </tr>
                   ))}
                   <tr className="border-b border-slate-200">
-                    <td className="py-1 pl-4 text-left font-medium text-slate-600">Discretionary subtotal</td>
+                    <td className="py-0.5 pl-4 text-left font-medium text-slate-600">Discretionary subtotal</td>
                     <td className="font-medium">{money(discTotal / 12)}</td>
                     <td className="text-slate-500">{money(discTotal)}</td>
                   </tr>
                   <tr className="border-t-2 border-slate-300">
-                    <td className="py-1 text-left font-bold text-slate-800">Total budget</td>
+                    <td className="py-0.5 text-left font-bold text-slate-800">Total budget</td>
                     <td className="font-bold text-slate-800">{money((essTotal + discTotal) / 12)}</td>
                     <td className="font-medium text-slate-600">{money(essTotal + discTotal)}</td>
                   </tr>
