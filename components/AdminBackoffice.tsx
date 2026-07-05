@@ -51,7 +51,7 @@ interface AuditEntry {
 
 function toDisplay(unit: Unit, value: number): string {
   if (unit === "percent") return String(+(value * 100).toFixed(4));
-  return String(value);
+  return String(value); // percentPoint values are already a percentage number
 }
 function fromDisplay(unit: Unit, display: string): number {
   const n = parseFloat(display);
@@ -59,10 +59,11 @@ function fromDisplay(unit: Unit, display: string): number {
   return unit === "percent" ? n / 100 : n;
 }
 function unitSuffix(unit: Unit): string {
-  return unit === "percent" ? "%" : unit === "age" ? "yrs" : "";
+  return unit === "percent" || unit === "percentPoint" ? "%" : unit === "age" ? "yrs" : "";
 }
 function formatValue(unit: Unit, value: number): string {
   if (unit === "percent") return `${+(value * 100).toFixed(3)}%`;
+  if (unit === "percentPoint") return `${+value.toFixed(3)}%`;
   if (unit === "aud") return fmtCurrency(value);
   if (unit === "age") return `${value}`;
   return String(+value.toFixed(4));

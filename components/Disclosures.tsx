@@ -143,11 +143,6 @@ export default function Disclosures({ config }: { config: EngineConfig }) {
                 year. Real fees vary by fund; check yours and adjust.
               </li>
               <li>
-                <strong>Division 293 not modelled</strong> — the extra 15% tax
-                on concessional contributions for incomes above $250,000 is not
-                applied, so high earners&apos; super may be overstated.
-              </li>
-              <li>
                 <strong>Transfer Balance Cap</strong> is treated simply; very
                 large balances moving to the retirement phase may be overstated.
               </li>

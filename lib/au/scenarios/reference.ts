@@ -20,13 +20,19 @@ export function realRate(nominalPct: number, inflationPct: number): number {
  *   Bₙ = B₀(1+g)ⁿ + c·(1+g)·((1+g)ⁿ − 1)/g
  * Assumes a constant contribution (i.e. constant, uncapped salary inputs).
  */
-export function futureValue(opening: number, contrib: number, g: number, n: number): number {
+export function futureValue(
+  opening: number,
+  contrib: number,
+  g: number,
+  n: number,
+  contribGrowthExp = 1, // 1 = add-then-grow; 0.5 = mid-year (contribution grows ½ a year)
+): number {
   if (Math.abs(g) < 1e-12) return opening + contrib * n;
   const gp = Math.pow(1 + g, n);
-  return opening * gp + (contrib * (1 + g) * (gp - 1)) / g;
+  return opening * gp + (contrib * Math.pow(1 + g, contribGrowthExp) * (gp - 1)) / g;
 }
 
-/** Net annual super contribution: concessional net of 15%, plus non-concessional. */
+/** Net annual super contribution: concessional net of 15% (+ Division 293), plus non-concessional. */
 export function netAnnualContribution(
   salary: number,
   sgRate: number,
@@ -35,10 +41,14 @@ export function netAnnualContribution(
   contribTax: number,
   volNonConcessional: number,
   nccCap: number,
+  div293Threshold = Infinity,
+  div293ExtraRate = 0,
 ): number {
   const concessional = Math.min(salary * sgRate + volConcessional, concCap);
   const ncc = Math.min(volNonConcessional, nccCap);
-  return concessional * (1 - contribTax) + ncc;
+  const taxed293 = Math.min(concessional, Math.max(0, salary + concessional - div293Threshold));
+  const extra293 = taxed293 * div293ExtraRate;
+  return concessional * (1 - contribTax) - extra293 + ncc;
 }
 
 /**
@@ -57,7 +67,7 @@ export function superBalanceAt(
   annualDeduction = 0,
 ): number {
   const g = realRate(nominalReturnPct * (1 - earningsTaxRate) - feePct, inflationPct);
-  return futureValue(opening, netContrib - annualDeduction, g, years);
+  return futureValue(opening, netContrib - annualDeduction, g, years, 0.5);
 }
 
 /** Outside-super balance after `years` (no earnings tax). */
@@ -68,7 +78,7 @@ export function outsideBalanceAt(
   inflationPct: number,
   years: number,
 ): number {
-  return futureValue(opening, savings, realRate(nominalReturnPct, inflationPct), years);
+  return futureValue(opening, savings, realRate(nominalReturnPct, inflationPct), years, 0.5);
 }
 
 /** Income deemed on financial assets — two-tier, per Services Australia. */

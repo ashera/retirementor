@@ -77,6 +77,8 @@ export interface EngineConfig {
   superEarningsTaxAccumulation: number;
   transferBalanceCap: number;
   totalSuperBalanceNccThreshold: number;
+  div293Threshold: number; // income (incl. concessional) above which Division 293 applies
+  div293ExtraTaxRate: number; // extra contributions tax for high earners (15%)
 
   // Ages
   preservationAge: number;
@@ -135,6 +137,8 @@ export const DEFAULT_CONFIG: EngineConfig = {
   superEarningsTaxAccumulation: 0.15,
   transferBalanceCap: 2_100_000,
   totalSuperBalanceNccThreshold: 2_100_000,
+  div293Threshold: 250_000,
+  div293ExtraTaxRate: 0.15,
 
   preservationAge: 60,
   agePensionAge: 67,

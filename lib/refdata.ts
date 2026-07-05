@@ -42,6 +42,14 @@ function withDefaults(data: EngineConfig): EngineConfig {
   if (out.fees == null) {
     out = { ...out, fees: DEFAULT_CONFIG.fees };
   }
+  // Division 293, added after the initial seed.
+  if (out.div293Threshold == null) {
+    out = {
+      ...out,
+      div293Threshold: DEFAULT_CONFIG.div293Threshold,
+      div293ExtraTaxRate: DEFAULT_CONFIG.div293ExtraTaxRate,
+    };
+  }
   return out;
 }
 

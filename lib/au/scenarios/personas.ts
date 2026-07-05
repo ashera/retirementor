@@ -98,6 +98,7 @@ function superCheckpoint(
     const c = ref.netAnnualContribution(
       person.salary, config.sgRate, person.voluntaryConcessional, config.concessionalCap,
       config.contributionsTax, person.voluntaryNonConcessional, config.nonConcessionalCap,
+      config.div293Threshold, config.div293ExtraTaxRate,
     );
     const fv = ref.superBalanceAt(person.superBalance, c, nomReturn, infl, et, years, feePct, deduction);
     total += fv;
@@ -484,8 +485,8 @@ function cappedCarl(config: EngineConfig): PersonaReport {
     covers: ["Single", "Homeowner", "Concessional cap hit", "High earner", "Nil pension"],
     assumptions: [
       "Today's dollars (inflation 0%); retires at 67.",
-      "Salary $300k × 12% SG = $36k exceeds the $32,500 concessional cap, so contributions are capped — the closed form uses the capped, net-of-15% amount.",
-      "GAP DISCLOSURE: Division 293 (extra 15% concessional tax for incomes over $250k) is NOT modelled — the engine and this reference both apply a flat 15%, so a real high earner's super would be lower.",
+      "Salary $300k × 12% SG = $36k exceeds the $32,500 concessional cap, so contributions are capped — the closed form uses the capped, net-of-tax amount.",
+      "Division 293 applies: income over $250k, so the capped concessional carries an extra 15% tax (30% total) — the engine and this reference both apply it.",
       `Reference data: FY${config.financialYear} config seed.`,
     ],
     inputs: [

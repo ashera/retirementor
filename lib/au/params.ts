@@ -6,7 +6,7 @@
 import { DEFAULT_CONFIG, type EngineConfig } from "./config";
 import { categoryMeta } from "./budget";
 
-export type Unit = "percent" | "aud" | "age" | "ratio";
+export type Unit = "percent" | "percentPoint" | "aud" | "age" | "ratio";
 
 export interface ParamDescriptor {
   key: string;
@@ -52,9 +52,11 @@ export const PARAM_DESCRIPTORS: ParamDescriptor[] = [
   { key: "tsb_ncc_threshold", label: "TSB threshold (NCC nil)", category: "Superannuation", path: "totalSuperBalanceNccThreshold", unit: "aud", sourceKey: "ato-rates" },
 
   // Super fees (Moneysmart-style defaults)
-  { key: "fees_admin_investment_pct", label: "Admin + investment fee", category: "Super fees", path: "fees.adminInvestmentPct", unit: "percent", sourceKey: "ms-tax" },
+  { key: "fees_admin_investment_pct", label: "Admin + investment fee", category: "Super fees", path: "fees.adminInvestmentPct", unit: "percentPoint", sourceKey: "ms-tax" },
   { key: "fees_fixed_admin", label: "Fixed admin fee (per account)", category: "Super fees", path: "fees.fixedAdminAnnual", unit: "aud", sourceKey: "ms-tax" },
   { key: "fees_insurance", label: "Default insurance premium", category: "Super fees", path: "fees.insuranceAnnual", unit: "aud", sourceKey: "ms-tax" },
+  { key: "div293_threshold", label: "Division 293 threshold", category: "Superannuation", path: "div293Threshold", unit: "aud", sourceKey: "ato-rates" },
+  { key: "div293_extra_rate", label: "Division 293 extra tax", category: "Superannuation", path: "div293ExtraTaxRate", unit: "percent", sourceKey: "ato-rates" },
 
   // Ages
   { key: "preservation_age", label: "Preservation age", category: "Ages", path: "preservationAge", unit: "age", sourceKey: "ms-preserve" },
@@ -106,6 +108,7 @@ export const PARAM_DESCRIPTORS: ParamDescriptor[] = [
 
 export const PARAM_CATEGORIES: string[] = [
   "Superannuation",
+  "Super fees",
   "Ages",
   "Age Pension · rates",
   "Age Pension · income test",
@@ -154,5 +157,11 @@ export interface ParamRow extends ParamDescriptor {
 }
 
 export function configToRows(config: EngineConfig): ParamRow[] {
-  return PARAM_DESCRIPTORS.map((d) => ({ ...d, value: getByPath(config, d.path) }));
+  // Fall back to the code default for any param the stored config predates
+  // (e.g. fees / Division 293 added after that version was seeded), so newly
+  // added parameters still appear in the backoffice with their default value.
+  return PARAM_DESCRIPTORS.map((d) => {
+    const value = getByPath(config, d.path);
+    return { ...d, value: Number.isNaN(value) ? getByPath(DEFAULT_CONFIG, d.path) : value };
+  });
 }

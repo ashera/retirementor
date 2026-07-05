@@ -414,7 +414,6 @@ export default function ReportView({
                 <h3 className="mb-1 font-semibold text-slate-700">Significant limitations</h3>
                 <ul className="list-disc space-y-1 pl-4">
                   <li>Super fees (admin + investment %, a fixed member fee and any insurance) are deducted using default figures — real fees vary by fund.</li>
-                  <li>Division 293 (extra 15% for incomes over $250k) is not applied.</li>
                   <li>Transfer Balance Cap is treated simply; CGT and interest-only loans are approximations.</li>
                   <li>Excludes aged-care costs, one-off spending, and future changes to rates or law.</li>
                 </ul>

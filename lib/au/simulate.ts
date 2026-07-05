@@ -109,29 +109,37 @@ export function simulate(
       let superGrowth = 0;
       let earningsTax = 0;
       let feesPaid = 0;
+      // Contributions arrive through the year, so grow ~half a year on average.
+      const superHalf = Math.pow(1 + superAccumReturn, 0.5);
       plan.people.forEach((p, i) => {
         const concessional = Math.min(
           p.salary * config.sgRate + p.voluntaryConcessional,
           config.concessionalCap,
         );
         const ncc = Math.min(p.voluntaryNonConcessional, config.nonConcessionalCap);
-        const added = concessional * (1 - config.contributionsTax) + ncc;
-        balances[i] += added;
+        // Division 293: an extra 15% on the concessional contributions that push
+        // income (salary + concessional) over the high-income threshold.
+        const div293Income = p.salary + concessional;
+        const taxed293 = Math.min(concessional, Math.max(0, div293Income - config.div293Threshold));
+        const extra293 = taxed293 * config.div293ExtraTaxRate;
+        const added = concessional * (1 - config.contributionsTax) - extra293 + ncc;
         const fee = fixedAdmin + insurance; // fixed admin + insurance while working
-        balances[i] -= fee;
-        const beforeGrowth = balances[i];
-        balances[i] *= 1 + superAccumReturn;
+        const net = added - fee;
+        const opening = balances[i];
+        // Opening grows a full year; this year's net contribution grows half a year.
+        balances[i] = opening * (1 + superAccumReturn) + net * superHalf;
         contribGross += concessional;
-        contribTax += concessional * config.contributionsTax;
+        contribTax += concessional * config.contributionsTax + extra293;
         contribNet += added;
         feesPaid += fee;
-        superGrowth += beforeGrowth * superAccumReturn;
+        superGrowth += balances[i] - opening - net;
         // Isolate the earnings tax (vs a tax-free, same-fee pool).
-        earningsTax += beforeGrowth * (superPensionReturn - superAccumReturn);
+        earningsTax += opening * (superPensionReturn - superAccumReturn);
       });
       const savings = plan.annualOutsideSavings;
-      const outsideGrowth = (startOutside + savings) * realReturn;
-      outside = (startOutside + savings) * (1 + realReturn);
+      const outsideHalf = Math.pow(1 + realReturn, 0.5);
+      outside = startOutside * (1 + realReturn) + savings * outsideHalf;
+      const outsideGrowth = outside - startOutside - savings;
 
       rows.push(
         row(oldest, startSuper, startOutside, 0, 0, 0, 0, "accumulation", true, 0, 0, {

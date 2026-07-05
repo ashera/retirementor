@@ -180,7 +180,7 @@ describe(`Stress matrix — ${PLANS.length} plans, universal invariants`, () => 
       const wageInfl = plan.inflation + cfg.livingStandardsGrowthPct;
       let expSuper = 0;
       plan.people.forEach((p, i) => {
-        const c = ref.netAnnualContribution(p.salary, cfg.sgRate, p.voluntaryConcessional, cfg.concessionalCap, cfg.contributionsTax, p.voluntaryNonConcessional, cfg.nonConcessionalCap);
+        const c = ref.netAnnualContribution(p.salary, cfg.sgRate, p.voluntaryConcessional, cfg.concessionalCap, cfg.contributionsTax, p.voluntaryNonConcessional, cfg.nonConcessionalCap, cfg.div293Threshold, cfg.div293ExtraTaxRate);
         expSuper += ref.superBalanceAt(opening[i], c, plan.investmentReturn, wageInfl, cfg.superEarningsTaxAccumulation, n, cfg.fees.adminInvestmentPct, cfg.fees.fixedAdminAnnual + cfg.fees.insuranceAnnual);
       });
       const expOutside = ref.outsideBalanceAt(plan.outsideSuper, plan.annualOutsideSavings, plan.investmentReturn, wageInfl, n);
