@@ -1,9 +1,26 @@
 "use client";
 
-import type { SimResult } from "@/lib/au/types";
+import type { RetirementPlan, SimResult } from "@/lib/au/types";
 import { fmtCurrency } from "@/lib/au/format";
+import { retirementGoal, type GoalBreakdown } from "@/lib/au/goal";
 import { initialWithdrawal, withdrawalBand, type InitialWithdrawal } from "@/lib/au/withdrawal";
 import Explainer from "@/components/Explainer";
+
+/** Join a list into "a, b and c". */
+function joinAnd(parts: string[]): string {
+  if (parts.length <= 1) return parts.join("");
+  return parts.slice(0, -1).join(", ") + " and " + parts[parts.length - 1];
+}
+
+/** The reductions that bridge the income goal down to the super draw. */
+function reductions(w: InitialWithdrawal, goal: GoalBreakdown): { label: string; amount: number }[] {
+  const out: { label: string; amount: number }[] = [];
+  const loanErosion = Math.round(goal.total - w.spend); // nominal loan − its deflated value that year
+  if (w.agePension + w.rent > 1) out.push({ label: `the Age Pension${w.rent > 1 ? " & rent" : ""}`, amount: Math.round(w.agePension + w.rent) });
+  if (loanErosion > 100) out.push({ label: "inflation eroding your fixed loan payment", amount: loanErosion });
+  if (w.outsideDrawn > 1) out.push({ label: "your outside-super savings", amount: Math.round(w.outsideDrawn) });
+  return out;
+}
 
 const TONE: Record<"accent" | "amber" | "red", { text: string; badge: string }> = {
   accent: { text: "text-emerald-400", badge: "bg-emerald-500/15 text-emerald-400" },
@@ -16,19 +33,21 @@ const TONE: Record<"accent" | "amber" | "red", { text: string; badge: string }> 
  * drawdown year, with a safe/moderate/high guidance band. Read-only; it explains
  * sustainability alongside "money lasts" and the likelihood gauge.
  */
-export default function WithdrawalRateCard({ result, successPct }: { result: SimResult; successPct: number }) {
+export default function WithdrawalRateCard({ result, plan, successPct }: { result: SimResult; plan: RetirementPlan; successPct: number }) {
   const w = initialWithdrawal(result);
   if (!w) return null;
   const pct = +(w.rate * 100).toFixed(1);
   const band = withdrawalBand(w.rate);
   const tone = TONE[band.tone];
   const markerPct = Math.min(100, Math.max(0, (w.rate / 0.1) * 100)); // 0–10% scale
+  const goal = retirementGoal(plan);
+  const reds = reductions(w, goal);
 
   return (
     <div className="mb-6 rounded-2xl border border-line bg-panel p-5">
       <div className="flex items-start justify-between gap-2">
         <span className="text-xs font-medium uppercase tracking-wide text-muted">Your withdrawal rate</span>
-        <WithdrawalRateExplainer w={w} pct={pct} band={band.label} successPct={successPct} />
+        <WithdrawalRateExplainer w={w} goal={goal} reds={reds} pct={pct} band={band.label} successPct={successPct} />
       </div>
       <div className="mt-1 flex flex-wrap items-baseline gap-2">
         <span className={`text-3xl font-bold tabular-nums ${tone.text}`}>{pct}%</span>
@@ -38,11 +57,9 @@ export default function WithdrawalRateCard({ result, successPct }: { result: Sim
       <div className="mt-0.5 text-xs text-muted">
         {fmtCurrency(w.drawn)} of {fmtCurrency(w.balance)} at age {w.age}
         {w.minDriven ? (
-          <> — the ATO minimum, above your {fmtCurrency(w.spend)} spend; the surplus is reinvested outside super.</>
-        ) : w.agePension + w.rent > 0 ? (
-          <> — your {fmtCurrency(w.spend)} spend less {fmtCurrency(w.agePension + w.rent)} from the Age Pension{w.rent > 0 ? " and rent" : ""}.</>
-        ) : w.outsideDrawn > 0 ? (
-          <> — super plus {fmtCurrency(w.outsideDrawn)} from your outside savings funds the {fmtCurrency(w.spend)} spend.</>
+          <> — the ATO minimum, above what your {fmtCurrency(goal.total)} goal needs from super; the surplus is reinvested outside super.</>
+        ) : reds.length > 0 ? (
+          <> — your {fmtCurrency(goal.total)} goal less {joinAnd(reds.map((r) => `${fmtCurrency(r.amount)} from ${r.label}`))}.</>
         ) : null}
       </div>
 
@@ -78,11 +95,15 @@ export default function WithdrawalRateCard({ result, successPct }: { result: Sim
 
 function WithdrawalRateExplainer({
   w,
+  goal,
+  reds,
   pct,
   band,
   successPct,
 }: {
   w: InitialWithdrawal;
+  goal: GoalBreakdown;
+  reds: { label: string; amount: number }[];
   pct: number;
   band: string;
   successPct: number;
@@ -109,21 +130,42 @@ function WithdrawalRateExplainer({
       <div>
         <h3 className="mb-1 font-semibold text-white">Why it&apos;s not your income goal</h3>
         <p>
-          The withdrawal is only the slice of your spending that <em>super</em> funds — it won&apos;t
-          equal your headline income goal, because:
+          The withdrawal is only the slice of your spending that <em>super</em> funds. Here&apos;s how
+          it reconciles with your income goal:
         </p>
-        <ul className="mt-1 list-disc space-y-1 pl-5">
-          {w.agePension + w.rent > 0 && (
-            <li>The <strong>Age Pension</strong>{w.rent > 0 ? " and any net rent" : ""} pays part of your spend ({fmtCurrency(w.agePension + w.rent)}), so super draws that much less.</li>
-          )}
-          {w.minDriven && (
-            <li>The <strong>ATO minimum drawdown</strong> forces super to pay out more than you spend — the surplus is reinvested in your outside-super savings, not lost.</li>
-          )}
-          {w.outsideDrawn > 0 && (
-            <li>Your <strong>outside-super savings</strong> chip in ({fmtCurrency(w.outsideDrawn)}), reducing what super has to cover.</li>
-          )}
-          <li>Before Age Pension age, with no pension yet, the super draw usually equals your spend.</li>
-        </ul>
+        {w.minDriven ? (
+          <p className="mt-2">
+            The <strong>ATO minimum drawdown</strong> forces super to pay out{" "}
+            <strong className="text-white">{fmtCurrency(w.drawn)}</strong> — more than your{" "}
+            {fmtCurrency(goal.total)} goal needs from super — so the surplus is reinvested in your
+            outside-super savings, not lost.
+          </p>
+        ) : (
+          <div className="mt-2 space-y-0.5 rounded-lg border border-line bg-ink/60 px-3 py-2 text-xs">
+            <div className="flex justify-between gap-4">
+              <span>Retirement income goal</span>
+              <span className="tabular-nums text-slate-200">{fmtCurrency(goal.total)}</span>
+            </div>
+            {reds.map((r) => (
+              <div key={r.label} className="flex justify-between gap-4 text-muted">
+                <span>− {r.label}</span>
+                <span className="tabular-nums">−{fmtCurrency(r.amount)}</span>
+              </div>
+            ))}
+            <div className="flex justify-between gap-4 border-t border-line pt-0.5 font-semibold text-white">
+              <span>Drawn from super</span>
+              <span className="tabular-nums">{fmtCurrency(w.drawn)}</span>
+            </div>
+          </div>
+        )}
+        {goal.total - w.spend > 100 && (
+          <p className="mt-2">
+            Your home-loan payment is a <strong>fixed dollar amount</strong>, so in today&apos;s-dollar
+            terms it shrinks with inflation each year — which is why the goal&apos;s{" "}
+            {fmtCurrency(goal.loanCost)} loan cost is smaller by age {w.age}.
+          </p>
+        )}
+        <p className="mt-2">Before Age Pension age, with no pension yet, the super draw usually equals your spend.</p>
       </div>
 
       <div>

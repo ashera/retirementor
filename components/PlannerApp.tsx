@@ -563,7 +563,7 @@ export default function PlannerApp({
       </div>
 
       {/* Withdrawal-rate diagnostic */}
-      <WithdrawalRateCard result={result} successPct={successPct} />
+      <WithdrawalRateCard result={result} plan={plan} successPct={successPct} />
 
       {/* Assets chart */}
       <div className="rounded-2xl border border-line bg-panel p-6">
