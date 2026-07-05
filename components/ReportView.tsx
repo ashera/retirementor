@@ -6,6 +6,7 @@ import type { RetirementPlan, SimResult } from "@/lib/au/types";
 import type { MonteCarloResult } from "@/lib/au/montecarlo";
 import { retirementGoal } from "@/lib/au/goal";
 import { fmtCurrency } from "@/lib/au/format";
+import { track } from "@/lib/analytics";
 import RetirementChart, { type SpendingBand } from "@/components/RetirementChart";
 import IncomeChart from "@/components/IncomeChart";
 import FanChart from "@/components/FanChart";
@@ -198,7 +199,10 @@ export default function ReportView({
           ← Back to planner
         </Link>
         <button
-          onClick={() => window.print()}
+          onClick={() => {
+            track("Report printed");
+            window.print();
+          }}
           className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-700"
         >
           Download / Print PDF

@@ -10,6 +10,7 @@ import { runMonteCarlo } from "@/lib/au/montecarlo";
 import { retirementGoal } from "@/lib/au/goal";
 import { initialWithdrawal } from "@/lib/au/withdrawal";
 import { fmtCurrency } from "@/lib/au/format";
+import { track } from "@/lib/analytics";
 import type { SavedPlan } from "@/app/actions/plans";
 import CompareChart, { type CompareSeries } from "@/components/CompareChart";
 import VariantEditor, { type CompareColumn } from "@/components/VariantEditor";
@@ -73,10 +74,12 @@ export default function CompareView({ config, savedPlans }: { config: EngineConf
   const addSaved = (sp: SavedPlan) => {
     const id = `s${idRef.current++}`;
     persist([...added, { id, label: sp.name, plan: { ...DEFAULT_PLAN, ...sp.data }, kind: "saved" }]);
+    track("Compare: saved added");
   };
   const addVariant = (label: string, plan: RetirementPlan) => {
     const id = `v${idRef.current++}`;
     persist([...added, { id, label, plan, kind: "variant" }]);
+    track("Compare: variant added");
   };
   const remove = (id: string) => persist(added.filter((c) => c.id !== id));
 

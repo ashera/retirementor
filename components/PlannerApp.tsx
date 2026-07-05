@@ -36,6 +36,7 @@ import {
 import { simulate } from "@/lib/au/simulate";
 import type { EngineConfig } from "@/lib/au/config";
 import { fmtCurrency } from "@/lib/au/format";
+import { track } from "@/lib/analytics";
 import { planCompleteness } from "@/lib/au/completeness";
 import CompletenessRing from "@/components/CompletenessRing";
 import WithdrawalRateCard from "@/components/WithdrawalRateCard";
@@ -239,6 +240,7 @@ export default function PlannerApp({
         commit(plan, name);
         setSaveName("");
         setNotice(`Saved “${name}”.`);
+        track("Plan saved");
         router.refresh();
       }
     });
