@@ -484,6 +484,15 @@ export default function PlannerApp({
           </p>
         )}
         {notice && <p className="mt-2 text-xs text-accent">{notice}</p>}
+        <div className="mt-3 border-t border-line pt-3">
+          <Link
+            href="/compare"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-panel-2 px-3 py-1.5 text-sm font-medium text-slate-200 transition hover:border-accent/50 hover:text-white"
+          >
+            ⚖ Compare scenarios &amp; what-ifs
+            <span aria-hidden>→</span>
+          </Link>
+        </div>
       </div>
 
       {/* Stat cards */}
