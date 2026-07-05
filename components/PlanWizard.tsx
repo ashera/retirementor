@@ -221,6 +221,16 @@ export default function PlanWizard({
   const isCouple = draft.household === "couple";
   const preview = simulate(draft, config);
 
+  // A first-run wizard starts blank (empty Fields = NaN). Don't show a projection
+  // — or NaN figures — until the essentials have actually been entered.
+  const previewSuper = draft.superMode === "joint" ? draft.jointSuperBalance : draft.people[0].superBalance;
+  const previewSpend = draft.spendingMode === "stages" ? draft.spendingStages.goGo : draft.targetSpending;
+  const previewReady =
+    draft.people.every((pp) => Number.isFinite(pp.currentAge) && Number.isFinite(pp.salary)) &&
+    Number.isFinite(previewSuper) &&
+    Number.isFinite(previewSpend) &&
+    Number.isFinite(draft.retirementAge);
+
   // Build steps dynamically (partner step only for couples).
   const personStep = (i: number, title: string, subtitle: string) => ({
     key: i === 0 ? "you" : "partner",
@@ -281,7 +291,11 @@ export default function PlanWizard({
           max={500_000}
           step={1000}
           prefix="$"
-          hint={`Employer pays ${fmtCurrency(draft.people[i].salary * config.sgRate)}/yr in super (${(config.sgRate * 100).toFixed(0)}% SG).`}
+          hint={
+            Number.isFinite(draft.people[i].salary)
+              ? `Employer pays ${fmtCurrency(draft.people[i].salary * config.sgRate)}/yr in super (${(config.sgRate * 100).toFixed(0)}% SG).`
+              : `Your employer adds ${(config.sgRate * 100).toFixed(0)}% on top as super (the Super Guarantee).`
+          }
         />
       </div>
     ),
@@ -590,9 +604,11 @@ export default function PlanWizard({
         <div className="rounded-xl border border-line bg-panel-2 p-4">
           <div className="text-xs font-semibold uppercase tracking-wide text-muted">Retirement spending</div>
           <div className="mt-1 text-lg font-bold text-white">
-            {draft.spendingMode === "stages"
-              ? `${fmtCurrency(draft.spendingStages.goGo)}/yr go-go`
-              : `${fmtCurrency(draft.targetSpending)}/yr`}
+            {!Number.isFinite(previewSpend)
+              ? "Not set yet"
+              : draft.spendingMode === "stages"
+                ? `${fmtCurrency(draft.spendingStages.goGo)}/yr go-go`
+                : `${fmtCurrency(draft.targetSpending)}/yr`}
           </div>
           {draft.spendingMode === "stages" && (
             <div className="mt-0.5 text-xs text-muted">
@@ -791,22 +807,22 @@ export default function PlanWizard({
   const contribTotal = draft.people.reduce((s, pp) => s + pp.voluntaryConcessional + pp.voluntaryNonConcessional, 0);
   // Impact hints: what each optional section adds to the projection (vs. without it).
   const contribImpact =
-    contribMode === "yes" && contribTotal > 0
+    previewReady && contribMode === "yes" && contribTotal > 0
       ? Math.max(0, preview.superAtRetirement - simulate({ ...draft, people: draft.people.map((pp) => ({ ...pp, voluntaryConcessional: 0, voluntaryNonConcessional: 0 })) }, config).superAtRetirement)
       : 0;
   const outsideImpact =
-    outsideMode === "yes" && (draft.outsideSuper > 0 || draft.annualOutsideSavings > 0)
+    previewReady && outsideMode === "yes" && (draft.outsideSuper > 0 || draft.annualOutsideSavings > 0)
       ? Math.max(0, preview.totalAtRetirement - simulate({ ...draft, outsideSuper: 0, annualOutsideSavings: 0 }, config).totalAtRetirement)
       : 0;
   const stepValue = (key: string): string => {
     switch (key) {
       case "household": return `${isCouple ? "Couple" : "Single"} · ${draft.homeowner ? "Owner" : "Renter"}`;
-      case "you": return `${fmtCurrency(draft.superMode === "joint" ? draft.jointSuperBalance : draft.people[0].superBalance)} super`;
-      case "partner": return draft.people[1] ? `${fmtCurrency(draft.people[1].superBalance)} super` : "";
+      case "you": return Number.isFinite(previewSuper) ? `${fmtCurrency(previewSuper)} super` : "Not set yet";
+      case "partner": return draft.people[1] && Number.isFinite(draft.people[1].superBalance) ? `${fmtCurrency(draft.people[1].superBalance)} super` : "";
       case "contributions": return contribMode === undefined ? "Not set yet" : contribMode === "no" ? "None" : `${fmtCurrency(contribTotal)}/yr`;
       case "outside": return outsideMode === undefined ? "Not set yet" : outsideMode === "no" ? "None" : fmtCurrency(draft.outsideSuper);
       case "property": return propMode === undefined ? "Not set yet" : propMode === "no" ? "None" : "Included";
-      case "goal": return `${fmtCurrency(draft.spendingMode === "stages" ? draft.spendingStages.goGo : draft.targetSpending)}/yr · retire ${draft.retirementAge}`;
+      case "goal": return Number.isFinite(previewSpend) ? `${fmtCurrency(previewSpend)}/yr · retire ${draft.retirementAge}` : "Not set yet";
       case "assumptions": return `${draft.investmentReturn}% · CPI ${draft.inflation}% · to ${draft.lifeExpectancy}`;
       default: return "";
     }
@@ -821,6 +837,20 @@ export default function PlanWizard({
     return { text: "✓ Done", tone: "text-accent" };
   };
   const goToStep = (i: number) => { setStep(i); setView("step"); };
+
+  // Finish only when the essentials are actually entered; otherwise jump to the
+  // first step still missing a required figure (rather than completing on NaN).
+  const finish = () => {
+    if (previewReady) {
+      onComplete(draft);
+      return;
+    }
+    const youMissing =
+      !draft.people.every((pp) => Number.isFinite(pp.currentAge) && Number.isFinite(pp.salary)) ||
+      !Number.isFinite(previewSuper);
+    const idx = steps.findIndex((s) => s.key === (youMissing ? "you" : "goal"));
+    if (idx >= 0) goToStep(idx);
+  };
 
   return (
     <div
@@ -884,7 +914,7 @@ export default function PlanWizard({
                 Cancel
               </button>
               <button
-                onClick={() => (gapStepIndex >= 0 ? goToStep(gapStepIndex) : onComplete(draft))}
+                onClick={() => (gapStepIndex >= 0 ? goToStep(gapStepIndex) : finish())}
                 className="rounded-lg bg-accent px-5 py-2 text-sm font-semibold text-ink transition hover:bg-accent-soft"
               >
                 {gapStepIndex >= 0 ? "Add missing details →" : configured ? "Update plan" : "See my plan"}
@@ -986,26 +1016,32 @@ export default function PlanWizard({
         ) : null}
 
         {/* Live preview */}
-        <div className="mx-6 mb-2 flex items-center justify-between rounded-xl border border-line bg-panel-2 px-4 py-3">
-          <div>
-            <div className="text-xs text-muted">Super at retirement</div>
-            <div className="text-base font-bold tabular-nums text-white">
-              {fmtCurrency(preview.superAtRetirement)}
+        {previewReady ? (
+          <div className="mx-6 mb-2 flex items-center justify-between rounded-xl border border-line bg-panel-2 px-4 py-3">
+            <div>
+              <div className="text-xs text-muted">Super at retirement</div>
+              <div className="text-base font-bold tabular-nums text-white">
+                {fmtCurrency(preview.superAtRetirement)}
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="text-xs text-muted">Money lasts</div>
+              <div
+                className={`text-base font-bold tabular-nums ${
+                  preview.lastsToLifeExpectancy ? "text-accent" : "text-amber-400"
+                }`}
+              >
+                {preview.lastsToLifeExpectancy
+                  ? `to age ${draft.lifeExpectancy} ✓`
+                  : `to age ${preview.depletedAge}`}
+              </div>
             </div>
           </div>
-          <div className="text-right">
-            <div className="text-xs text-muted">Money lasts</div>
-            <div
-              className={`text-base font-bold tabular-nums ${
-                preview.lastsToLifeExpectancy ? "text-accent" : "text-amber-400"
-              }`}
-            >
-              {preview.lastsToLifeExpectancy
-                ? `to age ${draft.lifeExpectancy} ✓`
-                : `to age ${preview.depletedAge}`}
-            </div>
+        ) : (
+          <div className="mx-6 mb-2 rounded-xl border border-line bg-panel-2 px-4 py-3 text-center text-xs text-muted">
+            Add your age, super, salary and spending to see your projection.
           </div>
-        </div>
+        )}
 
         {/* Footer */}
         <div className="flex items-center justify-between gap-3 border-t border-line px-6 py-4">
@@ -1018,7 +1054,7 @@ export default function PlanWizard({
           <button
             onClick={() => {
               if (isLast) {
-                onComplete(draft);
+                finish();
                 return;
               }
               onProgress?.(draft); // save progress as they advance

@@ -52,6 +52,18 @@ const STORAGE_KEY = "au-retirement-plan";
 const BASELINE_KEY = "au-retirement-baseline";
 const BASELINE_NAME_KEY = "au-retirement-baseline-name"; // label for the ghost line
 
+// A blank starting point for a first-time visitor's "Enter my details" wizard:
+// personal figures start empty (NaN renders as a blank Field) rather than
+// prepopulated, so nothing looks like the user's data until they type it.
+const BLANK_STARTER: RetirementPlan = {
+  ...DEFAULT_PLAN,
+  people: [{ ...DEFAULT_PLAN.people[0], currentAge: NaN, superBalance: NaN, salary: NaN }],
+  superMode: "individual",
+  outsideSuper: 0,
+  annualOutsideSavings: 0,
+  targetSpending: NaN,
+};
+
 function LegendDot({ color, label }: { color: string; label: string }) {
   return (
     <span className="flex items-center gap-1.5 text-xs text-muted">
@@ -1025,13 +1037,18 @@ export default function PlannerApp({
 
       {wizardOpen && (
         <PlanWizard
-          initial={plan}
+          initial={configured ? plan : BLANK_STARTER}
           configured={configured}
           config={config}
           onComplete={handleComplete}
           onProgress={(d) => {
-            setPlan(d);
-            persistWorking(d);
+            // Only mirror progress into the live dashboard / storage once there's
+            // a real plan — a blank first-run wizard shouldn't push NaN fields
+            // into the (still empty) dashboard or persist a half-entered plan.
+            if (configured) {
+              setPlan(d);
+              persistWorking(d);
+            }
           }}
           onClose={() => setWizardOpen(false)}
         />
