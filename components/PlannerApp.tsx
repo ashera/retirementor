@@ -933,6 +933,10 @@ export default function PlannerApp({
           configured={configured}
           config={config}
           onComplete={handleComplete}
+          onProgress={(d) => {
+            setPlan(d);
+            persistWorking(d);
+          }}
           onClose={() => setWizardOpen(false)}
         />
       )}

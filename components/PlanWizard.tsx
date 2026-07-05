@@ -40,6 +40,8 @@ interface PlanWizardProps {
   configured: boolean;
   config: EngineConfig;
   onComplete: (plan: RetirementPlan) => void;
+  /** Called on every "Next" so the host can save progress as the user advances. */
+  onProgress?: (plan: RetirementPlan) => void;
   onClose: () => void;
 }
 
@@ -137,6 +139,7 @@ export default function PlanWizard({
   configured,
   config,
   onComplete,
+  onProgress,
   onClose,
 }: PlanWizardProps) {
   const [draft, setDraft] = useState<RetirementPlan>(initial);
@@ -869,7 +872,7 @@ export default function PlanWizard({
     ...(isCouple ? { partner: { core: true, optional: false, complete: !!p1 && (p1.superBalance > 0 || p1.salary > 0), label: "your partner" } } : {}),
     contributions: { core: false, optional: true, complete: contribMode !== undefined, label: "extra contributions" },
     outside: { core: false, optional: true, complete: outsideMode !== undefined, label: "outside savings" },
-    property: { core: false, optional: true, complete: propMode !== undefined, label: "an investment property" },
+    property: { core: false, optional: true, complete: propMode !== undefined, label: "a property" },
     goal: { core: true, optional: false, complete: goalSet, label: "retirement goal" },
   };
   const scored = Object.values(sectionState);
@@ -958,8 +961,9 @@ export default function PlanWizard({
           })}
         </div>
 
-        {/* Body (scrolls) */}
-        <div className="flex-1 overflow-y-auto px-6 py-6">
+        {/* Body — fixed height so the modal doesn't resize between steps; scrolls
+            internally when a step's content is taller. */}
+        <div className="h-[420px] max-h-[calc(90vh-340px)] overflow-y-auto px-6 py-6">
           <p className="mb-5 text-sm text-muted">{current.subtitle}</p>
           {current.body}
         </div>
@@ -976,7 +980,7 @@ export default function PlanWizard({
               onClick={() => gapStepIndex >= 0 && setStep(gapStepIndex)}
               className="flex w-full items-center justify-between gap-2 rounded-xl border border-line bg-panel-2 px-4 py-2.5 text-left text-xs transition hover:border-accent/40"
             >
-              <span className="text-slate-300">
+              <span className="min-w-0 truncate text-slate-300">
                 {gap.core ? (
                   <>Add <span className="font-semibold text-white">{gap.label}</span> to finish the essentials</>
                 ) : (
@@ -1019,7 +1023,14 @@ export default function PlanWizard({
             {safeStep === 0 ? "Cancel" : "← Back"}
           </button>
           <button
-            onClick={() => (isLast ? onComplete(draft) : setStep(safeStep + 1))}
+            onClick={() => {
+              if (isLast) {
+                onComplete(draft);
+                return;
+              }
+              onProgress?.(draft); // save progress as they advance
+              setStep(safeStep + 1);
+            }}
             className="rounded-lg bg-accent px-5 py-2 text-sm font-semibold text-ink transition hover:bg-accent-soft"
           >
             {isLast ? (configured ? "Update plan" : "See my plan") : "Next →"}
