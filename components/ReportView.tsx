@@ -11,6 +11,7 @@ import IncomeChart from "@/components/IncomeChart";
 import FanChart from "@/components/FanChart";
 import ReportExplainers from "@/components/ReportExplainers";
 import { lifestageBreakdown } from "@/lib/au/lifestages";
+import { BUDGET_CATEGORY_META } from "@/lib/au/budget";
 
 const money = (n: number) => fmtCurrency(Math.round(n));
 
@@ -115,6 +116,18 @@ export default function ReportView({
       ].filter((b) => b.x2 > b.x1)
     : undefined;
   const ls = lifestageBreakdown(plan, config);
+
+  // Per-category budget breakdown (only when the user has built a budget) —
+  // essentials first, then discretionary, with the household-level amounts they
+  // set. Shown per month on the report below the spending table.
+  const budgetCats = plan.budget?.categories;
+  const budgetRows = budgetCats
+    ? BUDGET_CATEGORY_META.map((m) => ({ key: m.key, label: m.label, hint: m.hint, essential: m.essential, annual: budgetCats[m.key] ?? 0 })).filter((r) => r.annual > 0)
+    : [];
+  const essRows = budgetRows.filter((r) => r.essential);
+  const discRows = budgetRows.filter((r) => !r.essential);
+  const essTotal = essRows.reduce((s, r) => s + r.annual, 0);
+  const discTotal = discRows.reduce((s, r) => s + r.annual, 0);
 
   const inputs: { label: string; value: string }[] = [
     { label: "Household", value: plan.household === "couple" ? "Couple" : "Single" },
@@ -313,6 +326,75 @@ export default function ReportView({
                   : ls.goal.loanKind === "io"
                     ? " The interest-only loan continues for life."
                     : ""}
+              </p>
+            </Section>
+          )}
+
+          {budgetRows.length > 0 && (
+            <Section title="Your monthly budget by category">
+              <Lead>
+                The category amounts behind your budget, at the full (go-go)
+                level and shown per month.{" "}
+                {ls.staged
+                  ? "Essentials hold steady through retirement; discretionary spending tapers in the slow-go and no-go years (see the table above)."
+                  : "This is your flat retirement budget."}
+              </Lead>
+              <table className="w-full border-collapse text-right text-xs tabular-nums">
+                <thead className="text-[10px] uppercase tracking-wide text-slate-500">
+                  <tr className="border-b border-slate-300">
+                    <th className="py-1 text-left">Category</th>
+                    <th>Per month</th>
+                    <th>Per year</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr className="bg-slate-50">
+                    <td className="py-1 text-left font-semibold text-slate-700" colSpan={3}>
+                      <span className="mr-1.5 inline-block h-2 w-2 rounded-full align-middle" style={{ background: "#0ea5e9" }} />
+                      Essentials
+                    </td>
+                  </tr>
+                  {essRows.map((r) => (
+                    <tr key={r.key} className="border-b border-slate-100">
+                      <td className="py-1 pl-4 text-left text-slate-700">{r.label}</td>
+                      <td>{money(r.annual / 12)}</td>
+                      <td className="text-slate-500">{money(r.annual)}</td>
+                    </tr>
+                  ))}
+                  <tr className="border-b border-slate-200">
+                    <td className="py-1 pl-4 text-left font-medium text-slate-600">Essentials subtotal</td>
+                    <td className="font-medium">{money(essTotal / 12)}</td>
+                    <td className="text-slate-500">{money(essTotal)}</td>
+                  </tr>
+                  <tr className="bg-slate-50">
+                    <td className="py-1 text-left font-semibold text-slate-700" colSpan={3}>
+                      <span className="mr-1.5 inline-block h-2 w-2 rounded-full align-middle" style={{ background: "#f472b6" }} />
+                      Discretionary
+                    </td>
+                  </tr>
+                  {discRows.map((r) => (
+                    <tr key={r.key} className="border-b border-slate-100">
+                      <td className="py-1 pl-4 text-left text-slate-700">{r.label}</td>
+                      <td>{money(r.annual / 12)}</td>
+                      <td className="text-slate-500">{money(r.annual)}</td>
+                    </tr>
+                  ))}
+                  <tr className="border-b border-slate-200">
+                    <td className="py-1 pl-4 text-left font-medium text-slate-600">Discretionary subtotal</td>
+                    <td className="font-medium">{money(discTotal / 12)}</td>
+                    <td className="text-slate-500">{money(discTotal)}</td>
+                  </tr>
+                  <tr className="border-t-2 border-slate-300">
+                    <td className="py-1 text-left font-bold text-slate-800">Total budget</td>
+                    <td className="font-bold text-slate-800">{money((essTotal + discTotal) / 12)}</td>
+                    <td className="font-medium text-slate-600">{money(essTotal + discTotal)}</td>
+                  </tr>
+                </tbody>
+              </table>
+              <p className="mt-2 text-xs text-slate-500">
+                Household-level amounts you set in the budget builder
+                {plan.household === "couple" ? " (combined for the couple)" : ""}. Any
+                home-loan cost is shown separately in the spending table above, not here.
               </p>
             </Section>
           )}
