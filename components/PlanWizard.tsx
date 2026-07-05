@@ -5,7 +5,7 @@ import Field from "@/components/Field";
 import InlineExplainer from "@/components/InlineExplainer";
 import { simulate } from "@/lib/au/simulate";
 import type { EngineConfig } from "@/lib/au/config";
-import { fmtCurrency } from "@/lib/au/format";
+import { fmtCompact, fmtCurrency } from "@/lib/au/format";
 import { incomeTestRent, netEquity, netRentCash } from "@/lib/au/property";
 import {
   DEFAULT_PARTNER,
@@ -72,9 +72,11 @@ function CompletenessRing({ pct, size = 44 }: { pct: number; size?: number }) {
           className="transition-[stroke-dashoffset] duration-500 ease-out"
         />
       </svg>
-      <div className="absolute inset-0 flex items-baseline justify-center font-bold tabular-nums text-white">
-        <span className={big ? "text-3xl" : "text-[11px]"}>{pct}</span>
-        {big && <span className="text-sm text-muted">%</span>}
+      <div className="absolute inset-0 flex items-center justify-center leading-none">
+        <span className="font-bold tabular-nums text-white">
+          <span className={big ? "text-[30px]" : "text-[11px]"}>{pct}</span>
+          {big && <span className="align-top text-sm font-semibold text-muted">%</span>}
+        </span>
       </div>
     </div>
   );
@@ -942,6 +944,15 @@ export default function PlanWizard({
 
   // Overview-card values & status per step.
   const contribTotal = draft.people.reduce((s, pp) => s + pp.voluntaryConcessional + pp.voluntaryNonConcessional, 0);
+  // Impact hints: what each optional section adds to the projection (vs. without it).
+  const contribImpact =
+    contribMode === "yes" && contribTotal > 0
+      ? Math.max(0, preview.superAtRetirement - simulate({ ...draft, people: draft.people.map((pp) => ({ ...pp, voluntaryConcessional: 0, voluntaryNonConcessional: 0 })) }, config).superAtRetirement)
+      : 0;
+  const outsideImpact =
+    outsideMode === "yes" && (draft.outsideSuper > 0 || draft.annualOutsideSavings > 0)
+      ? Math.max(0, preview.totalAtRetirement - simulate({ ...draft, outsideSuper: 0, annualOutsideSavings: 0 }, config).totalAtRetirement)
+      : 0;
   const stepValue = (key: string): string => {
     switch (key) {
       case "household": return `${isCouple ? "Couple" : "Single"} · ${draft.homeowner ? "Owner" : "Renter"}`;
@@ -958,9 +969,11 @@ export default function PlanWizard({
   const stepStatus = (key: string): { text: string; tone: string } => {
     if (key === "assumptions") return tuned ? { text: "★ Tuned", tone: "text-cyan-300" } : { text: "Defaults", tone: "text-muted" };
     const sec = sectionState[key];
-    if (sec?.complete) return { text: "✓ Done", tone: "text-accent" };
-    if (sec?.optional) return { text: "＋ Add", tone: "text-amber-300" };
-    return { text: "Needs info", tone: "text-amber-300" };
+    if (!sec?.complete) return sec?.optional ? { text: "＋ Add", tone: "text-amber-300" } : { text: "Needs info", tone: "text-amber-300" };
+    // Complete — for enrichments, show what they add to the projection.
+    if (key === "contributions" && contribImpact > 500) return { text: `✓ +${fmtCompact(contribImpact)} super`, tone: "text-accent" };
+    if (key === "outside" && outsideImpact > 500) return { text: `✓ +${fmtCompact(outsideImpact)}`, tone: "text-accent" };
+    return { text: "✓ Done", tone: "text-accent" };
   };
   const goToStep = (i: number) => { setStep(i); setView("step"); };
 
@@ -974,7 +987,7 @@ export default function PlanWizard({
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
         onClick={onClose}
       />
-      <div className="relative z-10 flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-line bg-panel shadow-2xl">
+      <div key={view} className="wizfade relative z-10 flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-line bg-panel shadow-2xl">
         {view === "summary" ? (
           <>
             {/* Overview header */}
@@ -983,20 +996,19 @@ export default function PlanWizard({
               <button onClick={onClose} aria-label="Close" className="rounded-lg p-1.5 text-muted transition hover:bg-panel-2 hover:text-white">✕</button>
             </div>
 
-            {/* Big progress donut + a card per section (budget-builder style) */}
-            <div className="h-[420px] max-h-[calc(90vh-150px)] overflow-y-auto px-6 py-6">
+            {/* Big progress donut + a card per section (budget-builder style).
+                Height matches the step pages so the modal doesn't jump. */}
+            <div className="h-[622px] max-h-[calc(90vh-150px)] overflow-y-auto px-6 py-5">
               <div className="flex flex-col items-center text-center">
-                <CompletenessRing pct={pct} size={104} />
-                <div className="mt-3 text-sm font-semibold text-accent">{tier}</div>
+                <CompletenessRing pct={pct} size={88} />
+                <div className="mt-2 text-sm font-semibold text-accent">{tier}</div>
                 <div className="text-xs text-muted">
                   {completeCount} of {total} details told{tuned ? " · ★ fine-tuned" : ""}
                 </div>
-                <p className="mt-2 max-w-xs text-xs text-muted">
-                  The more you tell us, the sharper your projection. Tap a section to fill it in.
-                </p>
+                <p className="mt-1 text-xs text-muted">Tap a section to add detail.</p>
               </div>
 
-              <div className="mt-6 space-y-2">
+              <div className="mt-4 space-y-1.5">
                 {steps.map((s, i) => {
                   const st = stepStatus(s.key);
                   return (
@@ -1004,11 +1016,11 @@ export default function PlanWizard({
                       key={s.key}
                       type="button"
                       onClick={() => goToStep(i)}
-                      className="flex w-full items-center gap-3 rounded-xl border border-line bg-panel-2/60 px-3 py-2.5 text-left transition hover:border-accent/40"
+                      className="flex w-full items-center gap-3 rounded-xl border border-line bg-panel-2/60 px-3 py-1.5 text-left transition hover:border-accent/40"
                     >
-                      <StepIcon stepKey={s.key} />
+                      <StepIcon stepKey={s.key} size={20} />
                       <div className="min-w-0 flex-1">
-                        <div className="font-semibold text-white">{s.nav}</div>
+                        <div className="text-sm font-semibold text-white">{s.nav}</div>
                         <div className="truncate text-xs text-muted">{STEP_META[s.key]?.desc}</div>
                       </div>
                       <div className="shrink-0 text-right">

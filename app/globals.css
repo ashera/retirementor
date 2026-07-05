@@ -51,6 +51,26 @@ body {
   }
 }
 
+/* Subtle fade+lift used when the wizard switches between overview and a step. */
+@keyframes wizfade {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.wizfade {
+  animation: wizfade 0.18s ease-out both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .wizfade {
+    animation: none;
+  }
+}
+
 /* Range slider styling */
 input[type="range"] {
   -webkit-appearance: none;
