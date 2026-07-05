@@ -541,12 +541,8 @@ export default function PlannerApp({
           tag={`${successPct}% likely`}
           tagTone={successTone}
           tagHref="#likelihood"
-          tagTitle="See why — jump to the likelihood breakdown"
-          sub={
-            result.lastsToLifeExpectancy
-              ? "covers your whole plan"
-              : "runs short — adjust inputs"
-          }
+          tagTitle={`${successPct}% of market return scenarios fund your spending all the way to age ${plan.lifeExpectancy} — tap for the breakdown`}
+          sub={`${successPct}% likely to last to your planning age of ${plan.lifeExpectancy}`}
           explainer={
             <MoneyLastsExplainer plan={plan} config={config} result={result} />
           }
