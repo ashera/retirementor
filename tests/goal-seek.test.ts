@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { whatWillItTake } from "../lib/au/goalseek";
+import { whatWillItTake, trimSpending, boostSpending } from "../lib/au/goalseek";
 import { simulate } from "../lib/au/simulate";
+import { lifestageBreakdown } from "../lib/au/lifestages";
 import { DEFAULT_CONFIG as cfg } from "../lib/au/config";
 import { DEFAULT_PLAN, type RetirementPlan } from "../lib/au/types";
 
@@ -37,5 +38,40 @@ describe("Goal-seek", () => {
     const above = simulate({ ...base, targetSpending: gs.maxSpend! + 5_000 }, cfg);
     expect(at.lastsToLifeExpectancy).toBe(true);
     expect(above.lastsToLifeExpectancy).toBe(false);
+  });
+});
+
+describe("Spending boost (mirror of trim)", () => {
+  // A comfortably-funded plan → real headroom to spend more.
+  const plan: RetirementPlan = { ...base, targetSpending: 45_000 };
+
+  it("raises spending, holds essentials, and still lasts to life expectancy", () => {
+    const before = lifestageBreakdown(plan, cfg);
+    const boost = boostSpending(plan, cfg);
+
+    expect(boost.applicable).toBe(true); // the plan already lasts
+    expect(boost.hasHeadroom).toBe(true);
+    expect(boost.essentials).toBeCloseTo(before.essentials, 0); // floor untouched
+    expect(boost.extraPerYear).toBeGreaterThan(0);
+    expect(boost.newHeadlineLiving).toBeGreaterThan(before.rows[0].living);
+
+    // The applied boost genuinely still lasts on the central projection.
+    const after = simulate({ ...plan, ...boost.patch }, cfg);
+    expect(after.lastsToLifeExpectancy).toBe(true);
+    expect(boost.lastsAfter).toBe(true);
+  });
+
+  it("is not offered when the plan already can't last (trim's territory)", () => {
+    const boost = boostSpending({ ...base, targetSpending: 95_000 }, cfg);
+    expect(boost.applicable).toBe(false);
+    expect(boost.hasHeadroom).toBe(false);
+  });
+
+  it("boosting to the max leaves essentially no further headroom", () => {
+    const boost = boostSpending(plan, cfg);
+    const boosted = { ...plan, ...boost.patch };
+    // After spending the headroom, a re-boost finds little to nothing left.
+    const again = boostSpending(boosted, cfg);
+    expect(again.extraPerYear).toBeLessThan(boost.extraPerYear);
   });
 });

@@ -26,6 +26,7 @@ import {
 import { runMonteCarlo } from "@/lib/au/montecarlo";
 import { whatWillItTake } from "@/lib/au/goalseek";
 import TrimSpendingModal from "@/components/TrimSpendingModal";
+import BoostSpendingModal from "@/components/BoostSpendingModal";
 import { retirementGoal } from "@/lib/au/goal";
 import { logout } from "@/app/actions/auth";
 import {
@@ -114,6 +115,7 @@ export default function PlannerApp({
   const [budgetOpen, setBudgetOpen] = useState(false);
   const [lifestageOpen, setLifestageOpen] = useState(false);
   const [trimOpen, setTrimOpen] = useState(false);
+  const [boostOpen, setBoostOpen] = useState(false);
   const [selectedAge, setSelectedAge] = useState<number | null>(null);
   const [incomeAge, setIncomeAge] = useState<number | null>(null);
   const [saveName, setSaveName] = useState("");
@@ -888,6 +890,21 @@ export default function PlannerApp({
             </button>
           </div>
         )}
+        {gs.lasts && gs.maxSpend != null && gs.maxSpend - gs.currentSpend >= 1000 && (
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
+            <p className="text-sm text-slate-300">
+              Money to spare? Put your headroom to work — raise discretionary
+              spending (essentials kept) to the most your plan can afford while
+              still lasting to age {plan.lifeExpectancy}.
+            </p>
+            <button
+              onClick={() => setBoostOpen(true)}
+              className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-ink transition hover:brightness-110"
+            >
+              📈 Help me spend more
+            </button>
+          </div>
+        )}
       </div>
 
       <TrimSpendingModal
@@ -896,6 +913,19 @@ export default function PlannerApp({
         onApply={(patch) => {
           quickAdjust(patch);
           setNotice("Spending trimmed (essentials kept) to make your money last to life expectancy.");
+        }}
+        plan={plan}
+        config={config}
+        result={result}
+      />
+
+      <BoostSpendingModal
+        open={boostOpen}
+        onClose={() => setBoostOpen(false)}
+        onApply={(patch) => {
+          quickAdjust(patch);
+          track("Spending boosted");
+          setNotice("Spending raised (essentials kept) to the most your plan can afford.");
         }}
         plan={plan}
         config={config}
