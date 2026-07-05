@@ -20,6 +20,7 @@ export default function TrimSpendingModal({
   plan,
   config,
   result,
+  applyLabel = "Apply this budget",
 }: {
   open: boolean;
   onClose: () => void;
@@ -27,6 +28,7 @@ export default function TrimSpendingModal({
   plan: RetirementPlan;
   config: EngineConfig;
   result: SimResult;
+  applyLabel?: string;
 }) {
   if (!open) return null;
 
@@ -196,7 +198,7 @@ export default function TrimSpendingModal({
               onClick={apply}
               className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-ink transition hover:brightness-110"
             >
-              Apply this budget
+              {applyLabel}
             </button>
           )}
         </div>

@@ -24,6 +24,7 @@ import type {
 } from "@/lib/au/types";
 import Field from "@/components/Field";
 import BudgetCategoryIcon, { CATEGORY_COLOR } from "@/components/BudgetCategoryIcon";
+import TrimSpendingModal from "@/components/TrimSpendingModal";
 
 function defaultMortgage(oldestAtRetire: number): MortgageDetail {
   const balance = 180_000;
@@ -103,6 +104,17 @@ export default function BudgetBuilder({ plan, config, onApply, onClose }: Budget
 
   // Live "money lasts" impact of the current budget (+ mortgage).
   const impact = useMemo(() => simulate(workingPlan, config), [workingPlan, config]);
+
+  // The working plan carrying the in-progress budget, so the trim can scale the
+  // discretionary categories (and we apply the result straight back into them).
+  const [trimOpen, setTrimOpen] = useState(false);
+  const budgetPlan = useMemo(
+    () => ({ ...workingPlan, budget: { tenure, lifestyle, categories, applyPhases } }),
+    [workingPlan, tenure, lifestyle, categories, applyPhases],
+  );
+  const applyTrim = (patch: Partial<RetirementPlan>) => {
+    if (patch.budget?.categories) setCategories(patch.budget.categories);
+  };
 
   // Compare carry vs clear-at-retirement so we can show the pension uplift.
   const strategyCompare = useMemo(() => {
@@ -336,6 +348,7 @@ export default function BudgetBuilder({ plan, config, onApply, onClose }: Budget
               applyPhases={applyPhases}
               stages={stages}
               mortgage={activeMortgage}
+              onTrim={() => setTrimOpen(true)}
             />
           )}
         </div>
@@ -356,6 +369,16 @@ export default function BudgetBuilder({ plan, config, onApply, onClose }: Budget
           </button>
         </div>
       </div>
+
+      <TrimSpendingModal
+        open={trimOpen}
+        onClose={() => setTrimOpen(false)}
+        onApply={applyTrim}
+        plan={budgetPlan}
+        config={config}
+        result={impact}
+        applyLabel="Trim my budget"
+      />
     </div>
   );
 }
@@ -923,6 +946,7 @@ function PayoffStep({
   applyPhases,
   stages,
   mortgage,
+  onTrim,
 }: {
   total: number;
   essential: number;
@@ -933,6 +957,7 @@ function PayoffStep({
   applyPhases: boolean;
   stages: SpendingStages;
   mortgage: MortgageDetail | undefined;
+  onTrim: () => void;
 }) {
   const hh = plan.household;
   const comfortable = config.asfa.comfortable[hh];
@@ -1034,11 +1059,18 @@ function PayoffStep({
         {impact.lastsToLifeExpectancy ? (
           <>On this budget your money lasts to {plan.lifeExpectancy}+ 🎉</>
         ) : (
-          <>
-            Heads up — on this budget your money runs short around age{" "}
-            <span className="font-bold">{impact.depletedAge}</span>. You can still use it,
-            then trim from the balance graph.
-          </>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span>
+              Heads up — on this budget your money runs short around age{" "}
+              <span className="font-bold">{impact.depletedAge}</span>.
+            </span>
+            <button
+              onClick={onTrim}
+              className="shrink-0 rounded-lg bg-amber-400/90 px-3 py-1.5 text-xs font-semibold text-ink transition hover:bg-amber-300"
+            >
+              ✂️ Help me make it last
+            </button>
+          </div>
         )}
       </div>
 
