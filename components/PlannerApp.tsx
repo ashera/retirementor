@@ -43,6 +43,7 @@ import {
 
 const STORAGE_KEY = "au-retirement-plan";
 const BASELINE_KEY = "au-retirement-baseline";
+const BASELINE_NAME_KEY = "au-retirement-baseline-name"; // label for the ghost line
 const GUIDED_KEY = "au-retirement-guided"; // marks the first-run guide as seen
 
 function LegendDot({ color, label }: { color: string; label: string }) {
@@ -98,6 +99,9 @@ export default function PlannerApp({
   // Baseline = the last committed plan (wizard / saved / load). Quick-adjust tweaks
   // update `plan` only, so the chart can show a "vs saved" ghost line.
   const [baseline, setBaseline] = useState<RetirementPlan>(DEFAULT_PLAN);
+  // Where the baseline came from, so the ghost line names it (a loaded/saved
+  // scenario's name, or null when it's just the pre-tweak committed plan).
+  const [baselineName, setBaselineName] = useState<string | null>(null);
   const [configured, setConfigured] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
   const [ready, setReady] = useState(false); // false until localStorage decides guide vs dashboard
@@ -121,6 +125,7 @@ export default function PlannerApp({
         const rawBase = localStorage.getItem(BASELINE_KEY);
         setPlan(working);
         setBaseline(rawBase ? { ...DEFAULT_PLAN, ...JSON.parse(rawBase) } : working);
+        setBaselineName(localStorage.getItem(BASELINE_NAME_KEY) || null);
         setConfigured(true);
       } else if (!localStorage.getItem(GUIDED_KEY) && savedPlans.length === 0) {
         // Genuine first-run: no working plan, no saved scenarios, guide not yet seen.
@@ -147,6 +152,9 @@ export default function PlannerApp({
     () => (tweaked ? simulate(baseline, config) : null),
     [tweaked, baseline, config],
   );
+  // Name the ghost line: a loaded/saved scenario's name, else "Before changes"
+  // (the committed plan the current quick-adjustments are measured against).
+  const baselineLabel = baselineName || "Before changes";
 
   const persistWorking = (next: RetirementPlan) => {
     try {
@@ -156,13 +164,17 @@ export default function PlannerApp({
     }
   };
 
-  // Commit a plan as the new baseline (wizard / load) and persist both.
-  const commit = (next: RetirementPlan) => {
+  // Commit a plan as the new baseline (wizard / load / save) and persist both.
+  // `name` labels the ghost line (a scenario name, or null for an unnamed plan).
+  const commit = (next: RetirementPlan, name: string | null = null) => {
     setPlan(next);
     setBaseline(next);
+    setBaselineName(name);
     persistWorking(next);
     try {
       localStorage.setItem(BASELINE_KEY, JSON.stringify(next));
+      if (name) localStorage.setItem(BASELINE_NAME_KEY, name);
+      else localStorage.removeItem(BASELINE_NAME_KEY);
     } catch {
       /* ignore */
     }
@@ -206,7 +218,7 @@ export default function PlannerApp({
   };
 
   const handleLoad = (sp: SavedPlan) => {
-    commit({ ...DEFAULT_PLAN, ...sp.data });
+    commit({ ...DEFAULT_PLAN, ...sp.data }, sp.name);
     setConfigured(true);
     setNotice(`Loaded “${sp.name}”.`);
   };
@@ -217,6 +229,9 @@ export default function PlannerApp({
       const res = await savePlan(name, plan);
       if (res.error) setNotice(res.error);
       else {
+        // The current plan is now this named scenario — make it the baseline so
+        // any further quick-adjusts show a ghost line labelled with its name.
+        commit(plan, name);
         setSaveName("");
         setNotice(`Saved “${name}”.`);
         router.refresh();
@@ -534,13 +549,14 @@ export default function PlannerApp({
           <div className="flex flex-wrap gap-4">
             <LegendDot color="#34d399" label="Super" />
             <LegendDot color="#38bdf8" label="Outside super" />
-            {tweaked && <LegendDot color="#94a3b8" label="Saved plan" />}
+            {tweaked && <LegendDot color="#94a3b8" label={baselineLabel} />}
           </div>
         </div>
         <RetirementChart
           result={result}
           bands={stageBands}
           baseline={baselineResult}
+          baselineLabel={baselineLabel}
           onSelectYear={setSelectedAge}
           selectedAge={selectedAge}
           wageInflationPct={plan.inflation + (config.livingStandardsGrowthPct ?? 0)}
@@ -590,7 +606,7 @@ export default function PlannerApp({
                 onClick={resetToBaseline}
                 className="rounded-lg border border-line px-3 py-1 text-xs font-medium text-slate-200 transition hover:border-accent/50 hover:text-white"
               >
-                Reset to saved
+                {baselineName ? `Reset to “${baselineName}”` : "Undo changes"}
               </button>
             )}
           </div>

@@ -26,9 +26,11 @@ type ChartRow = Partial<YearRow> & { age: number; baselineTotal?: number };
 function AssetsTooltip({
   active,
   payload,
+  baselineLabel = "Saved plan",
 }: {
   active?: boolean;
   payload?: { payload: ChartRow }[];
+  baselineLabel?: string;
 }) {
   if (!active || !payload?.length) return null;
   const r = payload[0].payload;
@@ -52,7 +54,7 @@ function AssetsTooltip({
       )}
       {r.baselineTotal !== undefined && (
         <div className="tabular-nums text-slate-400">
-          Saved plan {fmtCurrency(r.baselineTotal)}
+          {baselineLabel} {fmtCurrency(r.baselineTotal)}
         </div>
       )}
       {r.phase && (
@@ -69,6 +71,7 @@ export default function RetirementChart({
   result,
   bands,
   baseline,
+  baselineLabel = "Saved plan",
   onSelectYear,
   selectedAge,
   animate = true,
@@ -79,6 +82,7 @@ export default function RetirementChart({
   result: SimResult;
   bands?: SpendingBand[];
   baseline?: SimResult | null;
+  baselineLabel?: string;
   onSelectYear?: (age: number) => void;
   selectedAge?: number | null;
   animate?: boolean;
@@ -178,7 +182,7 @@ export default function RetirementChart({
           width={54}
           tickFormatter={fmtCompact}
         />
-        <Tooltip content={<AssetsTooltip />} />
+        <Tooltip content={<AssetsTooltip baselineLabel={baselineLabel} />} />
         <ReferenceLine
           x={retirementAge}
           stroke="#f59e0b"
@@ -244,7 +248,7 @@ export default function RetirementChart({
             fill="none"
             dot={false}
             isAnimationActive={false}
-            name="Saved plan"
+            name={baselineLabel}
           />
         )}
       </AreaChart>
