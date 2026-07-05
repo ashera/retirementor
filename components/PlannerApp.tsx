@@ -25,6 +25,7 @@ import {
 } from "@/components/explainers";
 import { runMonteCarlo } from "@/lib/au/montecarlo";
 import { whatWillItTake } from "@/lib/au/goalseek";
+import TrimSpendingModal from "@/components/TrimSpendingModal";
 import { retirementGoal } from "@/lib/au/goal";
 import { logout } from "@/app/actions/auth";
 import {
@@ -108,6 +109,7 @@ export default function PlannerApp({
   const [wizardOpen, setWizardOpen] = useState(false);
   const [budgetOpen, setBudgetOpen] = useState(false);
   const [lifestageOpen, setLifestageOpen] = useState(false);
+  const [trimOpen, setTrimOpen] = useState(false);
   const [selectedAge, setSelectedAge] = useState<number | null>(null);
   const [incomeAge, setIncomeAge] = useState<number | null>(null);
   const [saveName, setSaveName] = useState("");
@@ -838,7 +840,35 @@ export default function PlannerApp({
           Each lever on its own, on the central (average-return) projection —
           combine them, or check the likelihood above for the odds.
         </p>
+        {gs.maxSpend != null && gs.maxSpend < gs.currentSpend && (
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
+            <p className="text-sm text-slate-300">
+              Want the app to do it for you? Trim the budget to the amount that
+              lasts to age {plan.lifeExpectancy}.
+            </p>
+            <button
+              onClick={() => setTrimOpen(true)}
+              className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-ink transition hover:brightness-110"
+            >
+              ✂️ Help me trim spending
+            </button>
+          </div>
+        )}
       </div>
+
+      <TrimSpendingModal
+        open={trimOpen}
+        onClose={() => setTrimOpen(false)}
+        onApply={(patch) => {
+          quickAdjust(patch);
+          setNotice("Spending trimmed to make your money last to life expectancy.");
+        }}
+        plan={plan}
+        config={config}
+        result={result}
+        gs={gs}
+        loanCost={goal.loanCost}
+      />
 
       {/* Assumptions summary */}
       <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 rounded-2xl border border-line bg-panel px-6 py-4">
