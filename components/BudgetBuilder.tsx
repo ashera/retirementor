@@ -67,7 +67,9 @@ export default function BudgetBuilder({ plan, config, onApply, onClose }: Budget
     Math.max(...plan.people.map((p) => p.currentAge)) +
     Math.max(0, plan.retirementAge - plan.people[0].currentAge);
 
-  const [step, setStep] = useState(0);
+  // Returning to edit an existing budget? Jump straight to the last (goal) page
+  // — safeStep clamps this to the real last index. New budgets start at Setup.
+  const [step, setStep] = useState(plan.budget ? 99 : 0);
   const [tenure, setTenure] = useState<HomeTenure>(
     plan.budget?.tenure ?? (plan.homeowner ? "own" : "rent"),
   );
