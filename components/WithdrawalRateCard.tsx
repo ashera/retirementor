@@ -37,6 +37,13 @@ export default function WithdrawalRateCard({ result, successPct }: { result: Sim
       </div>
       <div className="mt-0.5 text-xs text-muted">
         {fmtCurrency(w.drawn)} of {fmtCurrency(w.balance)} at age {w.age}
+        {w.minDriven ? (
+          <> — the ATO minimum, above your {fmtCurrency(w.spend)} spend; the surplus is reinvested outside super.</>
+        ) : w.agePension + w.rent > 0 ? (
+          <> — your {fmtCurrency(w.spend)} spend less {fmtCurrency(w.agePension + w.rent)} from the Age Pension{w.rent > 0 ? " and rent" : ""}.</>
+        ) : w.outsideDrawn > 0 ? (
+          <> — super plus {fmtCurrency(w.outsideDrawn)} from your outside savings funds the {fmtCurrency(w.spend)} spend.</>
+        ) : null}
       </div>
 
       {/* Guidance band bar (0–10% scale) with a marker at the rate */}
@@ -95,9 +102,28 @@ function WithdrawalRateExplainer({
           {fmtCurrency(w.drawn)} ÷ {fmtCurrency(w.balance)} = {pct}%
         </div>
         <p className="mt-2">
-          We take the amount drawn from super to fund your spending (or the ATO minimum, whichever
-          is higher) and divide it by the balance at the start of that year.
+          We take the amount drawn from super and divide it by the balance at the start of that year.
         </p>
+      </div>
+
+      <div>
+        <h3 className="mb-1 font-semibold text-white">Why it&apos;s not your income goal</h3>
+        <p>
+          The withdrawal is only the slice of your spending that <em>super</em> funds — it won&apos;t
+          equal your headline income goal, because:
+        </p>
+        <ul className="mt-1 list-disc space-y-1 pl-5">
+          {w.agePension + w.rent > 0 && (
+            <li>The <strong>Age Pension</strong>{w.rent > 0 ? " and any net rent" : ""} pays part of your spend ({fmtCurrency(w.agePension + w.rent)}), so super draws that much less.</li>
+          )}
+          {w.minDriven && (
+            <li>The <strong>ATO minimum drawdown</strong> forces super to pay out more than you spend — the surplus is reinvested in your outside-super savings, not lost.</li>
+          )}
+          {w.outsideDrawn > 0 && (
+            <li>Your <strong>outside-super savings</strong> chip in ({fmtCurrency(w.outsideDrawn)}), reducing what super has to cover.</li>
+          )}
+          <li>Before Age Pension age, with no pension yet, the super draw usually equals your spend.</li>
+        </ul>
       </div>
 
       <div>

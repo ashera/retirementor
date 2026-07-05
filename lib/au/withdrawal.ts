@@ -15,13 +15,34 @@ export interface InitialWithdrawal {
   age: number;
   drawn: number; // $ drawn from super that year
   balance: number; // start-of-year super balance
+  // Funding context — why the super draw differs from the headline spend:
+  spend: number; // total spending that year
+  agePension: number; // Age Pension funding part of the spend
+  rent: number; // net investment-property rent funding part (≥ 0)
+  outsideDrawn: number; // drawn from outside-super savings
+  minDriven: boolean; // true when the ATO minimum forces a draw above the spending need
 }
 
 /** The first drawdown year's rate — the standard "initial withdrawal rate". */
 export function initialWithdrawal(result: SimResult): InitialWithdrawal | null {
   const row = result.rows.find((r) => r.phase !== "accumulation" && r.superDrawn > 0 && r.totalSuper > 0);
   if (!row) return null;
-  return { rate: rowWithdrawalRate(row), age: row.age, drawn: row.superDrawn, balance: row.totalSuper };
+  const b = row.breakdown;
+  const spend = b.livingSpend + b.mortgageCost;
+  const agePension = b.agePension;
+  const rent = Math.max(0, b.rentIncome);
+  const need = Math.max(0, spend - agePension - rent); // the slice super must fund
+  return {
+    rate: rowWithdrawalRate(row),
+    age: row.age,
+    drawn: row.superDrawn,
+    balance: row.totalSuper,
+    spend,
+    agePension,
+    rent,
+    outsideDrawn: row.outsideDrawn,
+    minDriven: row.superDrawn > need + 1,
+  };
 }
 
 export type WithdrawalBand = { label: string; tone: "accent" | "amber" | "red" };
