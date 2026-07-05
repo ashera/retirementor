@@ -1,1 +1,42 @@
-[]
+[
+  {
+    "key": "single-90k-300k-retire-67",
+    "name": "Single · $90k salary, $300k super, retire 67",
+    "input": {
+      "household": "single",
+      "people": [
+        {
+          "currentAge": 55,
+          "salary": 90000,
+          "superBalance": 300000
+        }
+      ],
+      "outsideSuper": 0,
+      "retirementAge": 67,
+      "targetSpending": 45000,
+      "investmentReturn": 6,
+      "inflation": 2.5,
+      "lifeExpectancy": 92,
+      "homeowner": true
+    },
+    "points": [
+      {
+        "key": "super_at_retirement",
+        "moneysmart": 505770,
+        "tolerancePct": 5
+      },
+      {
+        "key": "age_pension_year1",
+        "moneysmart": 14364,
+        "tolerancePct": 25
+      },
+      {
+        "key": "money_lasts_age",
+        "moneysmart": 92,
+        "tolerancePct": 2
+      }
+    ],
+    "notes": "Transcribed from Moneysmart's Retirement Planner with assumptions aligned: investment return 6% (pre- and post-retirement), admin+investment fee 0.85%, fixed admin $74/yr, insurance $0; CPI 2.5%, salary growth 3.7% and pre-retirement deflator 3.7% (= CPI + 1.2% living standards), retirement deflator CPI 2.5%. Single homeowner, $0 outside super for the cleanest comparison. Super-at-retirement matches within ~1.7% (nominal accumulation agrees to <2%); money lasts the full horizon in both. The first-year Age Pension carries a WIDE 25% tolerance on purpose: our engine (~$18.4k) is assets-test bound on the current-FY single max ($31,223 incl. supplements), whereas Moneysmart's $14,364 implies an older max of ~$27,840 — a reference-data VINTAGE difference, not an engine discrepancy (our figure is the more current one). Revisit the tolerance when Moneysmart refreshes its Age Pension rates.",
+    "savedAt": "2026-07-05T00:00:00.000Z"
+  }
+]
