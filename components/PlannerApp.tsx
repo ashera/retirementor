@@ -38,6 +38,7 @@ import type { EngineConfig } from "@/lib/au/config";
 import { fmtCurrency } from "@/lib/au/format";
 import { planCompleteness } from "@/lib/au/completeness";
 import CompletenessRing from "@/components/CompletenessRing";
+import WithdrawalRateCard from "@/components/WithdrawalRateCard";
 import {
   DEFAULT_PLAN,
   spendingRange,
@@ -560,6 +561,9 @@ export default function PlannerApp({
           }
         />
       </div>
+
+      {/* Withdrawal-rate diagnostic */}
+      <WithdrawalRateCard result={result} successPct={successPct} />
 
       {/* Assets chart */}
       <div className="rounded-2xl border border-line bg-panel p-6">

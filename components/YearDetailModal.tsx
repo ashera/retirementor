@@ -2,7 +2,14 @@
 
 import { fmtCurrency } from "@/lib/au/format";
 import { mortgageAnnualCost } from "@/lib/au/mortgage";
+import { rowWithdrawalRate, withdrawalBand } from "@/lib/au/withdrawal";
 import type { RetirementPlan, YearRow } from "@/lib/au/types";
+
+const WR_TONE: Record<"accent" | "amber" | "red", string> = {
+  accent: "text-emerald-400",
+  amber: "text-amber-400",
+  red: "text-red-400",
+};
 
 const PHASE_LABEL: Record<string, string> = {
   accumulation: "still working",
@@ -69,6 +76,8 @@ export default function YearDetailModal({
   const netChange = closingTotal - openingTotal;
   const isWorking = row.phase === "accumulation";
   const spending = b.livingSpend + b.mortgageCost;
+  // This year's super withdrawal rate (share of the balance drawn).
+  const wr = !isWorking && row.superDrawn > 0 && row.totalSuper > 0 ? rowWithdrawalRate(row) : null;
 
   // Net money pulled from savings to fund spending (negative = surplus saved).
   const netDrawdown = openingTotal + growth + b.propertyProceeds - b.mortgageCleared - b.fees - closingTotal;
@@ -222,6 +231,15 @@ export default function YearDetailModal({
             <div className="rounded-xl border border-line bg-panel-2 px-4 py-3 text-xs text-muted">
               <span className="text-slate-200">{fmtCurrency(spending)}/yr of spending</span> funded by{" "}
               {fundingText}.
+              {wr !== null && (
+                <div className="mt-1">
+                  Withdrawal rate:{" "}
+                  <span className={`font-semibold ${WR_TONE[withdrawalBand(wr).tone]}`}>
+                    {(wr * 100).toFixed(1)}% of super
+                  </span>{" "}
+                  ({fmtCurrency(row.superDrawn)} of {fmtCurrency(row.totalSuper)}, {withdrawalBand(wr).label}).
+                </div>
+              )}
               {shortfall > 1 && (
                 <div className="mt-1 font-semibold text-amber-400">
                   ⚠ Savings couldn&apos;t cover it — short {fmtCurrency(shortfall)} this year.
