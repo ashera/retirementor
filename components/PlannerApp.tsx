@@ -227,6 +227,25 @@ export default function PlannerApp({
     setNotice(`Loaded “${sp.name}”.`);
   };
 
+  // Wipe the guest's local data and return to the fresh first-visit state.
+  const startOver = () => {
+    if (!window.confirm("Clear your details and start over? This can't be undone.")) return;
+    try {
+      [STORAGE_KEY, BASELINE_KEY, BASELINE_NAME_KEY, "au-retirement-compare"].forEach((k) =>
+        localStorage.removeItem(k),
+      );
+    } catch {
+      /* ignore */
+    }
+    setPlan(DEFAULT_PLAN);
+    setBaseline(DEFAULT_PLAN);
+    setBaselineName(null);
+    setConfigured(false);
+    setShowGuide(false);
+    setSaveName("");
+    setNotice(null);
+  };
+
   const handleSave = () => {
     const name = saveName.trim() || `Plan ${savedPlans.length + 1}`;
     startTransition(async () => {
@@ -420,7 +439,10 @@ export default function PlannerApp({
       <Disclosures config={config} />
       <div className="mb-6" />
 
-      {/* Saved plans bar */}
+      {/* Saved-scenarios bar — only once the user has built a plan (or already
+          has saved ones to load). A first-time visitor with no data doesn't see
+          the account/compare card until there's something worth saving. */}
+      {(configured || savedPlans.length > 0) && (
       <div className="mb-6 rounded-2xl border border-line bg-panel px-5 py-4">
         {user ? (
           <div className="flex flex-wrap items-center gap-3">
@@ -496,6 +518,7 @@ export default function PlannerApp({
           </Link>
         </div>
       </div>
+      )}
 
       {/* The projection only renders once the user has actually built a plan.
           Before that we show the Get-started panel — never fabricated numbers. */}
@@ -1070,6 +1093,18 @@ export default function PlannerApp({
             />
           );
         })()}
+
+      {/* Guest reset — signed-out users can wipe local data and start fresh. */}
+      {!user && (
+        <div className="mt-10 border-t border-line pt-4 text-center">
+          <button
+            onClick={startOver}
+            className="text-xs text-muted transition hover:text-white"
+          >
+            Start again — clear my details
+          </button>
+        </div>
+      )}
     </main>
   );
 }
