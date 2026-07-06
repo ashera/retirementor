@@ -360,8 +360,8 @@ export default function PlannerApp({
   // flash before the first-run guide takes over.
   if (!ready) {
     return (
-      <main className="flex min-h-screen items-center justify-center">
-        <Logo />
+      <main className="flex min-h-screen items-center justify-center p-6">
+        <Logo className="h-auto w-[min(88vw,540px)]" />
       </main>
     );
   }
