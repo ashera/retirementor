@@ -891,7 +891,7 @@ export default function PlannerApp({
                   In the worst 10% of scenarios your money runs short by age{" "}
                   {mc.worstCaseDepletionAge}
                   {mc.medianDepletionAge !== null &&
-                    `; when it does fall short, typically around age ${mc.medianDepletionAge}`}
+                    `; when it does run short, typically around age ${mc.medianDepletionAge}`}
                   .
                 </p>
               )}
@@ -955,7 +955,7 @@ export default function PlannerApp({
                   }
                   delta={
                     spendDelta == null
-                      ? "even a low spend falls short"
+                      ? "even a low spend runs short"
                       : spendDelta >= 0
                         ? `${fmtCurrency(spendDelta)} of headroom`
                         : `${fmtCurrency(-spendDelta)} less than now`

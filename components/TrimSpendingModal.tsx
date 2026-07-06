@@ -91,7 +91,7 @@ export default function TrimSpendingModal({
                 On the central (average-return) projection your budget of{" "}
                 <strong className="text-white">{fmtCurrency(nowTotal)}/yr</strong>{" "}
                 {result.depletedAge != null ? (
-                  <>runs out at <strong className="text-amber-400">age {result.depletedAge}</strong>.</>
+                  <>runs short at <strong className="text-amber-400">age {result.depletedAge}</strong>.</>
                 ) : (
                   <>doesn&apos;t quite reach age {plan.lifeExpectancy}.</>
                 )}{" "}
@@ -166,7 +166,7 @@ export default function TrimSpendingModal({
                 <p className="text-xs text-slate-200">
                   Trimming spending <strong>can&apos;t fix this on its own</strong>. Even cutting{" "}
                   <strong>all</strong> discretionary spending — living on just your{" "}
-                  {fmtCurrency(essentials)}/yr of essentials — your money still runs out at{" "}
+                  {fmtCurrency(essentials)}/yr of essentials — your money still runs short at{" "}
                   <strong className="text-amber-300">age {trim.depletedAgeIfEssentialsOnly ?? plan.lifeExpectancy}</strong>.
                 </p>
               </div>
