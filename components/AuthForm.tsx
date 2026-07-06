@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import Link from "next/link";
+import Logo from "@/components/Logo";
 import type { AuthState } from "@/app/actions/auth";
 
 export default function AuthForm({
@@ -17,12 +18,9 @@ export default function AuthForm({
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-5 py-10">
       <div className="rounded-2xl border border-line bg-panel p-8">
-        <div className="mb-6 flex items-center gap-2 text-accent">
-          <span className="text-2xl">🦘</span>
-          <span className="text-sm font-semibold uppercase tracking-widest">
-            Retirement Planner
-          </span>
-        </div>
+        <Link href="/" className="mb-6 flex justify-center" aria-label="RetireWiz home">
+          <Logo className="h-12 w-auto" />
+        </Link>
         <h1 className="text-2xl font-bold text-white">
           {isLogin ? "Welcome back" : "Create your account"}
         </h1>
