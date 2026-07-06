@@ -54,6 +54,10 @@ export default function ProbabilityYearModal({
   const range = Math.max(1, p90 - p10);
   const pos = (v: number) => Math.min(100, Math.max(0, ((v - p10) / range) * 100));
   const centralInRange = central != null && central >= p10 && central <= p90;
+  // Volatility drag: the deterministic central path (compounding the average
+  // return) typically lands above the median stochastic outcome. Flag it when
+  // the gap is meaningful so we can explain why.
+  const centralAboveMedian = central != null && p50 > 0 && central > p50 * 1.05;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
@@ -137,6 +141,13 @@ export default function ProbabilityYearModal({
                 </div>
               )}
             </div>
+            {centralAboveMedian && (
+              <p className="mt-3 text-xs text-muted">
+                The central estimate sits above the median because a bad year sets you back more than
+                a good year makes up — so compounding the average return outruns the typical outcome,
+                the more so the longer you invest.
+              </p>
+            )}
           </div>
 
           {/* Solvency */}
