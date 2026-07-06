@@ -125,6 +125,9 @@ export default function PlannerApp({
   const [showGuide, setShowGuide] = useState(false);
   const [ready, setReady] = useState(false); // false until localStorage decides guide vs dashboard
   const [wizardOpen, setWizardOpen] = useState(false);
+  // When the user opts out of the guide, seed the wizard with what they entered
+  // so nothing is re-typed (null → the blank starter, for a cold "enter details").
+  const [wizardSeed, setWizardSeed] = useState<RetirementPlan | null>(null);
   const [budgetOpen, setBudgetOpen] = useState(false);
   const [lifestageOpen, setLifestageOpen] = useState(false);
   const [trimOpen, setTrimOpen] = useState(false);
@@ -199,13 +202,15 @@ export default function PlannerApp({
   };
 
   // Leaving the first-run guide. Completing adopts the entered plan and shows the
-  // dashboard; opting out ("Enter my details myself") drops straight into the
-  // blank manual wizard rather than back to the empty Get-started panel.
+  // dashboard; opting out ("Enter my details myself") continues into the manual
+  // wizard, carrying over whatever they entered so far (rather than the empty
+  // Get-started panel or a blank form).
   const handleGuideExit = (next: RetirementPlan, completed: boolean) => {
     if (completed) {
       commit(next);
       setConfigured(true);
     } else {
+      setWizardSeed(next);
       setWizardOpen(true);
     }
     setShowGuide(false);
@@ -228,6 +233,7 @@ export default function PlannerApp({
     commit(next);
     setConfigured(true);
     setWizardOpen(false);
+    setWizardSeed(null);
   };
 
   const handleBudgetApply = (update: Partial<RetirementPlan>) => {
@@ -1032,7 +1038,7 @@ export default function PlannerApp({
 
       {wizardOpen && (
         <PlanWizard
-          initial={configured ? plan : BLANK_STARTER}
+          initial={configured ? plan : (wizardSeed ?? BLANK_STARTER)}
           configured={configured}
           config={config}
           onComplete={handleComplete}
@@ -1045,7 +1051,10 @@ export default function PlannerApp({
               persistWorking(d);
             }
           }}
-          onClose={() => setWizardOpen(false)}
+          onClose={() => {
+            setWizardOpen(false);
+            setWizardSeed(null);
+          }}
         />
       )}
 
