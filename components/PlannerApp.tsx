@@ -198,13 +198,15 @@ export default function PlannerApp({
     }
   };
 
-  // Leaving the first-run guide. Only adopt the plan when the user actually
-  // completed it — skipping returns to the Get-started panel rather than seeding
-  // the dashboard with example numbers.
+  // Leaving the first-run guide. Completing adopts the entered plan and shows the
+  // dashboard; opting out ("Enter my details myself") drops straight into the
+  // blank manual wizard rather than back to the empty Get-started panel.
   const handleGuideExit = (next: RetirementPlan, completed: boolean) => {
     if (completed) {
       commit(next);
       setConfigured(true);
+    } else {
+      setWizardOpen(true);
     }
     setShowGuide(false);
   };

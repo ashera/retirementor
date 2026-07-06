@@ -185,7 +185,7 @@ export default function GuidedIntro({
           onClick={() => onExit(plan, false)}
           className="text-xs font-medium text-muted underline underline-offset-2 hover:text-slate-200"
         >
-          Skip to full dashboard
+          Enter my details myself
         </button>
         <button
           type="button"
