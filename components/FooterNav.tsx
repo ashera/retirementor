@@ -27,6 +27,7 @@ export default function FooterNav() {
           <Link href="/compare" className="hover:text-white">Compare scenarios</Link>
         </>
       )}
+      <Link href="/about" className="hover:text-white">About</Link>
       <Link href="/faq" className="hover:text-white">Retirement &amp; super FAQ</Link>
     </nav>
   );
