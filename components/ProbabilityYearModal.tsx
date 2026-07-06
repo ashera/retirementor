@@ -118,9 +118,13 @@ export default function ProbabilityYearModal({
               <span>best 10%: {fmtCompact(p90)}</span>
             </div>
             <div className="mt-3 space-y-1.5">
-              <Row label="Optimistic (best 10%)" value={fmtCurrency(Math.round(p90))} dot="bg-emerald-400" />
-              <Row label="Median (middle outcome)" value={fmtCurrency(Math.round(p50))} dot="bg-emerald-500" strong />
-              <Row label="Pessimistic (worst 10%)" value={fmtCurrency(Math.round(p10))} dot="bg-amber-500" />
+              <Row label="Best 10% of futures" value={`${fmtCurrency(Math.round(p90))} or more`} dot="bg-emerald-400" />
+              <Row label="Middle (median)" value={fmtCurrency(Math.round(p50))} dot="bg-emerald-500" strong />
+              <Row
+                label="Worst 10% of futures"
+                value={p10 > 1 ? `${fmtCurrency(Math.round(p10))} or less` : "nothing left"}
+                dot="bg-amber-500"
+              />
               {central != null && (
                 <div className="mt-1 flex items-center justify-between gap-4 border-t border-line pt-2">
                   <span className="flex items-center gap-2 text-slate-200">
