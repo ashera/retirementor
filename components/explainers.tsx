@@ -522,7 +522,7 @@ export function LikelihoodExplainer({
             }
           />
           <Figure
-            label="Worst 10% run short by"
+            label="Earliest shortfall (worst 10%)"
             value={`age ${mc.worstCaseDepletionAge}`}
           />
         </div>

@@ -886,12 +886,12 @@ export default function PlannerApp({
                   style={{ width: `${s * 100}%`, backgroundColor: hex }}
                 />
               </div>
-              {mc.worstCaseDepletionAge !== null && (
+              {mc.worstCaseDepletionAge !== null && mc.medianDepletionAge !== null && (
                 <p className="mt-2 text-xs text-muted">
-                  In the worst 10% of scenarios your money runs short by age{" "}
-                  {mc.worstCaseDepletionAge}
-                  {mc.medianDepletionAge !== null &&
-                    `; when it does run short, typically around age ${mc.medianDepletionAge}`}
+                  When your money does run short, it&apos;s typically around age{" "}
+                  {mc.medianDepletionAge}
+                  {mc.worstCaseDepletionAge < mc.medianDepletionAge &&
+                    ` — and as early as age ${mc.worstCaseDepletionAge} in the worst 10% of outcomes`}
                   .
                 </p>
               )}
