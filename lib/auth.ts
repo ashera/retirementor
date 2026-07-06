@@ -1,5 +1,5 @@
 import "server-only";
-import { randomBytes, scrypt, timingSafeEqual } from "crypto";
+import { randomBytes, scrypt, timingSafeEqual, createHash } from "crypto";
 import { promisify } from "util";
 import { cookies } from "next/headers";
 import { query } from "./db";
@@ -7,6 +7,25 @@ import { query } from "./db";
 const scryptAsync = promisify(scrypt);
 const COOKIE = "session";
 const SESSION_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+const RESET_TTL_MS = 60 * 60 * 1000; // password-reset links valid for one hour
+
+// --- Password-reset tokens (only the sha256 hash is stored) ---
+export function hashResetToken(token: string): string {
+  return createHash("sha256").update(token).digest("hex");
+}
+
+/** Issue a one-time reset token for a user (clearing any earlier one) and return
+ *  the RAW token to embed in a link. Shared by self-service and admin resets. */
+export async function issueResetToken(userId: string): Promise<string> {
+  const token = randomBytes(32).toString("hex");
+  const expires = new Date(Date.now() + RESET_TTL_MS);
+  await query("delete from password_resets where user_id = $1", [userId]);
+  await query(
+    "insert into password_resets (user_id, token_hash, expires_at) values ($1, $2, $3)",
+    [userId, hashResetToken(token), expires],
+  );
+  return token;
+}
 
 export interface User {
   id: string;

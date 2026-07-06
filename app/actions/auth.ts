@@ -1,6 +1,5 @@
 "use server";
 
-import { randomBytes, createHash } from "crypto";
 import { redirect } from "next/navigation";
 import { query } from "@/lib/db";
 import {
@@ -8,6 +7,8 @@ import {
   destroySession,
   hashPassword,
   verifyPassword,
+  issueResetToken,
+  hashResetToken,
 } from "@/lib/auth";
 import { sendEmail } from "@/lib/email";
 import { SITE_URL, SITE_NAME } from "@/lib/site";
@@ -20,9 +21,6 @@ export interface AuthState {
 function normalizeEmail(v: FormDataEntryValue | null): string {
   return String(v ?? "").trim().toLowerCase();
 }
-
-const sha256 = (v: string) => createHash("sha256").update(v).digest("hex");
-const RESET_TTL_MS = 60 * 60 * 1000; // reset links are valid for one hour
 
 export async function signup(
   _prev: AuthState,
@@ -88,14 +86,7 @@ export async function requestPasswordReset(
   const r = await query<{ id: string }>("select id from users where email = $1", [email]);
   const user = r.rows[0];
   if (user) {
-    const token = randomBytes(32).toString("hex");
-    const expires = new Date(Date.now() + RESET_TTL_MS);
-    // Keep at most one active reset per user.
-    await query("delete from password_resets where user_id = $1", [user.id]);
-    await query(
-      "insert into password_resets (user_id, token_hash, expires_at) values ($1, $2, $3)",
-      [user.id, sha256(token), expires],
-    );
+    const token = await issueResetToken(user.id);
     const link = `${SITE_URL}/reset-password?token=${token}`;
     await sendEmail({
       to: email,
@@ -122,7 +113,7 @@ export async function resetPassword(
 
   const r = await query<{ id: string; user_id: string }>(
     "select id, user_id from password_resets where token_hash = $1 and used_at is null and expires_at > now()",
-    [sha256(token)],
+    [hashResetToken(token)],
   );
   const row = r.rows[0];
   if (!row) return { error: "This reset link is invalid or has expired — request a new one." };

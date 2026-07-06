@@ -2,8 +2,8 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth";
 import { listUsers } from "@/lib/adminUsers";
-import { fmtDate, fmtDateTime } from "@/lib/au/format";
 import AdminTabs from "@/components/AdminTabs";
+import UsersTable from "@/components/UsersTable";
 
 export const metadata = { title: "Backoffice — Users", robots: { index: false } };
 export const dynamic = "force-dynamic";
@@ -36,48 +36,7 @@ export default async function UsersPage() {
         </p>
       </header>
 
-      <div className="overflow-x-auto rounded-2xl border border-line bg-panel">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-muted">
-              <th className="px-4 py-3">Email</th>
-              <th className="px-4 py-3">Role</th>
-              <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3 text-right">Plans</th>
-              <th className="px-4 py-3">Last login</th>
-              <th className="px-4 py-3">Joined</th>
-            </tr>
-          </thead>
-          <tbody>
-            {users.map((u) => (
-              <tr key={u.id} className="border-b border-line/60 transition hover:bg-panel-2/40">
-                <td className="px-4 py-2.5">
-                  <Link href={`/admin/users/${u.id}`} className="font-medium text-slate-100 hover:text-accent">
-                    {u.email}
-                  </Link>
-                </td>
-                <td className="px-4 py-2.5">
-                  {u.is_admin ? (
-                    <span className="rounded-full bg-accent/15 px-2 py-0.5 text-xs font-semibold text-accent">Admin</span>
-                  ) : (
-                    <span className="text-muted">User</span>
-                  )}
-                </td>
-                <td className="px-4 py-2.5">
-                  {u.suspended ? (
-                    <span className="rounded-full bg-red-500/15 px-2 py-0.5 text-xs font-semibold text-red-300">Suspended</span>
-                  ) : (
-                    <span className="text-xs text-emerald-400">Active</span>
-                  )}
-                </td>
-                <td className="px-4 py-2.5 text-right tabular-nums text-slate-200">{u.plan_count}</td>
-                <td className="px-4 py-2.5 text-muted">{fmtDateTime(u.last_login_at)}</td>
-                <td className="px-4 py-2.5 text-muted">{fmtDate(u.created_at)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <UsersTable users={users} />
     </main>
   );
 }

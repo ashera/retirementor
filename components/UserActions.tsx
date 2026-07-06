@@ -6,6 +6,7 @@ import {
   setUserAdmin,
   setUserSuspended,
   deleteUser,
+  adminResetPassword,
   type UserAdminResult,
 } from "@/app/actions/users";
 
@@ -25,6 +26,9 @@ export default function UserActions({
   const router = useRouter();
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [resetLink, setResetLink] = useState<string | null>(null);
+  const [emailed, setEmailed] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const act = (fn: () => Promise<UserAdminResult>, onOk?: () => void) =>
     start(async () => {
@@ -34,6 +38,20 @@ export default function UserActions({
         setError(null);
         if (onOk) onOk();
         else router.refresh();
+      }
+    });
+
+  const doReset = () =>
+    start(async () => {
+      const r = await adminResetPassword(userId);
+      if (r?.error) {
+        setError(r.error);
+        setResetLink(null);
+      } else {
+        setError(null);
+        setResetLink(r.link ?? null);
+        setEmailed(!!r.emailed);
+        setCopied(false);
       }
     });
 
@@ -56,6 +74,9 @@ export default function UserActions({
         >
           {suspended ? "Reinstate account" : "Suspend account"}
         </button>
+        <button className={btn} disabled={pending} onClick={doReset}>
+          Reset password
+        </button>
         <button
           className="rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-1.5 text-sm font-medium text-red-300 transition hover:bg-red-500/20 disabled:opacity-40"
           disabled={pending || isSelf}
@@ -69,9 +90,38 @@ export default function UserActions({
         </button>
       </div>
       {isSelf && (
-        <p className="text-xs text-muted">That&apos;s you — manage your own account elsewhere.</p>
+        <p className="text-xs text-muted">
+          That&apos;s you — you can&apos;t change your own role or status here (reset still works).
+        </p>
       )}
       {error && <p className="text-xs text-red-400">{error}</p>}
+
+      {resetLink && (
+        <div className="rounded-lg border border-accent/30 bg-accent/5 p-3 text-xs">
+          <p className="mb-2 text-slate-200">
+            {emailed
+              ? "A password-reset link was emailed to the user. You can also copy it below (valid 1 hour):"
+              : "Email isn't configured — share this reset link with the user (valid 1 hour):"}
+          </p>
+          <div className="flex items-center gap-2">
+            <input
+              readOnly
+              value={resetLink}
+              onFocus={(e) => e.currentTarget.select()}
+              className="w-full rounded border border-line bg-panel-2 px-2 py-1 text-[11px] text-slate-300"
+            />
+            <button
+              onClick={() => {
+                navigator.clipboard?.writeText(resetLink);
+                setCopied(true);
+              }}
+              className="shrink-0 rounded border border-line px-2 py-1 font-medium text-slate-200 transition hover:text-white"
+            >
+              {copied ? "Copied" : "Copy"}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
