@@ -28,6 +28,7 @@ import { runMonteCarlo } from "@/lib/au/montecarlo";
 import { whatWillItTake } from "@/lib/au/goalseek";
 import TrimSpendingModal from "@/components/TrimSpendingModal";
 import BoostSpendingModal from "@/components/BoostSpendingModal";
+import ProbabilityYearModal from "@/components/ProbabilityYearModal";
 import { retirementGoal } from "@/lib/au/goal";
 import { logout } from "@/app/actions/auth";
 import {
@@ -140,6 +141,7 @@ export default function PlannerApp({
   const [boostOpen, setBoostOpen] = useState(false);
   const [selectedAge, setSelectedAge] = useState<number | null>(null);
   const [incomeAge, setIncomeAge] = useState<number | null>(null);
+  const [fanAge, setFanAge] = useState<number | null>(null);
   const [saveName, setSaveName] = useState("");
   const [pending, startTransition] = useTransition();
   const [notice, setNotice] = useState<string | null>(null);
@@ -903,7 +905,11 @@ export default function PlannerApp({
           fan={mc.fan}
           retirementAge={result.retirementAge}
           agePensionAge={result.agePensionAge}
+          onSelectAge={setFanAge}
         />
+        <p className="mt-1 text-center text-xs text-muted">
+          Click a year to see the range of possible outcomes — and why they spread.
+        </p>
 
         <div className="mt-3 border-t border-line pt-3 sm:max-w-sm">
           <Field
@@ -1205,6 +1211,30 @@ export default function PlannerApp({
               onNext={() => setIncomeAge((a) => (a != null ? Math.min(max, a + 1) : a))}
               canPrev={incomeAge > min}
               canNext={incomeAge < max}
+            />
+          );
+        })()}
+
+      {fanAge != null &&
+        (() => {
+          const point = mc.fan.find((f) => f.age === fanAge);
+          if (!point) return null;
+          const ages = mc.fan.map((f) => f.age);
+          const min = ages[0];
+          const max = ages[ages.length - 1];
+          const central = result.rows.find((r) => r.age === fanAge)?.total ?? null;
+          return (
+            <ProbabilityYearModal
+              age={fanAge}
+              point={point}
+              central={central}
+              iterations={mc.iterations}
+              plan={plan}
+              onClose={() => setFanAge(null)}
+              onPrev={() => setFanAge((a) => (a != null ? Math.max(min, a - 1) : a))}
+              onNext={() => setFanAge((a) => (a != null ? Math.min(max, a + 1) : a))}
+              canPrev={fanAge > min}
+              canNext={fanAge < max}
             />
           );
         })()}

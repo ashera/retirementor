@@ -31,6 +31,7 @@ export interface FanPoint {
   p10: number; // pessimistic total balance
   p50: number; // median
   p90: number; // optimistic
+  solvent: number; // fraction of runs that still have savings at this age (0–1)
 }
 
 export interface MonteCarloResult {
@@ -89,6 +90,7 @@ export function runMonteCarlo(
       p10: percentile(sorted, 10),
       p50: percentile(sorted, 50),
       p90: percentile(sorted, 90),
+      solvent: vals.length ? vals.filter((v) => v > 1).length / vals.length : 1,
     };
   });
 

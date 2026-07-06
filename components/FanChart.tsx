@@ -47,11 +47,13 @@ export default function FanChart({
   retirementAge,
   agePensionAge,
   height = 280,
+  onSelectAge,
 }: {
   fan: FanPoint[];
   retirementAge: number;
   agePensionAge: number;
   height?: number;
+  onSelectAge?: (age: number) => void;
 }) {
   const data: FanRow[] = fan.map((f) => ({
     age: f.age,
@@ -62,7 +64,15 @@ export default function FanChart({
 
   return (
     <ResponsiveContainer width="100%" height={height}>
-      <AreaChart data={data} margin={{ top: 8, right: 8, left: 8, bottom: 0 }}>
+      <AreaChart
+        data={data}
+        margin={{ top: 8, right: 8, left: 8, bottom: 0 }}
+        style={onSelectAge ? { cursor: "pointer" } : undefined}
+        onClick={(state) => {
+          const age = (state as { activeLabel?: string | number } | undefined)?.activeLabel;
+          if (age != null && onSelectAge) onSelectAge(Number(age));
+        }}
+      >
         <defs>
           <linearGradient id="fanFill" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#34d399" stopOpacity={0.28} />
