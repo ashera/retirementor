@@ -40,6 +40,7 @@ export async function createSession(userId: string): Promise<void> {
     "insert into sessions (user_id, token, expires_at) values ($1, $2, $3)",
     [userId, token, expires],
   );
+  await query("update users set last_login_at = now() where id = $1", [userId]);
   const store = await cookies();
   store.set(COOKIE, token, {
     httpOnly: true,
@@ -67,7 +68,8 @@ export async function getCurrentUser(): Promise<User | null> {
     `select u.id, u.email, u.is_admin
        from sessions s
        join users u on u.id = s.user_id
-      where s.token = $1 and s.expires_at > now()`,
+      where s.token = $1 and s.expires_at > now()
+        and not coalesce(u.suspended, false)`,
     [token],
   );
   return r.rows[0] ?? null;

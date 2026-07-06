@@ -56,13 +56,16 @@ export async function login(
   const password = String(formData.get("password") ?? "");
   if (!email || !password) return { error: "Email and password are required." };
 
-  const r = await query<{ id: string; password_hash: string }>(
-    "select id, password_hash from users where email = $1",
+  const r = await query<{ id: string; password_hash: string; suspended: boolean }>(
+    "select id, password_hash, suspended from users where email = $1",
     [email],
   );
   const user = r.rows[0];
   if (!user || !(await verifyPassword(password, user.password_hash))) {
     return { error: "Incorrect email or password." };
+  }
+  if (user.suspended) {
+    return { error: "This account has been suspended. Please contact support." };
   }
   await createSession(user.id);
   redirect("/");

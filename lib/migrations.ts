@@ -15,6 +15,8 @@ create table if not exists users (
   created_at timestamptz not null default now()
 );
 alter table users add column if not exists is_admin boolean not null default false;
+alter table users add column if not exists suspended boolean not null default false;
+alter table users add column if not exists last_login_at timestamptz;
 
 create table if not exists sessions (
   id uuid primary key default gen_random_uuid(),
