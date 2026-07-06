@@ -24,6 +24,18 @@ create table if not exists sessions (
   created_at timestamptz not null default now()
 );
 
+-- One-time password-reset tokens (only the sha256 hash is stored, never the raw
+-- token), with a short expiry. Cleared per-user when a new one is requested.
+create table if not exists password_resets (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references users(id) on delete cascade,
+  token_hash text not null,
+  expires_at timestamptz not null,
+  used_at timestamptz,
+  created_at timestamptz not null default now()
+);
+create index if not exists password_resets_token_hash_idx on password_resets (token_hash);
+
 create table if not exists plans (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references users(id) on delete cascade,

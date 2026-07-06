@@ -60,6 +60,13 @@ export default function AuthForm({
               className="mt-1 w-full rounded-lg border border-line bg-panel-2 px-3 py-2 text-white outline-none transition focus:border-accent"
             />
           </div>
+          {isLogin && (
+            <p className="text-right text-xs">
+              <Link href="/forgot-password" className="text-muted hover:text-accent">
+                Forgot password?
+              </Link>
+            </p>
+          )}
           {state.error && <p className="text-sm text-red-400">{state.error}</p>}
           <button
             type="submit"
