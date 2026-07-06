@@ -151,6 +151,20 @@ export default function PlannerApp({
         setBaseline(rawBase ? { ...DEFAULT_PLAN, ...JSON.parse(rawBase) } : working);
         setBaselineName(localStorage.getItem(BASELINE_NAME_KEY) || null);
         setConfigured(true);
+      } else if (savedPlans.length > 0) {
+        // Returning user with saved scenarios but no local working plan (e.g.
+        // just signed in on this browser) → open the most recent one straight
+        // into the dashboard. listPlans() is ordered newest-first.
+        const sp = savedPlans[0];
+        const working = { ...DEFAULT_PLAN, ...sp.data };
+        setPlan(working);
+        setBaseline(working);
+        setBaselineName(sp.name);
+        setConfigured(true);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(working));
+        localStorage.setItem(BASELINE_KEY, JSON.stringify(working));
+        localStorage.setItem(BASELINE_NAME_KEY, sp.name);
+        setNotice(`Loaded your most recent scenario “${sp.name}”.`);
       }
     } catch {
       /* ignore malformed storage — fall back to the empty Get-started state */
