@@ -555,16 +555,16 @@ export default function PlannerApp({
       <Disclosures config={config} />
       <div className="mb-6" />
 
-      {/* Saved-scenarios bar — only once the user has built a plan (or already
-          has saved ones to load). A first-time visitor with no data doesn't see
-          the account/compare card until there's something worth saving. */}
-      {(configured || savedPlans.length > 0) && (
+      {/* Status confirmations (loaded / saved / applied) — shown to everyone. */}
+      {notice && <p className="mb-4 text-xs text-accent">{notice}</p>}
+
+      {/* Saved-scenarios card — signed-in users only. */}
+      {user && (configured || savedPlans.length > 0) && (
       <div className="mb-6 rounded-2xl border border-line bg-panel px-5 py-4">
-        {user && (
-          <div className="flex flex-wrap items-center gap-3">
-            <span className="text-xs font-semibold uppercase tracking-wide text-muted">
-              Saved scenarios
-            </span>
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="text-xs font-semibold uppercase tracking-wide text-muted">
+            Saved scenarios
+          </span>
             {savedPlans.length === 0 && (
               <span className="text-sm text-muted">None yet — save one →</span>
             )}
@@ -614,9 +614,7 @@ export default function PlannerApp({
                 </button>
               </div>
             )}
-          </div>
-        )}
-        {notice && <p className="mt-2 text-xs text-accent">{notice}</p>}
+        </div>
         <div className="mt-3 border-t border-line pt-3">
           <Link
             href="/compare"
