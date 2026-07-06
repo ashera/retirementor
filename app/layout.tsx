@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
-import Link from "next/link";
 import Analytics from "@/components/Analytics";
+import FooterNav from "@/components/FooterNav";
 import { SITE_URL, SITE_NAME, SITE_TAGLINE, SITE_DESCRIPTION } from "@/lib/site";
 
 const title = `${SITE_NAME} — ${SITE_TAGLINE}`;
@@ -61,11 +61,7 @@ export default function RootLayout({
       <body className="flex min-h-screen flex-col antialiased">
         <div className="flex-1">{children}</div>
         <footer className="border-t border-line px-5 py-6 text-center text-xs text-muted print:hidden">
-          <nav className="mx-auto mb-4 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-slate-300">
-            <Link href="/" className="hover:text-white">Planner</Link>
-            <Link href="/compare" className="hover:text-white">Compare scenarios</Link>
-            <Link href="/faq" className="hover:text-white">Retirement &amp; super FAQ</Link>
-          </nav>
+          <FooterNav />
           <p className="mx-auto max-w-3xl">
             <strong className="text-slate-300">{SITE_NAME}</strong> is a
             superannuation forecast tool provided under ASIC Corporations
