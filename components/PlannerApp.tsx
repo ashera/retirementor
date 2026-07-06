@@ -560,7 +560,7 @@ export default function PlannerApp({
           the account/compare card until there's something worth saving. */}
       {(configured || savedPlans.length > 0) && (
       <div className="mb-6 rounded-2xl border border-line bg-panel px-5 py-4">
-        {user ? (
+        {user && (
           <div className="flex flex-wrap items-center gap-3">
             <span className="text-xs font-semibold uppercase tracking-wide text-muted">
               Saved scenarios
@@ -615,13 +615,6 @@ export default function PlannerApp({
               </div>
             )}
           </div>
-        ) : (
-          <p className="text-sm text-muted">
-            <Link href="/signup" className="text-accent hover:underline">
-              Create an account
-            </Link>{" "}
-            to save and compare multiple retirement scenarios.
-          </p>
         )}
         {notice && <p className="mt-2 text-xs text-accent">{notice}</p>}
         <div className="mt-3 border-t border-line pt-3">
