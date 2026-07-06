@@ -27,6 +27,35 @@ export async function listPlans(): Promise<SavedPlan[]> {
   return r.rows;
 }
 
+export interface PlanDraft {
+  data: RetirementPlan;
+  updated_at: string;
+}
+
+/** The user's auto-saved working draft (their latest unsaved work), or null. */
+export async function getDraft(): Promise<PlanDraft | null> {
+  const user = await getCurrentUser();
+  if (!user) return null;
+  const r = await query<PlanDraft>(
+    "select data, updated_at from plan_drafts where user_id = $1",
+    [user.id],
+  );
+  return r.rows[0] ?? null;
+}
+
+/** Upsert the working draft. Silently no-ops for signed-out users (their work
+ *  still lives in localStorage). Called debounced from the client. */
+export async function saveDraft(data: RetirementPlan): Promise<ActionResult> {
+  const user = await getCurrentUser();
+  if (!user) return { ok: true };
+  await query(
+    `insert into plan_drafts (user_id, data, updated_at) values ($1, $2, now())
+     on conflict (user_id) do update set data = excluded.data, updated_at = now()`,
+    [user.id, JSON.stringify(data)],
+  );
+  return { ok: true };
+}
+
 export async function savePlan(
   name: string,
   data: RetirementPlan,

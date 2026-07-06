@@ -1,6 +1,6 @@
 import PlannerApp from "@/components/PlannerApp";
 import { getCurrentUser } from "@/lib/auth";
-import { listPlans } from "@/app/actions/plans";
+import { listPlans, getDraft } from "@/app/actions/plans";
 import { buildReviewData, getActiveConfig } from "@/lib/refdata";
 import { SITE_URL, SITE_NAME, SITE_DESCRIPTION } from "@/lib/site";
 
@@ -20,8 +20,9 @@ const jsonLd = {
 
 export default async function Page() {
   const user = await getCurrentUser();
-  const [savedPlans, config] = await Promise.all([
+  const [savedPlans, draft, config] = await Promise.all([
     user ? listPlans() : Promise.resolve([]),
+    user ? getDraft() : Promise.resolve(null),
     getActiveConfig(),
   ]);
   const reviewDue = user?.is_admin ? (await buildReviewData()).dueTotal : 0;
@@ -31,6 +32,7 @@ export default async function Page() {
       <PlannerApp
         user={user ? { email: user.email, isAdmin: user.is_admin } : null}
         savedPlans={savedPlans}
+        draft={draft}
         config={config}
         reviewDue={reviewDue}
       />

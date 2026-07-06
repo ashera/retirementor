@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import StatCard from "@/components/StatCard";
@@ -33,7 +33,9 @@ import { logout } from "@/app/actions/auth";
 import {
   deletePlan,
   savePlan,
+  saveDraft,
   type SavedPlan,
+  type PlanDraft,
 } from "@/app/actions/plans";
 import { simulate } from "@/lib/au/simulate";
 import type { EngineConfig } from "@/lib/au/config";
@@ -51,6 +53,8 @@ import {
 const STORAGE_KEY = "au-retirement-plan";
 const BASELINE_KEY = "au-retirement-baseline";
 const BASELINE_NAME_KEY = "au-retirement-baseline-name"; // label for the ghost line
+const WORKING_TS_KEY = "au-retirement-plan-ts"; // when the local working plan was last saved
+const NUDGE_KEY = "au-retirement-nudge-dismissed"; // signed-out "save your work" banner dismissed
 
 // A blank starting point for a first-time visitor's "Enter my details" wizard:
 // the personal figures (age, super, salary) start empty (NaN renders as a blank
@@ -105,11 +109,13 @@ function Lever({
 export default function PlannerApp({
   user,
   savedPlans,
+  draft = null,
   config,
   reviewDue = 0,
 }: {
   user: { email: string; isAdmin: boolean } | null;
   savedPlans: SavedPlan[];
+  draft?: PlanDraft | null;
   config: EngineConfig;
   reviewDue?: number;
 }) {
@@ -137,14 +143,30 @@ export default function PlannerApp({
   const [saveName, setSaveName] = useState("");
   const [pending, startTransition] = useTransition();
   const [notice, setNotice] = useState<string | null>(null);
+  const [nudgeDismissed, setNudgeDismissed] = useState(false);
 
   useEffect(() => {
-    // Restore a previously built plan if one exists. If there's no plan yet, the
-    // dashboard shows the Get-started panel (no fabricated projection) until the
-    // user builds one via the guide/editor or loads a saved scenario.
+    // Decide which working plan to restore. Priority: the newer of the local
+    // working copy vs. the signed-in user's cloud draft (so work follows them
+    // across devices / survives cleared storage); else the most recent saved
+    // scenario; else the empty Get-started state.
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
+      const localTs = Number(localStorage.getItem(WORKING_TS_KEY) || 0);
+      const draftTs = draft ? new Date(draft.updated_at).getTime() : 0;
+
+      if (draft && draftTs >= localTs) {
+        // Cloud draft is at least as fresh (e.g. newer work from another device
+        // or a first sign-in here) → adopt it and mirror to this device.
+        const working = { ...DEFAULT_PLAN, ...draft.data };
+        setPlan(working);
+        setBaseline(working);
+        setBaselineName(null);
+        setConfigured(true);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(working));
+        localStorage.setItem(WORKING_TS_KEY, String(draftTs));
+        if (raw && localTs < draftTs) setNotice("Restored your latest work from your account.");
+      } else if (raw) {
         const working = { ...DEFAULT_PLAN, ...JSON.parse(raw) };
         const rawBase = localStorage.getItem(BASELINE_KEY);
         setPlan(working);
@@ -152,9 +174,8 @@ export default function PlannerApp({
         setBaselineName(localStorage.getItem(BASELINE_NAME_KEY) || null);
         setConfigured(true);
       } else if (savedPlans.length > 0) {
-        // Returning user with saved scenarios but no local working plan (e.g.
-        // just signed in on this browser) → open the most recent one straight
-        // into the dashboard. listPlans() is ordered newest-first.
+        // No working copy anywhere, but there are saved scenarios → open the most
+        // recent (listPlans() is ordered newest-first) straight into the dashboard.
         const sp = savedPlans[0];
         const working = { ...DEFAULT_PLAN, ...sp.data };
         setPlan(working);
@@ -166,11 +187,47 @@ export default function PlannerApp({
         localStorage.setItem(BASELINE_NAME_KEY, sp.name);
         setNotice(`Loaded your most recent scenario “${sp.name}”.`);
       }
+      if (localStorage.getItem(NUDGE_KEY)) setNudgeDismissed(true);
     } catch {
       /* ignore malformed storage — fall back to the empty Get-started state */
     }
     setReady(true);
   }, []);
+
+  const dismissNudge = () => {
+    setNudgeDismissed(true);
+    try {
+      localStorage.setItem(NUDGE_KEY, "1");
+    } catch {
+      /* ignore */
+    }
+  };
+
+  // Keep a ref to the latest plan for the visibility-flush handler below.
+  const planRef = useRef(plan);
+  planRef.current = plan;
+
+  // Debounced cloud auto-save of the working plan (signed-in users) so unsaved
+  // work is backed up server-side and follows them to other devices / survives
+  // cleared browser storage.
+  useEffect(() => {
+    if (!ready || !user || !configured) return;
+    const t = setTimeout(() => {
+      void saveDraft(plan);
+    }, 1500);
+    return () => clearTimeout(t);
+  }, [plan, ready, user, configured]);
+
+  // Best-effort flush when the tab is hidden, to catch edits made within the
+  // debounce window (localStorage already holds them for this device).
+  useEffect(() => {
+    if (!user) return;
+    const flush = () => {
+      if (document.visibilityState === "hidden" && configured) void saveDraft(planRef.current);
+    };
+    document.addEventListener("visibilitychange", flush);
+    return () => document.removeEventListener("visibilitychange", flush);
+  }, [user, configured]);
 
   const result = useMemo(() => simulate(plan, config), [plan, config]);
   const mc = useMemo(() => runMonteCarlo(plan, config), [plan, config]);
@@ -194,6 +251,7 @@ export default function PlannerApp({
   const persistWorking = (next: RetirementPlan) => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      localStorage.setItem(WORKING_TS_KEY, String(Date.now()));
     } catch {
       /* ignore */
     }
@@ -463,6 +521,37 @@ export default function PlannerApp({
           })()}
       </header>
 
+      {/* Signed-out users: their work lives only on this device — nudge them to
+          create an account so it's backed up and available anywhere. */}
+      {!user && configured && !nudgeDismissed && (
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/5 px-5 py-3">
+          <p className="text-sm text-amber-100">
+            <span aria-hidden>💾</span> Your plan is saved on{" "}
+            <strong>this device only</strong>. Create a free account to keep it safe and pick up
+            where you left off on any device.
+          </p>
+          <div className="flex shrink-0 items-center gap-2">
+            <Link
+              href="/signup"
+              className="rounded-lg bg-accent px-3 py-1.5 text-sm font-semibold text-ink transition hover:bg-accent-soft"
+            >
+              Create free account
+            </Link>
+            <Link href="/login" className="text-sm font-medium text-amber-100 hover:text-white">
+              Sign in
+            </Link>
+            <button
+              onClick={dismissNudge}
+              aria-label="Dismiss"
+              className="ml-1 rounded p-1 text-amber-200/70 transition hover:text-white"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="mt-4" />
       <Disclosures config={config} />
       <div className="mb-6" />
 

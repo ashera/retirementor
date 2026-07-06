@@ -33,6 +33,14 @@ create table if not exists plans (
   updated_at timestamptz not null default now()
 );
 
+-- One auto-saved working draft per user, so unsaved work survives across
+-- devices and cleared browser storage (upserted on the user_id primary key).
+create table if not exists plan_drafts (
+  user_id uuid primary key references users(id) on delete cascade,
+  data jsonb not null,
+  updated_at timestamptz not null default now()
+);
+
 -- Effective-dated reference-data versions (one per financial year).
 create table if not exists ref_data_versions (
   id uuid primary key default gen_random_uuid(),
