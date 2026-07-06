@@ -67,7 +67,7 @@ export default function RootLayout({
             <Link href="/faq" className="hover:text-white">Retirement &amp; super FAQ</Link>
           </nav>
           <p className="mx-auto max-w-3xl">
-            <strong className="text-slate-300">RetireMentor</strong> is a
+            <strong className="text-slate-300">{SITE_NAME}</strong> is a
             superannuation forecast tool provided under ASIC Corporations
             (Superannuation Calculators and Retirement Estimates) Instrument
             2022/603 and prepared in line with ASIC Regulatory Guide 276. It

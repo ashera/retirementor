@@ -36,7 +36,7 @@ export default function OgImage() {
           </svg>
           <div style={{ display: "flex", fontSize: 72, fontWeight: 800, letterSpacing: "-2px" }}>
             <span style={{ color: "#34d399" }}>Retire</span>
-            <span style={{ color: "#ffffff" }}>Mentor</span>
+            <span style={{ color: "#ffffff" }}>Wiz</span>
           </div>
         </div>
 
