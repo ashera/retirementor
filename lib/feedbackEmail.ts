@@ -49,3 +49,43 @@ export function feedbackNotificationEmail(f: {
 
   return { subject, text, html };
 }
+
+export interface FeedbackItem {
+  message: string;
+  from: string;
+  sentiment: string | null;
+  path: string | null;
+}
+
+/** Digest of several feedback notes collected in one batch window. */
+export function feedbackDigestEmail(items: FeedbackItem[]) {
+  const n = items.length;
+  const subject = `💬 ${n} new ${SITE_NAME} feedback notes`;
+  const link = `${SITE_URL}/admin/feedback`;
+
+  const meta = (f: FeedbackItem) =>
+    [f.sentiment ? SENTIMENT_LABELS[f.sentiment] ?? "" : "", f.from, f.path]
+      .filter(Boolean)
+      .join(" · ");
+
+  const text = [
+    `${n} new feedback notes on ${SITE_NAME}:`,
+    "",
+    ...items.map((f, i) => `${i + 1}. ${meta(f)}\n${f.message}\n`),
+    `View all: ${link}`,
+  ].join("\n");
+
+  const card = (f: FeedbackItem) => `
+  <div style="margin:0 0 12px;padding:12px 16px;background:#f3f4f6;border-left:3px solid #10b981;border-radius:6px">
+    <div style="color:#6b7280;font-size:12px;margin-bottom:6px">${escapeHtml(meta(f))}</div>
+    <div style="white-space:pre-wrap;font-size:15px;color:#111">${escapeHtml(f.message)}</div>
+  </div>`;
+
+  const html = `<div style="font-family:system-ui,sans-serif;max-width:560px">
+  <p style="color:#6b7280;font-size:13px;margin:0 0 12px">${n} new feedback notes on ${SITE_NAME}</p>
+  ${items.map(card).join("")}
+  <p style="margin:16px 0 0"><a href="${link}" style="color:#10b981">View all feedback →</a></p>
+</div>`;
+
+  return { subject, text, html };
+}

@@ -69,7 +69,11 @@ create table if not exists feedback (
   handled boolean not null default false,
   created_at timestamptz not null default now()
 );
+-- notified_at: when this row was included in a digest email to the team (null =
+-- still pending notification). Drives the debounced batch notifier.
+alter table feedback add column if not exists notified_at timestamptz;
 create index if not exists feedback_created_idx on feedback (created_at desc);
+create index if not exists feedback_unnotified_idx on feedback (created_at) where notified_at is null;
 
 -- Effective-dated reference-data versions (one per financial year).
 create table if not exists ref_data_versions (

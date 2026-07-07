@@ -4,8 +4,7 @@ import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { query } from "@/lib/db";
 import { getCurrentUser, getAdmin } from "@/lib/auth";
-import { sendEmail } from "@/lib/email";
-import { feedbackNotificationEmail } from "@/lib/feedbackEmail";
+import { scheduleFeedbackFlush } from "@/lib/feedbackNotifier";
 
 export interface FeedbackResult {
   ok?: boolean;
@@ -39,23 +38,9 @@ export async function submitFeedback(input: {
     [user?.id ?? null, email, sentiment, message.slice(0, 4000), path, ua],
   );
 
-  // Notify the team (opt-in via FEEDBACK_NOTIFY_TO). Never let email trouble
-  // fail the submission — sendEmail already swallows errors, but guard anyway.
-  const notifyTo = process.env.FEEDBACK_NOTIFY_TO || process.env.ADMIN_EMAIL;
-  if (notifyTo) {
-    const replyTo = user?.email || email || undefined;
-    const mail = feedbackNotificationEmail({
-      message,
-      from: user?.email ? `${user.email} (account)` : email ? `${email} (guest)` : "Anonymous",
-      sentiment: sentiment ?? null,
-      path,
-    });
-    try {
-      await sendEmail({ to: notifyTo, replyTo, ...mail });
-    } catch {
-      /* already logged in sendEmail */
-    }
-  }
+  // Notify the team, batched: arm the debounced digest (opt-in via
+  // FEEDBACK_NOTIFY_TO / ADMIN_EMAIL). Never blocks or fails the submission.
+  scheduleFeedbackFlush();
 
   revalidatePath("/admin/feedback");
   return { ok: true };
