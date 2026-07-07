@@ -109,7 +109,7 @@ export default function IncomeYearModal({
       <div className="relative z-10 flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-line bg-panel shadow-2xl">
         <div className="flex items-center justify-between border-b border-line px-6 py-4">
           <div>
-            <div className="text-xs font-semibold uppercase tracking-widest text-accent">Retirement income</div>
+            <div className="text-xs font-semibold uppercase tracking-widest text-accent">{retired ? "Retirement income" : "Working income"}</div>
             <h2 className="mt-0.5 text-lg font-bold text-white">Age {row.age}</h2>
           </div>
           <div className="flex items-center gap-1">
@@ -121,11 +121,60 @@ export default function IncomeYearModal({
 
         <div className="flex-1 space-y-4 overflow-y-auto px-6 py-5">
           {!retired ? (
-            <p className="rounded-xl border border-line bg-panel-2 px-4 py-3 text-sm text-muted">
-              You&apos;re still working at {row.age}, so you&apos;re not drawing a retirement
-              income yet — you&apos;re building super instead. Click a year after you retire
-              ({plan.retirementAge}) to see the income mix.
-            </p>
+            <>
+              <div className="rounded-xl border border-line bg-panel-2 p-4 text-center">
+                <div className="text-[11px] font-medium uppercase tracking-wide text-muted">Gross salary this year</div>
+                <div className="text-3xl font-bold tabular-nums text-white">{cur(row.salaryIncome)}</div>
+                <div className="mt-0.5 text-xs text-muted">
+                  while working — your retirement income begins at {plan.retirementAge}
+                </div>
+              </div>
+
+              <section>
+                <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted">Where it comes from</h3>
+                <div className="rounded-xl border border-line bg-panel px-3 py-1">
+                  <Row
+                    color="#facc15"
+                    label="Salary"
+                    sub={plan.people.length > 1 ? "Combined gross salary for the household." : "Your gross salary."}
+                    value={row.salaryIncome}
+                  />
+                </div>
+              </section>
+
+              {(row.breakdown.contribGross > 0 || row.breakdown.savings > 0) && (
+                <section>
+                  <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted">
+                    What you&apos;re putting away this year
+                  </h3>
+                  <div className="rounded-xl border border-line bg-panel px-3 py-1">
+                    {row.breakdown.contribGross > 0 && (
+                      <Row
+                        color="#34d399"
+                        label="Into super"
+                        sub="Employer Super Guarantee plus any salary sacrifice, before the 15% contributions tax."
+                        value={row.breakdown.contribGross}
+                      />
+                    )}
+                    {row.breakdown.savings > 0 && (
+                      <Row
+                        color="#38bdf8"
+                        label="Into savings outside super"
+                        sub="Added to your outside-super investments this year."
+                        value={row.breakdown.savings}
+                      />
+                    )}
+                  </div>
+                </section>
+              )}
+
+              <div className="rounded-xl border border-line bg-panel-2 px-4 py-3 text-xs leading-relaxed text-muted">
+                While you&apos;re working, your income is your salary — and each year a
+                slice goes into super (growing tax-advantaged) and any savings. When you
+                retire at {plan.retirementAge}, that&apos;s what your income switches to
+                drawing on.
+              </div>
+            </>
           ) : (
             <>
               <div className="rounded-xl border border-line bg-panel-2 p-4 text-center">
@@ -240,7 +289,7 @@ export default function IncomeYearModal({
         </div>
 
         <div className="border-t border-line px-6 py-3 text-[11px] text-muted">
-          Today&apos;s dollars · FY{config.financialYear} rules. Income is what you draw to fund spending, not investment growth.
+          Today&apos;s dollars · FY{config.financialYear} rules. {retired ? "Income is what you draw to fund spending, not investment growth." : "Salary is gross, before tax; super contributions are shown before the 15% contributions tax."}
         </div>
       </div>
     </div>

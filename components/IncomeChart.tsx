@@ -23,24 +23,36 @@ function IncomeTooltip({
   if (!active || !payload?.length) return null;
   const r = payload[0].payload;
   const rent = Math.max(0, r.rentIncome ?? 0);
-  const total = r.agePension + r.superDrawn + r.outsideDrawn + rent;
+  const salary = Math.max(0, r.salaryIncome ?? 0);
+  const total = salary + r.agePension + r.superDrawn + r.outsideDrawn + rent;
   return (
     <div className="rounded-lg border border-line bg-panel px-3 py-2 text-sm shadow-xl">
       <div className="font-semibold text-white">Age {r.age}</div>
-      <div className="tabular-nums text-violet-400">
-        Age Pension {fmtCurrency(r.agePension)}
-      </div>
+      {salary > 0 && (
+        <div className="tabular-nums text-yellow-400">
+          Salary {fmtCurrency(salary)}
+        </div>
+      )}
+      {r.agePension > 0 && (
+        <div className="tabular-nums text-violet-400">
+          Age Pension {fmtCurrency(r.agePension)}
+        </div>
+      )}
       {rent > 0 && (
         <div className="tabular-nums text-orange-400">
           Net rent {fmtCurrency(rent)}
         </div>
       )}
-      <div className="tabular-nums text-emerald-400">
-        From super {fmtCurrency(r.superDrawn)}
-      </div>
-      <div className="tabular-nums text-sky-400">
-        From outside {fmtCurrency(r.outsideDrawn)}
-      </div>
+      {r.superDrawn > 0 && (
+        <div className="tabular-nums text-emerald-400">
+          From super {fmtCurrency(r.superDrawn)}
+        </div>
+      )}
+      {r.outsideDrawn > 0 && (
+        <div className="tabular-nums text-sky-400">
+          From outside {fmtCurrency(r.outsideDrawn)}
+        </div>
+      )}
       <div className="mt-0.5 tabular-nums text-slate-200">
         Total income {fmtCurrency(total)}
       </div>
@@ -109,6 +121,16 @@ export default function IncomeChart({
           stroke="#a78bfa"
           strokeDasharray="6 4"
           strokeOpacity={0.6}
+        />
+        <Area
+          type="stepAfter"
+          dataKey={(r: YearRow) => Math.max(0, r.salaryIncome ?? 0)}
+          stackId="1"
+          stroke="#facc15"
+          fill="#facc15"
+          fillOpacity={0.35}
+          name="Salary"
+          isAnimationActive={animate}
         />
         <Area
           type="stepAfter"

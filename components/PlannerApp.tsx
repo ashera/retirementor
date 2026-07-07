@@ -830,8 +830,9 @@ export default function PlannerApp({
       {/* Income sources */}
       <div className="mt-4 rounded-2xl border border-line bg-panel p-6">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-          <h2 className="font-semibold text-white">Retirement income sources</h2>
-          <div className="flex gap-4">
+          <h2 className="font-semibold text-white">Income sources</h2>
+          <div className="flex flex-wrap gap-4">
+            <LegendDot color="#facc15" label="Salary" />
             <LegendDot color="#a78bfa" label="Age Pension" />
             <LegendDot color="#34d399" label="Super" />
             <LegendDot color="#38bdf8" label="Outside super" />
@@ -840,7 +841,8 @@ export default function PlannerApp({
         </div>
         <IncomeChart result={result} onSelectYear={setIncomeAge} />
         <p className="mt-2 text-center text-xs text-muted">
-          Tip: click any retirement year to see why your income is that amount.
+          Tip: click any year to see why your income is that amount — your salary
+          while working, then your retirement income sources.
         </p>
       </div>
 

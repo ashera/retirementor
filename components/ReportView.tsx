@@ -276,14 +276,15 @@ export default function ReportView({
           </div>
         </Section>
 
-        {/* ───────── PAGE 2: Retirement income sources · Lifestages ───────── */}
+        {/* ───────── PAGE 2: Income sources · Lifestages ───────── */}
         <div className="break-before-page">
-          <Section title="Retirement income sources">
+          <Section title="Income sources">
             <Lead>
-              How your spending is funded each year: tax-free super drawdowns
-              (green), withdrawals from outside super (blue), any net property rent
-              (orange), and — from Age Pension age — the means-tested Age Pension
-              (purple). As assets draw down, the pension typically grows to fill the gap.
+              Your income across the whole plan: your gross salary while working
+              (yellow), then in retirement — tax-free super drawdowns (green),
+              withdrawals from outside super (blue), any net property rent (orange),
+              and from Age Pension age the means-tested Age Pension (purple). As
+              assets draw down, the pension typically grows to fill the gap.
             </Lead>
             <div className="rounded-lg border border-slate-200 bg-slate-50 p-2">
               <IncomeChart result={result} animate={false} height={175} />

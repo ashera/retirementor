@@ -453,8 +453,8 @@ export function RetirementIncomeGoalExplainer({
           Each year this is funded from your super (drawn tax-free from age{" "}
           {config.preservationAge}), your savings outside super, and — from age{" "}
           {config.agePensionAge} — the means-tested Age Pension topping up
-          whatever&apos;s left. The <em>Retirement income sources</em> chart
-          shows the mix year by year.
+          whatever&apos;s left. The <em>Income sources</em> chart shows the mix
+          year by year — including your salary through the working years.
         </p>
       </div>
 
