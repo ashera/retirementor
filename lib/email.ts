@@ -11,6 +11,7 @@ export interface EmailMessage {
   subject: string;
   html: string;
   text?: string;
+  replyTo?: string; // where a "Reply" should go (e.g. the user who left feedback)
 }
 
 export async function sendEmail(msg: EmailMessage): Promise<{ ok: boolean }> {
@@ -32,6 +33,7 @@ export async function sendEmail(msg: EmailMessage): Promise<{ ok: boolean }> {
         subject: msg.subject,
         html: msg.html,
         ...(msg.text ? { text: msg.text } : {}),
+        ...(msg.replyTo ? { reply_to: msg.replyTo } : {}),
       }),
     });
     if (!res.ok) {
