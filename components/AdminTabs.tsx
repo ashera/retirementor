@@ -1,13 +1,15 @@
 import Link from "next/link";
 
-type Tab = "review" | "parameters" | "sources" | "tests" | "scenarios" | "moneysmart" | "users" | "media";
+type Tab = "review" | "parameters" | "sources" | "tests" | "scenarios" | "moneysmart" | "users" | "media" | "feedback";
 
 export default function AdminTabs({
   active,
   staleCount = 0,
+  feedbackCount = 0,
 }: {
   active: Tab;
   staleCount?: number;
+  feedbackCount?: number;
 }) {
   const tab = (href: string, key: Tab, label: string, badge: number) => {
     const isActive = active === key;
@@ -43,6 +45,7 @@ export default function AdminTabs({
       {tab("/admin/scenarios", "scenarios", "Scenarios", 0)}
       {tab("/admin/moneysmart", "moneysmart", "Moneysmart", 0)}
       {tab("/admin/users", "users", "Users", 0)}
+      {tab("/admin/feedback", "feedback", "Feedback", feedbackCount)}
       {tab("/admin/media", "media", "Media", 0)}
     </nav>
   );

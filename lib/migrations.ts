@@ -55,6 +55,22 @@ create table if not exists plan_drafts (
   updated_at timestamptz not null default now()
 );
 
+-- Free-form user feedback from the floating widget. user_id is kept if they were
+-- signed in (set null if the account is later deleted); email is an optional
+-- reply-to they can leave. handled = an admin has actioned/triaged it.
+create table if not exists feedback (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references users(id) on delete set null,
+  email text,
+  sentiment text,            -- love | ok | frustrated (optional)
+  message text not null,
+  path text,                 -- page they were on when they submitted
+  user_agent text,
+  handled boolean not null default false,
+  created_at timestamptz not null default now()
+);
+create index if not exists feedback_created_idx on feedback (created_at desc);
+
 -- Effective-dated reference-data versions (one per financial year).
 create table if not exists ref_data_versions (
   id uuid primary key default gen_random_uuid(),

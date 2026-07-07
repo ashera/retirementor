@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import Analytics from "@/components/Analytics";
+import FeedbackButton from "@/components/FeedbackButton";
 import FooterNav from "@/components/FooterNav";
 import { SITE_URL, SITE_NAME, SITE_TAGLINE, SITE_DESCRIPTION } from "@/lib/site";
 
@@ -77,6 +78,7 @@ export default function RootLayout({
             advice from an AFS licensee before making any financial decision.
           </p>
         </footer>
+        <FeedbackButton />
         <Analytics />
       </body>
     </html>
