@@ -35,6 +35,10 @@ const SHOT_PRESETS: { t: string; s: string; img: string }[] = [
   { t: "Your retirement, *modelled in minutes.*", s: "", img: "chart" },
   { t: "See exactly *when your money runs short.*", s: "", img: "chart" },
   { t: "*85% likely to last?* Find out — free, in minutes.", s: "", img: "stats" },
+  { t: "Know what retirement will *actually cost you.*", s: "", img: "budget" },
+  { t: "Build your retirement budget — *and see if it lasts.*", s: "", img: "budget" },
+  { t: "What's your real retirement *income goal?*", s: "", img: "budgetcard" },
+  { t: "Essentials, home loan, fun money — *see the whole picture.*", s: "", img: "budgetcard" },
 ];
 
 const SIZES = [

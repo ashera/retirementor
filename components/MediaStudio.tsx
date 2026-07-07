@@ -14,6 +14,8 @@ const IMAGES = [
   { key: "", label: "No screenshot" },
   { key: "stats", label: "Dashboard cards" },
   { key: "chart", label: "Balance chart" },
+  { key: "budget", label: "Budget breakdown" },
+  { key: "budgetcard", label: "Income-goal card" },
 ];
 
 export default function MediaStudio() {
