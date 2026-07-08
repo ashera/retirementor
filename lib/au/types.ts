@@ -174,6 +174,19 @@ export interface MinDrawdownPart {
   amount: number; // balance × rate
 }
 
+// The Age Pension means-test working for one year (the engine's actual inputs
+// and both test results), so the income modal can show exactly how the figure
+// was reached. null before Age Pension age.
+export interface PensionBreakdown {
+  assessableAssets: number; // financial assets + investment-property equity
+  financialAssets: number; // outside super + accessible super (the deemed base)
+  deemedIncome: number; // income deemed on financialAssets
+  otherIncome: number; // assessable rent counted in the income test
+  assetsTestAnnual: number; // entitlement under the assets test
+  incomeTestAnnual: number; // entitlement under the income test
+  bindingTest: "assets" | "income"; // the lower (binding) test
+}
+
 export interface YearBreakdown {
   openingSuper: number;
   openingOutside: number;
@@ -193,6 +206,7 @@ export interface YearBreakdown {
   earningsTax: number; // approx 15% super earnings tax (accumulation only)
   // Retirement income
   agePension: number;
+  pension: PensionBreakdown | null; // means-test working behind agePension (null before pension age)
   rentIncome: number; // net cash rent from an investment property
   minDrawdown: number; // legislated minimum super drawdown this year (per-person, summed)
   minDrawdownParts: MinDrawdownPart[]; // the per-person split behind minDrawdown
@@ -211,6 +225,7 @@ export interface YearRow {
   outside: number; // outside-super balance
   total: number; // totalSuper + outside
   agePension: number; // Age Pension received this year
+  pension: PensionBreakdown | null; // means-test working behind agePension (null before pension age)
   salaryIncome: number; // gross household salary this year (0 once retired)
   superDrawn: number; // drawn from super this year
   outsideDrawn: number; // drawn from outside-super this year

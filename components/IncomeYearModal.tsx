@@ -2,17 +2,9 @@
 
 import { fmtCurrency } from "@/lib/au/format";
 import { minDrawdownRate, type EngineConfig } from "@/lib/au/config";
-import type { Household, RetirementPlan, YearRow } from "@/lib/au/types";
+import type { RetirementPlan, YearRow } from "@/lib/au/types";
 
 const cur = (n: number) => fmtCurrency(Math.round(n));
-
-function deemedIncome(financial: number, household: Household, config: EngineConfig) {
-  const t = household === "single" ? config.deeming.threshold.single : config.deeming.threshold.couple;
-  return (
-    Math.min(financial, t) * config.deeming.lowerRate +
-    Math.max(0, financial - t) * config.deeming.upperRate
-  );
-}
 
 function Row({
   color,
@@ -74,18 +66,25 @@ export default function IncomeYearModal({
   const spend = row.spending;
   const shortfall = Math.max(0, spend - total);
 
-  // Why is the Age Pension this amount? Re-run the two-test for this year.
+  // Why is the Age Pension this amount? Use the engine's actual means-test working
+  // for this year (persisted on the row), so the modal matches the figure exactly.
+  const pb = row.pension; // null before Age Pension age
   const side = plan.household === "couple" ? config.agePension.couple : config.agePension.single;
   const freeArea = plan.homeowner ? side.assetsFreeArea.homeowner : side.assetsFreeArea.nonHomeowner;
   const assetsTaper = config.agePension.assetsTaperPerDollar;
+  const incomeTaper = config.agePension.incomeTaperPerDollar;
   const cutoff = freeArea + side.maxAnnual / assetsTaper;
-  const financial = row.totalSuper + row.outside;
-  const assessable = financial + (row.propertyEquity ?? 0);
-  const income = deemedIncome(financial, plan.household, config) + rent;
-  const assetsTest = Math.max(0, side.maxAnnual - Math.max(0, assessable - freeArea) * assetsTaper);
-  const incomeTest = Math.max(0, side.maxAnnual - Math.max(0, income - side.incomeFreeAreaAnnual) * config.agePension.incomeTaperPerDollar);
-  const binding = assetsTest <= incomeTest ? "assets" : "income";
   const belowPensionAge = row.age < config.agePensionAge;
+  const binding = pb?.bindingTest ?? "assets";
+
+  // Per-test working for the breakdown (from the engine's stored inputs).
+  const excessAssets = pb ? Math.max(0, pb.assessableAssets - freeArea) : 0;
+  const reductionAssets = excessAssets * assetsTaper;
+  const incomeTotal = pb ? pb.deemedIncome + pb.otherIncome : 0;
+  const excessIncome = pb ? Math.max(0, incomeTotal - side.incomeFreeAreaAnnual) : 0;
+  const reductionIncome = excessIncome * incomeTaper;
+  const assetsPerK = Math.round(assetsTaper * 1000); // annual reduction per $1,000 over
+  const incomeCentsPerDollar = Math.round(incomeTaper * 100); // cents per $1 over
 
   // Why is the super draw this amount? Uses the engine's actual minimum (summed
   // per person — a couple with an age gap has different rates each).
@@ -99,7 +98,7 @@ export default function IncomeYearModal({
 
   let pensionReason: string;
   if (belowPensionAge) pensionReason = `Not yet — the Age Pension starts at ${config.agePensionAge}.`;
-  else if (pension <= 1) pensionReason = `Nil this year — your ${cur(assessable)} of assessable assets is above the ${cur(cutoff)} cut-off. As you spend down, a part pension kicks in.`;
+  else if (pension <= 1) pensionReason = `Nil this year — your ${cur(pb?.assessableAssets ?? 0)} of assessable assets is above the ${cur(cutoff)} cut-off. As you spend down, a part pension kicks in.`;
   else if (pension >= side.maxAnnual - 1) pensionReason = `The full rate — your assets and income sit under the thresholds.`;
   else pensionReason = `A part pension — the ${binding} test is binding, tapering the ${cur(side.maxAnnual)} maximum down to this.`;
 
@@ -204,6 +203,78 @@ export default function IncomeYearModal({
                   )}
                 </div>
               </section>
+
+              {pb && (
+                <section>
+                  <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted">
+                    How the Age Pension is worked out
+                  </h3>
+                  <div className="space-y-3 rounded-xl border border-line bg-panel px-3 py-3 text-xs">
+                    <p className="text-muted">
+                      Services Australia runs an <span className="text-slate-200">assets test</span> and an{" "}
+                      <span className="text-slate-200">income test</span>, and pays the{" "}
+                      <strong className="text-white">lower</strong> of the two. The maximum for a{" "}
+                      {plan.household === "couple" ? "couple" : "single"} is {cur(side.maxAnnual)}/yr.
+                    </p>
+
+                    <div className={`rounded-lg border p-2.5 ${binding === "assets" ? "border-accent/40 bg-accent/5" : "border-line"}`}>
+                      <div className="mb-1.5 flex items-center justify-between">
+                        <span className="font-semibold text-slate-200">Assets test</span>
+                        {binding === "assets" && (
+                          <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-accent">Binding</span>
+                        )}
+                      </div>
+                      <div className="space-y-1">
+                        <DLine label="Assessable assets" value={pb.assessableAssets} />
+                        <DLine label={`− Free area (${plan.homeowner ? "homeowner" : "non-homeowner"})`} value={freeArea} />
+                        <div className="border-t border-line pt-1">
+                          <DLine label="= Amount over the free area" value={excessAssets} strong />
+                        </div>
+                        <DLine label={`− Taper ($${assetsPerK}/yr per $1,000 over)`} value={reductionAssets} />
+                        <div className="border-t border-line pt-1">
+                          <DLine label="= Assets-test entitlement" value={pb.assetsTestAnnual} strong />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className={`rounded-lg border p-2.5 ${binding === "income" ? "border-accent/40 bg-accent/5" : "border-line"}`}>
+                      <div className="mb-1.5 flex items-center justify-between">
+                        <span className="font-semibold text-slate-200">Income test</span>
+                        {binding === "income" && (
+                          <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-accent">Binding</span>
+                        )}
+                      </div>
+                      <div className="space-y-1">
+                        <DLine label="Deemed income (on financial assets)" value={pb.deemedIncome} />
+                        {pb.otherIncome > 0 && <DLine label="+ Assessable rent" value={pb.otherIncome} />}
+                        {pb.otherIncome > 0 && (
+                          <div className="border-t border-line pt-1">
+                            <DLine label="= Assessable income" value={incomeTotal} strong />
+                          </div>
+                        )}
+                        <DLine label="− Income free area" value={side.incomeFreeAreaAnnual} />
+                        <div className="border-t border-line pt-1">
+                          <DLine label="= Amount over the free area" value={excessIncome} strong />
+                        </div>
+                        <DLine label={`− Taper (${incomeCentsPerDollar}c per $1 over)`} value={reductionIncome} />
+                        <div className="border-t border-line pt-1">
+                          <DLine label="= Income-test entitlement" value={pb.incomeTestAnnual} strong />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="border-t border-line pt-2 text-slate-300">
+                      You&apos;re paid the <strong className="text-white">lower</strong> of the two — the{" "}
+                      <strong className="text-white">{binding}</strong> test →{" "}
+                      <strong className="text-accent">{cur(pension)}</strong>.
+                    </div>
+                    <p className="text-[11px] text-muted">
+                      Deeming assumes your financial assets earn a set rate regardless of actual returns.
+                      The family home isn&apos;t counted{plan.investmentProperty ? "; an investment property's equity is (but its rent is assessed as actual income, not deemed)" : ""}.
+                    </p>
+                  </div>
+                </section>
+              )}
 
               {fromSuper > 0 && (
                 <section>

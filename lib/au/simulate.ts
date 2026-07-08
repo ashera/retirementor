@@ -12,7 +12,7 @@
 //   pension      — pension age+: means-tested Age Pension tops up private drawdown
 
 import { minDrawdownRate, type EngineConfig } from "./config";
-import { agePension } from "./agePension";
+import { agePension, deemedIncome } from "./agePension";
 import { spendingForAge, startingSuperBalances } from "./types";
 import { mortgageActiveAtAge, mortgageAnnualCost } from "./mortgage";
 import {
@@ -172,6 +172,7 @@ export function simulate(
           fees: feesPaid,
           earningsTax: Math.max(0, earningsTax),
           agePension: 0,
+          pension: null,
           rentIncome: 0,
           minDrawdown: 0,
           minDrawdownParts: [],
@@ -253,6 +254,7 @@ export function simulate(
     // an investment property's equity is assessable but NOT deemed, and its rent is
     // counted as actual income — so these two are no longer the same figure.
     let agePensionAmt = 0;
+    let pensionBreakdown: YearBreakdown["pension"] = null;
     if (oldest >= pensionAge) {
       const financialAssets = outside + accessibleSuper;
       const ap = agePension(
@@ -266,6 +268,15 @@ export function simulate(
         config,
       );
       agePensionAmt = ap.annual;
+      pensionBreakdown = {
+        assessableAssets: financialAssets + propertyEquity,
+        financialAssets,
+        deemedIncome: deemedIncome(financialAssets, plan.household, config),
+        otherIncome: rentAssessable,
+        assetsTestAnnual: ap.assetsTestAnnual,
+        incomeTestAnnual: ap.incomeTestAnnual,
+        bindingTest: ap.bindingTest,
+      };
       if (agePensionAmt > 0 && firstAgePensionAge === null) {
         firstAgePensionAge = oldest;
       }
@@ -339,6 +350,7 @@ export function simulate(
         fees: feesPaid,
         earningsTax: 0,
         agePension: agePensionAmt,
+        pension: pensionBreakdown,
         rentIncome: rentCash,
         minDrawdown: minDraw,
         minDrawdownParts,
@@ -400,6 +412,7 @@ function row(
     outside,
     total: totalSuper + outside,
     agePension: agePensionAmt,
+    pension: breakdown.pension,
     salaryIncome: breakdown.salaryIncome,
     superDrawn,
     outsideDrawn,
