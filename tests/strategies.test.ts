@@ -106,6 +106,22 @@ describe("What-If strategies", () => {
     expect(buildStrategyCatalog(base({ homeowner: false })).some((c) => c.id === "downsize")).toBe(false);
   });
 
+  it("downsizing discharges the mortgage from the sale (loan cost stops)", () => {
+    const b = base({
+      people: [{ currentAge: 67, superBalance: 300_000, salary: 0, voluntaryConcessional: 0, voluntaryNonConcessional: 0 }],
+      retirementAge: 67,
+      mortgage: { type: "interest_only", balance: 200_000, interestRate: 6, annualRepayment: 0, payoffAge: null, strategy: "carry" },
+    });
+    const card = cardById(b, "downsize");
+    const plan = card.apply(b, resolveValues(card, { age: 70, release: 300_000, toSuper: 0 }));
+    const rows = simulate(plan, cfg);
+    // Interest-only loan is an ongoing cost until the downsize, then discharged.
+    expect(rows.rows.find((r) => r.age === 69)!.breakdown.mortgageCost).toBeGreaterThan(0);
+    expect(rows.rows.find((r) => r.age === 71)!.breakdown.mortgageCost).toBe(0);
+    // Not paid from super (repaid from the sale) — no super lump-sum recorded.
+    expect(rows.rows.find((r) => r.age === 70)!.breakdown.mortgageCleared).toBe(0);
+  });
+
   it("sell-and-rent releases equity, adds rent, and switches to non-homeowner thresholds", () => {
     const b = base({ people: [{ currentAge: 67, superBalance: 150_000, salary: 0, voluntaryConcessional: 0, voluntaryNonConcessional: 0 }], retirementAge: 67, outsideSuper: 20_000, targetSpending: 45_000 });
     const card = cardById(b, "sell-and-rent");

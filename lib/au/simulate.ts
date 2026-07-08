@@ -133,6 +133,7 @@ export function simulate(
       downsized = true;
       homeProceedsThisYear = downsize.release;
       homeToSuperThisYear = toSuper;
+      if (mortgage) mortgageCleared = true; // discharged from the sale (freed equity is net of it)
     }
     // Sell up and rent: release all equity into savings (a mortgage is repaid
     // from proceeds, so `release` is net of it). Renter status/rent apply below.
@@ -140,6 +141,7 @@ export function simulate(
       outside += Math.max(0, sellRent.release);
       soldHome = true;
       homeProceedsThisYear = sellRent.release;
+      if (mortgage) mortgageCleared = true; // discharged from the sale
     }
     const isHomeowner = plan.homeowner && !(sellRent != null && oldest >= sellRent.atAge);
 

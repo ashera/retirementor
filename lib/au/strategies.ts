@@ -87,7 +87,7 @@ export function buildStrategyCatalog(plan: RetirementPlan): StrategyCard[] {
       group: "home",
       exclusive: "home",
       label: "Downsize your home",
-      blurb: "Sell and buy somewhere cheaper, freeing up equity. Your home stays exempt from the Age Pension; cash you move into savings becomes assessable, while up to $300k per person can go into super as a downsizer contribution.",
+      blurb: `Sell and buy somewhere cheaper, freeing up equity.${plan.mortgage ? " Any mortgage is discharged from the sale, so the freed equity below is net of it." : ""} Your home stays exempt from the Age Pension; cash you move into savings becomes assessable, while up to $300k per person can go into super as a downsizer contribution.`,
       params: [
         {
           key: "age",
@@ -100,7 +100,7 @@ export function buildStrategyCatalog(plan: RetirementPlan): StrategyCard[] {
         },
         {
           key: "release",
-          label: "Equity you free up",
+          label: plan.mortgage ? "Equity you free up (net of the loan)" : "Equity you free up",
           min: 0,
           max: homeVal,
           step: 10_000,

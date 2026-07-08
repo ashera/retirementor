@@ -189,6 +189,7 @@ export default function YearDetailModal({
                 {plan.home?.sellAndRent
                   ? " You're now a renter: higher Age Pension asset thresholds, with rent included in your living costs."
                   : " Your home stays exempt from the Age Pension."}
+                {plan.mortgage ? " Any remaining mortgage is discharged from the sale." : ""}
               </p>
             </div>
           )}
