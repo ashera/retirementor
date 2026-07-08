@@ -86,9 +86,11 @@ describe("What-If strategies", () => {
     const b = base({ people: [{ currentAge: 67, superBalance: 200_000, salary: 0, voluntaryConcessional: 0, voluntaryNonConcessional: 0 }], retirementAge: 67, outsideSuper: 50_000 });
     const card = cardById(b, "downsize");
     expect(card.exclusive).toBe("home");
-    // Release $400k at 70: $150k into super (downsizer), $250k into savings.
-    const plan = card.apply(b, resolveValues(card, { age: 70, release: 400_000, toSuper: 150_000 }));
+    // From the ~$900k home (no loan) down to a $500k home → frees $400k;
+    // $150k into super (downsizer), $250k into savings.
+    const plan = card.apply(b, resolveValues(card, { age: 70, newValue: 500_000, toSuper: 150_000 }));
     expect(plan.home?.downsize).toEqual({ atAge: 70, release: 400_000, toSuper: 150_000 });
+    expect(plan.home?.value).toBe(500_000); // net worth reallocated, not lost
 
     const before = simulate(plan, cfg).rows.find((r) => r.age === 69)!;
     const after = simulate(plan, cfg).rows.find((r) => r.age === 70)!;
@@ -113,7 +115,9 @@ describe("What-If strategies", () => {
       mortgage: { type: "interest_only", balance: 200_000, interestRate: 6, annualRepayment: 0, payoffAge: null, strategy: "carry" },
     });
     const card = cardById(b, "downsize");
-    const plan = card.apply(b, resolveValues(card, { age: 70, release: 300_000, toSuper: 0 }));
+    // ~$900k home, $200k loan → downsize to a $400k home frees $300k (net of loan).
+    const plan = card.apply(b, resolveValues(card, { age: 70, newValue: 400_000, toSuper: 0 }));
+    expect(plan.home?.downsize?.release).toBe(300_000);
     const rows = simulate(plan, cfg);
     // Interest-only loan is an ongoing cost until the downsize, then discharged.
     expect(rows.rows.find((r) => r.age === 69)!.breakdown.mortgageCost).toBeGreaterThan(0);

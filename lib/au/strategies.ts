@@ -6,6 +6,7 @@
 
 import type { RetirementPlan } from "./types";
 import { getInvestmentProperties } from "./types";
+import { fmtCurrency } from "./format";
 
 export type StrategyGroup = "home" | "mortgage" | "property" | "timing" | "work";
 
@@ -80,6 +81,7 @@ export function buildStrategyCatalog(plan: RetirementPlan): StrategyCard[] {
   // --- Your home ---
   if (plan.homeowner) {
     const homeVal = Math.max(300_000, Math.round(plan.home?.value ?? 900_000));
+    const loan = plan.mortgage?.balance ?? 0;
     const people = plan.people.length;
     const superCap = 300_000 * people; // downsizer contribution cap ($300k/person)
     cards.push({
@@ -87,7 +89,7 @@ export function buildStrategyCatalog(plan: RetirementPlan): StrategyCard[] {
       group: "home",
       exclusive: "home",
       label: "Downsize your home",
-      blurb: `Sell and buy somewhere cheaper, freeing up equity.${plan.mortgage ? " Any mortgage is discharged from the sale, so the freed equity below is net of it." : ""} Your home stays exempt from the Age Pension; cash you move into savings becomes assessable, while up to $300k per person can go into super as a downsizer contribution.`,
+      blurb: `Move from your ${fmtCurrency(homeVal)} home to a cheaper one — the difference${loan ? ", after discharging your mortgage," : ""} is freed into savings, with up to $300k per person able to go into super as a downsizer contribution. Your new (smaller) home stays exempt from the Age Pension, so your net worth carries over — it's just reallocated.`,
       params: [
         {
           key: "age",
@@ -99,12 +101,12 @@ export function buildStrategyCatalog(plan: RetirementPlan): StrategyCard[] {
           suffix: "yrs",
         },
         {
-          key: "release",
-          label: plan.mortgage ? "Equity you free up (net of the loan)" : "Equity you free up",
-          min: 0,
+          key: "newValue",
+          label: "Downsize to a home worth",
+          min: 100_000,
           max: homeVal,
-          step: 10_000,
-          default: Math.min(400_000, Math.round(homeVal * 0.4)),
+          step: 25_000,
+          default: Math.round(homeVal * 0.6),
           prefix: "$",
         },
         {
@@ -117,17 +119,23 @@ export function buildStrategyCatalog(plan: RetirementPlan): StrategyCard[] {
           prefix: "$",
         },
       ],
-      apply: (p, v) => ({
-        ...p,
-        home: {
-          value: p.home?.value ?? 900_000,
-          growthReal: p.home?.growthReal ?? 2,
-          downsize: { atAge: v.age, release: v.release, toSuper: v.toSuper },
-        },
-      }),
+      apply: (p, v) => {
+        const currentValue = Math.max(0, p.home?.value ?? 900_000);
+        const ln = p.mortgage?.balance ?? 0;
+        const release = Math.max(0, currentValue - v.newValue - ln);
+        return {
+          ...p,
+          // The home is now the smaller value; the difference (net of the loan) is
+          // freed — so total net worth carries across, just reallocated.
+          home: {
+            value: v.newValue,
+            growthReal: p.home?.growthReal ?? 2,
+            downsize: { atAge: v.age, release, toSuper: v.toSuper },
+          },
+        };
+      },
     });
 
-    const loan = plan.mortgage?.balance ?? 0;
     cards.push({
       id: "sell-and-rent",
       group: "home",
