@@ -19,6 +19,7 @@ import IncomeChart from "@/components/IncomeChart";
 import FanChart from "@/components/FanChart";
 import Field from "@/components/Field";
 import Logo from "@/components/Logo";
+import { track as trackEvent } from "@/lib/analytics";
 import {
   AgePensionExplainer,
   LikelihoodExplainer,
@@ -170,6 +171,11 @@ export default function GuidedIntro({
   const bottomRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (step > 1) bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [step]);
+
+  // Funnel: which panel of the guided walkthrough a visitor reaches before leaving.
+  useEffect(() => {
+    trackEvent("Guide step", { step, phase: phaseOf(step) });
   }, [step]);
 
   const next = () => setStep((s) => s + 1);

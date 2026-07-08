@@ -9,6 +9,7 @@ import { simulate } from "@/lib/au/simulate";
 import type { EngineConfig } from "@/lib/au/config";
 import { fmtCompact, fmtCurrency } from "@/lib/au/format";
 import { planCompleteness } from "@/lib/au/completeness";
+import { track } from "@/lib/analytics";
 import {
   DEFAULT_PARTNER,
   DEFAULT_PLAN,
@@ -691,6 +692,13 @@ export default function PlanWizard({
   const safeStep = Math.min(step, steps.length - 1);
   const current = steps[safeStep];
   const isLast = safeStep === steps.length - 1;
+
+  // Funnel: record which wizard step a visitor reaches (and in what order), so
+  // GA4 path/funnel exploration shows where people drop off before finishing.
+  useEffect(() => {
+    if (view === "step") track("Wizard step", { step: current.key, index: safeStep });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, safeStep]);
 
   // ── Completeness meter — shared with the dashboard (measures what the user has
   // TOLD us, not steps clicked). Assumptions is a bonus ★, not part of the score.

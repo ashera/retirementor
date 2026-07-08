@@ -232,6 +232,18 @@ export default function PlannerApp({
     return () => document.removeEventListener("visibilitychange", flush);
   }, [user, configured]);
 
+  // Funnel top: tag each visit once we've read localStorage — did the visitor
+  // land on the empty Get-started state (new) or straight onto results (has a
+  // plan)? Combined with the guide/wizard events, this shows how far explorers
+  // get before bouncing. Fires once per mount. Guide entry is captured by
+  // GuidedIntro's first "Guide step".
+  const landingTracked = useRef(false);
+  useEffect(() => {
+    if (!ready || landingTracked.current) return;
+    landingTracked.current = true;
+    track(configured ? "Results viewed" : "Get started shown", { signed_in: !!user });
+  }, [ready, configured, user]);
+
   const result = useMemo(() => simulate(plan, config), [plan, config]);
   const mc = useMemo(() => runMonteCarlo(plan, config), [plan, config]);
   const successPct = Math.round(mc.successRate * 100);
@@ -284,8 +296,10 @@ export default function PlannerApp({
     if (completed) {
       commit(next);
       setConfigured(true);
+      track("Guide completed");
       trackPlanBuiltConversion();
     } else {
+      track("Guide exited to wizard");
       setWizardSeed(next);
       setWizardOpen(true);
     }
@@ -310,6 +324,7 @@ export default function PlannerApp({
     setConfigured(true);
     setWizardOpen(false);
     setWizardSeed(null);
+    track("Wizard completed");
     trackPlanBuiltConversion();
   };
 
@@ -681,7 +696,10 @@ export default function PlannerApp({
           }
           action={
             <button
-              onClick={() => setBudgetOpen(true)}
+              onClick={() => {
+                track("Budget opened");
+                setBudgetOpen(true);
+              }}
               className="inline-flex items-center gap-1.5 rounded-lg border border-accent/40 bg-accent/10 px-2.5 py-1 text-xs font-semibold text-accent transition hover:bg-accent/20"
             >
               {plan.budget ? "✎ Edit your budget" : "🧮 Not sure? Build a budget"}
@@ -739,7 +757,10 @@ export default function PlannerApp({
           bands={stageBands}
           baseline={baselineResult}
           baselineLabel={baselineLabel}
-          onSelectYear={setSelectedAge}
+          onSelectYear={(age) => {
+            track("Year breakdown opened", { chart: "balance" });
+            setSelectedAge(age);
+          }}
           selectedAge={selectedAge}
           wageInflationPct={plan.inflation + (config.livingStandardsGrowthPct ?? 0)}
           cpiPct={plan.inflation}
@@ -850,7 +871,13 @@ export default function PlannerApp({
             {hasInvestmentProperty(plan) && <LegendDot color="#fb923c" label="Net rent" />}
           </div>
         </div>
-        <IncomeChart result={result} onSelectYear={setIncomeAge} />
+        <IncomeChart
+          result={result}
+          onSelectYear={(age) => {
+            track("Year breakdown opened", { chart: "income" });
+            setIncomeAge(age);
+          }}
+        />
         <p className="mt-2 text-center text-xs text-muted">
           Tip: click any year to see why your income is that amount — your salary
           while working, then your retirement income sources.
@@ -1144,8 +1171,14 @@ export default function PlannerApp({
         </>
       ) : (
         <GetStartedPanel
-          onGuide={() => setShowGuide(true)}
-          onWizard={() => setWizardOpen(true)}
+          onGuide={() => {
+            track("Get started: guide");
+            setShowGuide(true);
+          }}
+          onWizard={() => {
+            track("Get started: wizard");
+            setWizardOpen(true);
+          }}
         />
       )}
 
