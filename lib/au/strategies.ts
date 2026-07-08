@@ -125,12 +125,13 @@ export function buildStrategyCatalog(plan: RetirementPlan): StrategyCard[] {
         const release = Math.max(0, currentValue - v.newValue - ln);
         return {
           ...p,
-          // The home is now the smaller value; the difference (net of the loan) is
-          // freed — so total net worth carries across, just reallocated.
+          // Keep the ORIGINAL home value; the new (smaller) value lives on the
+          // downsize event, so the engine can track the home from big → small and
+          // net worth carries across, just reallocated.
           home: {
-            value: v.newValue,
+            value: currentValue,
             growthReal: p.home?.growthReal ?? 2,
-            downsize: { atAge: v.age, release, toSuper: v.toSuper },
+            downsize: { atAge: v.age, newValue: v.newValue, release, toSuper: v.toSuper },
           },
         };
       },

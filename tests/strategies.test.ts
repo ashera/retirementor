@@ -89,8 +89,12 @@ describe("What-If strategies", () => {
     // From the ~$900k home (no loan) down to a $500k home → frees $400k;
     // $150k into super (downsizer), $250k into savings.
     const plan = card.apply(b, resolveValues(card, { age: 70, newValue: 500_000, toSuper: 150_000 }));
-    expect(plan.home?.downsize).toEqual({ atAge: 70, release: 400_000, toSuper: 150_000 });
-    expect(plan.home?.value).toBe(500_000); // net worth reallocated, not lost
+    expect(plan.home?.downsize).toEqual({ atAge: 70, newValue: 500_000, release: 400_000, toSuper: 150_000 });
+    expect(plan.home?.value).toBe(900_000); // keeps the ORIGINAL value; new value on the event
+    // The tracked home value steps from the original to the new value at the downsize.
+    const rows = simulate(plan, cfg).rows;
+    expect(rows.find((r) => r.age === 69)!.homeValue).toBe(900_000);
+    expect(rows.find((r) => r.age === 71)!.homeValue).toBe(500_000);
 
     const before = simulate(plan, cfg).rows.find((r) => r.age === 69)!;
     const after = simulate(plan, cfg).rows.find((r) => r.age === 70)!;

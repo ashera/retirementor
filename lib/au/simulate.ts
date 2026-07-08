@@ -89,6 +89,10 @@ export function simulate(
   // (non-homeowner means test + ongoing rent) from `atAge`.
   const sellRent = plan.home?.sellAndRent;
   let soldHome = false;
+  // The (exempt) home value tracked for the net-worth view: the current value
+  // until a downsize (→ the smaller home) or a sale (→ 0). Homeowners without a
+  // stated value get the same default the downsize lever assumes.
+  const homeBaseValue = plan.homeowner ? (plan.home?.value ?? 900_000) : 0;
 
   for (let t = 0; t <= horizon; t++) {
     const ages = plan.people.map((p) => p.currentAge + t);
@@ -144,6 +148,7 @@ export function simulate(
       if (mortgage) mortgageCleared = true; // discharged from the sale
     }
     const isHomeowner = plan.homeowner && !(sellRent != null && oldest >= sellRent.atAge);
+    const homeValueThisYear = soldHome ? 0 : downsized ? (downsize?.newValue ?? homeBaseValue) : homeBaseValue;
 
     // Balances at the START of this year (on the birthday) — this is what each
     // data point plots, so the peak lands on the retirement age, not the year before.
@@ -219,6 +224,7 @@ export function simulate(
           propertyCgt: 0,
           homeProceeds: 0,
           homeProceedsToSuper: 0,
+          homeValue: homeValueThisYear,
         }),
       );
       continue;
@@ -428,6 +434,7 @@ export function simulate(
         propertyCgt,
         homeProceeds: homeProceedsThisYear,
         homeProceedsToSuper: homeToSuperThisYear,
+        homeValue: homeValueThisYear,
       }),
     );
   }
@@ -484,6 +491,7 @@ function row(
     pension: breakdown.pension,
     salaryIncome: breakdown.salaryIncome,
     workIncome: breakdown.workIncome,
+    homeValue: breakdown.homeValue,
     superDrawn,
     outsideDrawn,
     spending,

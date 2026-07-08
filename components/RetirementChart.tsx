@@ -27,19 +27,27 @@ function AssetsTooltip({
   active,
   payload,
   baselineLabel = "Saved plan",
+  showHome = false,
 }: {
   active?: boolean;
   payload?: { payload: ChartRow }[];
   baselineLabel?: string;
+  showHome?: boolean;
 }) {
   if (!active || !payload?.length) return null;
   const r = payload[0].payload;
+  const home = showHome ? Math.max(0, r.homeValue ?? 0) : 0;
   return (
     <div className="rounded-lg border border-line bg-panel px-3 py-2 text-sm shadow-xl">
       <div className="font-semibold text-white">Age {r.age}</div>
       {r.total !== undefined && (
         <div className="tabular-nums text-slate-200">
-          Total {fmtCurrency(r.total)}
+          {showHome ? "Net worth" : "Total"} {fmtCurrency(r.total + home)}
+        </div>
+      )}
+      {showHome && r.homeValue !== undefined && (
+        <div className="tabular-nums text-slate-400">
+          Home (exempt) {fmtCurrency(home)}
         </div>
       )}
       {r.totalSuper !== undefined && (
@@ -76,6 +84,7 @@ export default function RetirementChart({
   selectedAge,
   animate = true,
   height = 320,
+  showHome = false,
   wageInflationPct,
   cpiPct,
 }: {
@@ -87,6 +96,7 @@ export default function RetirementChart({
   selectedAge?: number | null;
   animate?: boolean;
   height?: number;
+  showHome?: boolean; // add the exempt-home band → a net-worth view
   // RG 276 two-stage deflators. When supplied (and wage ≠ CPI) the whole balance
   // line is drawn on a single CPI basis so it stays continuous through retirement.
   wageInflationPct?: number;
@@ -165,6 +175,10 @@ export default function RetirementChart({
             <stop offset="0%" stopColor="#38bdf8" stopOpacity={0.5} />
             <stop offset="100%" stopColor="#38bdf8" stopOpacity={0.05} />
           </linearGradient>
+          <linearGradient id="homeFill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#64748b" stopOpacity={0.4} />
+            <stop offset="100%" stopColor="#64748b" stopOpacity={0.04} />
+          </linearGradient>
         </defs>
         <CartesianGrid strokeDasharray="3 3" stroke="#232c40" vertical={false} />
         <XAxis
@@ -182,7 +196,7 @@ export default function RetirementChart({
           width={54}
           tickFormatter={fmtCompact}
         />
-        <Tooltip content={<AssetsTooltip baselineLabel={baselineLabel} />} />
+        <Tooltip content={<AssetsTooltip baselineLabel={baselineLabel} showHome={showHome} />} />
         <ReferenceLine
           x={retirementAge}
           stroke="#f59e0b"
@@ -216,6 +230,18 @@ export default function RetirementChart({
               fill: "#ef4444",
               fontSize: 11,
             }}
+          />
+        )}
+        {showHome && (
+          <Area
+            type="monotone"
+            dataKey="homeValue"
+            stackId="1"
+            stroke="#64748b"
+            strokeWidth={2}
+            fill="url(#homeFill)"
+            name="Home (exempt)"
+            isAnimationActive={animate}
           />
         )}
         <Area

@@ -82,10 +82,11 @@ export interface MortgageDetail {
 export interface HomeDetail {
   value: number; // current market value (today's dollars)
   growthReal: number; // annual real capital growth, percent
-  // Optional downsize: at `atAge`, free up `release` of equity (staying a
-  // homeowner). `toSuper` of it goes into super as a downsizer contribution
-  // (assessable but tax-advantaged); the rest lands in outside savings (deemed).
-  downsize?: { atAge: number; release: number; toSuper: number };
+  // Optional downsize: at `atAge`, move to a home worth `newValue`, freeing up
+  // `release` (= current value − newValue − loan). `toSuper` of it goes into super
+  // as a downsizer contribution (assessable but tax-advantaged); the rest lands in
+  // outside savings (deemed). The home stays exempt; `value` stays the ORIGINAL.
+  downsize?: { atAge: number; newValue: number; release: number; toSuper: number };
   // Optional sell-up-and-rent: at `atAge`, release all `release` equity into
   // savings, become a NON-homeowner (higher assets-test threshold) and pay
   // `rentPerYear` from then on. Any mortgage is treated as repaid from proceeds.
@@ -264,6 +265,7 @@ export interface YearBreakdown {
   // opening balance, so it explains a step-up rather than a mid-year inflow.
   homeProceeds: number; // total equity freed (0 normally)
   homeProceedsToSuper: number; // portion contributed to super as a downsizer (rest → savings)
+  homeValue: number; // the home's (exempt) value this year — for the net-worth view
 }
 
 export interface YearRow {
@@ -275,6 +277,7 @@ export interface YearRow {
   pension: PensionBreakdown | null; // means-test working behind agePension (null before pension age)
   salaryIncome: number; // gross household salary this year (0 once retired)
   workIncome: number; // net part-time work income this year (0 outside the work years)
+  homeValue: number; // the home's (exempt) value this year — for the net-worth view
   superDrawn: number; // drawn from super this year
   outsideDrawn: number; // drawn from outside-super this year
   spending: number; // target spending this year (0 while working)

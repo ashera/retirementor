@@ -89,7 +89,7 @@ export default function WhatIfView({
   const [saveName, setSaveName] = useState("");
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [chartView, setChartView] = useState<"balance" | "income">("balance");
+  const [chartView, setChartView] = useState<"balance" | "networth" | "income">("balance");
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
 
   useEffect(() => {
@@ -281,11 +281,15 @@ export default function WhatIfView({
       <div className="mb-6 rounded-2xl border border-line bg-panel p-6">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <h2 className="font-semibold text-white">
-            {chartView === "balance" ? "Balance over time" : "Income sources"}{" "}
+            {chartView === "balance" ? "Balance over time" : chartView === "networth" ? "Net worth (incl. your home)" : "Income sources"}{" "}
             <span className="text-sm font-normal text-muted">(today&apos;s dollars)</span>
           </h2>
           <div className="flex gap-1 rounded-lg border border-line bg-panel-2 p-1 text-xs">
-            {(["balance", "income"] as const).map((v) => (
+            {([
+              ["balance", "Balance"],
+              ["networth", "Net worth"],
+              ["income", "Income"],
+            ] as const).map(([v, label]) => (
               <button
                 key={v}
                 onClick={() => setChartView(v)}
@@ -293,40 +297,13 @@ export default function WhatIfView({
                   chartView === v ? "bg-accent text-ink" : "text-muted hover:text-white"
                 }`}
               >
-                {v === "balance" ? "Balance" : "Income"}
+                {label}
               </button>
             ))}
           </div>
         </div>
 
-        {chartView === "balance" ? (
-          <>
-            <RetirementChart
-              result={compRes}
-              baseline={changed ? baseRes : null}
-              baselineLabel="Baseline"
-              onSelectYear={setSelectedYear}
-              selectedAge={selectedYear}
-              animate={false}
-              height={300}
-              wageInflationPct={composed.inflation + (config.livingStandardsGrowthPct ?? 0)}
-              cpiPct={composed.inflation}
-            />
-            <div className="mt-3 flex flex-wrap gap-4">
-              {[
-                { c: "#34d399", l: "Super" },
-                { c: "#38bdf8", l: "Outside super" },
-                ...(changed ? [{ c: "#94a3b8", l: "Baseline" }] : []),
-              ].map((it) => (
-                <span key={it.l} className="flex items-center gap-1.5 text-xs text-muted">
-                  <span className="h-2.5 w-2.5 rounded-full" style={{ background: it.c }} />
-                  {it.l}
-                </span>
-              ))}
-            </div>
-            <p className="mt-2 text-xs text-muted">Tip: click a year to break down that year&apos;s money flow.</p>
-          </>
-        ) : (
+        {chartView === "income" ? (
           <>
             <IncomeChart result={compRes} height={300} animate={false} onSelectYear={setSelectedYear} />
             <div className="mt-3 flex flex-wrap gap-4">
@@ -340,6 +317,40 @@ export default function WhatIfView({
             <p className="mt-2 text-xs text-muted">
               {changed ? "Your income mix with the selected strategies. " : "Where your income comes from each year. "}
               Click a year to see why it&apos;s that amount.
+            </p>
+          </>
+        ) : (
+          <>
+            <RetirementChart
+              result={compRes}
+              baseline={chartView === "balance" && changed ? baseRes : null}
+              baselineLabel="Baseline"
+              showHome={chartView === "networth"}
+              onSelectYear={setSelectedYear}
+              selectedAge={selectedYear}
+              animate={false}
+              height={300}
+              wageInflationPct={composed.inflation + (config.livingStandardsGrowthPct ?? 0)}
+              cpiPct={composed.inflation}
+            />
+            <div className="mt-3 flex flex-wrap gap-4">
+              {[
+                ...(chartView === "networth" ? [{ c: "#64748b", l: "Home (exempt)" }] : []),
+                { c: "#34d399", l: "Super" },
+                { c: "#38bdf8", l: "Outside super" },
+                ...(chartView === "balance" && changed ? [{ c: "#94a3b8", l: "Baseline" }] : []),
+              ].map((it) => (
+                <span key={it.l} className="flex items-center gap-1.5 text-xs text-muted">
+                  <span className="h-2.5 w-2.5 rounded-full" style={{ background: it.c }} />
+                  {it.l}
+                </span>
+              ))}
+            </div>
+            <p className="mt-2 text-xs text-muted">
+              {chartView === "networth"
+                ? "Your assets incl. the exempt home — watch a downsize reallocate (home shrinks, savings grow). "
+                : "Tip: "}
+              Click a year to break down that year&apos;s money flow.
             </p>
           </>
         )}
