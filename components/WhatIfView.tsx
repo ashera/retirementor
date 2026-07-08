@@ -21,6 +21,8 @@ import {
 } from "@/lib/au/strategies";
 import CompareChart, { type CompareSeries } from "@/components/CompareChart";
 import IncomeChart from "@/components/IncomeChart";
+import YearDetailModal from "@/components/YearDetailModal";
+import IncomeYearModal from "@/components/IncomeYearModal";
 import Field from "@/components/Field";
 
 const PLAN_KEY = "au-retirement-plan";
@@ -88,6 +90,7 @@ export default function WhatIfView({
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [chartView, setChartView] = useState<"balance" | "income">("balance");
+  const [selectedYear, setSelectedYear] = useState<number | null>(null);
 
   useEffect(() => {
     try {
@@ -302,7 +305,7 @@ export default function WhatIfView({
 
         {chartView === "balance" ? (
           <>
-            <CompareChart series={series} />
+            <CompareChart series={series} onSelectYear={setSelectedYear} />
             <div className="mt-3 flex flex-wrap gap-4">
               {series.map((s) => (
                 <span key={s.id} className="flex items-center gap-1.5 text-xs text-muted">
@@ -311,10 +314,11 @@ export default function WhatIfView({
                 </span>
               ))}
             </div>
+            <p className="mt-2 text-xs text-muted">Tip: click a year to break down that year&apos;s money flow.</p>
           </>
         ) : (
           <>
-            <IncomeChart result={compRes} height={300} animate={false} />
+            <IncomeChart result={compRes} height={300} animate={false} onSelectYear={setSelectedYear} />
             <div className="mt-3 flex flex-wrap gap-4">
               {incomeLegend.map((it) => (
                 <span key={it.l} className="flex items-center gap-1.5 text-xs text-muted">
@@ -324,9 +328,8 @@ export default function WhatIfView({
               ))}
             </div>
             <p className="mt-2 text-xs text-muted">
-              {changed
-                ? "Your income mix with the selected strategies."
-                : "Where your income comes from each year — toggle strategies to see it change."}
+              {changed ? "Your income mix with the selected strategies. " : "Where your income comes from each year. "}
+              Click a year to see why it&apos;s that amount.
             </p>
           </>
         )}
@@ -383,6 +386,28 @@ export default function WhatIfView({
         {!signedIn && <p className="mt-2 text-xs text-muted">Sign in to save scenarios to your account.</p>}
         {saveMsg && <p className="mt-2 text-xs text-accent">{saveMsg}</p>}
       </div>
+
+      {/* Year explainer for the composed ("with strategies") plan. */}
+      {selectedYear != null &&
+        (() => {
+          const ages = compRes.rows.map((r) => r.age);
+          const row = compRes.rows.find((r) => r.age === selectedYear);
+          if (!row) return null;
+          const min = ages[0];
+          const max = ages[ages.length - 1];
+          const nav = {
+            onClose: () => setSelectedYear(null),
+            onPrev: () => setSelectedYear((a) => (a != null ? Math.max(min, a - 1) : a)),
+            onNext: () => setSelectedYear((a) => (a != null ? Math.min(max, a + 1) : a)),
+            canPrev: selectedYear > min,
+            canNext: selectedYear < max,
+          };
+          return chartView === "income" ? (
+            <IncomeYearModal row={row} plan={composed} config={config} {...nav} />
+          ) : (
+            <YearDetailModal row={row} plan={composed} {...nav} />
+          );
+        })()}
     </div>
   );
 }

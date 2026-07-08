@@ -41,7 +41,15 @@ function CompareTooltip({
 }
 
 /** Overlays each scenario's total balance (super + outside) by age. */
-export default function CompareChart({ series, height = 300 }: { series: CompareSeries[]; height?: number }) {
+export default function CompareChart({
+  series,
+  height = 300,
+  onSelectYear,
+}: {
+  series: CompareSeries[];
+  height?: number;
+  onSelectYear?: (age: number) => void;
+}) {
   // Merge all scenarios' totals into one row per age.
   const byAge = new Map<number, Record<string, number>>();
   for (const s of series) {
@@ -55,7 +63,15 @@ export default function CompareChart({ series, height = 300 }: { series: Compare
 
   return (
     <ResponsiveContainer width="100%" height={height}>
-      <LineChart data={data} margin={{ top: 8, right: 12, left: 8, bottom: 0 }}>
+      <LineChart
+        data={data}
+        margin={{ top: 8, right: 12, left: 8, bottom: 0 }}
+        onClick={onSelectYear ? (state: { activeLabel?: string | number }) => {
+          const age = Number(state?.activeLabel);
+          if (Number.isFinite(age)) onSelectYear(age);
+        } : undefined}
+        style={onSelectYear ? { cursor: "pointer" } : undefined}
+      >
         <CartesianGrid strokeDasharray="3 3" stroke="#232c40" vertical={false} />
         <XAxis dataKey="age" stroke="#8b97ad" fontSize={12} tickLine={false} axisLine={{ stroke: "#232c40" }} />
         <YAxis stroke="#8b97ad" fontSize={12} tickLine={false} axisLine={false} width={54} tickFormatter={fmtCompact} />
