@@ -71,7 +71,16 @@ export default function IncomeYearModal({
   const couple = plan.people.length > 1;
   const oldestCurrentAge = Math.max(...plan.people.map((pp) => pp.currentAge));
   const yearsElapsed = row.age - oldestCurrentAge;
-  const propertyCount = getInvestmentProperties(plan).length;
+  const propsList = getInvestmentProperties(plan);
+  const propertyCount = propsList.length;
+  // Label for a property line: its custom name, else "Property N" (or a lone
+  // "Investment property"), matching the wizard's naming.
+  const propLabel = (part: { name?: string; index: number }) =>
+    part.name?.trim() || (propertyCount > 1 ? `Property ${part.index + 1}` : "Investment property");
+  const rentLabel =
+    propertyCount === 1
+      ? `+ ${propsList[0].name?.trim() || "Investment property"} rent (actual)`
+      : "+ Combined property rent (actual)";
 
   // Why is the Age Pension this amount? Use the engine's actual means-test working
   // for this year (persisted on the row), so the modal matches the figure exactly.
@@ -249,9 +258,9 @@ export default function IncomeYearModal({
                         <div className="mb-0.5 text-[11px] uppercase tracking-wide text-muted">What&apos;s counted</div>
                         <DLine label="Savings outside super" value={pb.outsideAssets} />
                         <DLine label="Super" value={pb.accessibleSuper} />
-                        {pb.propertyEquity > 0 && (
-                          <DLine label={`Investment ${propertyCount > 1 ? "properties" : "property"} (net equity)`} value={pb.propertyEquity} />
-                        )}
+                        {pb.propertyParts.map((part) => (
+                          <DLine key={part.index} label={`${propLabel(part)} (net equity)`} value={part.equity} />
+                        ))}
                         <div className="border-t border-line pt-1">
                           <DLine label="= Assessable assets" value={pb.assessableAssets} strong />
                         </div>
@@ -276,7 +285,7 @@ export default function IncomeYearModal({
                       <div className="space-y-1">
                         <div className="mb-0.5 text-[11px] uppercase tracking-wide text-muted">What&apos;s counted</div>
                         <DLine label={`Deemed on ${cur(pb.financialAssets)} savings + super`} value={pb.deemedIncome} />
-                        {pb.otherIncome > 0 && <DLine label="+ Investment property rent (actual)" value={pb.otherIncome} />}
+                        {pb.otherIncome > 0 && <DLine label={rentLabel} value={pb.otherIncome} />}
                         {pb.otherIncome > 0 && (
                           <div className="border-t border-line pt-1">
                             <DLine label="= Assessable income" value={incomeTotal} strong />

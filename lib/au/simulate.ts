@@ -234,6 +234,7 @@ export function simulate(
     let propertyEquity = 0; // combined assessable net equity (assets test)
     let propertyProceeds = 0; // combined net sale proceeds released this year
     let propertyCgt = 0; // combined CGT paid on sales this year
+    const propertyParts: { name?: string; index: number; equity: number }[] = [];
     properties.forEach((prop, pi) => {
       if (sold[pi]) return;
       const value = propertyValueAt(prop, t);
@@ -244,8 +245,10 @@ export function simulate(
         outside += proceeds;
         sold[pi] = true;
       } else {
+        const eq = netEquity(prop, value);
         rentCash += netRentCash(prop, value);
-        propertyEquity += netEquity(prop, value);
+        propertyEquity += eq;
+        propertyParts.push({ name: prop.name, index: pi, equity: eq });
       }
     });
     // Income test assesses net rental income at the household level, so gains and
@@ -275,6 +278,7 @@ export function simulate(
         outsideAssets: outside,
         accessibleSuper,
         propertyEquity,
+        propertyParts,
         assessableAssets: financialAssets + propertyEquity,
         financialAssets,
         deemedIncome: deemedIncome(financialAssets, plan.household, config),

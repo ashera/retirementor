@@ -196,7 +196,8 @@ export interface PensionBreakdown {
   // Assessable assets, itemised (the family home is excluded entirely).
   outsideAssets: number; // savings/investments outside super
   accessibleSuper: number; // super counted in the assets test
-  propertyEquity: number; // investment-property net equity (0 if none)
+  propertyEquity: number; // combined investment-property net equity (0 if none)
+  propertyParts: { name?: string; index: number; equity: number }[]; // per-property net equity (held this year)
   assessableAssets: number; // sum of the three above
   financialAssets: number; // outsideAssets + accessibleSuper (the deemed base)
   // Assessable income, itemised.
