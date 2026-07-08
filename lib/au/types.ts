@@ -114,11 +114,25 @@ export interface RetirementPlan {
   fees?: SuperFees; // optional per-plan fee override (else the config default applies)
   budget?: RetirementBudget; // optional guided budget that produced targetSpending
   mortgage?: MortgageDetail; // optional home loan carried into retirement
-  investmentProperty?: PropertyDetail; // optional income-producing property
+  investmentProperties?: PropertyDetail[]; // income-producing properties (source of truth)
+  investmentProperty?: PropertyDetail; // DEPRECATED legacy single property — read via getInvestmentProperties()
   // Which optional sections the user has explicitly answered in the wizard (incl.
   // "none"), so plan-completeness can reach 100% honestly and the dashboard ring
   // matches the wizard. Not used by the engine.
   answered?: { contributions?: boolean; outside?: boolean; property?: boolean };
+}
+
+/** All investment properties on a plan, tolerating the legacy single-property
+ *  field. An explicit `investmentProperties` (even empty) wins; otherwise the
+ *  deprecated `investmentProperty` is treated as a one-element list. */
+export function getInvestmentProperties(plan: RetirementPlan): PropertyDetail[] {
+  if (plan.investmentProperties) return plan.investmentProperties;
+  return plan.investmentProperty ? [plan.investmentProperty] : [];
+}
+
+/** Whether the plan has at least one investment property. */
+export function hasInvestmentProperty(plan: RetirementPlan): boolean {
+  return getInvestmentProperties(plan).length > 0;
 }
 
 /** Household spending for a given age, honouring the flat/staged mode. */

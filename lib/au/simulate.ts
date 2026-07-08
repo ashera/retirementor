@@ -13,11 +13,10 @@
 
 import { minDrawdownRate, type EngineConfig } from "./config";
 import { agePension, deemedIncome } from "./agePension";
-import { spendingForAge, startingSuperBalances } from "./types";
+import { getInvestmentProperties, spendingForAge, startingSuperBalances } from "./types";
 import { mortgageActiveAtAge, mortgageAnnualCost } from "./mortgage";
 import {
   capitalGainsTax,
-  incomeTestRent,
   netEquity,
   netRentCash,
   netSaleProceeds,
@@ -76,10 +75,10 @@ export function simulate(
   const mortgage = plan.mortgage;
   let mortgageCleared = false;
 
-  // An investment property. `propertySold` flips true once a "sell at age" event
-  // has released its net proceeds into the outside-super pool.
-  const property = plan.investmentProperty;
-  let propertySold = false;
+  // Investment properties. `sold[i]` flips true once that property's "sell at age"
+  // event has released its net proceeds into the outside-super pool.
+  const properties = getInvestmentProperties(plan);
+  const sold = properties.map(() => false);
 
   for (let t = 0; t <= horizon; t++) {
     const ages = plan.people.map((p) => p.currentAge + t);
@@ -231,24 +230,28 @@ export function simulate(
     // Investment property: real capital growth, actual net rent (income test) and
     // net equity (assets test — assessed, NOT deemed). An optional sale releases
     // its proceeds (after CGT + loan) into the deemed outside-super pool.
-    let rentCash = 0; // net cash rent this year (negative if geared)
-    let rentAssessable = 0; // actual net rent for the income test (floored at 0)
-    let propertyEquity = 0;
-    let propertyProceeds = 0;
-    let propertyCgt = 0;
-    if (property && !propertySold) {
-      const value = propertyValueAt(property, t);
-      if (property.strategy === "sell" && oldest >= property.sellAtAge) {
-        propertyProceeds = netSaleProceeds(property, value);
-        propertyCgt = capitalGainsTax(property, value);
-        outside += propertyProceeds;
-        propertySold = true;
+    let rentCash = 0; // net cash rent this year across held properties (negative if geared)
+    let propertyEquity = 0; // combined assessable net equity (assets test)
+    let propertyProceeds = 0; // combined net sale proceeds released this year
+    let propertyCgt = 0; // combined CGT paid on sales this year
+    properties.forEach((prop, pi) => {
+      if (sold[pi]) return;
+      const value = propertyValueAt(prop, t);
+      if (prop.strategy === "sell" && oldest >= prop.sellAtAge) {
+        const proceeds = netSaleProceeds(prop, value);
+        propertyProceeds += proceeds;
+        propertyCgt += capitalGainsTax(prop, value);
+        outside += proceeds;
+        sold[pi] = true;
       } else {
-        rentCash = netRentCash(property, value);
-        rentAssessable = incomeTestRent(property, value);
-        propertyEquity = netEquity(property, value);
+        rentCash += netRentCash(prop, value);
+        propertyEquity += netEquity(prop, value);
       }
-    }
+    });
+    // Income test assesses net rental income at the household level, so gains and
+    // losses across properties offset before flooring at $0 (identical to the old
+    // per-property flooring when there's a single property).
+    const rentAssessable = Math.max(0, rentCash);
 
     // Age Pension (household level, from pension age). Financial assets are deemed;
     // an investment property's equity is assessable but NOT deemed, and its rent is

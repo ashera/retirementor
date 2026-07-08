@@ -2,7 +2,7 @@
 
 import { fmtCurrency } from "@/lib/au/format";
 import { minDrawdownRate, type EngineConfig } from "@/lib/au/config";
-import type { RetirementPlan, YearRow } from "@/lib/au/types";
+import { getInvestmentProperties, type RetirementPlan, type YearRow } from "@/lib/au/types";
 
 const cur = (n: number) => fmtCurrency(Math.round(n));
 
@@ -71,6 +71,7 @@ export default function IncomeYearModal({
   const couple = plan.people.length > 1;
   const oldestCurrentAge = Math.max(...plan.people.map((pp) => pp.currentAge));
   const yearsElapsed = row.age - oldestCurrentAge;
+  const propertyCount = getInvestmentProperties(plan).length;
 
   // Why is the Age Pension this amount? Use the engine's actual means-test working
   // for this year (persisted on the row), so the modal matches the figure exactly.
@@ -248,7 +249,9 @@ export default function IncomeYearModal({
                         <div className="mb-0.5 text-[11px] uppercase tracking-wide text-muted">What&apos;s counted</div>
                         <DLine label="Savings outside super" value={pb.outsideAssets} />
                         <DLine label="Super" value={pb.accessibleSuper} />
-                        {pb.propertyEquity > 0 && <DLine label="Investment property (net equity)" value={pb.propertyEquity} />}
+                        {pb.propertyEquity > 0 && (
+                          <DLine label={`Investment ${propertyCount > 1 ? "properties" : "property"} (net equity)`} value={pb.propertyEquity} />
+                        )}
                         <div className="border-t border-line pt-1">
                           <DLine label="= Assessable assets" value={pb.assessableAssets} strong />
                         </div>
@@ -297,7 +300,7 @@ export default function IncomeYearModal({
                     </div>
                     <p className="text-[11px] text-muted">
                       Deeming assumes your financial assets earn a set rate regardless of actual returns.
-                      The family home isn&apos;t counted{plan.investmentProperty ? "; an investment property's equity is (but its rent is assessed as actual income, not deemed)" : ""}.
+                      The family home isn&apos;t counted{propertyCount > 0 ? "; an investment property's equity is (but its rent is assessed as actual income, not deemed)" : ""}.
                     </p>
                   </div>
                 </section>

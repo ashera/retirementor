@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { EngineConfig } from "@/lib/au/config";
-import type { RetirementPlan, SimResult } from "@/lib/au/types";
+import { getInvestmentProperties, type RetirementPlan, type SimResult } from "@/lib/au/types";
 import type { MonteCarloResult } from "@/lib/au/montecarlo";
 import { retirementGoal } from "@/lib/au/goal";
 import { fmtCurrency } from "@/lib/au/format";
@@ -104,7 +104,7 @@ export default function ReportView({
   const wageInfl = plan.inflation + (config.livingStandardsGrowthPct ?? 0);
   const people = plan.people;
   const mtg = plan.mortgage;
-  const prop = plan.investmentProperty;
+  const props = getInvestmentProperties(plan);
 
   const staged = plan.spendingMode === "stages";
   const stg = plan.spendingStages;
@@ -175,12 +175,12 @@ export default function ReportView({
       value: `${mtg.type === "interest_only" ? "Interest-only" : "P&I"} ${money(mtg.balance)} @ ${mtg.interestRate}% (${mtg.strategy.replace(/_/g, " ")})`,
     });
   }
-  if (prop) {
+  props.forEach((pr, i) => {
     inputs.push({
-      label: "Investment property",
-      value: `${money(prop.value)} value, ${money(prop.loanBalance)} loan, ${prop.grossYield}% yield (${prop.strategy})`,
+      label: props.length > 1 ? `Investment property ${i + 1}` : "Investment property",
+      value: `${money(pr.value)} value, ${money(pr.loanBalance)} loan, ${pr.grossYield}% yield (${pr.strategy})`,
     });
-  }
+  });
 
   return (
     <div className="min-h-screen bg-slate-100 py-8 print:bg-white print:py-0">

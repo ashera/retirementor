@@ -87,3 +87,30 @@ describe("Investment property", () => {
     expect(capitalGainsTax(prop(), 500_000)).toBeCloseTo(incomeTax(100_000), 5);
   });
 });
+
+describe("Multiple investment properties", () => {
+  it("sums net rent and net equity across held properties", () => {
+    const one = rowAt(simulate(base({ people: super0, investmentProperties: [prop()] }), cfg), 67);
+    const two = rowAt(simulate(base({ people: super0, investmentProperties: [prop(), prop()] }), cfg), 67);
+    expect(two.rentIncome).toBeCloseTo(one.rentIncome * 2, 0);
+    expect(two.propertyEquity).toBe(one.propertyEquity * 2);
+  });
+
+  it("tracks each property's sale independently", () => {
+    const people = [{ currentAge: 67, superBalance: 800_000, salary: 0, voluntaryConcessional: 0, voluntaryNonConcessional: 0 }];
+    const r = simulate(base({ people, investmentProperties: [prop({ strategy: "sell", sellAtAge: 70 }), prop({ strategy: "hold" })] }), cfg);
+    const oneHeld = simulate(base({ people, investmentProperties: [prop({ strategy: "hold" })] }), cfg);
+    // Before the sale both are held → twice a single held property's equity.
+    expect(rowAt(r, 69).propertyEquity).toBeCloseTo(rowAt(oneHeld, 69).propertyEquity * 2, -2);
+    // After the sale only the survivor remains → exactly one held property.
+    expect(rowAt(r, 71).propertyEquity).toBeCloseTo(rowAt(oneHeld, 71).propertyEquity, -2);
+    expect(rowAt(r, 71).rentIncome).toBeGreaterThan(0); // the held one still earns rent
+  });
+
+  it("treats a legacy single investmentProperty the same as a one-element array", () => {
+    const legacy = simulate(base({ people: super0, investmentProperty: prop() }), cfg);
+    const array = simulate(base({ people: super0, investmentProperties: [prop()] }), cfg);
+    expect(rowAt(array, 67).propertyEquity).toBe(rowAt(legacy, 67).propertyEquity);
+    expect(pensionAt(array, 67)).toBeCloseTo(pensionAt(legacy, 67), 5);
+  });
+});

@@ -4,15 +4,16 @@ import { useState, type ReactNode } from "react";
 import Field from "@/components/Field";
 import CompletenessRing from "@/components/CompletenessRing";
 import BudgetBuilder from "@/components/BudgetBuilder";
-import InlineExplainer from "@/components/InlineExplainer";
+import PropertyCard from "@/components/PropertyCard";
 import { simulate } from "@/lib/au/simulate";
 import type { EngineConfig } from "@/lib/au/config";
 import { fmtCompact, fmtCurrency } from "@/lib/au/format";
-import { incomeTestRent, netEquity, netRentCash } from "@/lib/au/property";
 import { planCompleteness } from "@/lib/au/completeness";
 import {
   DEFAULT_PARTNER,
   DEFAULT_PLAN,
+  getInvestmentProperties,
+  hasInvestmentProperty,
   type Household,
   type Person,
   type PropertyDetail,
@@ -162,7 +163,7 @@ export default function PlanWizard({
   // Recover the yes/no answer from data + the persisted `answered` flags.
   const [contribMode, setContribMode] = useState<OptMode | undefined>(hasContrib ? "yes" : initial.answered?.contributions ? "no" : undefined);
   const [outsideMode, setOutsideMode] = useState<OptMode | undefined>(hasOutside ? "yes" : initial.answered?.outside ? "no" : undefined);
-  const [propMode, setPropMode] = useState<OptMode | undefined>(initial.investmentProperty ? "yes" : initial.answered?.property ? "no" : undefined);
+  const [propMode, setPropMode] = useState<OptMode | undefined>(hasInvestmentProperty(initial) ? "yes" : initial.answered?.property ? "no" : undefined);
 
   const patch = (p: Partial<RetirementPlan>) =>
     setDraft((prev) => ({ ...prev, ...p }));
@@ -392,20 +393,31 @@ export default function PlanWizard({
     ),
   };
 
-  const p = draft.investmentProperty;
-  const setProperty = (patchP: Partial<PropertyDetail>) =>
-    setDraft((prev) =>
-      prev.investmentProperty
-        ? { ...prev, investmentProperty: { ...prev.investmentProperty, ...patchP } }
-        : prev,
-    );
-  const toggleProperty = (on: boolean) =>
-    setDraft((prev) => ({
-      ...prev,
-      investmentProperty: on
-        ? (prev.investmentProperty ?? { ...DEFAULT_PROPERTY, sellAtAge: prev.retirementAge + 8 })
-        : undefined,
-    }));
+  const properties = getInvestmentProperties(draft);
+  const newProperty = (retirementAge: number): PropertyDetail => ({
+    ...DEFAULT_PROPERTY,
+    sellAtAge: retirementAge + 8,
+  });
+  // Write to investmentProperties (the array source of truth) and clear the
+  // legacy single field so the two never disagree.
+  const writeProperties = (arr: PropertyDetail[]) =>
+    setDraft((prev) => ({ ...prev, investmentProperties: arr, investmentProperty: undefined }));
+  const setPropertyAt = (i: number, patchP: Partial<PropertyDetail>) => {
+    const arr = getInvestmentProperties(draft).slice();
+    arr[i] = { ...arr[i], ...patchP };
+    writeProperties(arr);
+  };
+  const addProperty = () =>
+    writeProperties([...getInvestmentProperties(draft), newProperty(draft.retirementAge)]);
+  const removePropertyAt = (i: number) => {
+    const arr = getInvestmentProperties(draft).slice();
+    arr.splice(i, 1);
+    writeProperties(arr);
+  };
+  const toggleProperty = (on: boolean) => {
+    const existing = getInvestmentProperties(draft);
+    writeProperties(on ? (existing.length ? existing : [newProperty(draft.retirementAge)]) : []);
+  };
 
   const propertyStep = {
     key: "property",
@@ -428,152 +440,30 @@ export default function PlanWizard({
           }}
         />
 
-        {p && (
-          <div className="space-y-5">
-            <Field
-              label="Current market value"
-              value={p.value}
-              onChange={(v) => setProperty({ value: v })}
-              min={0}
-              max={5_000_000}
-              step={10_000}
-              prefix="$"
-            />
-            <Field
-              label="Loan secured against it"
-              value={p.loanBalance}
-              onChange={(v) => setProperty({ loanBalance: v })}
-              min={0}
-              max={5_000_000}
-              step={5_000}
-              prefix="$"
-              hint="Only a loan against THIS property reduces its assessed value (interest-only)."
-            />
-            <Field
-              label="Loan interest rate"
-              value={p.loanRate}
-              onChange={(v) => setProperty({ loanRate: v })}
-              min={0}
-              max={12}
-              step={0.1}
-              suffix="%"
-            />
-            <Field
-              label="Gross rental yield"
-              value={p.grossYield}
-              onChange={(v) => setProperty({ grossYield: v })}
-              min={0}
-              max={12}
-              step={0.1}
-              suffix="%"
-              hint={`about ${fmtCurrency(Math.round((p.value * p.grossYield) / 100))}/yr gross rent`}
-            />
-            <Field
-              label="Running costs & vacancy"
-              value={p.costRatio}
-              onChange={(v) => setProperty({ costRatio: v })}
-              min={0}
-              max={60}
-              step={1}
-              suffix="% of rent"
-            />
-            <Field
-              label="Capital growth (real, after inflation)"
-              value={p.growthReal}
-              onChange={(v) => setProperty({ growthReal: v })}
-              min={-2}
-              max={6}
-              step={0.5}
-              suffix="% p.a."
-            />
-            <Field
-              label="What you paid (cost base for CGT)"
-              value={p.purchasePrice}
-              onChange={(v) => setProperty({ purchasePrice: v })}
-              min={0}
-              max={5_000_000}
-              step={10_000}
-              prefix="$"
-            />
-
-            <div>
-              <div className="mb-2 text-sm font-semibold text-slate-200">
-                In retirement, will you…
-              </div>
-              <Segmented
-                value={p.strategy}
-                options={[
-                  { value: "hold", label: "Hold for income" },
-                  { value: "sell", label: "Sell it" },
-                ]}
-                onChange={(v) => setProperty({ strategy: v as PropertyDetail["strategy"] })}
+        {properties.length > 0 && (
+          <div className="space-y-4">
+            {properties.map((pp, i) => (
+              <PropertyCard
+                key={i}
+                index={i}
+                total={properties.length}
+                property={pp}
+                retirementAge={draft.retirementAge}
+                lifeExpectancy={draft.lifeExpectancy}
+                onChange={(patchP) => setPropertyAt(i, patchP)}
+                onRemove={() => removePropertyAt(i)}
               />
-            </div>
-            {p.strategy === "sell" && (
-              <Field
-                label="Sell at age"
-                value={p.sellAtAge}
-                onChange={(v) => setProperty({ sellAtAge: v })}
-                min={draft.retirementAge}
-                max={draft.lifeExpectancy}
-                step={1}
-                suffix="yrs"
-                hint="Triggers CGT (50% discount); net proceeds move into your outside-super savings."
-              />
-            )}
-
-            <div className="rounded-xl border border-line bg-panel-2 px-4 py-3 text-xs text-muted">
-              <InlineExplainer
-                label="Net rent (after costs & interest)"
-                value={`${fmtCurrency(Math.round(netRentCash(p, p.value)))}/yr`}
-                valueClassName={netRentCash(p, p.value) < 0 ? "text-amber-400" : "text-accent"}
-              >
-                <div className="space-y-1">
-                  <div className="flex justify-between gap-4">
-                    <span>Gross rent ({p.grossYield}% of {fmtCurrency(p.value)})</span>
-                    <span className="tabular-nums">
-                      {fmtCurrency(Math.round((p.value * p.grossYield) / 100))}
-                    </span>
-                  </div>
-                  <div className="flex justify-between gap-4">
-                    <span>− Running costs &amp; vacancy ({p.costRatio}% of rent)</span>
-                    <span className="tabular-nums">
-                      −{fmtCurrency(Math.round((p.value * p.grossYield * p.costRatio) / 10000))}
-                    </span>
-                  </div>
-                  <div className="flex justify-between gap-4">
-                    <span>− Loan interest ({p.loanRate}% of {fmtCurrency(p.loanBalance)})</span>
-                    <span className="tabular-nums">
-                      −{fmtCurrency(Math.round((p.loanBalance * p.loanRate) / 100))}
-                    </span>
-                  </div>
-                  <div className="flex justify-between gap-4 border-t border-line pt-1 font-semibold text-white">
-                    <span>Net rent</span>
-                    <span className="tabular-nums">
-                      {fmtCurrency(Math.round(netRentCash(p, p.value)))}/yr
-                    </span>
-                  </div>
-                </div>
-                <p className="mt-2">
-                  Loan <em>principal</em> isn&apos;t subtracted — it&apos;s not a rental expense.
-                  This net figure is what the Age Pension income test assesses (your actual rent,
-                  not a deemed rate).
-                </p>
-              </InlineExplainer>
-              <div className="mt-1 flex justify-between">
-                <span>Assessable net equity</span>
-                <span className="font-semibold tabular-nums text-slate-200">
-                  {fmtCurrency(netEquity(p, p.value))}
-                </span>
-              </div>
-              <p className="mt-2">
-                Counts as {fmtCurrency(Math.round(incomeTestRent(p, p.value)))}/yr of income
-                (actual rent, not deemed) and {fmtCurrency(netEquity(p, p.value))} of assessable
-                assets.
-              </p>
-            </div>
+            ))}
+            <button
+              type="button"
+              onClick={addProperty}
+              className="w-full rounded-xl border border-dashed border-line py-2.5 text-sm font-medium text-muted transition hover:border-accent/50 hover:text-white"
+            >
+              + Add another property
+            </button>
           </div>
         )}
+
       </div>
     ),
   };

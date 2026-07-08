@@ -47,6 +47,7 @@ import CompletenessRing from "@/components/CompletenessRing";
 import WithdrawalRateCard from "@/components/WithdrawalRateCard";
 import {
   DEFAULT_PLAN,
+  hasInvestmentProperty,
   spendingRange,
   type RetirementPlan,
 } from "@/lib/au/types";
@@ -836,7 +837,7 @@ export default function PlannerApp({
             <LegendDot color="#a78bfa" label="Age Pension" />
             <LegendDot color="#34d399" label="Super" />
             <LegendDot color="#38bdf8" label="Outside super" />
-            {plan.investmentProperty && <LegendDot color="#fb923c" label="Net rent" />}
+            {hasInvestmentProperty(plan) && <LegendDot color="#fb923c" label="Net rent" />}
           </div>
         </div>
         <IncomeChart result={result} onSelectYear={setIncomeAge} />

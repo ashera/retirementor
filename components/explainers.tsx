@@ -5,7 +5,7 @@ import InlineExplainer from "@/components/InlineExplainer";
 import type { EngineConfig } from "@/lib/au/config";
 import type { MonteCarloResult } from "@/lib/au/montecarlo";
 import { fmtCurrency, fmtPercent } from "@/lib/au/format";
-import { spendingRange, totalStartingSuper } from "@/lib/au/types";
+import { hasInvestmentProperty, spendingRange, totalStartingSuper } from "@/lib/au/types";
 import { retirementGoal } from "@/lib/au/goal";
 import type { RetirementPlan, SimResult, YearRow } from "@/lib/au/types";
 
@@ -730,7 +730,7 @@ export function AgePensionExplainer({
               <strong>Income test</strong> — your financial assets are
               &lsquo;deemed&rsquo; to earn income at set rates; more deemed
               income means less pension.
-              {plan.investmentProperty && (
+              {hasInvestmentProperty(plan) && (
                 <>
                   {" "}
                   Rent from an investment property is counted as your{" "}
@@ -758,7 +758,7 @@ export function AgePensionExplainer({
           <p className="mb-2">
             Your super (once you&apos;re drawing it) and your savings outside
             super are counted — your home is excluded
-            {plan.investmentProperty
+            {hasInvestmentProperty(plan)
               ? ", but an investment property's net equity is not"
               : ""}
             . These fall as you spend, so you can cross the cut-off partway

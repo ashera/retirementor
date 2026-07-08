@@ -4,6 +4,7 @@
 // has data OR the user has explicitly answered it (incl. "none", via
 // plan.answered). Keeping this in one place means the wizard and dashboard agree.
 
+import { hasInvestmentProperty } from "./types";
 import type { RetirementPlan } from "./types";
 
 export interface CompSection {
@@ -40,7 +41,7 @@ export function planCompleteness(plan: RetirementPlan): PlanCompleteness {
     ...(isCouple ? [{ key: "partner", label: "your partner", core: true, optional: false, complete: !!p1 && (p1.superBalance > 0 || p1.salary > 0) }] : []),
     { key: "contributions", label: "extra contributions", core: false, optional: true, complete: hasContrib || !!a.contributions },
     { key: "outside", label: "outside savings", core: false, optional: true, complete: hasOutside || !!a.outside },
-    { key: "property", label: "a property", core: false, optional: true, complete: !!plan.investmentProperty || !!a.property },
+    { key: "property", label: "a property", core: false, optional: true, complete: hasInvestmentProperty(plan) || !!a.property },
     { key: "goal", label: "retirement goal", core: true, optional: false, complete: goalSet },
   ];
 
