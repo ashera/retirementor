@@ -153,6 +153,26 @@ export default function YearDetailModal({
             </div>
           </div>
 
+          {/* Home equity freed this year (downsize / sell-up-and-rent) */}
+          {b.homeProceeds > 0 && (
+            <div className="rounded-xl border border-accent/30 bg-accent/5 px-4 py-3">
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="text-sm font-medium text-slate-200">
+                  {plan.home?.sellAndRent ? "Sold your home & renting" : "Downsized your home"} — equity freed
+                </span>
+                <span className="font-bold tabular-nums text-accent">+{fmtCurrency(Math.round(b.homeProceeds))}</span>
+              </div>
+              <p className="mt-1 text-[11px] leading-snug text-muted">
+                {b.homeProceedsToSuper > 0
+                  ? `${fmtCurrency(Math.round(b.homeProceeds - b.homeProceedsToSuper))} into your savings and ${fmtCurrency(Math.round(b.homeProceedsToSuper))} into super (downsizer) — which is why your balance steps up this year.`
+                  : "Into your savings (outside super) — which is why your balance steps up this year."}
+                {plan.home?.sellAndRent
+                  ? " You're now a renter: higher Age Pension asset thresholds, with rent included in your living costs."
+                  : " Your home stays exempt from the Age Pension."}
+              </p>
+            </div>
+          )}
+
           {/* Money in */}
           <Section title="Money in — income & how it was earned">
             <Line

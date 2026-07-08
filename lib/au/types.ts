@@ -259,6 +259,10 @@ export interface YearBreakdown {
   // Investment property sale
   propertyProceeds: number; // net proceeds added to outside super
   propertyCgt: number; // CGT paid on the sale
+  // Home equity freed this year (downsize / sell-up-and-rent). Lands in the
+  // opening balance, so it explains a step-up rather than a mid-year inflow.
+  homeProceeds: number; // total equity freed (0 normally)
+  homeProceedsToSuper: number; // portion contributed to super as a downsizer (rest → savings)
 }
 
 export interface YearRow {

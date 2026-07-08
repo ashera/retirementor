@@ -123,18 +123,23 @@ export function simulate(
     // Home downsize: free up equity once the oldest reaches the chosen age. The
     // downsizer portion lands in the primary's super (assessable once accessible),
     // the rest in outside savings (deemed). The home itself stays exempt.
+    let homeProceedsThisYear = 0;
+    let homeToSuperThisYear = 0;
     if (downsize && !downsized && oldest >= downsize.atAge) {
       const toSuper = Math.max(0, Math.min(downsize.toSuper, downsize.release));
       const toOutside = Math.max(0, downsize.release - toSuper);
       if (balances.length) balances[0] += toSuper;
       outside += toOutside;
       downsized = true;
+      homeProceedsThisYear = downsize.release;
+      homeToSuperThisYear = toSuper;
     }
     // Sell up and rent: release all equity into savings (a mortgage is repaid
     // from proceeds, so `release` is net of it). Renter status/rent apply below.
     if (sellRent && !soldHome && oldest >= sellRent.atAge) {
       outside += Math.max(0, sellRent.release);
       soldHome = true;
+      homeProceedsThisYear = sellRent.release;
     }
     const isHomeowner = plan.homeowner && !(sellRent != null && oldest >= sellRent.atAge);
 
@@ -209,6 +214,8 @@ export function simulate(
           mortgageCleared: 0,
           propertyProceeds: 0,
           propertyCgt: 0,
+          homeProceeds: 0,
+          homeProceedsToSuper: 0,
         }),
       );
       continue;
@@ -415,6 +422,8 @@ export function simulate(
         mortgageCleared: mortgageClearedNow,
         propertyProceeds,
         propertyCgt,
+        homeProceeds: homeProceedsThisYear,
+        homeProceedsToSuper: homeToSuperThisYear,
       }),
     );
   }
