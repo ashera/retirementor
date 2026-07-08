@@ -27,6 +27,12 @@ export interface StrategyParam {
   default: number;
   prefix?: string;
   suffix?: string;
+  // Optional upper bound derived from the card's other live param values (e.g.
+  // the downsizer contribution can't exceed the equity actually freed, which
+  // depends on the chosen new-home value and downsize age). The effective slider
+  // max is min(max, dynamicMax(values)); returns Infinity to impose no extra cap.
+  dynamicMax?: (values: Record<string, number>) => number;
+  hint?: string;
 }
 
 export interface StrategyCard {
@@ -84,6 +90,16 @@ export function buildStrategyCatalog(plan: RetirementPlan): StrategyCard[] {
     const loan = plan.mortgage?.balance ?? 0;
     const people = plan.people.length;
     const superCap = 300_000 * people; // downsizer contribution cap ($300k/person)
+    const oldestNow = Math.max(...plan.people.map((pp) => pp.currentAge));
+    const homeGrowth = (plan.home?.growthReal ?? 2) / 100;
+    // Equity freed by a downsize to `newValue` at `age`: the home appreciates in
+    // real terms until then, net of the new home and any loan. The downsizer
+    // contribution can't exceed this — so it bounds the "into super" slider.
+    const freedEquity = (v: Record<string, number>) => {
+      const yrs = Math.max(0, (v.age ?? oldestNow) - oldestNow);
+      const grown = homeVal * Math.pow(1 + homeGrowth, yrs);
+      return Math.max(0, grown - (v.newValue ?? homeVal) - loan);
+    };
     cards.push({
       id: "downsize",
       group: "home",
@@ -117,6 +133,8 @@ export function buildStrategyCatalog(plan: RetirementPlan): StrategyCard[] {
           step: 10_000,
           default: 0,
           prefix: "$",
+          // Can't put more into super than the downsize actually frees.
+          dynamicMax: freedEquity,
         },
       ],
       apply: (p, v) => ({

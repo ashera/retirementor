@@ -546,19 +546,30 @@ function StrategyCardRow({
         <div className="mt-3 space-y-3 border-t border-line pt-3">
           {card.blurb && <p className="text-xs text-muted">{card.blurb}</p>}
           <ImpactBreakdown delta={delta} life={life} />
-          {card.params.map((pm) => (
-            <Field
-              key={pm.key}
-              label={pm.label}
-              value={values[pm.key]}
-              onChange={(v) => onParam(pm.key, v)}
-              min={pm.min}
-              max={pm.max}
-              step={pm.step}
-              prefix={pm.prefix}
-              suffix={pm.suffix}
-            />
-          ))}
+          {card.params.map((pm) => {
+            // A param can cap itself against the card's other live values (e.g.
+            // the downsizer contribution can't exceed the equity actually freed).
+            const cap = pm.dynamicMax ? pm.dynamicMax(values) : Infinity;
+            const effMax = Math.min(pm.max, cap);
+            const hint =
+              pm.dynamicMax != null
+                ? `Downsizing frees about ${fmtCurrency(Math.max(0, cap))} — the rest goes to savings.`
+                : pm.hint;
+            return (
+              <Field
+                key={pm.key}
+                label={pm.label}
+                value={Math.min(values[pm.key], effMax)}
+                onChange={(v) => onParam(pm.key, v)}
+                min={pm.min}
+                max={effMax}
+                step={pm.step}
+                prefix={pm.prefix}
+                suffix={pm.suffix}
+                hint={hint}
+              />
+            );
+          })}
         </div>
       )}
     </div>
