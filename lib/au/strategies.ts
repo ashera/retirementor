@@ -252,6 +252,29 @@ export function buildStrategyCatalog(plan: RetirementPlan): StrategyCard[] {
     });
   }
 
+  // --- Work ---
+  if (oldest < 75) {
+    cards.push({
+      id: "part-time-work",
+      group: "work",
+      label: "Work part-time in early retirement",
+      blurb: "Earn some income in your first retirement years — it offsets what you draw down. Assessable under the Age Pension income test, but the Work Bonus exempts the first $7,800/yr each.",
+      params: [
+        { key: "perYear", label: "Earn per year", min: 0, max: 60_000, step: 1_000, default: 20_000, prefix: "$", suffix: "/yr" },
+        {
+          key: "untilAge",
+          label: "Until age",
+          min: plan.retirementAge + 1,
+          max: Math.min(80, plan.lifeExpectancy),
+          step: 1,
+          default: Math.min(plan.lifeExpectancy, plan.retirementAge + 5),
+          suffix: "yrs",
+        },
+      ],
+      apply: (p, v) => ({ ...p, workIncome: { perYear: v.perYear, untilAge: v.untilAge } }),
+    });
+  }
+
   if (working && plan.people[0]?.salary > 0) {
     cards.push({
       id: "salary-sacrifice",

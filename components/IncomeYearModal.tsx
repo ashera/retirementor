@@ -77,8 +77,9 @@ export default function IncomeYearModal({
   // "Investment property"), matching the wizard's naming.
   const propLabel = (part: { name?: string; index: number }) =>
     part.name?.trim() || (propertyCount > 1 ? `Property ${part.index + 1}` : "Investment property");
-  const rentLabel =
-    propertyCount === 1
+  const rentLabel = plan.workIncome
+    ? "+ Rent & part-time work (assessable)"
+    : propertyCount === 1
       ? `+ ${propsList[0].name?.trim() || "Investment property"} rent (actual)`
       : "+ Combined property rent (actual)";
 

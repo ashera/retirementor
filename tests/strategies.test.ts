@@ -135,6 +135,31 @@ describe("What-If strategies", () => {
     expect(rows.find((r) => r.age === 71)!.breakdown.mortgageCost).toBe(0);
   });
 
+  it("part-time work offsets drawdown and preserves super early in retirement", () => {
+    const b = base({ people: [{ currentAge: 65, superBalance: 300_000, salary: 0, voluntaryConcessional: 0, voluntaryNonConcessional: 0 }], retirementAge: 65 });
+    const card = cardById(b, "part-time-work");
+    const plan = card.apply(b, resolveValues(card, { perYear: 25_000, untilAge: 70 }));
+    expect(plan.workIncome).toEqual({ perYear: 25_000, untilAge: 70 });
+    // Earning while retired means drawing less, so super holds up better at 69
+    // and the money lasts at least as long.
+    const withWork = simulate(plan, cfg);
+    const noWork = simulate(b, cfg);
+    const superAt = (r: ReturnType<typeof simulate>, age: number) => r.rows.find((x) => x.age === age)!.totalSuper;
+    expect(superAt(withWork, 69)).toBeGreaterThan(superAt(noWork, 69));
+    const score = (r: ReturnType<typeof simulate>) => (r.lastsToLifeExpectancy ? 999 : r.depletedAge ?? 0);
+    expect(score(withWork)).toBeGreaterThanOrEqual(score(noWork));
+  });
+
+  it("work income stops at the chosen age", () => {
+    const b = base({ people: [{ currentAge: 65, superBalance: 300_000, salary: 0, voluntaryConcessional: 0, voluntaryNonConcessional: 0 }], retirementAge: 65 });
+    const card = cardById(b, "part-time-work");
+    const plan = card.apply(b, resolveValues(card, { perYear: 30_000, untilAge: 68 }));
+    const rows = simulate(plan, cfg);
+    const superAt = (age: number) => rows.rows.find((x) => x.age === age)!.totalSuper;
+    // While working (to 68) super is preserved; once it stops, drawdown resumes.
+    expect(superAt(67) - superAt(68)).toBeLessThan(superAt(69) - superAt(70));
+  });
+
   it("composes multiple strategies onto the baseline", () => {
     const b = base({ mortgage: { type: "principal_interest", balance: 150_000, interestRate: 6, annualRepayment: 18_000, payoffAge: 72, strategy: "carry" } });
     const cat = buildStrategyCatalog(b);

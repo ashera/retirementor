@@ -286,6 +286,14 @@ export function simulate(
     // per-property flooring when there's a single property).
     const rentAssessable = Math.max(0, rentCash);
 
+    // Part-time work in early retirement: offsets what must be drawn down, and is
+    // assessable under the income test net of the Work Bonus ($300/fortnight, i.e.
+    // $7,800/yr per person). Treated as net income (no income tax modelled on it).
+    const work = plan.workIncome;
+    const workIncome = work && oldest < work.untilAge ? Math.max(0, work.perYear) : 0;
+    const assessableWork = Math.max(0, workIncome - 7_800 * plan.people.length);
+    const assessableOther = rentAssessable + assessableWork;
+
     // Age Pension (household level, from pension age). Financial assets are deemed;
     // an investment property's equity is assessable but NOT deemed, and its rent is
     // counted as actual income — so these two are no longer the same figure.
@@ -299,7 +307,7 @@ export function simulate(
           homeowner: isHomeowner,
           assessableAssets: financialAssets + propertyEquity,
           financialAssets,
-          otherIncome: rentAssessable,
+          otherIncome: assessableOther,
         },
         config,
       );
@@ -312,7 +320,7 @@ export function simulate(
         assessableAssets: financialAssets + propertyEquity,
         financialAssets,
         deemedIncome: deemedIncome(financialAssets, plan.household, config),
-        otherIncome: rentAssessable,
+        otherIncome: assessableOther,
         assetsTestAnnual: ap.assetsTestAnnual,
         incomeTestAnnual: ap.incomeTestAnnual,
         bindingTest: ap.bindingTest,
@@ -324,7 +332,7 @@ export function simulate(
 
     // Rent offsets the spending the household must fund from super/outside; any
     // surplus income (pension + rent beyond spending) is saved to outside super.
-    const externalIncome = agePensionAmt + rentCash;
+    const externalIncome = agePensionAmt + rentCash + workIncome;
     const privateNeed = Math.max(0, spending - externalIncome);
     if (externalIncome > spending) outside += externalIncome - spending;
 

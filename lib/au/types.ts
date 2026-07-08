@@ -134,6 +134,7 @@ export interface RetirementPlan {
   budget?: RetirementBudget; // optional guided budget that produced targetSpending
   mortgage?: MortgageDetail; // optional home loan carried into retirement
   home?: HomeDetail; // the principal home as an asset (exempt; net-worth context only)
+  workIncome?: { perYear: number; untilAge: number }; // part-time work in early retirement (offsets drawdown; income-test assessable net of the Work Bonus)
   investmentProperties?: PropertyDetail[]; // income-producing properties (source of truth)
   investmentProperty?: PropertyDetail; // DEPRECATED legacy single property — read via getInvestmentProperties()
   // Which optional sections the user has explicitly answered in the wizard (incl.
