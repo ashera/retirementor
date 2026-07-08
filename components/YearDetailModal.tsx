@@ -82,12 +82,15 @@ export default function YearDetailModal({
   // Split what funded spending: external income, then super and outside savings.
   // A minimum-drawdown surplus is drawn from super but reinvested outside, so the
   // super figure here is only the part that actually funded spending.
-  const external = b.agePension + Math.max(0, b.rentIncome) + row.workIncome;
+  const external = b.agePension + b.rentIncome + row.workIncome;
   const privateNeed = Math.max(0, spending - external);
   const drawnFromSuper = Math.max(0, Math.min(row.superDrawn, privateNeed));
   const drawnFromOutside = Math.max(0, row.outsideDrawn);
   const superSurplus = Math.max(0, row.superDrawn - drawnFromSuper);
   const shortfall = Math.max(0, spending - external - drawnFromSuper - drawnFromOutside);
+  // Income beyond spending is kept in outside super (so the pool never rises
+  // unexplained). Same for a minimum-drawdown surplus (noted in the funding line).
+  const savedFromIncome = Math.max(0, external - spending);
 
   const fundingParts: string[] = [];
   if (b.agePension > 0) fundingParts.push(`Age Pension ${fmtCurrency(Math.round(b.agePension))}`);
@@ -161,6 +164,15 @@ export default function YearDetailModal({
             </div>
           </div>
 
+          {/* What the outside-super pool is (shown when there's a balance) */}
+          {!isWorking && (b.openingOutside > 1_000 || b.closingOutside > 1_000) && (
+            <p className="text-[11px] leading-snug text-muted">
+              <span className="text-sky-400">Outside super</span> is savings you can draw anytime — no
+              preservation age or minimum drawdown — so it bridges the years before super unlocks and
+              tops up when super&apos;s minimum falls short. It&apos;s counted (deemed) by the Age Pension.
+            </p>
+          )}
+
           {/* Home equity freed this year (downsize / sell-up-and-rent) */}
           {b.homeProceeds > 0 && (
             <div className="rounded-xl border border-accent/30 bg-accent/5 px-4 py-3">
@@ -224,6 +236,14 @@ export default function YearDetailModal({
                 label="Property sale (net proceeds)"
                 sub={`after clearing the loan and ${fmtCurrency(b.propertyCgt)} capital gains tax`}
                 value={money(b.propertyProceeds)}
+                tone="text-emerald-400"
+              />
+            )}
+            {savedFromIncome > 1 && (
+              <Line
+                label="Income saved to savings"
+                sub="income beyond your spending, kept in outside super"
+                value={money(savedFromIncome)}
                 tone="text-emerald-400"
               />
             )}
