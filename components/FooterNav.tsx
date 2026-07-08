@@ -25,6 +25,7 @@ export default function FooterNav() {
         <>
           <Link href="/" className="hover:text-white">Planner</Link>
           <Link href="/compare" className="hover:text-white">Compare scenarios</Link>
+          <Link href="/what-if" className="hover:text-white">What if…</Link>
         </>
       )}
       <Link href="/about" className="hover:text-white">About</Link>

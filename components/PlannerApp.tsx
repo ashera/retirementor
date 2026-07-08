@@ -620,12 +620,19 @@ export default function PlannerApp({
               </div>
             )}
         </div>
-        <div className="mt-3 border-t border-line pt-3">
+        <div className="mt-3 flex flex-wrap gap-2 border-t border-line pt-3">
           <Link
             href="/compare"
             className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-panel-2 px-3 py-1.5 text-sm font-medium text-slate-200 transition hover:border-accent/50 hover:text-white"
           >
-            ⚖ Compare scenarios &amp; what-ifs
+            ⚖ Compare scenarios
+            <span aria-hidden>→</span>
+          </Link>
+          <Link
+            href="/what-if"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-panel-2 px-3 py-1.5 text-sm font-medium text-slate-200 transition hover:border-accent/50 hover:text-white"
+          >
+            🎛 What if…
             <span aria-hidden>→</span>
           </Link>
         </div>
