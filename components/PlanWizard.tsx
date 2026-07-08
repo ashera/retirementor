@@ -164,6 +164,9 @@ export default function PlanWizard({
   const [contribMode, setContribMode] = useState<OptMode | undefined>(hasContrib ? "yes" : initial.answered?.contributions ? "no" : undefined);
   const [outsideMode, setOutsideMode] = useState<OptMode | undefined>(hasOutside ? "yes" : initial.answered?.outside ? "no" : undefined);
   const [propMode, setPropMode] = useState<OptMode | undefined>(hasInvestmentProperty(initial) ? "yes" : initial.answered?.property ? "no" : undefined);
+  // Accordion: which property card is expanded (the one being edited / just
+  // added); the rest collapse to a summary row. A lone property is always open.
+  const [openProp, setOpenProp] = useState<number | null>(0);
 
   const patch = (p: Partial<RetirementPlan>) =>
     setDraft((prev) => ({ ...prev, ...p }));
@@ -407,8 +410,11 @@ export default function PlanWizard({
     arr[i] = { ...arr[i], ...patchP };
     writeProperties(arr);
   };
-  const addProperty = () =>
-    writeProperties([...getInvestmentProperties(draft), newProperty(draft.retirementAge)]);
+  const addProperty = () => {
+    const arr = [...getInvestmentProperties(draft), newProperty(draft.retirementAge)];
+    setOpenProp(arr.length - 1); // expand the one just added
+    writeProperties(arr);
+  };
   const removePropertyAt = (i: number) => {
     const arr = getInvestmentProperties(draft).slice();
     arr.splice(i, 1);
@@ -450,6 +456,8 @@ export default function PlanWizard({
                 property={pp}
                 retirementAge={draft.retirementAge}
                 lifeExpectancy={draft.lifeExpectancy}
+                expanded={properties.length === 1 || i === openProp}
+                onToggle={() => setOpenProp((prev) => (prev === i ? null : i))}
                 onChange={(patchP) => setPropertyAt(i, patchP)}
                 onRemove={() => removePropertyAt(i)}
               />

@@ -16,6 +16,8 @@ export default function PropertyCard({
   property: p,
   retirementAge,
   lifeExpectancy,
+  expanded,
+  onToggle,
   onChange,
   onRemove,
 }: {
@@ -24,6 +26,8 @@ export default function PropertyCard({
   property: PropertyDetail;
   retirementAge: number;
   lifeExpectancy: number;
+  expanded: boolean;
+  onToggle: () => void;
   onChange: (patch: Partial<PropertyDetail>) => void;
   onRemove: () => void;
 }) {
@@ -33,23 +37,34 @@ export default function PropertyCard({
   return (
     <div className="space-y-4 rounded-2xl border border-line bg-panel-2 p-4">
       <div className="flex items-center justify-between gap-3">
-        <div className="text-sm font-semibold text-white">
-          {total > 1 ? `Property ${index + 1}` : "Your property"}
-          <span className="ml-2 text-xs font-normal text-muted">
-            {fmtCurrency(p.value)} · {fmtCurrency(Math.round(netRent))}/yr net
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-expanded={expanded}
+          className="flex min-w-0 flex-1 items-center gap-2 text-left"
+        >
+          <span className="text-muted transition">{expanded ? "▾" : "▸"}</span>
+          <span className="min-w-0 truncate text-sm font-semibold text-white">
+            {total > 1 ? `Property ${index + 1}` : "Your property"}
+            <span className="ml-2 text-xs font-normal text-muted">
+              {fmtCurrency(p.value)} · {fmtCurrency(Math.round(netRent))}/yr net ·{" "}
+              {p.strategy === "hold" ? "Hold" : `Sell at ${p.sellAtAge}`}
+            </span>
           </span>
-        </div>
+        </button>
         {total > 1 && (
           <button
             type="button"
             onClick={onRemove}
-            className="text-xs font-medium text-red-400/80 transition hover:text-red-400"
+            className="shrink-0 text-xs font-medium text-red-400/80 transition hover:text-red-400"
           >
             Remove
           </button>
         )}
       </div>
 
+      {expanded && (
+        <>
       {/* Essentials */}
       <Field label="Current market value" value={p.value} onChange={(v) => onChange({ value: v })} min={0} max={5_000_000} step={10_000} prefix="$" />
       <Field
@@ -161,6 +176,8 @@ export default function PropertyCard({
           not deemed) and {fmtCurrency(netEquity(p, p.value))} of assessable assets.
         </p>
       </div>
+        </>
+      )}
     </div>
   );
 }
