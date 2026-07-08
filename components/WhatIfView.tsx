@@ -181,6 +181,7 @@ export default function WhatIfView({
   const composedWorking = Math.max(...composed.people.map((pp) => pp.currentAge)) < composed.retirementAge;
   const incomeLegend = [
     ...(composedWorking ? [{ c: "#facc15", l: "Salary" }] : []),
+    ...(composed.workIncome ? [{ c: "#f472b6", l: "Part-time work" }] : []),
     { c: "#a78bfa", l: "Age Pension" },
     { c: "#34d399", l: "Super" },
     { c: "#38bdf8", l: "Outside super" },

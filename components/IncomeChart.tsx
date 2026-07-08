@@ -24,13 +24,19 @@ function IncomeTooltip({
   const r = payload[0].payload;
   const rent = Math.max(0, r.rentIncome ?? 0);
   const salary = Math.max(0, r.salaryIncome ?? 0);
-  const total = salary + r.agePension + r.superDrawn + r.outsideDrawn + rent;
+  const work = Math.max(0, r.workIncome ?? 0);
+  const total = salary + work + r.agePension + r.superDrawn + r.outsideDrawn + rent;
   return (
     <div className="rounded-lg border border-line bg-panel px-3 py-2 text-sm shadow-xl">
       <div className="font-semibold text-white">Age {r.age}</div>
       {salary > 0 && (
         <div className="tabular-nums text-yellow-400">
           Salary {fmtCurrency(salary)}
+        </div>
+      )}
+      {work > 0 && (
+        <div className="tabular-nums text-pink-400">
+          Part-time work {fmtCurrency(work)}
         </div>
       )}
       {r.agePension > 0 && (
@@ -130,6 +136,16 @@ export default function IncomeChart({
           fill="#facc15"
           fillOpacity={0.35}
           name="Salary"
+          isAnimationActive={animate}
+        />
+        <Area
+          type="stepAfter"
+          dataKey={(r: YearRow) => Math.max(0, r.workIncome ?? 0)}
+          stackId="1"
+          stroke="#f472b6"
+          fill="#f472b6"
+          fillOpacity={0.35}
+          name="Part-time work"
           isAnimationActive={animate}
         />
         <Area

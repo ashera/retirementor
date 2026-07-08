@@ -239,6 +239,7 @@ export interface YearBreakdown {
   contribNet: number; // net amount added to super (concessional net + non-concessional)
   savings: number; // added to outside-super this year
   salaryIncome: number; // gross household salary this year (accumulation only; 0 in retirement)
+  workIncome: number; // net part-time work income this year (retirement only; after tax)
   // Investment growth (super growth is net of accumulation earnings tax AND the
   // % investment/admin fee; the fixed $ fees + insurance are the `fees` line)
   superGrowth: number;
@@ -268,6 +269,7 @@ export interface YearRow {
   agePension: number; // Age Pension received this year
   pension: PensionBreakdown | null; // means-test working behind agePension (null before pension age)
   salaryIncome: number; // gross household salary this year (0 once retired)
+  workIncome: number; // net part-time work income this year (0 outside the work years)
   superDrawn: number; // drawn from super this year
   outsideDrawn: number; // drawn from outside-super this year
   spending: number; // target spending this year (0 while working)

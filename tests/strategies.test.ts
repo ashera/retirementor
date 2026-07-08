@@ -147,6 +147,9 @@ describe("What-If strategies", () => {
     const noWork = simulate(b, cfg);
     const superAt = (r: ReturnType<typeof simulate>, age: number) => r.rows.find((x) => x.age === age)!.totalSuper;
     expect(superAt(withWork, 69)).toBeGreaterThan(superAt(noWork, 69));
+    // The net work income lands on the year rows during the work years, and stops after.
+    expect(withWork.rows.find((x) => x.age === 68)!.workIncome).toBeCloseTo(25_000, -2);
+    expect(withWork.rows.find((x) => x.age === 71)!.workIncome).toBe(0);
     const score = (r: ReturnType<typeof simulate>) => (r.lastsToLifeExpectancy ? 999 : r.depletedAge ?? 0);
     expect(score(withWork)).toBeGreaterThanOrEqual(score(noWork));
   });
