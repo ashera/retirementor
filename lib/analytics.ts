@@ -26,3 +26,25 @@ export function track(event: string, props?: Props) {
   window.plausible?.(event, props ? { props } : undefined);
   window.gtag?.("event", gaEventName(event), props);
 }
+
+// Google Ads conversion event. The conversion action in Google Ads is linked to
+// this event name; firing it (once the AW-… tag is configured) records the
+// conversion. No-op when the Ads tag isn't loaded. `onceKey` de-dupes per browser
+// so an activation conversion (e.g. "built a plan") counts a user only once.
+export function trackConversion(eventName: string, onceKey?: string, params?: Props) {
+  if (typeof window === "undefined") return;
+  if (onceKey) {
+    try {
+      if (localStorage.getItem(onceKey)) return;
+      localStorage.setItem(onceKey, "1");
+    } catch {
+      /* storage blocked — fall through and still fire */
+    }
+  }
+  window.gtag?.("event", eventName, params);
+}
+
+/** Fires the Google Ads conversion when a visitor first builds a plan. */
+export function trackPlanBuiltConversion() {
+  trackConversion("conversion_event_page_view", "rw_conv_plan_built");
+}

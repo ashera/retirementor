@@ -6,9 +6,11 @@ import Script from "next/script";
 //     to the domain you registered in Plausible (e.g. retirewiz.com.au).
 //     Self-hosting? Point NEXT_PUBLIC_PLAUSIBLE_HOST at your instance.
 //   - GA4: set NEXT_PUBLIC_GA_ID=G-XXXXXXXXXX  (note: sets cookies — you'll want a consent banner)
+//   - Google Ads: set NEXT_PUBLIC_GOOGLE_ADS_ID=AW-XXXXXXXXXX (conversion tracking; shares gtag.js with GA4)
 const PLAUSIBLE_DOMAIN = process.env.NEXT_PUBLIC_PLAUSIBLE_DOMAIN;
 const PLAUSIBLE_HOST = (process.env.NEXT_PUBLIC_PLAUSIBLE_HOST ?? "https://plausible.io").replace(/\/$/, "");
 const GA = process.env.NEXT_PUBLIC_GA_ID;
+const ADS = process.env.NEXT_PUBLIC_GOOGLE_ADS_ID;
 
 export default function Analytics() {
   return (
@@ -28,14 +30,16 @@ export default function Analytics() {
           </Script>
         </>
       )}
-      {GA && (
+      {(GA || ADS) && (
         <>
-          <Script src={`https://www.googletagmanager.com/gtag/js?id=${GA}`} strategy="afterInteractive" />
-          <Script id="ga-init" strategy="afterInteractive">
+          {/* One gtag.js load serves both GA4 (G-…) and Google Ads (AW-…). */}
+          <Script src={`https://www.googletagmanager.com/gtag/js?id=${GA || ADS}`} strategy="afterInteractive" />
+          <Script id="gtag-init" strategy="afterInteractive">
             {`window.dataLayer = window.dataLayer || [];
 function gtag(){dataLayer.push(arguments);}
 gtag('js', new Date());
-gtag('config', '${GA}');`}
+${GA ? `gtag('config', '${GA}');` : ""}
+${ADS ? `gtag('config', '${ADS}');` : ""}`}
           </Script>
         </>
       )}

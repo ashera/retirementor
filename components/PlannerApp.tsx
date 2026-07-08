@@ -41,7 +41,7 @@ import {
 import { simulate } from "@/lib/au/simulate";
 import type { EngineConfig } from "@/lib/au/config";
 import { fmtCurrency } from "@/lib/au/format";
-import { track } from "@/lib/analytics";
+import { track, trackPlanBuiltConversion } from "@/lib/analytics";
 import { planCompleteness } from "@/lib/au/completeness";
 import CompletenessRing from "@/components/CompletenessRing";
 import WithdrawalRateCard from "@/components/WithdrawalRateCard";
@@ -284,6 +284,7 @@ export default function PlannerApp({
     if (completed) {
       commit(next);
       setConfigured(true);
+      trackPlanBuiltConversion();
     } else {
       setWizardSeed(next);
       setWizardOpen(true);
@@ -309,6 +310,7 @@ export default function PlannerApp({
     setConfigured(true);
     setWizardOpen(false);
     setWizardSeed(null);
+    trackPlanBuiltConversion();
   };
 
   const handleBudgetApply = (update: Partial<RetirementPlan>) => {
