@@ -40,20 +40,26 @@ function lastsScore(res: SimResult, denom: number, life: number): number {
 const lastsLabel = (res: SimResult, plan: RetirementPlan) =>
   res.lastsToLifeExpectancy ? `to ${plan.lifeExpectancy}+` : `to ${res.depletedAge}`;
 
-/** A single "how much better off" figure that works whether the plan lasts or
- *  runs short: money left at the end, minus any spending it couldn't fund. */
-function planValue(res: SimResult): number {
+// How well off a plan leaves you, split into money left at the end and total
+// spending it couldn't fund. Only unfunded years count toward the shortfall
+// (funded years met their spending, including any work income that isn't a row
+// drawdown). "How much better off" overall = final − shortfall.
+function planParts(res: SimResult): { final: number; shortfall: number } {
   const final = res.rows.length ? res.rows[res.rows.length - 1].total : 0;
   let shortfall = 0;
   for (const r of res.rows) {
-    // In funded years spending was fully met (however — including any work income
-    // that isn't a drawdown on the row), so there's no shortfall. Only unfunded
-    // years (assets exhausted) leave spending unmet.
     if (r.funded) continue;
     const provided = r.agePension + r.superDrawn + r.outsideDrawn + Math.max(0, r.rentIncome);
     shortfall += Math.max(0, r.spending - provided);
   }
-  return final - shortfall;
+  return { final, shortfall };
+}
+
+interface Marginal {
+  years: number;
+  dollars: number; // combined "better off"
+  moneyLeft: number; // change in money left at the end
+  shortfallAvoided: number; // reduction in unfunded spending
 }
 
 /** Compact signed dollar delta, or null when too small to bother showing. */
@@ -139,16 +145,24 @@ export default function WhatIfView({
   // Per-card isolated marginal effect: how much longer the money lasts, and how
   // much better off overall (dollars).
   const marginal = useMemo(() => {
-    if (!baseline || !baseRes) return {} as Record<string, { years: number; dollars: number }>;
+    if (!baseline || !baseRes) return {} as Record<string, Marginal>;
     const denom = annualSpend(baseline);
     const life = baseline.lifeExpectancy;
     const baseScore = lastsScore(baseRes, denom, life);
-    const baseVal = planValue(baseRes);
-    const out: Record<string, { years: number; dollars: number }> = {};
+    const baseParts = planParts(baseRes);
+    const out: Record<string, Marginal> = {};
     for (const card of catalog) {
       const single = card.apply(baseline, resolveValues(card, values[card.id]));
       const res = simulate(single, config);
-      out[card.id] = { years: lastsScore(res, denom, life) - baseScore, dollars: planValue(res) - baseVal };
+      const parts = planParts(res);
+      const moneyLeft = parts.final - baseParts.final;
+      const shortfallAvoided = baseParts.shortfall - parts.shortfall;
+      out[card.id] = {
+        years: lastsScore(res, denom, life) - baseScore,
+        dollars: moneyLeft + shortfallAvoided,
+        moneyLeft,
+        shortfallAvoided,
+      };
     }
     return out;
   }, [baseline, baseRes, catalog, values, config]);
@@ -282,7 +296,8 @@ export default function WhatIfView({
                     key={card.id}
                     card={card}
                     on={active.has(card.id)}
-                    delta={marginal[card.id] ?? { years: 0, dollars: 0 }}
+                    delta={marginal[card.id] ?? { years: 0, dollars: 0, moneyLeft: 0, shortfallAvoided: 0 }}
+                    life={baseline.lifeExpectancy}
                     values={resolveValues(card, values[card.id])}
                     onToggle={() => toggle(card)}
                     onParam={(k, v) => setParam(card.id, k, v)}
@@ -356,6 +371,25 @@ function MetricCard({
   );
 }
 
+function ImpactBreakdown({ delta, life }: { delta: Marginal; life: number }) {
+  const rows = [
+    { label: `Money left at ${life}`, v: delta.moneyLeft },
+    { label: "Spending shortfall avoided", v: delta.shortfallAvoided },
+  ].filter((r) => Math.abs(r.v) >= 2_000);
+  if (!rows.length) return null;
+  return (
+    <div className="rounded-lg border border-line bg-panel px-3 py-2 text-xs">
+      <div className="mb-1 text-[10px] uppercase tracking-wide text-muted">On its own — where the dollars come from</div>
+      {rows.map((r) => (
+        <div key={r.label} className="flex justify-between gap-4 py-0.5">
+          <span className="text-muted">{r.label}</span>
+          <span className={`font-semibold tabular-nums ${r.v > 0 ? "text-accent" : "text-amber-400"}`}>{fmtDelta(r.v)}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function DeltaChip({ years, dollars }: { years: number; dollars: number }) {
   const yAbs = Math.abs(years);
   const yStr = yAbs < 0.05 ? null : `${years > 0 ? "+" : "−"}${yAbs >= 10 ? Math.round(yAbs) : yAbs.toFixed(1)} yrs`;
@@ -378,13 +412,15 @@ function StrategyCardRow({
   card,
   on,
   delta,
+  life,
   values,
   onToggle,
   onParam,
 }: {
   card: StrategyCard;
   on: boolean;
-  delta: { years: number; dollars: number };
+  delta: Marginal;
+  life: number;
   values: Record<string, number>;
   onToggle: () => void;
   onParam: (key: string, v: number) => void;
@@ -410,6 +446,7 @@ function StrategyCardRow({
       {on && (
         <div className="mt-3 space-y-3 border-t border-line pt-3">
           {card.blurb && <p className="text-xs text-muted">{card.blurb}</p>}
+          <ImpactBreakdown delta={delta} life={life} />
           {card.params.map((pm) => (
             <Field
               key={pm.key}
