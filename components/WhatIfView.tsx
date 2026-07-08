@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import type { EngineConfig } from "@/lib/au/config";
 import type { RetirementPlan, SimResult } from "@/lib/au/types";
-import { DEFAULT_PLAN } from "@/lib/au/types";
+import { DEFAULT_PLAN, getInvestmentProperties } from "@/lib/au/types";
 import { simulate } from "@/lib/au/simulate";
 import { runMonteCarlo } from "@/lib/au/montecarlo";
 import { fmtCurrency } from "@/lib/au/format";
@@ -20,6 +20,7 @@ import {
   type StrategyGroup,
 } from "@/lib/au/strategies";
 import CompareChart, { type CompareSeries } from "@/components/CompareChart";
+import IncomeChart from "@/components/IncomeChart";
 import Field from "@/components/Field";
 
 const PLAN_KEY = "au-retirement-plan";
@@ -86,6 +87,7 @@ export default function WhatIfView({
   const [saveName, setSaveName] = useState("");
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [chartView, setChartView] = useState<"balance" | "income">("balance");
 
   useEffect(() => {
     try {
@@ -173,6 +175,16 @@ export default function WhatIfView({
   const series: CompareSeries[] = [
     { id: "baseline", label: "Baseline", color: "#64748b", result: baseRes },
     ...(changed ? [{ id: "composed", label: "With strategies", color: "#34d399", result: compRes }] : []),
+  ];
+
+  // Legend for the income-sources view (only the bands the composed plan uses).
+  const composedWorking = Math.max(...composed.people.map((pp) => pp.currentAge)) < composed.retirementAge;
+  const incomeLegend = [
+    ...(composedWorking ? [{ c: "#facc15", l: "Salary" }] : []),
+    { c: "#a78bfa", l: "Age Pension" },
+    { c: "#34d399", l: "Super" },
+    { c: "#38bdf8", l: "Outside super" },
+    ...(getInvestmentProperties(composed).length ? [{ c: "#fb923c", l: "Net rent" }] : []),
   ];
 
   const toggle = (card: StrategyCard) =>
@@ -267,16 +279,56 @@ export default function WhatIfView({
 
       {/* Chart */}
       <div className="mb-6 rounded-2xl border border-line bg-panel p-6">
-        <h2 className="mb-4 font-semibold text-white">Balance over time (today&apos;s dollars)</h2>
-        <CompareChart series={series} />
-        <div className="mt-3 flex flex-wrap gap-4">
-          {series.map((s) => (
-            <span key={s.id} className="flex items-center gap-1.5 text-xs text-muted">
-              <span className="h-2.5 w-2.5 rounded-full" style={{ background: s.color }} />
-              {s.label}
-            </span>
-          ))}
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <h2 className="font-semibold text-white">
+            {chartView === "balance" ? "Balance over time" : "Income sources"}{" "}
+            <span className="text-sm font-normal text-muted">(today&apos;s dollars)</span>
+          </h2>
+          <div className="flex gap-1 rounded-lg border border-line bg-panel-2 p-1 text-xs">
+            {(["balance", "income"] as const).map((v) => (
+              <button
+                key={v}
+                onClick={() => setChartView(v)}
+                className={`rounded-md px-2.5 py-1 font-medium transition ${
+                  chartView === v ? "bg-accent text-ink" : "text-muted hover:text-white"
+                }`}
+              >
+                {v === "balance" ? "Balance" : "Income"}
+              </button>
+            ))}
+          </div>
         </div>
+
+        {chartView === "balance" ? (
+          <>
+            <CompareChart series={series} />
+            <div className="mt-3 flex flex-wrap gap-4">
+              {series.map((s) => (
+                <span key={s.id} className="flex items-center gap-1.5 text-xs text-muted">
+                  <span className="h-2.5 w-2.5 rounded-full" style={{ background: s.color }} />
+                  {s.label}
+                </span>
+              ))}
+            </div>
+          </>
+        ) : (
+          <>
+            <IncomeChart result={compRes} height={300} animate={false} />
+            <div className="mt-3 flex flex-wrap gap-4">
+              {incomeLegend.map((it) => (
+                <span key={it.l} className="flex items-center gap-1.5 text-xs text-muted">
+                  <span className="h-2.5 w-2.5 rounded-full" style={{ background: it.c }} />
+                  {it.l}
+                </span>
+              ))}
+            </div>
+            <p className="mt-2 text-xs text-muted">
+              {changed
+                ? "Your income mix with the selected strategies."
+                : "Where your income comes from each year — toggle strategies to see it change."}
+            </p>
+          </>
+        )}
       </div>
 
       {/* Strategy board */}
