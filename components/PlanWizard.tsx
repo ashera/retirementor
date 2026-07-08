@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import Field from "@/components/Field";
 import CompletenessRing from "@/components/CompletenessRing";
 import BudgetBuilder from "@/components/BudgetBuilder";
@@ -164,9 +164,14 @@ export default function PlanWizard({
   const [contribMode, setContribMode] = useState<OptMode | undefined>(hasContrib ? "yes" : initial.answered?.contributions ? "no" : undefined);
   const [outsideMode, setOutsideMode] = useState<OptMode | undefined>(hasOutside ? "yes" : initial.answered?.outside ? "no" : undefined);
   const [propMode, setPropMode] = useState<OptMode | undefined>(hasInvestmentProperty(initial) ? "yes" : initial.answered?.property ? "no" : undefined);
-  // Accordion: which property card is expanded (the one being edited / just
-  // added); the rest collapse to a summary row. A lone property is always open.
-  const [openProp, setOpenProp] = useState<number | null>(0);
+  // Accordion: which property card is expanded (index), or null when all are
+  // collapsed to summary rows. Reset to collapsed whenever the step/view changes
+  // so arriving at the Property section always starts collapsed; adding a
+  // property (same step) opens just that one.
+  const [openProp, setOpenProp] = useState<number | null>(null);
+  useEffect(() => {
+    setOpenProp(null);
+  }, [step, view]);
 
   const patch = (p: Partial<RetirementPlan>) =>
     setDraft((prev) => ({ ...prev, ...p }));
@@ -456,7 +461,7 @@ export default function PlanWizard({
                 property={pp}
                 retirementAge={draft.retirementAge}
                 lifeExpectancy={draft.lifeExpectancy}
-                expanded={properties.length === 1 || i === openProp}
+                expanded={i === openProp}
                 onToggle={() => setOpenProp((prev) => (prev === i ? null : i))}
                 onChange={(patchP) => setPropertyAt(i, patchP)}
                 onRemove={() => removePropertyAt(i)}
