@@ -19,7 +19,7 @@ import {
   type StrategyCard,
   type StrategyGroup,
 } from "@/lib/au/strategies";
-import CompareChart, { type CompareSeries } from "@/components/CompareChart";
+import RetirementChart from "@/components/RetirementChart";
 import IncomeChart from "@/components/IncomeChart";
 import YearDetailModal from "@/components/YearDetailModal";
 import IncomeYearModal from "@/components/IncomeYearModal";
@@ -175,10 +175,6 @@ export default function WhatIfView({
   if (!baseline || !baseRes || !compRes || !composed) return <div className="min-h-screen bg-ink" />;
 
   const changed = active.size > 0;
-  const series: CompareSeries[] = [
-    { id: "baseline", label: "Baseline", color: "#64748b", result: baseRes },
-    ...(changed ? [{ id: "composed", label: "With strategies", color: "#34d399", result: compRes }] : []),
-  ];
 
   // Legend for the income-sources view (only the bands the composed plan uses).
   const composedWorking = Math.max(...composed.people.map((pp) => pp.currentAge)) < composed.retirementAge;
@@ -305,12 +301,26 @@ export default function WhatIfView({
 
         {chartView === "balance" ? (
           <>
-            <CompareChart series={series} onSelectYear={setSelectedYear} />
+            <RetirementChart
+              result={compRes}
+              baseline={changed ? baseRes : null}
+              baselineLabel="Baseline"
+              onSelectYear={setSelectedYear}
+              selectedAge={selectedYear}
+              animate={false}
+              height={300}
+              wageInflationPct={composed.inflation + (config.livingStandardsGrowthPct ?? 0)}
+              cpiPct={composed.inflation}
+            />
             <div className="mt-3 flex flex-wrap gap-4">
-              {series.map((s) => (
-                <span key={s.id} className="flex items-center gap-1.5 text-xs text-muted">
-                  <span className="h-2.5 w-2.5 rounded-full" style={{ background: s.color }} />
-                  {s.label}
+              {[
+                { c: "#34d399", l: "Super" },
+                { c: "#38bdf8", l: "Outside super" },
+                ...(changed ? [{ c: "#94a3b8", l: "Baseline" }] : []),
+              ].map((it) => (
+                <span key={it.l} className="flex items-center gap-1.5 text-xs text-muted">
+                  <span className="h-2.5 w-2.5 rounded-full" style={{ background: it.c }} />
+                  {it.l}
                 </span>
               ))}
             </div>
