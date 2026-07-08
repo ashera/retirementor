@@ -66,6 +66,12 @@ export default function IncomeYearModal({
   const spend = row.spending;
   const shortfall = Math.max(0, spend - total);
 
+  // Per-person salary split for a couple's working years (salary is constant in
+  // today's dollars, so each person's figure is their plan salary this year).
+  const couple = plan.people.length > 1;
+  const oldestCurrentAge = Math.max(...plan.people.map((pp) => pp.currentAge));
+  const yearsElapsed = row.age - oldestCurrentAge;
+
   // Why is the Age Pension this amount? Use the engine's actual means-test working
   // for this year (persisted on the row), so the modal matches the figure exactly.
   const pb = row.pension; // null before Age Pension age
@@ -135,9 +141,23 @@ export default function IncomeYearModal({
                   <Row
                     color="#facc15"
                     label="Salary"
-                    sub={plan.people.length > 1 ? "Combined gross salary for the household." : "Your gross salary."}
+                    sub={couple ? "Combined gross salary for the household." : "Your gross salary."}
                     value={row.salaryIncome}
                   />
+                  {couple && (
+                    <div className="space-y-0.5 border-t border-line py-2 pl-[18px]">
+                      {plan.people.map((pp, i) => (
+                        <div key={i} className="flex justify-between gap-4 text-[11px] text-muted">
+                          <span>
+                            {i === 0 ? "You" : "Partner"}
+                            {pp.currentAge + yearsElapsed > 0 && ` (age ${pp.currentAge + yearsElapsed})`}
+                            {pp.salary <= 0 && " — not earning"}
+                          </span>
+                          <span className="tabular-nums text-slate-200">{cur(pp.salary)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </section>
 
