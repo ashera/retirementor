@@ -178,8 +178,13 @@ export interface MinDrawdownPart {
 // and both test results), so the income modal can show exactly how the figure
 // was reached. null before Age Pension age.
 export interface PensionBreakdown {
-  assessableAssets: number; // financial assets + investment-property equity
-  financialAssets: number; // outside super + accessible super (the deemed base)
+  // Assessable assets, itemised (the family home is excluded entirely).
+  outsideAssets: number; // savings/investments outside super
+  accessibleSuper: number; // super counted in the assets test
+  propertyEquity: number; // investment-property net equity (0 if none)
+  assessableAssets: number; // sum of the three above
+  financialAssets: number; // outsideAssets + accessibleSuper (the deemed base)
+  // Assessable income, itemised.
   deemedIncome: number; // income deemed on financialAssets
   otherIncome: number; // assessable rent counted in the income test
   assetsTestAnnual: number; // entitlement under the assets test

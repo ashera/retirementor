@@ -225,7 +225,13 @@ export default function IncomeYearModal({
                         )}
                       </div>
                       <div className="space-y-1">
-                        <DLine label="Assessable assets" value={pb.assessableAssets} />
+                        <div className="mb-0.5 text-[11px] uppercase tracking-wide text-muted">What&apos;s counted</div>
+                        <DLine label="Savings outside super" value={pb.outsideAssets} />
+                        <DLine label="Super" value={pb.accessibleSuper} />
+                        {pb.propertyEquity > 0 && <DLine label="Investment property (net equity)" value={pb.propertyEquity} />}
+                        <div className="border-t border-line pt-1">
+                          <DLine label="= Assessable assets" value={pb.assessableAssets} strong />
+                        </div>
                         <DLine label={`− Free area (${plan.homeowner ? "homeowner" : "non-homeowner"})`} value={freeArea} />
                         <div className="border-t border-line pt-1">
                           <DLine label="= Amount over the free area" value={excessAssets} strong />
@@ -245,8 +251,9 @@ export default function IncomeYearModal({
                         )}
                       </div>
                       <div className="space-y-1">
-                        <DLine label="Deemed income (on financial assets)" value={pb.deemedIncome} />
-                        {pb.otherIncome > 0 && <DLine label="+ Assessable rent" value={pb.otherIncome} />}
+                        <div className="mb-0.5 text-[11px] uppercase tracking-wide text-muted">What&apos;s counted</div>
+                        <DLine label={`Deemed on ${cur(pb.financialAssets)} savings + super`} value={pb.deemedIncome} />
+                        {pb.otherIncome > 0 && <DLine label="+ Investment property rent (actual)" value={pb.otherIncome} />}
                         {pb.otherIncome > 0 && (
                           <div className="border-t border-line pt-1">
                             <DLine label="= Assessable income" value={incomeTotal} strong />

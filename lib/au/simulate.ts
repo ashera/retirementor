@@ -269,6 +269,9 @@ export function simulate(
       );
       agePensionAmt = ap.annual;
       pensionBreakdown = {
+        outsideAssets: outside,
+        accessibleSuper,
+        propertyEquity,
         assessableAssets: financialAssets + propertyEquity,
         financialAssets,
         deemedIncome: deemedIncome(financialAssets, plan.household, config),
