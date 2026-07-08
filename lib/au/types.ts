@@ -82,6 +82,10 @@ export interface MortgageDetail {
 export interface HomeDetail {
   value: number; // current market value (today's dollars)
   growthReal: number; // annual real capital growth, percent
+  // Optional downsize: at `atAge`, free up `release` of equity (staying a
+  // homeowner). `toSuper` of it goes into super as a downsizer contribution
+  // (assessable but tax-advantaged); the rest lands in outside savings (deemed).
+  downsize?: { atAge: number; release: number; toSuper: number };
 }
 
 // An investment property held into retirement. Unlike the home it is assessable

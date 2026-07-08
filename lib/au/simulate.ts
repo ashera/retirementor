@@ -80,6 +80,11 @@ export function simulate(
   const properties = getInvestmentProperties(plan);
   const sold = properties.map(() => false);
 
+  // Optional home downsize: a one-off equity release at an age (home stays
+  // exempt). `downsized` guards it to a single event.
+  const downsize = plan.home?.downsize;
+  let downsized = false;
+
   for (let t = 0; t <= horizon; t++) {
     const ages = plan.people.map((p) => p.currentAge + t);
     const oldest = Math.max(...ages);
@@ -108,6 +113,17 @@ export function simulate(
       const rebase = Math.pow((1 + wageInflation / 100) / (1 + cpi / 100), retireOffset);
       for (let i = 0; i < balances.length; i++) balances[i] *= rebase;
       outside *= rebase;
+    }
+
+    // Home downsize: free up equity once the oldest reaches the chosen age. The
+    // downsizer portion lands in the primary's super (assessable once accessible),
+    // the rest in outside savings (deemed). The home itself stays exempt.
+    if (downsize && !downsized && oldest >= downsize.atAge) {
+      const toSuper = Math.max(0, Math.min(downsize.toSuper, downsize.release));
+      const toOutside = Math.max(0, downsize.release - toSuper);
+      if (balances.length) balances[0] += toSuper;
+      outside += toOutside;
+      downsized = true;
     }
 
     // Balances at the START of this year (on the birthday) — this is what each

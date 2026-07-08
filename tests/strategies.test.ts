@@ -81,6 +81,30 @@ describe("What-If strategies", () => {
     expect(p0.sellAtAge).toBe(75);
   });
 
+  it("downsize frees up equity at the chosen age (split super vs savings)", () => {
+    const b = base({ people: [{ currentAge: 67, superBalance: 200_000, salary: 0, voluntaryConcessional: 0, voluntaryNonConcessional: 0 }], retirementAge: 67, outsideSuper: 50_000 });
+    const card = cardById(b, "downsize");
+    expect(card.exclusive).toBe("home");
+    // Release $400k at 70: $150k into super (downsizer), $250k into savings.
+    const plan = card.apply(b, resolveValues(card, { age: 70, release: 400_000, toSuper: 150_000 }));
+    expect(plan.home?.downsize).toEqual({ atAge: 70, release: 400_000, toSuper: 150_000 });
+
+    const before = simulate(plan, cfg).rows.find((r) => r.age === 69)!;
+    const after = simulate(plan, cfg).rows.find((r) => r.age === 70)!;
+    // Outside jumps by ~$250k and super by ~$150k at the downsize year (before drawdown/growth).
+    expect(after.outside - before.outside).toBeGreaterThan(150_000);
+    expect(after.totalSuper).toBeGreaterThan(before.totalSuper);
+    // More assets → lasts longer than not downsizing.
+    const noDownsize = simulate(b, cfg);
+    const withDownsize = simulate(plan, cfg);
+    const score = (r: ReturnType<typeof simulate>) => (r.lastsToLifeExpectancy ? 999 : r.depletedAge ?? 0);
+    expect(score(withDownsize)).toBeGreaterThanOrEqual(score(noDownsize));
+  });
+
+  it("downsize is hidden for renters", () => {
+    expect(buildStrategyCatalog(base({ homeowner: false })).some((c) => c.id === "downsize")).toBe(false);
+  });
+
   it("composes multiple strategies onto the baseline", () => {
     const b = base({ mortgage: { type: "principal_interest", balance: 150_000, interestRate: 6, annualRepayment: 18_000, payoffAge: 72, strategy: "carry" } });
     const cat = buildStrategyCatalog(b);

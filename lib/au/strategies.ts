@@ -77,6 +77,57 @@ export function buildStrategyCatalog(plan: RetirementPlan): StrategyCard[] {
   const working = oldest < plan.retirementAge;
   const props = getInvestmentProperties(plan);
 
+  // --- Your home ---
+  if (plan.homeowner) {
+    const homeVal = Math.max(300_000, Math.round(plan.home?.value ?? 900_000));
+    const people = plan.people.length;
+    const superCap = 300_000 * people; // downsizer contribution cap ($300k/person)
+    cards.push({
+      id: "downsize",
+      group: "home",
+      exclusive: "home",
+      label: "Downsize your home",
+      blurb: "Sell and buy somewhere cheaper, freeing up equity. Your home stays exempt from the Age Pension; cash you move into savings becomes assessable, while up to $300k per person can go into super as a downsizer contribution.",
+      params: [
+        {
+          key: "age",
+          label: "Downsize at age",
+          min: Math.max(60, plan.retirementAge),
+          max: plan.lifeExpectancy,
+          step: 1,
+          default: Math.min(plan.lifeExpectancy, Math.max(plan.retirementAge, 66)),
+          suffix: "yrs",
+        },
+        {
+          key: "release",
+          label: "Equity you free up",
+          min: 0,
+          max: homeVal,
+          step: 10_000,
+          default: Math.min(400_000, Math.round(homeVal * 0.4)),
+          prefix: "$",
+        },
+        {
+          key: "toSuper",
+          label: "Into super (downsizer)",
+          min: 0,
+          max: superCap,
+          step: 10_000,
+          default: 0,
+          prefix: "$",
+        },
+      ],
+      apply: (p, v) => ({
+        ...p,
+        home: {
+          value: p.home?.value ?? 900_000,
+          growthReal: p.home?.growthReal ?? 2,
+          downsize: { atAge: v.age, release: v.release, toSuper: v.toSuper },
+        },
+      }),
+    });
+  }
+
   // --- Mortgage ---
   if (plan.mortgage && plan.mortgage.strategy !== "clear_at_retirement") {
     cards.push({
