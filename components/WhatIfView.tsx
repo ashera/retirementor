@@ -6,6 +6,7 @@ import type { EngineConfig } from "@/lib/au/config";
 import type { RetirementPlan, SimResult } from "@/lib/au/types";
 import { DEFAULT_PLAN } from "@/lib/au/types";
 import { simulate } from "@/lib/au/simulate";
+import { runMonteCarlo } from "@/lib/au/montecarlo";
 import { fmtCurrency } from "@/lib/au/format";
 import { track } from "@/lib/analytics";
 import type { SavedPlan } from "@/app/actions/plans";
@@ -89,6 +90,28 @@ export default function WhatIfView({
   const baseRes = useMemo(() => (baseline ? simulate(baseline, config) : null), [baseline, config]);
   const compRes = useMemo(() => (composed ? simulate(composed, config) : null), [composed, config]);
 
+  // Monte Carlo success %. A FIXED seed means baseline and composed run against the
+  // same market paths, so the comparison is fair and doesn't jitter as you toggle.
+  const MC = { iterations: 1000, seed: 12345 } as const;
+  const baseMc = useMemo(
+    () => (baseline ? runMonteCarlo(baseline, config, MC).successRate : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [baseline, config],
+  );
+  // MC is heavy, so debounce it: only run on the composed plan once toggling settles.
+  const [compMc, setCompMc] = useState<number | null>(null);
+  const [mcPending, setMcPending] = useState(false);
+  useEffect(() => {
+    if (!composed) return;
+    setMcPending(true);
+    const id = setTimeout(() => {
+      setCompMc(runMonteCarlo(composed, config, MC).successRate);
+      setMcPending(false);
+    }, 350);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [composed, config]);
+
   // Per-card isolated marginal effect on how long the money lasts.
   const marginal = useMemo(() => {
     if (!baseline || !baseRes) return {} as Record<string, number>;
@@ -168,7 +191,7 @@ export default function WhatIfView({
       </header>
 
       {/* Headline metrics */}
-      <div className="mb-6 grid gap-3 sm:grid-cols-2">
+      <div className="mb-6 grid gap-3 sm:grid-cols-3">
         <MetricCard
           label="Money lasts"
           base={lastsLabel(baseRes, baseline)}
@@ -182,6 +205,14 @@ export default function WhatIfView({
           now={changed ? fmtCurrency(compRes.superAtRetirement) : null}
           better={compRes.superAtRetirement > baseRes.superAtRetirement + 500}
           worse={compRes.superAtRetirement < baseRes.superAtRetirement - 500}
+        />
+        <MetricCard
+          label="Likely to last"
+          base={baseMc != null ? `${Math.round(baseMc * 100)}%` : "…"}
+          now={changed && compMc != null ? `${Math.round(compMc * 100)}%` : null}
+          better={changed && compMc != null && baseMc != null && compMc > baseMc + 0.005}
+          worse={changed && compMc != null && baseMc != null && compMc < baseMc - 0.005}
+          pending={changed && mcPending}
         />
       </div>
 
@@ -259,18 +290,23 @@ function MetricCard({
   now,
   better,
   worse,
+  pending,
 }: {
   label: string;
   base: string;
   now: string | null;
   better?: boolean;
   worse?: boolean;
+  pending?: boolean;
 }) {
   const tone = better ? "text-accent" : worse ? "text-amber-400" : "text-white";
   return (
     <div className="rounded-2xl border border-line bg-panel p-4">
-      <div className="text-[11px] font-medium uppercase tracking-wide text-muted">{label}</div>
-      <div className="mt-1 flex items-baseline gap-2">
+      <div className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-muted">
+        {label}
+        {pending && <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent" aria-label="updating" />}
+      </div>
+      <div className={`mt-1 flex items-baseline gap-2 ${pending ? "opacity-60" : ""}`}>
         {now ? (
           <>
             <span className="text-lg text-muted line-through">{base}</span>
