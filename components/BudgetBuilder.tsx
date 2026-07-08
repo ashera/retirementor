@@ -16,6 +16,7 @@ import {
 import { mortgageAnnualCost, suggestPayoffAge } from "@/lib/au/mortgage";
 import type {
   BudgetLifestyle,
+  HomeDetail,
   HomeTenure,
   MortgageDetail,
   RetirementBudget,
@@ -27,6 +28,8 @@ import BudgetCategoryIcon, { CATEGORY_COLOR } from "@/components/BudgetCategoryI
 import TrimSpendingModal from "@/components/TrimSpendingModal";
 import BoostSpendingModal from "@/components/BoostSpendingModal";
 import { boostSpending } from "@/lib/au/goalseek";
+
+const DEFAULT_HOME: HomeDetail = { value: 900_000, growthReal: 2 };
 
 function defaultMortgage(oldestAtRetire: number): MortgageDetail {
   const balance = 180_000;
@@ -54,10 +57,10 @@ const LIFESTYLES: { key: BudgetLifestyle; label: string; blurb: string }[] = [
   { key: "premium", label: "Premium", blurb: "A generous lifestyle with room to spare" },
 ];
 
-// The "loan" step only appears when the user has a mortgage (see stepKeys below).
+// The "home" step only appears when the user owns their home (see stepKeys below).
 const STEP_TITLES: Record<string, string> = {
   setup: "Setup",
-  loan: "Home loan",
+  home: "Your Home",
   budget: "Your budget",
   phases: "Later years",
   goal: "Your goal",
@@ -78,6 +81,7 @@ export default function BudgetBuilder({ plan, config, onApply, onClose }: Budget
   const [mortgage, setMortgage] = useState<MortgageDetail>(
     plan.mortgage ?? defaultMortgage(oldestAtRetire),
   );
+  const [home, setHome] = useState<HomeDetail>(plan.home ?? DEFAULT_HOME);
   const [lifestyle, setLifestyle] = useState<BudgetLifestyle>(
     plan.budget?.lifestyle ?? "comfortable",
   );
@@ -97,14 +101,16 @@ export default function BudgetBuilder({ plan, config, onApply, onClose }: Budget
 
   // The loan the engine should model (undefined unless the user has a mortgage).
   const activeMortgage = tenure === "mortgage" ? mortgage : undefined;
+  // The home asset (undefined for renters). Exempt, so it doesn't affect the sim.
+  const activeHome = homeowner ? home : undefined;
 
   // Build a working plan at a given spend, honouring phases + any mortgage.
   const workingPlan = useMemo(() => {
     const base: RetirementPlan = applyPhases
       ? { ...plan, spendingMode: "stages", spendingStages: stages, targetSpending: total }
       : { ...plan, spendingMode: "flat", targetSpending: total };
-    return { ...base, homeowner, mortgage: activeMortgage };
-  }, [plan, stages, total, applyPhases, homeowner, activeMortgage]);
+    return { ...base, homeowner, mortgage: activeMortgage, home: activeHome };
+  }, [plan, stages, total, applyPhases, homeowner, activeMortgage, activeHome]);
 
   // Live "money lasts" impact of the current budget (+ mortgage).
   const impact = useMemo(() => simulate(workingPlan, config), [workingPlan, config]);
@@ -160,6 +166,9 @@ export default function BudgetBuilder({ plan, config, onApply, onClose }: Budget
   const setMort = (patch: Partial<MortgageDetail>) =>
     setMortgage((prev) => ({ ...prev, ...patch }));
 
+  const setHomeField = (patch: Partial<HomeDetail>) =>
+    setHome((prev) => ({ ...prev, ...patch }));
+
   const toggleOpen = (key: string) =>
     setOpen((prev) => {
       const next = new Set(prev);
@@ -176,17 +185,18 @@ export default function BudgetBuilder({ plan, config, onApply, onClose }: Budget
       homeowner,
       budget,
       mortgage: activeMortgage,
+      home: activeHome,
     });
   };
 
   const essentials = BUDGET_CATEGORY_META.filter((m) => m.essential);
   const discretionaries = BUDGET_CATEGORY_META.filter((m) => !m.essential);
 
-  // A dedicated "Home loan" step is inserted after Setup only when relevant.
-  const stepKeys =
-    tenure === "mortgage"
-      ? ["setup", "loan", "budget", "phases", "goal"]
-      : ["setup", "budget", "phases", "goal"];
+  // A dedicated "Your Home" step is inserted after Setup for homeowners (it holds
+  // the home value and, when there's a mortgage, the loan). Renters skip it.
+  const stepKeys = homeowner
+    ? ["setup", "home", "budget", "phases", "goal"]
+    : ["setup", "budget", "phases", "goal"];
   const safeStep = Math.min(step, stepKeys.length - 1);
   const currentKey = stepKeys[safeStep];
   const isLast = safeStep === stepKeys.length - 1;
@@ -285,13 +295,17 @@ export default function BudgetBuilder({ plan, config, onApply, onClose }: Budget
             />
           )}
 
-          {currentKey === "loan" && (
+          {currentKey === "home" && (
             <div className="space-y-4">
               <p className="text-sm text-muted">
-                This is separate from your ASFA living budget — tell us about the loan and how
-                you&apos;ll handle it once you retire.
+                Your home is <strong className="text-slate-200">exempt</strong> from the Age
+                Pension assets test — we track its value for your net-worth picture only
+                {tenure === "mortgage" ? ", separate from the loan below." : "."}
               </p>
-              <MortgagePanel
+              <HomePanel
+                home={home}
+                setHomeField={setHomeField}
+                tenure={tenure}
                 mortgage={mortgage}
                 setMort={setMort}
                 oldestAtRetire={oldestAtRetire}
@@ -429,7 +443,7 @@ function SetupStep({
       </p>
 
       <div>
-        <div className="mb-2 text-sm font-semibold text-slate-200">Your home</div>
+        <div className="mb-2 text-sm font-semibold text-slate-200">Home ownership</div>
         <Segmented
           value={tenure}
           options={[
@@ -490,13 +504,19 @@ function SetupStep({
 
 // ---------------------------------------------------------------------------
 
-function MortgagePanel({
+function HomePanel({
+  home,
+  setHomeField,
+  tenure,
   mortgage,
   setMort,
   oldestAtRetire,
   lifeExpectancy,
   strategyCompare,
 }: {
+  home: HomeDetail;
+  setHomeField: (patch: Partial<HomeDetail>) => void;
+  tenure: HomeTenure;
   mortgage: MortgageDetail;
   setMort: (patch: Partial<MortgageDetail>) => void;
   oldestAtRetire: number;
@@ -505,6 +525,7 @@ function MortgagePanel({
 }) {
   const isPI = mortgage.type === "principal_interest";
   const cost = mortgageAnnualCost(mortgage);
+  const equity = Math.max(0, home.value - (tenure === "mortgage" ? mortgage.balance : 0));
   const suggested = suggestPayoffAge(
     mortgage.balance,
     mortgage.interestRate,
@@ -513,9 +534,45 @@ function MortgagePanel({
   );
 
   return (
+    <div className="space-y-4">
+      {/* The home as an asset (exempt) */}
+      <div className="space-y-4 rounded-2xl border border-line bg-panel-2 p-4">
+        <div className="flex items-center justify-between gap-3 text-sm font-semibold text-white">
+          <span>🏠 Your home</span>
+          <span className="text-xs font-normal text-muted">
+            {fmtCurrency(home.value)} · {fmtCurrency(equity)} equity
+          </span>
+        </div>
+        <Field
+          label="Current market value"
+          value={home.value}
+          onChange={(v) => setHomeField({ value: v })}
+          min={0}
+          max={10_000_000}
+          step={25_000}
+          prefix="$"
+          hint="Exempt from the Age Pension — for your net-worth picture."
+        />
+        <Field
+          label="Capital growth (real, after inflation)"
+          value={home.growthReal}
+          onChange={(v) => setHomeField({ growthReal: v })}
+          min={-2}
+          max={6}
+          step={0.5}
+          suffix="% p.a."
+        />
+        {tenure === "own" && (
+          <div className="rounded-lg border border-line bg-panel px-3 py-2.5 text-xs text-muted">
+            Owned outright — no loan to carry into retirement.
+          </div>
+        )}
+      </div>
+
+      {tenure !== "mortgage" ? null : (
     <div className="space-y-4 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
       <div className="flex items-center gap-2 text-sm font-semibold text-amber-200">
-        🏠 Your home loan
+        🏦 Your home loan
       </div>
 
       <Segmented
@@ -622,6 +679,8 @@ function MortgagePanel({
           />
         </div>
       </div>
+    </div>
+      )}
     </div>
   );
 }

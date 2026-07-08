@@ -169,6 +169,12 @@ export default function ReportView({
     },
     { label: "Plan until age", value: `${plan.lifeExpectancy}` },
   ];
+  if (plan.home) {
+    inputs.push({
+      label: "Home (exempt)",
+      value: `${money(plan.home.value)} value${mtg ? `, ${money(mtg.balance)} loan` : ", owned outright"}`,
+    });
+  }
   if (mtg) {
     inputs.push({
       label: "Home loan",

@@ -74,6 +74,16 @@ export interface MortgageDetail {
   strategy: MortgageStrategy;
 }
 
+// The principal home (PPOR), modelled as an asset for the household's net-worth
+// picture. Unlike an investment property it is EXEMPT from the Age Pension assets
+// test and produces no assessable income, so its value does not feed the engine
+// (the loan is handled separately via MortgageDetail). Kept as a first-class
+// object so the home can later gain downsizing/equity-release behaviour.
+export interface HomeDetail {
+  value: number; // current market value (today's dollars)
+  growthReal: number; // annual real capital growth, percent
+}
+
 // An investment property held into retirement. Unlike the home it is assessable
 // for the Age Pension (net equity under the assets test; actual net rent under
 // the income test — not deemed). The secured loan is modelled interest-only.
@@ -115,6 +125,7 @@ export interface RetirementPlan {
   fees?: SuperFees; // optional per-plan fee override (else the config default applies)
   budget?: RetirementBudget; // optional guided budget that produced targetSpending
   mortgage?: MortgageDetail; // optional home loan carried into retirement
+  home?: HomeDetail; // the principal home as an asset (exempt; net-worth context only)
   investmentProperties?: PropertyDetail[]; // income-producing properties (source of truth)
   investmentProperty?: PropertyDetail; // DEPRECATED legacy single property — read via getInvestmentProperties()
   // Which optional sections the user has explicitly answered in the wizard (incl.
