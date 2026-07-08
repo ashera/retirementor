@@ -65,7 +65,7 @@ describe("Year breakdown ledger", () => {
       const closingTotal = b.closingSuper + b.closingOutside;
       const growth = b.superGrowth + b.outsideGrowth;
       // Net money pulled from savings to fund spending (negative = surplus saved).
-      const netDrawdown = openingTotal + growth + b.propertyProceeds - b.mortgageCleared - b.fees - closingTotal;
+      const netDrawdown = openingTotal + growth + b.propertyProceeds - b.mortgageCleared - b.fees - b.outsideTax - closingTotal;
       expect(near(b.agePension + b.rentIncome + netDrawdown, row.spending, 2)).toBe(true);
     }
   });

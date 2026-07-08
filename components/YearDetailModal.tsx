@@ -307,13 +307,21 @@ export default function YearDetailModal({
           )}
 
           {/* Tax */}
-          {(b.contribTax > 0 || b.earningsTax > 0 || b.propertyCgt > 0) && (
+          {(b.contribTax > 0 || b.earningsTax > 0 || b.outsideTax > 0 || b.propertyCgt > 0) && (
             <Section title="Tax this year">
               {b.contribTax > 0 && (
                 <Line label="Contributions tax (15% on concessional)" value={fmtCurrency(Math.round(b.contribTax))} />
               )}
               {b.earningsTax > 0 && (
                 <Line label="Super earnings tax (accumulation)" value={fmtCurrency(Math.round(b.earningsTax))} />
+              )}
+              {b.outsideTax > 0 && (
+                <Line
+                  label="Tax on savings earnings (outside super)"
+                  sub="earnings on money held outside super are taxable (SAPTO applied); super pension earnings are tax-free"
+                  value={fmtCurrency(Math.round(b.outsideTax))}
+                  tone="text-amber-400"
+                />
               )}
               {b.propertyCgt > 0 && (
                 <Line label="Capital gains tax (property sale)" value={fmtCurrency(Math.round(b.propertyCgt))} />
@@ -323,7 +331,7 @@ export default function YearDetailModal({
               )}
             </Section>
           )}
-          {!isWorking && b.propertyCgt === 0 && b.contribTax === 0 && b.earningsTax === 0 && (
+          {!isWorking && b.propertyCgt === 0 && b.contribTax === 0 && b.earningsTax === 0 && b.outsideTax === 0 && (
             <p className="text-center text-xs text-muted">
               No tax this year — super drawdowns and the Age Pension are tax-free from age 60.
             </p>

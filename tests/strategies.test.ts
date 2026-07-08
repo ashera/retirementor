@@ -135,6 +135,26 @@ describe("What-If strategies", () => {
     expect(b70.breakdown.mortgageCleared).toBe(0);
   });
 
+  it("routing freed equity into super beats savings — outside earnings are taxed, super's aren't", () => {
+    const b = base({
+      people: [{ currentAge: 66, superBalance: 400_000, salary: 0, voluntaryConcessional: 0, voluntaryNonConcessional: 0 }],
+      retirementAge: 66, outsideSuper: 200_000, targetSpending: 70_000, lifeExpectancy: 92,
+      home: { value: 1_400_000, growthReal: 0 },
+    });
+    const card = cardById(b, "downsize");
+    const run = (toSuper: number) => simulate(card.apply(b, resolveValues(card, { age: 67, newValue: 800_000, toSuper })), cfg).rows;
+    const toSavings = run(0);
+    const toSuper = run(300_000);
+    // A large outside-super balance is taxed on its earnings in retirement...
+    const savingsTax = toSavings.find((r) => r.age === 70)!.breakdown.outsideTax;
+    expect(savingsTax).toBeGreaterThan(1_000);
+    // ...so sheltering the freed equity in (tax-free) super cuts that tax...
+    expect(toSuper.find((r) => r.age === 70)!.breakdown.outsideTax).toBeLessThan(savingsTax);
+    // ...and leaves you better off over the horizon.
+    const end = (rows: typeof toSavings) => rows.find((r) => r.age === 92)!.total;
+    expect(end(toSuper)).toBeGreaterThan(end(toSavings));
+  });
+
   it("the home appreciates, so a later downsize frees more equity", () => {
     const b = base({
       people: [{ currentAge: 65, superBalance: 200_000, salary: 0, voluntaryConcessional: 0, voluntaryNonConcessional: 0 }],

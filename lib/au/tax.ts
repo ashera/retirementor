@@ -33,10 +33,14 @@ export function incomeTax(taxable: number): number {
 // ~$32k before any tax).
 const SAPTO_MAX = { single: 2_230, couple: 1_602 };
 
-/** Approx income tax on a senior/pensioner's employment income (per person):
+/** Approx income tax on a senior/pensioner's assessable income (per person):
  *  ordinary resident tax less the SAPTO offset. Ignores SAPTO's high-income
- *  phase-out — fine for the part-time amounts modelled — and the Medicare levy
- *  (which SAPTO recipients on low incomes generally don't pay). */
-export function seniorEmploymentTax(income: number, household: "single" | "couple"): number {
+ *  phase-out — fine for the modest amounts modelled — and the Medicare levy
+ *  (which SAPTO recipients on low incomes generally don't pay). Used for both
+ *  part-time employment income and outside-super investment earnings. */
+export function seniorIncomeTax(income: number, household: "single" | "couple"): number {
   return Math.max(0, incomeTax(income) - SAPTO_MAX[household]);
 }
+
+/** @deprecated Renamed to {@link seniorIncomeTax} (also covers investment earnings). */
+export const seniorEmploymentTax = seniorIncomeTax;

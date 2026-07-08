@@ -165,7 +165,7 @@ describe(`Stress matrix — ${PLANS.length} plans, universal invariants`, () => 
         const openingTotal = b.openingSuper + b.openingOutside;
         const closingTotal = b.closingSuper + b.closingOutside;
         const growth = b.superGrowth + b.outsideGrowth;
-        const netDrawdown = openingTotal + growth + b.propertyProceeds - b.mortgageCleared - b.fees - closingTotal;
+        const netDrawdown = openingTotal + growth + b.propertyProceeds - b.mortgageCleared - b.fees - b.outsideTax - closingTotal;
         if (!near(b.agePension + b.rentIncome + netDrawdown, row.spending, 2)) {
           fails.push(`${name} @${row.age}: pension ${b.agePension.toFixed(0)} + rent ${b.rentIncome.toFixed(0)} + draw ${netDrawdown.toFixed(0)} ≠ spend ${row.spending.toFixed(0)}`);
         }

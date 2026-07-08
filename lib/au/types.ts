@@ -247,6 +247,7 @@ export interface YearBreakdown {
   outsideGrowth: number;
   fees: number; // fixed admin + insurance $ deducted from super this year
   earningsTax: number; // approx 15% super earnings tax (accumulation only)
+  outsideTax: number; // income tax on outside-super earnings in retirement (super pension earnings are tax-free)
   // Retirement income
   agePension: number;
   pension: PensionBreakdown | null; // means-test working behind agePension (null before pension age)

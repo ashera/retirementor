@@ -15,7 +15,7 @@ import { minDrawdownRate, type EngineConfig } from "./config";
 import { agePension, deemedIncome } from "./agePension";
 import { getInvestmentProperties, spendingForAge, startingSuperBalances } from "./types";
 import { mortgageActiveAtAge, mortgageAnnualCost } from "./mortgage";
-import { seniorEmploymentTax } from "./tax";
+import { seniorIncomeTax } from "./tax";
 import {
   capitalGainsTax,
   netEquity,
@@ -225,6 +225,7 @@ export function simulate(
           outsideGrowth,
           fees: feesPaid,
           earningsTax: Math.max(0, earningsTax),
+          outsideTax: 0,
           agePension: 0,
           pension: null,
           rentIncome: 0,
@@ -326,7 +327,7 @@ export function simulate(
     const work = plan.workIncome;
     const workers = plan.people.length;
     const grossWork = work && oldest < work.untilAge ? Math.max(0, work.perYear) : 0;
-    const workTax = grossWork > 0 ? workers * seniorEmploymentTax(grossWork / workers, plan.household) : 0;
+    const workTax = grossWork > 0 ? workers * seniorIncomeTax(grossWork / workers, plan.household) : 0;
     const netWork = grossWork - workTax;
     const assessableWork = Math.max(0, grossWork - 7_800 * workers);
     const assessableOther = rentAssessable + assessableWork;
@@ -412,6 +413,25 @@ export function simulate(
     const outsideGrowth = outside * realReturn;
     outside *= 1 + realReturn;
 
+    // Super's real edge: pension-phase super earnings are tax-free, but earnings
+    // on money held OUTSIDE super are taxable. In retirement we tax the (nominal)
+    // outside-super earnings at the senior marginal rate, stacked on top of any
+    // part-time work income so the tax-free threshold + SAPTO aren't double-used.
+    // SAPTO shields modest amounts, so this mainly bites larger balances — which
+    // is exactly when a downsizer contribution into super pays off. (Accumulation-
+    // phase outside earnings are left untaxed, as before.)
+    let outsideTax = 0;
+    if (!working) {
+      const outsideEarnings = Math.max(0, outside * (nom / 100)); // nominal, today's $
+      if (outsideEarnings > 0) {
+        const workPer = grossWork / workers;
+        const earnPer = outsideEarnings / workers; // household earnings split per person
+        outsideTax =
+          workers * Math.max(0, seniorIncomeTax(workPer + earnPer, plan.household) - seniorIncomeTax(workPer, plan.household));
+        outside = Math.max(0, outside - outsideTax);
+      }
+    }
+
     const phase: Phase =
       oldest >= pensionAge
         ? "pension"
@@ -435,6 +455,7 @@ export function simulate(
         outsideGrowth,
         fees: feesPaid,
         earningsTax: 0,
+        outsideTax,
         agePension: agePensionAmt,
         pension: pensionBreakdown,
         rentIncome: rentCash,
