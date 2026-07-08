@@ -78,6 +78,7 @@ export interface MortgageDetail {
 // for the Age Pension (net equity under the assets test; actual net rent under
 // the income test — not deemed). The secured loan is modelled interest-only.
 export interface PropertyDetail {
+  name?: string; // optional user label (e.g. "Beach house"); falls back to "Property N"
   value: number; // current market value (today's dollars)
   growthReal: number; // annual real capital growth, percent
   grossYield: number; // gross rent as a percent of value

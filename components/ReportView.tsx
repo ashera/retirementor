@@ -177,7 +177,7 @@ export default function ReportView({
   }
   props.forEach((pr, i) => {
     inputs.push({
-      label: props.length > 1 ? `Investment property ${i + 1}` : "Investment property",
+      label: pr.name?.trim() || (props.length > 1 ? `Investment property ${i + 1}` : "Investment property"),
       value: `${money(pr.value)} value, ${money(pr.loanBalance)} loan, ${pr.grossYield}% yield (${pr.strategy})`,
     });
   });

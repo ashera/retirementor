@@ -32,26 +32,73 @@ export default function PropertyCard({
   onRemove: () => void;
 }) {
   const [advanced, setAdvanced] = useState(false);
+  const [editingName, setEditingName] = useState(false);
+  const [draftName, setDraftName] = useState("");
   const netRent = netRentCash(p, p.value);
+  const fallbackName = total > 1 ? `Property ${index + 1}` : "Your property";
+  const displayName = p.name?.trim() || fallbackName;
+  const summary = `${fmtCurrency(p.value)} · ${fmtCurrency(Math.round(netRent))}/yr net · ${p.strategy === "hold" ? "Hold" : `Sell at ${p.sellAtAge}`}`;
+
+  const startRename = () => {
+    setDraftName(p.name ?? "");
+    setEditingName(true);
+  };
+  const commitName = () => {
+    const next = draftName.trim();
+    onChange({ name: next || undefined });
+    setEditingName(false);
+  };
 
   return (
     <div className="space-y-4 rounded-2xl border border-line bg-panel-2 p-4">
-      <div className="flex items-center justify-between gap-3">
-        <button
-          type="button"
-          onClick={onToggle}
-          aria-expanded={expanded}
-          className="flex min-w-0 flex-1 items-center gap-2 text-left"
-        >
-          <span className="text-muted transition">{expanded ? "▾" : "▸"}</span>
-          <span className="min-w-0 truncate text-sm font-semibold text-white">
-            {total > 1 ? `Property ${index + 1}` : "Your property"}
-            <span className="ml-2 text-xs font-normal text-muted">
-              {fmtCurrency(p.value)} · {fmtCurrency(Math.round(netRent))}/yr net ·{" "}
-              {p.strategy === "hold" ? "Hold" : `Sell at ${p.sellAtAge}`}
-            </span>
-          </span>
-        </button>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <button
+            type="button"
+            onClick={onToggle}
+            aria-expanded={expanded}
+            aria-label={expanded ? "Collapse" : "Expand"}
+            className="shrink-0 text-muted transition hover:text-white"
+          >
+            {expanded ? "▾" : "▸"}
+          </button>
+          {editingName ? (
+            <input
+              autoFocus
+              value={draftName}
+              onChange={(e) => setDraftName(e.target.value)}
+              onBlur={commitName}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") commitName();
+                if (e.key === "Escape") setEditingName(false);
+              }}
+              maxLength={40}
+              placeholder={fallbackName}
+              className="min-w-0 flex-1 rounded-md border border-accent bg-panel px-2 py-1 text-sm font-semibold text-white outline-none"
+            />
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={startRename}
+                title="Click to rename"
+                className="group flex shrink-0 items-center gap-1 text-sm font-semibold text-white"
+              >
+                <span className="max-w-[10rem] truncate">{displayName}</span>
+                <span className="text-xs text-muted opacity-0 transition group-hover:opacity-100" aria-hidden>
+                  ✎
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={onToggle}
+                className="min-w-0 flex-1 truncate text-left text-xs font-normal text-muted"
+              >
+                {summary}
+              </button>
+            </>
+          )}
+        </div>
         {total > 1 && (
           <button
             type="button"
