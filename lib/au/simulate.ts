@@ -91,8 +91,12 @@ export function simulate(
   let soldHome = false;
   // The (exempt) home value tracked for the net-worth view: the current value
   // until a downsize (→ the smaller home) or a sale (→ 0). Homeowners without a
-  // stated value get the same default the downsize lever assumes.
+  // stated value get the same default the downsize lever assumes. It appreciates
+  // at `growthReal` (real, CPI-basis) each year, so the freed equity at a downsize
+  // reflects appreciation and net worth carries across the event.
   const homeBaseValue = plan.homeowner ? (plan.home?.value ?? 900_000) : 0;
+  const homeGrowth = (plan.home?.growthReal ?? 2) / 100;
+  let homeVal = homeBaseValue; // start-of-year (CPI-real) value, grown in the loop
 
   for (let t = 0; t <= horizon; t++) {
     const ages = plan.people.map((p) => p.currentAge + t);
@@ -124,31 +128,41 @@ export function simulate(
       outside *= rebase;
     }
 
+    // The home appreciates in real terms over the prior year (until it is sold).
+    if (t > 0 && homeVal > 0) homeVal *= 1 + homeGrowth;
+
     // Home downsize: free up equity once the oldest reaches the chosen age. The
+    // freed equity is the GROWN home value less the new home and any loan, so a
+    // later downsize frees more and net worth carries across the event. The
     // downsizer portion lands in the primary's super (assessable once accessible),
     // the rest in outside savings (deemed). The home itself stays exempt.
+    const loanBal = mortgage?.balance ?? 0;
     let homeProceedsThisYear = 0;
     let homeToSuperThisYear = 0;
     if (downsize && !downsized && oldest >= downsize.atAge) {
-      const toSuper = Math.max(0, Math.min(downsize.toSuper, downsize.release));
-      const toOutside = Math.max(0, downsize.release - toSuper);
+      const release = Math.max(0, homeVal - downsize.newValue - loanBal);
+      const toSuper = Math.max(0, Math.min(downsize.toSuper, release));
+      const toOutside = Math.max(0, release - toSuper);
       if (balances.length) balances[0] += toSuper;
       outside += toOutside;
       downsized = true;
-      homeProceedsThisYear = downsize.release;
+      homeProceedsThisYear = release;
       homeToSuperThisYear = toSuper;
+      homeVal = downsize.newValue; // the new (smaller) home, which grows from here
       if (mortgage) mortgageCleared = true; // discharged from the sale (freed equity is net of it)
     }
-    // Sell up and rent: release all equity into savings (a mortgage is repaid
-    // from proceeds, so `release` is net of it). Renter status/rent apply below.
+    // Sell up and rent: release all equity into savings (grown value net of any
+    // loan, which is repaid from proceeds). Renter status/rent apply below.
     if (sellRent && !soldHome && oldest >= sellRent.atAge) {
-      outside += Math.max(0, sellRent.release);
+      const release = Math.max(0, homeVal - loanBal);
+      outside += release;
       soldHome = true;
-      homeProceedsThisYear = sellRent.release;
+      homeProceedsThisYear = release;
+      homeVal = 0;
       if (mortgage) mortgageCleared = true; // discharged from the sale
     }
     const isHomeowner = plan.homeowner && !(sellRent != null && oldest >= sellRent.atAge);
-    const homeValueThisYear = soldHome ? 0 : downsized ? (downsize?.newValue ?? homeBaseValue) : homeBaseValue;
+    const homeValueThisYear = homeVal;
 
     // Balances at the START of this year (on the birthday) — this is what each
     // data point plots, so the peak lands on the retirement age, not the year before.

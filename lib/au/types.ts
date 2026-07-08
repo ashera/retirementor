@@ -82,15 +82,15 @@ export interface MortgageDetail {
 export interface HomeDetail {
   value: number; // current market value (today's dollars)
   growthReal: number; // annual real capital growth, percent
-  // Optional downsize: at `atAge`, move to a home worth `newValue`, freeing up
-  // `release` (= current value − newValue − loan). `toSuper` of it goes into super
-  // as a downsizer contribution (assessable but tax-advantaged); the rest lands in
-  // outside savings (deemed). The home stays exempt; `value` stays the ORIGINAL.
-  downsize?: { atAge: number; newValue: number; release: number; toSuper: number };
-  // Optional sell-up-and-rent: at `atAge`, release all `release` equity into
-  // savings, become a NON-homeowner (higher assets-test threshold) and pay
-  // `rentPerYear` from then on. Any mortgage is treated as repaid from proceeds.
-  sellAndRent?: { atAge: number; release: number; rentPerYear: number };
+  // Optional downsize: at `atAge`, move to a home worth `newValue`. The freed
+  // equity (grown current value − newValue − loan) is computed by the engine;
+  // `toSuper` of it goes into super as a downsizer contribution (assessable but
+  // tax-advantaged), the rest into outside savings (deemed). `value` stays ORIGINAL.
+  downsize?: { atAge: number; newValue: number; toSuper: number };
+  // Optional sell-up-and-rent: at `atAge`, release all equity (grown value − loan,
+  // computed by the engine) into savings, become a NON-homeowner (higher assets
+  // threshold) and pay `rentPerYear` from then on. Any mortgage is repaid from it.
+  sellAndRent?: { atAge: number; rentPerYear: number };
 }
 
 // An investment property held into retirement. Unlike the home it is assessable

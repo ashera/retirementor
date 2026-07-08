@@ -83,13 +83,13 @@ describe("What-If strategies", () => {
   });
 
   it("downsize frees up equity at the chosen age (split super vs savings)", () => {
-    const b = base({ people: [{ currentAge: 67, superBalance: 200_000, salary: 0, voluntaryConcessional: 0, voluntaryNonConcessional: 0 }], retirementAge: 67, outsideSuper: 50_000 });
+    const b = base({ people: [{ currentAge: 67, superBalance: 200_000, salary: 0, voluntaryConcessional: 0, voluntaryNonConcessional: 0 }], retirementAge: 67, outsideSuper: 50_000, home: { value: 900_000, growthReal: 0 } });
     const card = cardById(b, "downsize");
     expect(card.exclusive).toBe("home");
-    // From the ~$900k home (no loan) down to a $500k home → frees $400k;
+    // From the $900k home (no loan, no growth) down to a $500k home → frees $400k;
     // $150k into super (downsizer), $250k into savings.
     const plan = card.apply(b, resolveValues(card, { age: 70, newValue: 500_000, toSuper: 150_000 }));
-    expect(plan.home?.downsize).toEqual({ atAge: 70, newValue: 500_000, release: 400_000, toSuper: 150_000 });
+    expect(plan.home?.downsize).toEqual({ atAge: 70, newValue: 500_000, toSuper: 150_000 });
     expect(plan.home?.value).toBe(900_000); // keeps the ORIGINAL value; new value on the event
     // The tracked home value steps from the original to the new value at the downsize.
     const rows = simulate(plan, cfg).rows;
@@ -116,26 +116,51 @@ describe("What-If strategies", () => {
     const b = base({
       people: [{ currentAge: 67, superBalance: 300_000, salary: 0, voluntaryConcessional: 0, voluntaryNonConcessional: 0 }],
       retirementAge: 67,
+      home: { value: 900_000, growthReal: 0 },
       mortgage: { type: "interest_only", balance: 200_000, interestRate: 6, annualRepayment: 0, payoffAge: null, strategy: "carry" },
     });
     const card = cardById(b, "downsize");
-    // ~$900k home, $200k loan → downsize to a $400k home frees $300k (net of loan).
+    // $900k home (no growth), $200k loan → downsize to a $400k home frees $300k (net of loan).
     const plan = card.apply(b, resolveValues(card, { age: 70, newValue: 400_000, toSuper: 0 }));
-    expect(plan.home?.downsize?.release).toBe(300_000);
     const rows = simulate(plan, cfg);
+    // The engine derives the freed equity from the grown value net of the loan:
+    // ~$300k lands in savings (net of drawdown, so a lower bound).
+    const b69 = rows.rows.find((r) => r.age === 69)!;
+    const b70 = rows.rows.find((r) => r.age === 70)!;
+    expect(b70.outside - b69.outside).toBeGreaterThan(250_000);
     // Interest-only loan is an ongoing cost until the downsize, then discharged.
-    expect(rows.rows.find((r) => r.age === 69)!.breakdown.mortgageCost).toBeGreaterThan(0);
+    expect(b69.breakdown.mortgageCost).toBeGreaterThan(0);
     expect(rows.rows.find((r) => r.age === 71)!.breakdown.mortgageCost).toBe(0);
     // Not paid from super (repaid from the sale) — no super lump-sum recorded.
-    expect(rows.rows.find((r) => r.age === 70)!.breakdown.mortgageCleared).toBe(0);
+    expect(b70.breakdown.mortgageCleared).toBe(0);
+  });
+
+  it("the home appreciates, so a later downsize frees more equity", () => {
+    const b = base({
+      people: [{ currentAge: 65, superBalance: 200_000, salary: 0, voluntaryConcessional: 0, voluntaryNonConcessional: 0 }],
+      retirementAge: 65,
+      home: { value: 900_000, growthReal: 3 },
+    });
+    const card = cardById(b, "downsize");
+    const freedAt = (age: number) => {
+      const rows = simulate(card.apply(b, resolveValues(card, { age, newValue: 500_000, toSuper: 0 })), cfg).rows;
+      const before = rows.find((r) => r.age === age - 1)!;
+      const at = rows.find((r) => r.age === age)!;
+      return at.outside - before.outside;
+    };
+    // Home grows at 3% real; the tracked value climbs each year until the downsize.
+    const rows = simulate(card.apply(b, resolveValues(card, { age: 80, newValue: 500_000, toSuper: 0 })), cfg).rows;
+    expect(rows.find((r) => r.age === 70)!.homeValue).toBeGreaterThan(rows.find((r) => r.age === 66)!.homeValue);
+    // And a downsize at 75 frees more than one at 67 (more appreciation banked).
+    expect(freedAt(75)).toBeGreaterThan(freedAt(67));
   });
 
   it("sell-and-rent releases equity, adds rent, and switches to non-homeowner thresholds", () => {
     const b = base({ people: [{ currentAge: 67, superBalance: 150_000, salary: 0, voluntaryConcessional: 0, voluntaryNonConcessional: 0 }], retirementAge: 67, outsideSuper: 20_000, targetSpending: 45_000 });
     const card = cardById(b, "sell-and-rent");
     expect(card.exclusive).toBe("home");
-    const plan = card.apply(b, resolveValues(card, { age: 70, release: 800_000, rent: 30_000 }));
-    expect(plan.home?.sellAndRent).toEqual({ atAge: 70, release: 800_000, rentPerYear: 30_000 });
+    const plan = card.apply(b, resolveValues(card, { age: 70, rent: 30_000 }));
+    expect(plan.home?.sellAndRent).toEqual({ atAge: 70, rentPerYear: 30_000 });
 
     const rows = simulate(plan, cfg).rows;
     const at69 = rows.find((r) => r.age === 69)!;
@@ -153,7 +178,7 @@ describe("What-If strategies", () => {
       mortgage: { type: "interest_only", balance: 200_000, interestRate: 6, annualRepayment: 0, payoffAge: null, strategy: "carry" },
     });
     const card = cardById(b, "sell-and-rent");
-    const plan = card.apply(b, resolveValues(card, { age: 70, release: 600_000, rent: 0 }));
+    const plan = card.apply(b, resolveValues(card, { age: 70, rent: 0 }));
     const rows = simulate(plan, cfg).rows;
     // Before the sale the interest-only loan is an ongoing cost; after, it's gone.
     expect(rows.find((r) => r.age === 69)!.breakdown.mortgageCost).toBeGreaterThan(0);

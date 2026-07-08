@@ -348,7 +348,7 @@ export default function WhatIfView({
             </div>
             <p className="mt-2 text-xs text-muted">
               {chartView === "networth"
-                ? "Your assets incl. the exempt home — watch a downsize reallocate (home shrinks, savings grow). "
+                ? "Your assets incl. the exempt home (appreciating in real terms) — watch a downsize reallocate it (home shrinks, savings grow). "
                 : "Tip: "}
               Click a year to break down that year&apos;s money flow.
             </p>

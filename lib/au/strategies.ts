@@ -119,22 +119,18 @@ export function buildStrategyCatalog(plan: RetirementPlan): StrategyCard[] {
           prefix: "$",
         },
       ],
-      apply: (p, v) => {
-        const currentValue = Math.max(0, p.home?.value ?? 900_000);
-        const ln = p.mortgage?.balance ?? 0;
-        const release = Math.max(0, currentValue - v.newValue - ln);
-        return {
-          ...p,
-          // Keep the ORIGINAL home value; the new (smaller) value lives on the
-          // downsize event, so the engine can track the home from big → small and
-          // net worth carries across, just reallocated.
-          home: {
-            value: currentValue,
-            growthReal: p.home?.growthReal ?? 2,
-            downsize: { atAge: v.age, newValue: v.newValue, release, toSuper: v.toSuper },
-          },
-        };
-      },
+      apply: (p, v) => ({
+        ...p,
+        // Keep the ORIGINAL home value; the new (smaller) value lives on the
+        // downsize event, so the engine can grow the home and track it from big →
+        // small, computing the freed equity from the grown value at the downsize
+        // age so net worth carries across, just reallocated.
+        home: {
+          value: Math.max(0, p.home?.value ?? 900_000),
+          growthReal: p.home?.growthReal ?? 2,
+          downsize: { atAge: v.age, newValue: v.newValue, toSuper: v.toSuper },
+        },
+      }),
     });
 
     cards.push({
@@ -142,7 +138,7 @@ export function buildStrategyCatalog(plan: RetirementPlan): StrategyCard[] {
       group: "home",
       exclusive: "home",
       label: "Sell up and rent",
-      blurb: "Sell the home at the chosen age, freeing up all your equity into savings, then rent. You move to the higher non-homeowner Age Pension asset thresholds, but pay rent for life (and lose the exempt home).",
+      blurb: `Sell your ${fmtCurrency(homeVal)} home at the chosen age, freeing all your equity${loan ? " (net of the mortgage)" : ""} into savings, then rent. You move to the higher non-homeowner Age Pension asset thresholds, but pay rent for life (and lose the exempt home).`,
       params: [
         {
           key: "age",
@@ -153,23 +149,14 @@ export function buildStrategyCatalog(plan: RetirementPlan): StrategyCard[] {
           default: Math.min(plan.lifeExpectancy, Math.max(plan.retirementAge, 70)),
           suffix: "yrs",
         },
-        {
-          key: "release",
-          label: "Equity freed (net of any loan)",
-          min: 0,
-          max: homeVal,
-          step: 10_000,
-          default: Math.max(0, Math.round(homeVal - loan)),
-          prefix: "$",
-        },
         { key: "rent", label: "Rent", min: 0, max: 80_000, step: 1_000, default: 30_000, prefix: "$", suffix: "/yr" },
       ],
       apply: (p, v) => ({
         ...p,
         home: {
-          value: p.home?.value ?? 900_000,
+          value: Math.max(0, p.home?.value ?? 900_000),
           growthReal: p.home?.growthReal ?? 2,
-          sellAndRent: { atAge: v.age, release: v.release, rentPerYear: v.rent },
+          sellAndRent: { atAge: v.age, rentPerYear: v.rent },
         },
       }),
     });
