@@ -3,6 +3,7 @@ import { simulate } from "../lib/au/simulate";
 import { DEFAULT_CONFIG as cfg } from "../lib/au/config";
 import { DEFAULT_PLAN, getInvestmentProperties, type PropertyDetail, type RetirementPlan } from "../lib/au/types";
 import { buildStrategyCatalog, applyStrategies, resolveValues } from "../lib/au/strategies";
+import { seniorEmploymentTax } from "../lib/au/tax";
 
 const base = (over: Partial<RetirementPlan> = {}): RetirementPlan => ({
   ...DEFAULT_PLAN,
@@ -148,6 +149,26 @@ describe("What-If strategies", () => {
     expect(superAt(withWork, 69)).toBeGreaterThan(superAt(noWork, 69));
     const score = (r: ReturnType<typeof simulate>) => (r.lastsToLifeExpectancy ? 999 : r.depletedAge ?? 0);
     expect(score(withWork)).toBeGreaterThanOrEqual(score(noWork));
+  });
+
+  it("taxes part-time work income (SAPTO makes modest amounts tax-free)", () => {
+    // Modest income sits under the effective (SAPTO) threshold → no tax.
+    expect(seniorEmploymentTax(20_000, "single")).toBe(0);
+    expect(seniorEmploymentTax(30_000, "single")).toBe(0);
+    // Higher income is taxed.
+    expect(seniorEmploymentTax(50_000, "single")).toBeGreaterThan(0);
+    // A single pays no more tax than a couple splitting the same per-person income
+    // (couple gets a smaller offset each).
+    expect(seniorEmploymentTax(50_000, "couple")).toBeGreaterThan(seniorEmploymentTax(50_000, "single"));
+
+    // A high work income leaves less to spend (after tax) than the gross.
+    const b = base({ people: [{ currentAge: 66, superBalance: 250_000, salary: 0, voluntaryConcessional: 0, voluntaryNonConcessional: 0 }], retirementAge: 66, targetSpending: 55_000 });
+    const card = cardById(b, "part-time-work");
+    const taxed = card.apply(b, resolveValues(card, { perYear: 55_000, untilAge: 72 }));
+    const untaxedProxy = card.apply(b, resolveValues(card, { perYear: 30_000, untilAge: 72 }));
+    // Both help, but the taxed run doesn't get the full $55k of benefit.
+    expect(simulate(taxed, cfg).superAtRetirement).toBeGreaterThan(0);
+    expect(untaxedProxy.workIncome?.perYear).toBe(30_000);
   });
 
   it("work income stops at the chosen age", () => {

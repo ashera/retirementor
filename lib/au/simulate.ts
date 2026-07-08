@@ -15,6 +15,7 @@ import { minDrawdownRate, type EngineConfig } from "./config";
 import { agePension, deemedIncome } from "./agePension";
 import { getInvestmentProperties, spendingForAge, startingSuperBalances } from "./types";
 import { mortgageActiveAtAge, mortgageAnnualCost } from "./mortgage";
+import { seniorEmploymentTax } from "./tax";
 import {
   capitalGainsTax,
   netEquity,
@@ -286,12 +287,17 @@ export function simulate(
     // per-property flooring when there's a single property).
     const rentAssessable = Math.max(0, rentCash);
 
-    // Part-time work in early retirement: offsets what must be drawn down, and is
-    // assessable under the income test net of the Work Bonus ($300/fortnight, i.e.
-    // $7,800/yr per person). Treated as net income (no income tax modelled on it).
+    // Part-time work in early retirement. Income tax applies (with SAPTO, so
+    // modest amounts are near tax-free): the AFTER-TAX amount offsets drawdown,
+    // while the GROSS amount is assessable under the Age Pension income test, net
+    // of the Work Bonus ($300/fortnight, i.e. $7,800/yr per person). Tax is worked
+    // out per person (split across a couple → two thresholds/offsets).
     const work = plan.workIncome;
-    const workIncome = work && oldest < work.untilAge ? Math.max(0, work.perYear) : 0;
-    const assessableWork = Math.max(0, workIncome - 7_800 * plan.people.length);
+    const workers = plan.people.length;
+    const grossWork = work && oldest < work.untilAge ? Math.max(0, work.perYear) : 0;
+    const workTax = grossWork > 0 ? workers * seniorEmploymentTax(grossWork / workers, plan.household) : 0;
+    const netWork = grossWork - workTax;
+    const assessableWork = Math.max(0, grossWork - 7_800 * workers);
     const assessableOther = rentAssessable + assessableWork;
 
     // Age Pension (household level, from pension age). Financial assets are deemed;
@@ -332,7 +338,7 @@ export function simulate(
 
     // Rent offsets the spending the household must fund from super/outside; any
     // surplus income (pension + rent beyond spending) is saved to outside super.
-    const externalIncome = agePensionAmt + rentCash + workIncome;
+    const externalIncome = agePensionAmt + rentCash + netWork;
     const privateNeed = Math.max(0, spending - externalIncome);
     if (externalIncome > spending) outside += externalIncome - spending;
 

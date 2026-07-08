@@ -27,3 +27,16 @@ export function incomeTax(taxable: number): number {
   }
   return 0; // unreachable — last bracket is Infinity
 }
+
+// Max SAPTO (Seniors & Pensioners Tax Offset), per person. The offset makes
+// modest senior income effectively tax-free (single ~$35k, each of a couple
+// ~$32k before any tax).
+const SAPTO_MAX = { single: 2_230, couple: 1_602 };
+
+/** Approx income tax on a senior/pensioner's employment income (per person):
+ *  ordinary resident tax less the SAPTO offset. Ignores SAPTO's high-income
+ *  phase-out — fine for the part-time amounts modelled — and the Medicare levy
+ *  (which SAPTO recipients on low incomes generally don't pay). */
+export function seniorEmploymentTax(income: number, household: "single" | "couple"): number {
+  return Math.max(0, incomeTax(income) - SAPTO_MAX[household]);
+}

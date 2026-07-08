@@ -40,6 +40,30 @@ function lastsScore(res: SimResult, denom: number, life: number): number {
 const lastsLabel = (res: SimResult, plan: RetirementPlan) =>
   res.lastsToLifeExpectancy ? `to ${plan.lifeExpectancy}+` : `to ${res.depletedAge}`;
 
+/** A single "how much better off" figure that works whether the plan lasts or
+ *  runs short: money left at the end, minus any spending it couldn't fund. */
+function planValue(res: SimResult): number {
+  const final = res.rows.length ? res.rows[res.rows.length - 1].total : 0;
+  let shortfall = 0;
+  for (const r of res.rows) {
+    // In funded years spending was fully met (however — including any work income
+    // that isn't a drawdown on the row), so there's no shortfall. Only unfunded
+    // years (assets exhausted) leave spending unmet.
+    if (r.funded) continue;
+    const provided = r.agePension + r.superDrawn + r.outsideDrawn + Math.max(0, r.rentIncome);
+    shortfall += Math.max(0, r.spending - provided);
+  }
+  return final - shortfall;
+}
+
+/** Compact signed dollar delta, or null when too small to bother showing. */
+function fmtDelta(d: number): string | null {
+  const a = Math.abs(d);
+  if (a < 2_000) return null;
+  const mag = a >= 1_000_000 ? `$${(a / 1_000_000).toFixed(a >= 10_000_000 ? 0 : 1)}m` : `$${Math.round(a / 1_000)}k`;
+  return `${d > 0 ? "+" : "−"}${mag}`;
+}
+
 export default function WhatIfView({
   config,
   savedPlans,
@@ -112,16 +136,19 @@ export default function WhatIfView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [composed, config]);
 
-  // Per-card isolated marginal effect on how long the money lasts.
+  // Per-card isolated marginal effect: how much longer the money lasts, and how
+  // much better off overall (dollars).
   const marginal = useMemo(() => {
-    if (!baseline || !baseRes) return {} as Record<string, number>;
+    if (!baseline || !baseRes) return {} as Record<string, { years: number; dollars: number }>;
     const denom = annualSpend(baseline);
     const life = baseline.lifeExpectancy;
-    const base = lastsScore(baseRes, denom, life);
-    const out: Record<string, number> = {};
+    const baseScore = lastsScore(baseRes, denom, life);
+    const baseVal = planValue(baseRes);
+    const out: Record<string, { years: number; dollars: number }> = {};
     for (const card of catalog) {
       const single = card.apply(baseline, resolveValues(card, values[card.id]));
-      out[card.id] = lastsScore(simulate(single, config), denom, life) - base;
+      const res = simulate(single, config);
+      out[card.id] = { years: lastsScore(res, denom, life) - baseScore, dollars: planValue(res) - baseVal };
     }
     return out;
   }, [baseline, baseRes, catalog, values, config]);
@@ -255,7 +282,7 @@ export default function WhatIfView({
                     key={card.id}
                     card={card}
                     on={active.has(card.id)}
-                    delta={marginal[card.id] ?? 0}
+                    delta={marginal[card.id] ?? { years: 0, dollars: 0 }}
                     values={resolveValues(card, values[card.id])}
                     onToggle={() => toggle(card)}
                     onParam={(k, v) => setParam(card.id, k, v)}
@@ -329,15 +356,20 @@ function MetricCard({
   );
 }
 
-function DeltaChip({ delta }: { delta: number }) {
-  const abs = Math.abs(delta);
-  if (abs < 0.05) return <span className="text-xs text-muted">≈ no change</span>;
-  const yrs = abs >= 10 ? Math.round(abs).toString() : abs.toFixed(1);
-  const up = delta > 0;
+function DeltaChip({ years, dollars }: { years: number; dollars: number }) {
+  const yAbs = Math.abs(years);
+  const yStr = yAbs < 0.05 ? null : `${years > 0 ? "+" : "−"}${yAbs >= 10 ? Math.round(yAbs) : yAbs.toFixed(1)} yrs`;
+  const dStr = fmtDelta(dollars);
+  if (!yStr && !dStr) return <span className="text-xs text-muted">≈ no change</span>;
+  const tone = (v: number) => (v > 0 ? "text-accent" : "text-amber-400");
   return (
-    <span className={`text-xs font-semibold tabular-nums ${up ? "text-accent" : "text-amber-400"}`}>
-      {up ? "+" : "−"}
-      {yrs} yrs
+    <span
+      className="shrink-0 text-right text-xs font-semibold tabular-nums"
+      title="This lever on its own: how much longer the money lasts, and how much better off you are overall (money left at the end, less any spending it couldn't fund)."
+    >
+      {yStr && <span className={tone(years)}>{yStr}</span>}
+      {yStr && dStr && <span className="text-muted"> · </span>}
+      {dStr && <span className={tone(dollars)}>{dStr}</span>}
     </span>
   );
 }
@@ -352,7 +384,7 @@ function StrategyCardRow({
 }: {
   card: StrategyCard;
   on: boolean;
-  delta: number;
+  delta: { years: number; dollars: number };
   values: Record<string, number>;
   onToggle: () => void;
   onParam: (key: string, v: number) => void;
@@ -372,7 +404,7 @@ function StrategyCardRow({
         <button type="button" onClick={onToggle} className="min-w-0 flex-1 text-left">
           <div className="text-sm font-semibold text-white">{card.label}</div>
         </button>
-        <DeltaChip delta={delta} />
+        <DeltaChip years={delta.years} dollars={delta.dollars} />
       </div>
 
       {on && (
