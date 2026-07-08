@@ -86,6 +86,10 @@ export interface HomeDetail {
   // homeowner). `toSuper` of it goes into super as a downsizer contribution
   // (assessable but tax-advantaged); the rest lands in outside savings (deemed).
   downsize?: { atAge: number; release: number; toSuper: number };
+  // Optional sell-up-and-rent: at `atAge`, release all `release` equity into
+  // savings, become a NON-homeowner (higher assets-test threshold) and pay
+  // `rentPerYear` from then on. Any mortgage is treated as repaid from proceeds.
+  sellAndRent?: { atAge: number; release: number; rentPerYear: number };
 }
 
 // An investment property held into retirement. Unlike the home it is assessable

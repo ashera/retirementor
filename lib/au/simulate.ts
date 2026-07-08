@@ -84,6 +84,10 @@ export function simulate(
   // exempt). `downsized` guards it to a single event.
   const downsize = plan.home?.downsize;
   let downsized = false;
+  // Optional sell-up-and-rent: releases all equity, then becomes a renter
+  // (non-homeowner means test + ongoing rent) from `atAge`.
+  const sellRent = plan.home?.sellAndRent;
+  let soldHome = false;
 
   for (let t = 0; t <= horizon; t++) {
     const ages = plan.people.map((p) => p.currentAge + t);
@@ -125,6 +129,13 @@ export function simulate(
       outside += toOutside;
       downsized = true;
     }
+    // Sell up and rent: release all equity into savings (a mortgage is repaid
+    // from proceeds, so `release` is net of it). Renter status/rent apply below.
+    if (sellRent && !soldHome && oldest >= sellRent.atAge) {
+      outside += Math.max(0, sellRent.release);
+      soldHome = true;
+    }
+    const isHomeowner = plan.homeowner && !(sellRent != null && oldest >= sellRent.atAge);
 
     // Balances at the START of this year (on the birthday) — this is what each
     // data point plots, so the peak lands on the retirement age, not the year before.
@@ -237,10 +248,13 @@ export function simulate(
     // fixed in nominal dollars, so in this today's-dollars model it erodes by
     // inflation each year and (for P&I) stops at payoff.
     let mortgageCost = 0;
-    if (mortgage && !mortgageCleared && mortgageActiveAtAge(mortgage, oldest)) {
+    if (mortgage && !mortgageCleared && isHomeowner && mortgageActiveAtAge(mortgage, oldest)) {
       mortgageCost = mortgageAnnualCost(mortgage) / Math.pow(1 + plan.inflation / 100, t);
     }
-    const livingSpend = spendingForAge(plan, oldest);
+    // Rent once sold up (today's-dollars flat, like living costs). Folded into the
+    // living total so the ledger still reconciles.
+    const rentExpense = sellRent != null && oldest >= sellRent.atAge ? Math.max(0, sellRent.rentPerYear) : 0;
+    const livingSpend = spendingForAge(plan, oldest) + rentExpense;
     const spending = livingSpend + mortgageCost;
 
     // Investment property: real capital growth, actual net rent (income test) and
@@ -282,7 +296,7 @@ export function simulate(
       const ap = agePension(
         {
           household: plan.household,
-          homeowner: plan.homeowner,
+          homeowner: isHomeowner,
           assessableAssets: financialAssets + propertyEquity,
           financialAssets,
           otherIncome: rentAssessable,

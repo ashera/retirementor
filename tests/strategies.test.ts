@@ -105,6 +105,36 @@ describe("What-If strategies", () => {
     expect(buildStrategyCatalog(base({ homeowner: false })).some((c) => c.id === "downsize")).toBe(false);
   });
 
+  it("sell-and-rent releases equity, adds rent, and switches to non-homeowner thresholds", () => {
+    const b = base({ people: [{ currentAge: 67, superBalance: 150_000, salary: 0, voluntaryConcessional: 0, voluntaryNonConcessional: 0 }], retirementAge: 67, outsideSuper: 20_000, targetSpending: 45_000 });
+    const card = cardById(b, "sell-and-rent");
+    expect(card.exclusive).toBe("home");
+    const plan = card.apply(b, resolveValues(card, { age: 70, release: 800_000, rent: 30_000 }));
+    expect(plan.home?.sellAndRent).toEqual({ atAge: 70, release: 800_000, rentPerYear: 30_000 });
+
+    const rows = simulate(plan, cfg).rows;
+    const at69 = rows.find((r) => r.age === 69)!;
+    const at70 = rows.find((r) => r.age === 70)!;
+    // Equity lands in savings at 70.
+    expect(at70.outside - at69.outside).toBeGreaterThan(600_000);
+    // Rent lifts the spending need from age 70 on.
+    expect(at70.spending).toBeGreaterThan(at69.spending + 20_000);
+  });
+
+  it("selling the home stops the mortgage cost from the sale year", () => {
+    const b = base({
+      people: [{ currentAge: 67, superBalance: 400_000, salary: 0, voluntaryConcessional: 0, voluntaryNonConcessional: 0 }],
+      retirementAge: 67,
+      mortgage: { type: "interest_only", balance: 200_000, interestRate: 6, annualRepayment: 0, payoffAge: null, strategy: "carry" },
+    });
+    const card = cardById(b, "sell-and-rent");
+    const plan = card.apply(b, resolveValues(card, { age: 70, release: 600_000, rent: 0 }));
+    const rows = simulate(plan, cfg).rows;
+    // Before the sale the interest-only loan is an ongoing cost; after, it's gone.
+    expect(rows.find((r) => r.age === 69)!.breakdown.mortgageCost).toBeGreaterThan(0);
+    expect(rows.find((r) => r.age === 71)!.breakdown.mortgageCost).toBe(0);
+  });
+
   it("composes multiple strategies onto the baseline", () => {
     const b = base({ mortgage: { type: "principal_interest", balance: 150_000, interestRate: 6, annualRepayment: 18_000, payoffAge: 72, strategy: "carry" } });
     const cat = buildStrategyCatalog(b);

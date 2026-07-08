@@ -137,7 +137,15 @@ export default function WhatIfView({
   const toggle = (card: StrategyCard) =>
     setActive((prev) => {
       const next = new Set(prev);
-      next.has(card.id) ? next.delete(card.id) : next.add(card.id);
+      if (next.has(card.id)) {
+        next.delete(card.id);
+        return next;
+      }
+      // Turning on an exclusive card switches off the others in its group.
+      if (card.exclusive) {
+        for (const c of catalog) if (c.exclusive === card.exclusive && c.id !== card.id) next.delete(c.id);
+      }
+      next.add(card.id);
       return next;
     });
   const setParam = (cardId: string, key: string, v: number) =>

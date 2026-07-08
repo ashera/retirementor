@@ -126,6 +126,44 @@ export function buildStrategyCatalog(plan: RetirementPlan): StrategyCard[] {
         },
       }),
     });
+
+    const loan = plan.mortgage?.balance ?? 0;
+    cards.push({
+      id: "sell-and-rent",
+      group: "home",
+      exclusive: "home",
+      label: "Sell up and rent",
+      blurb: "Sell the home at the chosen age, freeing up all your equity into savings, then rent. You move to the higher non-homeowner Age Pension asset thresholds, but pay rent for life (and lose the exempt home).",
+      params: [
+        {
+          key: "age",
+          label: "Sell at age",
+          min: Math.max(60, plan.retirementAge),
+          max: plan.lifeExpectancy,
+          step: 1,
+          default: Math.min(plan.lifeExpectancy, Math.max(plan.retirementAge, 70)),
+          suffix: "yrs",
+        },
+        {
+          key: "release",
+          label: "Equity freed (net of any loan)",
+          min: 0,
+          max: homeVal,
+          step: 10_000,
+          default: Math.max(0, Math.round(homeVal - loan)),
+          prefix: "$",
+        },
+        { key: "rent", label: "Rent", min: 0, max: 80_000, step: 1_000, default: 30_000, prefix: "$", suffix: "/yr" },
+      ],
+      apply: (p, v) => ({
+        ...p,
+        home: {
+          value: p.home?.value ?? 900_000,
+          growthReal: p.home?.growthReal ?? 2,
+          sellAndRent: { atAge: v.age, release: v.release, rentPerYear: v.rent },
+        },
+      }),
+    });
   }
 
   // --- Mortgage ---
