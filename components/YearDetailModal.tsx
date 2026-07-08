@@ -75,18 +75,26 @@ export default function YearDetailModal({
   const growth = b.superGrowth + b.outsideGrowth;
   const netChange = closingTotal - openingTotal;
   const isWorking = row.phase === "accumulation";
-  const spending = b.livingSpend + b.mortgageCost;
+  const spending = b.livingSpend + b.rentCost + b.mortgageCost;
   // This year's super withdrawal rate (share of the balance drawn).
   const wr = !isWorking && row.superDrawn > 0 && row.totalSuper > 0 ? rowWithdrawalRate(row) : null;
 
-  // Net money pulled from savings to fund spending (negative = surplus saved).
-  const netDrawdown = openingTotal + growth + b.propertyProceeds - b.mortgageCleared - b.fees - closingTotal;
-  const shortfall = Math.max(0, spending - (b.agePension + b.rentIncome + netDrawdown));
+  // Split what funded spending: external income, then super and outside savings.
+  // A minimum-drawdown surplus is drawn from super but reinvested outside, so the
+  // super figure here is only the part that actually funded spending.
+  const external = b.agePension + Math.max(0, b.rentIncome) + row.workIncome;
+  const privateNeed = Math.max(0, spending - external);
+  const drawnFromSuper = Math.max(0, Math.min(row.superDrawn, privateNeed));
+  const drawnFromOutside = Math.max(0, row.outsideDrawn);
+  const superSurplus = Math.max(0, row.superDrawn - drawnFromSuper);
+  const shortfall = Math.max(0, spending - external - drawnFromSuper - drawnFromOutside);
 
   const fundingParts: string[] = [];
   if (b.agePension > 0) fundingParts.push(`Age Pension ${fmtCurrency(Math.round(b.agePension))}`);
   if (b.rentIncome > 0) fundingParts.push(`net rent ${fmtCurrency(Math.round(b.rentIncome))}`);
-  if (netDrawdown > 1) fundingParts.push(`${fmtCurrency(Math.round(netDrawdown))} drawn from your savings`);
+  if (row.workIncome > 0) fundingParts.push(`part-time work ${fmtCurrency(Math.round(row.workIncome))}`);
+  if (drawnFromSuper > 1) fundingParts.push(`${fmtCurrency(Math.round(drawnFromSuper))} from super`);
+  if (drawnFromOutside > 1) fundingParts.push(`${fmtCurrency(Math.round(drawnFromOutside))} from outside savings`);
   const fundingText = fundingParts.length
     ? fundingParts.join(", ").replace(/, ([^,]*)$/, " and $1")
     : "income alone";
@@ -227,6 +235,9 @@ export default function YearDetailModal({
               {b.livingSpend > 0 && (
                 <Line label="Living costs" value={money(-b.livingSpend)} tone="text-amber-400" />
               )}
+              {b.rentCost > 0 && (
+                <Line label="Rent" sub="renting after selling your home" value={money(-b.rentCost)} tone="text-amber-400" />
+              )}
               {b.mortgageCost > 0 && (
                 <Line
                   label="Home-loan repayment"
@@ -258,6 +269,11 @@ export default function YearDetailModal({
                     {(wr * 100).toFixed(1)}% of super
                   </span>{" "}
                   ({fmtCurrency(row.superDrawn)} of {fmtCurrency(row.totalSuper)}, {withdrawalBand(wr).label}).
+                </div>
+              )}
+              {superSurplus > 1 && (
+                <div className="mt-1">
+                  Minimum drawdown pulled {fmtCurrency(Math.round(superSurplus))} more from super than you needed — the surplus is reinvested into your outside savings.
                 </div>
               )}
               {shortfall > 1 && (

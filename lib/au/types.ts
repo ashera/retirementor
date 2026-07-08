@@ -254,6 +254,7 @@ export interface YearBreakdown {
   minDrawdownParts: MinDrawdownPart[]; // the per-person split behind minDrawdown
   // Retirement spending
   livingSpend: number;
+  rentCost: number; // rent paid this year after selling up (0 otherwise)
   mortgageCost: number;
   mortgageCleared: number; // one-off super lump sum used to clear the home loan
   // Investment property sale

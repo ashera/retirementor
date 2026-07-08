@@ -210,6 +210,7 @@ export function simulate(
           minDrawdown: 0,
           minDrawdownParts: [],
           livingSpend: 0,
+          rentCost: 0,
           mortgageCost: 0,
           mortgageCleared: 0,
           propertyProceeds: 0,
@@ -260,11 +261,11 @@ export function simulate(
     if (mortgage && !mortgageCleared && isHomeowner && mortgageActiveAtAge(mortgage, oldest)) {
       mortgageCost = mortgageAnnualCost(mortgage) / Math.pow(1 + plan.inflation / 100, t);
     }
-    // Rent once sold up (today's-dollars flat, like living costs). Folded into the
-    // living total so the ledger still reconciles.
+    // Rent once sold up (today's-dollars flat, like living costs), itemised
+    // separately so the ledger can show it as its own line.
     const rentExpense = sellRent != null && oldest >= sellRent.atAge ? Math.max(0, sellRent.rentPerYear) : 0;
-    const livingSpend = spendingForAge(plan, oldest) + rentExpense;
-    const spending = livingSpend + mortgageCost;
+    const livingSpend = spendingForAge(plan, oldest);
+    const spending = livingSpend + rentExpense + mortgageCost;
 
     // Investment property: real capital growth, actual net rent (income test) and
     // net equity (assets test — assessed, NOT deemed). An optional sale releases
@@ -418,6 +419,7 @@ export function simulate(
         minDrawdown: minDraw,
         minDrawdownParts,
         livingSpend,
+        rentCost: rentExpense,
         mortgageCost,
         mortgageCleared: mortgageClearedNow,
         propertyProceeds,
