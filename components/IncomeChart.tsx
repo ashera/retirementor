@@ -95,7 +95,7 @@ export default function IncomeChart({
     <ResponsiveContainer width="100%" height={height}>
       <AreaChart
         data={rows}
-        margin={{ top: 8, right: 8, left: 8, bottom: 0 }}
+        margin={{ top: 18, right: 8, left: 8, bottom: 0 }}
         onClick={(state: { activeLabel?: string | number }) => {
           const age = Number(state?.activeLabel);
           if (onSelectYear && Number.isFinite(age)) onSelectYear(age);
