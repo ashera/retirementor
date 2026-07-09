@@ -78,6 +78,15 @@ function fmtDelta(d: number): string | null {
   return `${d > 0 ? "+" : "−"}${mag}`;
 }
 
+// Annual-income deltas are smaller than the balance deltas above, so they get
+// their own finer formatter: dollars (not $k), rounded to the nearest $100, with
+// a lower noise floor. Returns null when the change isn't worth showing.
+function fmtDeltaYr(d: number): string | null {
+  const a = Math.abs(d);
+  if (a < 300) return null;
+  return `${d > 0 ? "+" : "−"}${fmtCurrency(Math.round(a / 100) * 100)}/yr`;
+}
+
 export default function WhatIfView({
   config,
   savedPlans,
@@ -218,6 +227,32 @@ export default function WhatIfView({
     return () => clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [baseline, catalog, active, otherValsKey, config]);
+
+  // Per-lever "affordable income" — the change in the most you could sustainably
+  // spend each YEAR that this strategy buys you (isolated from the baseline, like
+  // the chips above). A full max-sustainable-spend bisection per card is heavy, so
+  // it's debounced off the interaction path with a pending pulse. This uses the
+  // deterministic central projection; the prudent (85% Monte Carlo) figure lives
+  // on the Adjust-spending card and the "spend up to" lever.
+  const valsKey = useMemo(() => JSON.stringify(values), [values]);
+  const [affordable, setAffordable] = useState<Record<string, number>>({});
+  const [affordablePending, setAffordablePending] = useState(false);
+  useEffect(() => {
+    if (!baseline) return;
+    setAffordablePending(true);
+    const id = setTimeout(() => {
+      const baseMax = maxSustainableSpend(baseline, config);
+      const out: Record<string, number> = {};
+      for (const card of catalog) {
+        const single = card.apply(baseline, resolveValues(card, values[card.id]));
+        out[card.id] = maxSustainableSpend(single, config) - baseMax;
+      }
+      setAffordable(out);
+      setAffordablePending(false);
+    }, 500);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [baseline, catalog, valsKey, config]);
 
   if (!baseline || !baseRes || !compRes || !composed) return <div className="min-h-screen bg-ink" />;
 
@@ -480,6 +515,8 @@ export default function WhatIfView({
                     card={card}
                     on={active.has(card.id)}
                     delta={marginal[card.id] ?? { years: 0, moneyLeft: 0, shortfallAvoided: 0, netWorth: 0, takeHomeNow: 0 }}
+                    incomeDelta={affordable[card.id] ?? null}
+                    incomePending={affordablePending}
                     life={baseline.lifeExpectancy}
                     baseTakeHome={baseRes.rows[0]?.takeHome ?? 0}
                     values={resolveValues(card, values[card.id])}
@@ -638,13 +675,15 @@ function Sparkline({
   );
 }
 
-function ImpactBreakdown({ delta, life }: { delta: Marginal; life: number }) {
+function ImpactBreakdown({ delta, incomeDelta, life }: { delta: Marginal; incomeDelta: number | null; life: number }) {
   const nwDiffers = Math.abs(delta.netWorth - delta.moneyLeft) >= 2_000;
+  const incomeStr = incomeDelta != null ? fmtDeltaYr(incomeDelta) : null;
   const rows = [
+    ...(incomeStr ? [{ label: "Income you could afford", sub: "most you could safely spend / yr", str: incomeStr, v: incomeDelta! }] : []),
     { label: `Spendable funds at ${life}`, sub: "liquid super + savings", v: delta.moneyLeft },
     { label: "Spending shortfall avoided", sub: "spending you can now cover", v: delta.shortfallAvoided },
     ...(nwDiffers ? [{ label: `Net worth at ${life}`, sub: "adds your home & property", v: delta.netWorth }] : []),
-  ].filter((r) => Math.abs(r.v) >= 2_000);
+  ].filter((r) => "str" in r || Math.abs(r.v) >= 2_000);
   if (!rows.length) return null;
   return (
     <div className="rounded-lg border border-line bg-panel px-3 py-2 text-xs">
@@ -655,24 +694,39 @@ function ImpactBreakdown({ delta, life }: { delta: Marginal; life: number }) {
             {r.label}
             <span className="ml-1 text-[10px] text-muted/70">{r.sub}</span>
           </span>
-          <span className={`shrink-0 font-semibold tabular-nums ${r.v > 0 ? "text-accent" : "text-amber-400"}`}>{fmtDelta(r.v)}</span>
+          <span className={`shrink-0 font-semibold tabular-nums ${r.v > 0 ? "text-accent" : "text-amber-400"}`}>{"str" in r ? r.str : fmtDelta(r.v)}</span>
         </div>
       ))}
     </div>
   );
 }
 
-function DeltaChip({ years, moneyLeft, netWorth, life }: { years: number; moneyLeft: number; netWorth: number; life: number }) {
+function DeltaChip({
+  years,
+  moneyLeft,
+  netWorth,
+  incomeDelta,
+  incomePending,
+  life,
+}: {
+  years: number;
+  moneyLeft: number;
+  netWorth: number;
+  incomeDelta: number | null;
+  incomePending: boolean;
+  life: number;
+}) {
   const yAbs = Math.abs(years);
   const yStr = yAbs < 0.05 ? null : `${years > 0 ? "+" : "−"}${yAbs >= 10 ? Math.round(yAbs) : yAbs.toFixed(1)} yrs`;
   const nwStr = fmtDelta(netWorth);
+  const incStr = incomeDelta != null ? fmtDeltaYr(incomeDelta) : null;
   // Only surface the liquid "money left" when it meaningfully differs from net
   // worth (i.e. asset levers move the home/property) — otherwise it's redundant.
   const mlStr = Math.abs(moneyLeft - netWorth) >= 2_000 ? fmtDelta(moneyLeft) : null;
-  if (!yStr && !mlStr && !nwStr) return <span className="text-xs text-muted">≈ no change</span>;
+  if (!yStr && !mlStr && !nwStr && !incStr) return <span className="text-xs text-muted">≈ no change</span>;
   const tone = (v: number) => (v > 0 ? "text-accent" : "text-amber-400");
-  const Line = ({ label, value, v, title }: { label: string; value: string; v: number; title: string }) => (
-    <span className="flex items-baseline justify-end gap-1.5" title={title}>
+  const Line = ({ label, value, v, title, pending }: { label: string; value: string; v: number; title: string; pending?: boolean }) => (
+    <span className={`flex items-baseline justify-end gap-1.5 ${pending ? "animate-pulse opacity-60" : ""}`} title={title}>
       <span className="text-[10px] font-normal text-muted">{label}</span>
       <span className={tone(v)}>{value}</span>
     </span>
@@ -680,6 +734,15 @@ function DeltaChip({ years, moneyLeft, netWorth, life }: { years: number; moneyL
   return (
     <span className="shrink-0 space-y-0.5 text-right text-xs font-semibold tabular-nums">
       {yStr && <Line label="Money lasts" value={yStr} v={years} title="On its own, how much longer your super + savings cover your spending." />}
+      {incStr && (
+        <Line
+          label="Income you could afford"
+          value={incStr}
+          v={incomeDelta!}
+          pending={incomePending}
+          title={`On its own, how much this lever changes the most you could sustainably spend each year — the yearly income headroom it buys (central projection, to age ${life}).`}
+        />
+      )}
       {mlStr && (
         <Line
           label={`Spendable funds at ${life}`}
@@ -699,6 +762,8 @@ function StrategyCardRow({
   card,
   on,
   delta,
+  incomeDelta,
+  incomePending,
   life,
   baseTakeHome,
   values,
@@ -709,6 +774,8 @@ function StrategyCardRow({
   card: StrategyCard;
   on: boolean;
   delta: Marginal;
+  incomeDelta: number | null; // Δ affordable income /yr (null until first computed)
+  incomePending: boolean;
   life: number;
   baseTakeHome: number;
   values: Record<string, number>;
@@ -742,13 +809,13 @@ function StrategyCardRow({
         <button type="button" onClick={onToggle} className="min-w-0 flex-1 text-left">
           <div className="text-sm font-semibold text-white">{card.label}</div>
         </button>
-        <DeltaChip years={delta.years} moneyLeft={delta.moneyLeft} netWorth={delta.netWorth} life={life} />
+        <DeltaChip years={delta.years} moneyLeft={delta.moneyLeft} netWorth={delta.netWorth} incomeDelta={incomeDelta} incomePending={incomePending} life={life} />
       </div>
 
       {on && (
         <div className="mt-3 space-y-3 border-t border-line pt-3">
           {card.blurb && <p className="text-xs text-muted">{card.blurb}</p>}
-          <ImpactBreakdown delta={delta} life={life} />
+          <ImpactBreakdown delta={delta} incomeDelta={incomeDelta} life={life} />
           {card.params.map((pm) => {
             // A param can cap itself against the card's other live values (e.g.
             // the downsizer contribution can't exceed the equity actually freed).
