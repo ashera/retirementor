@@ -43,7 +43,7 @@ describe("Year breakdown ledger", () => {
     const accum = r.rows.filter((x) => x.phase === "accumulation");
     expect(accum.length).toBeGreaterThan(0);
     for (const { breakdown: b } of accum) {
-      expect(near(b.openingSuper + b.contribNet - b.fees + b.superGrowth, b.closingSuper)).toBe(true);
+      expect(near(b.openingSuper + b.contribNet + b.ttrBenefit - b.fees + b.superGrowth, b.closingSuper)).toBe(true);
       expect(near(b.openingOutside + b.savings + b.outsideGrowth, b.closingOutside)).toBe(true);
     }
   });

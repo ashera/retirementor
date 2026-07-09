@@ -185,6 +185,7 @@ export function simulate(
       let earningsTax = 0;
       let feesPaid = 0;
       let takeHome = 0; // net cash from salary after income tax and pre-tax sacrifice
+      let ttrBenefit = 0; // net super gained from a Transition-to-Retirement swap this year
       // Contributions arrive through the year, so grow ~half a year on average.
       const superHalf = Math.pow(1 + superAccumReturn, 0.5);
       plan.people.forEach((p, i) => {
@@ -199,6 +200,23 @@ export function simulate(
         const sacrificed = Math.max(0, concessional - p.salary * config.sgRate);
         const taxable = Math.max(0, p.salary - sacrificed);
         takeHome += taxable - incomeTax(taxable);
+
+        // Transition to Retirement swap (age ≥ preservation age, still working):
+        // an extra pre-tax sacrifice is replaced by a tax-free TTR pension, so
+        // take-home is unchanged (above) while the net gain to super is the income
+        // tax saved less the 15% contributions tax — the marginal-vs-15% arbitrage.
+        // Bounded by the remaining concessional-cap room. Can be negative if the
+        // marginal rate is under 15% (then TTR isn't worthwhile).
+        let ttrBenefitI = 0;
+        if (plan.ttr && i === 0 && ages[i] >= preservationAge && plan.ttr.extraSacrifice > 0) {
+          const ttrSacrificed = Math.min(plan.ttr.extraSacrifice, Math.max(0, config.concessionalCap - concessional));
+          if (ttrSacrificed > 0) {
+            const taxSaved = incomeTax(taxable) - incomeTax(Math.max(0, taxable - ttrSacrificed));
+            ttrBenefitI = taxSaved - ttrSacrificed * config.contributionsTax;
+          }
+        }
+        ttrBenefit += ttrBenefitI;
+
         const ncc = Math.min(p.voluntaryNonConcessional, config.nonConcessionalCap);
         // Division 293: an extra 15% on the concessional contributions that push
         // income (salary + concessional) over the high-income threshold.
@@ -207,7 +225,7 @@ export function simulate(
         const extra293 = taxed293 * config.div293ExtraTaxRate;
         const added = concessional * (1 - config.contributionsTax) - extra293 + ncc;
         const fee = fixedAdmin + insurance; // fixed admin + insurance while working
-        const net = added - fee;
+        const net = added - fee + ttrBenefitI;
         const opening = balances[i];
         // Opening grows a full year; this year's net contribution grows half a year.
         balances[i] = opening * (1 + superAccumReturn) + net * superHalf;
@@ -242,6 +260,7 @@ export function simulate(
           savings,
           salaryIncome: plan.people.reduce((s, p) => s + p.salary, 0),
           takeHome,
+          ttrBenefit,
           workIncome: 0,
           superGrowth,
           outsideGrowth,
@@ -474,6 +493,7 @@ export function simulate(
         savings: 0,
         salaryIncome: 0,
         takeHome: 0,
+        ttrBenefit: 0,
         workIncome: netWork,
         superGrowth,
         outsideGrowth,

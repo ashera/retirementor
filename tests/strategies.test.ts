@@ -84,6 +84,33 @@ describe("What-If strategies", () => {
     expect(rowS.takeHome).toBeLessThan(row.takeHome);
   });
 
+  it("Transition to Retirement boosts super without touching take-home, over the 60→retirement window", () => {
+    const b = base({
+      people: [{ currentAge: 58, superBalance: 400_000, salary: 120_000, voluntaryConcessional: 0, voluntaryNonConcessional: 0 }],
+      retirementAge: 65,
+    });
+    const baseRows = simulate(b, cfg).rows;
+    const ttr = applyOne(b, "ttr", { extra: 15_000 });
+    const ttrRows = simulate(ttr, cfg).rows;
+    const at = (rows: typeof baseRows, age: number) => rows.find((r) => r.age === age)!;
+    // Before 60: no TTR effect on super, and take-home matches the baseline.
+    expect(at(ttrRows, 59).breakdown.ttrBenefit).toBe(0);
+    expect(at(ttrRows, 59).takeHome).toBeCloseTo(at(baseRows, 59).takeHome, 0);
+    // In the window (60–64): a positive benefit into super, take-home still held.
+    expect(at(ttrRows, 62).breakdown.ttrBenefit).toBeGreaterThan(0);
+    expect(at(ttrRows, 62).takeHome).toBeCloseTo(at(baseRows, 62).takeHome, 0);
+    // Net effect: more super at retirement, all at no cost to take-home.
+    expect(simulate(ttr, cfg).superAtRetirement).toBeGreaterThan(simulate(b, cfg).superAtRetirement);
+  });
+
+  it("Transition to Retirement is only offered when there's a 60→retirement working window", () => {
+    const withWindow = base({ people: [{ currentAge: 58, superBalance: 400_000, salary: 120_000, voluntaryConcessional: 0, voluntaryNonConcessional: 0 }], retirementAge: 65 });
+    expect(buildStrategyCatalog(withWindow).some((c) => c.id === "ttr")).toBe(true);
+    // Retiring at 60 leaves no window while 60+ and working.
+    const noWindow = base({ people: [{ currentAge: 50, superBalance: 400_000, salary: 120_000, voluntaryConcessional: 0, voluntaryNonConcessional: 0 }], retirementAge: 60 });
+    expect(buildStrategyCatalog(noWindow).some((c) => c.id === "ttr")).toBe(false);
+  });
+
   it("maxSustainableSpend finds the highest spend that still lasts to life expectancy", () => {
     const b = base({ targetSpending: 90_000, lifeExpectancy: 90 });
     const s = maxSustainableSpend(b, cfg);

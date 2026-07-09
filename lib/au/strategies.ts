@@ -9,6 +9,7 @@ import { getInvestmentProperties } from "./types";
 import { fmtCurrency } from "./format";
 import { propertyValueAt, capitalGainsTax, netSaleProceeds } from "./property";
 import { budgetSplit, presetCategories } from "./budget";
+import { incomeTax } from "./tax";
 import { simulate } from "./simulate";
 import { runMonteCarlo } from "./montecarlo";
 import type { EngineConfig } from "./config";
@@ -383,6 +384,30 @@ export function buildStrategyCatalog(plan: RetirementPlan): StrategyCard[] {
           i === 0 ? { ...pp, voluntaryConcessional: pp.voluntaryConcessional + v.extra } : pp,
         ),
       }),
+    });
+  }
+
+  // Transition to Retirement — only when there's a window to run it in: from
+  // preservation age (60) up to retirement, while still working.
+  if (working && plan.people[0]?.salary > 0 && plan.retirementAge > 60) {
+    const p0 = plan.people[0];
+    const startAge = Math.max(60, oldest);
+    const windowYears = Math.max(0, plan.retirementAge - startAge);
+    cards.push({
+      id: "ttr",
+      group: "timing",
+      label: "Transition to Retirement",
+      blurb: "From age 60 you can salary-sacrifice more and draw a tax-free TTR pension to replace the pay you give up — shifting income from your marginal rate down to 15% tax. Your take-home holds; the tax saved builds your super.",
+      params: [
+        { key: "extra", label: "Extra sacrifice via TTR", min: 0, max: 30_000, step: 1_000, default: 15_000, prefix: "$", suffix: "/yr" },
+      ],
+      note: (v) => {
+        const taxable = Math.max(0, p0.salary - p0.voluntaryConcessional);
+        const taxSaved = incomeTax(taxable) - incomeTax(Math.max(0, taxable - v.extra));
+        const benefit = Math.max(0, taxSaved - v.extra * 0.15);
+        return `Ages ${startAge}–${plan.retirementAge} (${windowYears} yr${windowYears === 1 ? "" : "s"}): take-home unchanged, about ${fmtCurrency(benefit)}/yr of tax saving into super (capped at the concessional limit).`;
+      },
+      apply: (p, v) => ({ ...p, ttr: { extraSacrifice: v.extra } }),
     });
   }
 

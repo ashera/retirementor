@@ -220,12 +220,20 @@ export default function IncomeYearModal({
                 </p>
               </section>
 
-              {(row.breakdown.contribGross > 0 || afterTaxContrib > 0 || row.breakdown.savings > 0) && (
+              {(row.breakdown.contribGross > 0 || afterTaxContrib > 0 || row.breakdown.ttrBenefit !== 0 || row.breakdown.savings > 0) && (
                 <section>
                   <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted">
                     What you&apos;re putting away this year
                   </h3>
                   <div className="rounded-xl border border-line bg-panel px-3 py-1">
+                    {row.breakdown.ttrBenefit !== 0 && (
+                      <Row
+                        color="#a78bfa"
+                        label="Transition to Retirement — tax saved"
+                        sub="Extra sacrificed via a tax-free TTR pension, so your take-home holds. This is the income tax saved (net of the 15% contributions tax) added to super."
+                        value={row.breakdown.ttrBenefit}
+                      />
+                    )}
                     {row.breakdown.contribGross > 0 && (
                       <Row
                         color="#34d399"

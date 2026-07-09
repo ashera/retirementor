@@ -136,6 +136,7 @@ export interface RetirementPlan {
   mortgage?: MortgageDetail; // optional home loan carried into retirement
   home?: HomeDetail; // the principal home as an asset (exempt; net-worth context only)
   workIncome?: { perYear: number; untilAge: number }; // part-time work in early retirement (offsets drawdown; income-test assessable net of the Work Bonus)
+  ttr?: { extraSacrifice: number }; // Transition to Retirement: extra pre-tax sacrifice/yr from preservation age → retirement, take-home held by a tax-free TTR pension
   investmentProperties?: PropertyDetail[]; // income-producing properties (source of truth)
   investmentProperty?: PropertyDetail; // DEPRECATED legacy single property — read via getInvestmentProperties()
   // Which optional sections the user has explicitly answered in the wizard (incl.
@@ -241,6 +242,7 @@ export interface YearBreakdown {
   savings: number; // added to outside-super this year
   salaryIncome: number; // gross household salary this year (accumulation only; 0 in retirement)
   takeHome: number; // net pay after income tax + pre-tax salary sacrifice (working years; 0 in retirement)
+  ttrBenefit: number; // net super gained this year from a Transition-to-Retirement swap (0 normally)
   workIncome: number; // net part-time work income this year (retirement only; after tax)
   // Investment growth (super growth is net of accumulation earnings tax AND the
   // % investment/admin fee; the fixed $ fees + insurance are the `fees` line)
