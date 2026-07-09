@@ -8,6 +8,7 @@ import { DEFAULT_PLAN, getInvestmentProperties } from "@/lib/au/types";
 import { simulate } from "@/lib/au/simulate";
 import { runMonteCarlo } from "@/lib/au/montecarlo";
 import { fmtCurrency } from "@/lib/au/format";
+import { rowNetWorth } from "@/lib/au/networth";
 import { track } from "@/lib/analytics";
 import type { SavedPlan } from "@/app/actions/plans";
 import { savePlan } from "@/app/actions/plans";
@@ -176,6 +177,18 @@ export default function WhatIfView({
 
   const changed = active.size > 0;
 
+  // Net worth trajectory: total wealth (super + outside + home + property) across
+  // retirement, plus the terminal estate at life expectancy. The sparkline spans
+  // the retirement window (earliest retirement age → life) on one CPI basis.
+  const nwLife = composed.lifeExpectancy;
+  const nwStart = Math.min(baseRes.retirementAge, compRes.retirementAge);
+  const nwSeries = (res: SimResult) =>
+    res.rows.filter((r) => r.age >= nwStart).map((r) => ({ age: r.age, v: rowNetWorth(r) }));
+  const baseNW = nwSeries(baseRes);
+  const compNW = nwSeries(compRes);
+  const baseTermNW = baseNW.length ? baseNW[baseNW.length - 1].v : 0;
+  const compTermNW = compNW.length ? compNW[compNW.length - 1].v : 0;
+
   // Legend for the income-sources view (only the bands the composed plan uses).
   const composedWorking = Math.max(...composed.people.map((pp) => pp.currentAge)) < composed.retirementAge;
   const incomeLegend = [
@@ -277,6 +290,46 @@ export default function WhatIfView({
         />
       </div>
 
+      {/* Net worth trajectory */}
+      <div className="mb-6 rounded-2xl border border-line bg-panel p-4">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="min-w-0">
+            <div className="text-[11px] font-medium uppercase tracking-wide text-muted">
+              Net worth at {nwLife}
+            </div>
+            <div className="mt-1 flex flex-wrap items-baseline gap-2">
+              {changed ? (
+                <>
+                  <span className="text-lg text-muted line-through">{fmtCurrency(baseTermNW)}</span>
+                  <span aria-hidden className="text-muted">→</span>
+                  <span className="text-2xl font-bold tabular-nums text-white">{fmtCurrency(compTermNW)}</span>
+                  <span className={`text-sm font-semibold tabular-nums ${compTermNW >= baseTermNW ? "text-accent" : "text-amber-400"}`}>
+                    {fmtDelta(compTermNW - baseTermNW)}
+                  </span>
+                </>
+              ) : (
+                <span className="text-2xl font-bold tabular-nums text-white">{fmtCurrency(baseTermNW)}</span>
+              )}
+            </div>
+            <div className="mt-0.5 text-[11px] text-muted">
+              Total wealth — super, savings, home &amp; property — through retirement
+            </div>
+          </div>
+          <div className="flex flex-col items-end gap-1">
+            <Sparkline
+              series={changed ? [baseNW, compNW] : [compNW]}
+              colors={changed ? ["#94a3b8", "#34d399"] : ["#34d399"]}
+            />
+            {changed && (
+              <div className="flex gap-3 text-[10px] text-muted">
+                <span className="flex items-center gap-1"><span className="inline-block h-0.5 w-3 bg-[#94a3b8]" />Before</span>
+                <span className="flex items-center gap-1"><span className="inline-block h-0.5 w-3 bg-[#34d399]" />After</span>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
       {/* Chart */}
       <div className="mb-6 rounded-2xl border border-line bg-panel p-6">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -323,8 +376,8 @@ export default function WhatIfView({
           <>
             <RetirementChart
               result={compRes}
-              baseline={chartView === "balance" && changed ? baseRes : null}
-              baselineLabel="Baseline"
+              baseline={(chartView === "balance" || chartView === "networth") && changed ? baseRes : null}
+              baselineLabel="Before"
               showHome={chartView === "networth"}
               onSelectYear={setSelectedYear}
               selectedAge={selectedYear}
@@ -339,7 +392,7 @@ export default function WhatIfView({
                 ...(chartView === "networth" && getInvestmentProperties(composed).length ? [{ c: "#fb923c", l: "Investment property" }] : []),
                 { c: "#34d399", l: "Super" },
                 { c: "#38bdf8", l: "Outside super" },
-                ...(chartView === "balance" && changed ? [{ c: "#94a3b8", l: "Baseline" }] : []),
+                ...((chartView === "balance" || chartView === "networth") && changed ? [{ c: "#94a3b8", l: "Before" }] : []),
               ].map((it) => (
                 <span key={it.l} className="flex items-center gap-1.5 text-xs text-muted">
                   <span className="h-2.5 w-2.5 rounded-full" style={{ background: it.c }} />
@@ -468,6 +521,49 @@ function MetricCard({
         )}
       </div>
     </div>
+  );
+}
+
+// Tiny overlaid line chart of net worth over the retirement window. The last
+// series is drawn solid + bold (the composed plan); earlier series are dashed
+// (the baseline ghost). Y is scaled to the data range so the shape reads clearly.
+function Sparkline({
+  series,
+  colors,
+  width = 240,
+  height = 56,
+}: {
+  series: { age: number; v: number }[][];
+  colors: string[];
+  width?: number;
+  height?: number;
+}) {
+  const all = series.flat();
+  if (all.length < 2) return <div style={{ width, height }} />;
+  const ages = all.map((p) => p.age);
+  const vals = all.map((p) => p.v);
+  const [minAge, maxAge] = [Math.min(...ages), Math.max(...ages)];
+  const [minV, maxV] = [Math.min(...vals), Math.max(...vals)];
+  const pad = 4;
+  const x = (age: number) => pad + (maxAge === minAge ? 0 : (age - minAge) / (maxAge - minAge)) * (width - 2 * pad);
+  const y = (v: number) => height - pad - (maxV === minV ? 0 : (v - minV) / (maxV - minV)) * (height - 2 * pad);
+  return (
+    <svg width={width} height={height} role="img" aria-label="Net worth trajectory">
+      {series.map((s, i) => {
+        const last = i === series.length - 1;
+        return (
+          <polyline
+            key={i}
+            fill="none"
+            stroke={colors[i]}
+            strokeWidth={last ? 2 : 1.5}
+            strokeDasharray={last ? undefined : "3 3"}
+            strokeLinejoin="round"
+            points={s.map((p) => `${x(p.age)},${y(p.v)}`).join(" ")}
+          />
+        );
+      })}
+    </svg>
   );
 }
 

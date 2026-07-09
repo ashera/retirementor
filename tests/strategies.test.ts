@@ -3,6 +3,7 @@ import { simulate } from "../lib/au/simulate";
 import { DEFAULT_CONFIG as cfg } from "../lib/au/config";
 import { DEFAULT_PLAN, getInvestmentProperties, type PropertyDetail, type RetirementPlan } from "../lib/au/types";
 import { buildStrategyCatalog, applyStrategies, resolveValues } from "../lib/au/strategies";
+import { rowNetWorth } from "../lib/au/networth";
 import { seniorEmploymentTax } from "../lib/au/tax";
 
 const base = (over: Partial<RetirementPlan> = {}): RetirementPlan => ({
@@ -185,12 +186,9 @@ describe("What-If strategies", () => {
     });
     const card = cardById(b, "sell-prop-0");
     const rows = simulate(card.apply(b, resolveValues(card, { age: 70 })), cfg).rows;
-    // Net worth as the chart plots it: held equity + (in the sale year) the proceeds,
-    // which only land in the OUTSIDE opening balance the following year.
-    const nw = (age: number) => {
-      const r = rows.find((x) => x.age === age)!;
-      return r.homeEquity + r.propertyEquity + r.breakdown.propertyProceeds + r.totalSuper + r.outside;
-    };
+    // Net worth as the chart plots it (rowNetWorth = super + outside + home equity
+    // + property equity, bridging the sale year with that year's proceeds).
+    const nw = (age: number) => rowNetWorth(rows.find((x) => x.age === age)!);
     // The held property's net equity ($600k − $200k loan) is on the net-worth ledger...
     expect(rows.find((r) => r.age === 69)!.propertyEquity).toBeCloseTo(400_000, -3);
     // ...and drops to 0 at the sale as the proceeds move into savings.

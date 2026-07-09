@@ -13,6 +13,7 @@ import {
 } from "recharts";
 import type { SimResult, YearRow } from "@/lib/au/types";
 import { fmtCompact, fmtCurrency } from "@/lib/au/format";
+import { rowNetWorth } from "@/lib/au/networth";
 
 export interface SpendingBand {
   x1: number;
@@ -138,10 +139,13 @@ export default function RetirementChart({
   for (const r of cpiBasis(result.rows))
     byAge.set(r.age, { ...r, propertyNW: Math.max(0, (r.propertyEquity ?? 0) + (r.breakdown?.propertyProceeds ?? 0)) });
   if (baseline) {
+    // In net-worth mode the ghost line must be baseline NET WORTH (incl. home +
+    // property), not just its liquid total, so the two trajectories are comparable.
     for (const r of cpiBasis(baseline.rows)) {
+      const ghost = showHome ? rowNetWorth(r) : r.total;
       const e = byAge.get(r.age);
-      if (e) e.baselineTotal = r.total;
-      else byAge.set(r.age, { age: r.age, baselineTotal: r.total });
+      if (e) e.baselineTotal = ghost;
+      else byAge.set(r.age, { age: r.age, baselineTotal: ghost });
     }
   }
   const data = [...byAge.values()].sort((a, b) => a.age - b.age);
