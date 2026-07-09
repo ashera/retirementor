@@ -297,6 +297,9 @@ export default function PlannerApp({
   const prudentDelta = maxSpend != null ? maxSpend - gs.currentSpend : null;
   const overspending = prudentDelta != null && prudentDelta <= -1000;
   const spendHeadroom = prudentDelta != null && prudentDelta >= 1000;
+  // Spend sits right at the prudent max — neither over nor under. Wait for the MC
+  // max to settle so it doesn't flicker to/from the trim/boost states.
+  const budgetBalanced = prudentDelta != null && !overspending && !spendHeadroom && !mcMaxPending;
 
   const tweaked = useMemo(
     () => JSON.stringify(plan) !== JSON.stringify(baseline),
@@ -1067,7 +1070,13 @@ export default function PlannerApp({
             return (
               <>
                 <Lever
-                  label={spendDelta != null && spendDelta < 0 ? "Trim spending to" : "Spend up to"}
+                  label={
+                    budgetBalanced
+                      ? "Budget balanced"
+                      : spendDelta != null && spendDelta < 0
+                        ? "Trim spending to"
+                        : "Spend up to"
+                  }
                   value={maxSpend != null ? `${fmtCurrency(maxSpend + goal.loanCost)}/yr` : "—"}
                   note={
                     maxSpend != null
@@ -1075,14 +1084,16 @@ export default function PlannerApp({
                       : undefined
                   }
                   delta={
-                    spendDelta == null
-                      ? "even a low spend is risky"
-                      : spendDelta >= 0
-                        ? `${fmtCurrency(spendDelta)} of headroom`
-                        : `${fmtCurrency(-spendDelta)} less than now`
+                    budgetBalanced
+                      ? "A great match for what your plan can afford"
+                      : spendDelta == null
+                        ? "even a low spend is risky"
+                        : spendDelta >= 0
+                          ? `${fmtCurrency(spendDelta)} of headroom`
+                          : `${fmtCurrency(-spendDelta)} less than now`
                   }
                   tone={
-                    spendDelta != null && spendDelta >= 0
+                    budgetBalanced || (spendDelta != null && spendDelta >= 0)
                       ? "text-emerald-400"
                       : "text-amber-400"
                   }
@@ -1161,7 +1172,7 @@ export default function PlannerApp({
             </button>
           </div>
         )}
-        {prudentDelta != null && !overspending && !spendHeadroom && !mcMaxPending && (
+        {budgetBalanced && (
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
             <p className="text-sm text-slate-300">
               <span className="font-semibold text-accent">Just right!</span> Your spending is about the most you
