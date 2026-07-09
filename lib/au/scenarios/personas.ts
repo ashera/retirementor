@@ -798,10 +798,134 @@ function ttrTom(config: EngineConfig): PersonaReport {
   });
 }
 
+// ── Division-293 Dan (boundary: PARTIAL Div 293) ─────────────────────────────
+function div293Dan(config: EngineConfig): PersonaReport {
+  const salary = 235_000; // salary + concessional just crosses the $250k Div 293 line
+  const person: Person = { currentAge: 58, superBalance: 500_000, salary, voluntaryConcessional: 0, voluntaryNonConcessional: 0 };
+  const plan: RetirementPlan = {
+    ...DEFAULT_PLAN, household: "single", people: [person], superMode: "individual",
+    homeowner: true, outsideSuper: 150_000, annualOutsideSavings: 0,
+    retirementAge: 65, spendingMode: "flat", targetSpending: 60_000, investmentReturn: 6, inflation: 0, lifeExpectancy: 88,
+  };
+  const r = simulate(plan, config);
+  const years = 65 - 58;
+  const row = r.rows.find((x) => x.age === 65)!;
+  const conc = Math.min(salary * config.sgRate, config.concessionalCap);
+  const over = Math.max(0, salary + conc - config.div293Threshold);
+  const taxed293 = Math.min(conc, over);
+
+  return finish({
+    key: "div293-dan",
+    name: "Division-293 Dan",
+    blurb: "A high earner whose income only PARTLY crosses the $250k Division 293 line.",
+    covers: ["Single", "Homeowner", "Division 293", "Concessional cap", "High earner"],
+    assumptions: [
+      "Today's dollars (inflation 0%); retires at 65.",
+      `Salary ${m(salary)} + Super Guarantee ${m(conc)} = ${m(salary + conc)} exceeds the $${(config.div293Threshold / 1000).toFixed(0)}k Division 293 threshold by ${m(over)}, so only ${m(taxed293)} of the concessional contribution (not all of it — unlike Capped Carl) takes the extra 15% tax.`,
+      "The closed-form super at retirement therefore uses the PARTIAL Div 293 charge — re-derived independently.",
+      `Reference data: FY${config.financialYear} config seed.`,
+    ],
+    inputs: [
+      { label: "Household", value: "Single" }, { label: "Age now → retire", value: "58 → 65" },
+      { label: "Super today", value: `${m(500_000)}` }, { label: "Salary", value: `${m(salary)}/yr (SG only)` },
+      { label: "Div 293", value: `partial — ${m(taxed293)} of ${m(conc)} taxed extra 15%` },
+      { label: "Outside super", value: `${m(150_000)}` }, { label: "Return / inflation", value: "6% / 0%" },
+    ],
+    checkpoints: [
+      superCheckpoint([{ name: "Dan", person }], 6, 0, years, row.totalSuper, config),
+      outsideCheckpoint(150_000, 0, 6, 0, years, row.outside, config),
+      pensionCheckpoint("single", true, row.totalSuper, row.outside, 0, 0, row.agePension, config),
+    ],
+  });
+}
+
+// ── Cutout Cora (boundary: assets-test CUTOUT → nil pension) ──────────────────
+function cutoutCora(config: EngineConfig): PersonaReport {
+  const person: Person = { currentAge: 60, superBalance: 560_000, salary: 75_000, voluntaryConcessional: 0, voluntaryNonConcessional: 0 };
+  const plan: RetirementPlan = {
+    ...DEFAULT_PLAN, household: "single", people: [person], superMode: "individual",
+    homeowner: true, outsideSuper: 180_000, annualOutsideSavings: 3_000,
+    retirementAge: 67, spendingMode: "flat", targetSpending: 60_000, investmentReturn: 6, inflation: 0, lifeExpectancy: 90,
+  };
+  const r = simulate(plan, config);
+  const years = 7;
+  const row = r.rows.find((x) => x.age === 67)!;
+  const side = config.agePension.single;
+  const cutout = side.assetsFreeArea.homeowner + side.maxAnnual / config.agePension.assetsTaperPerDollar;
+
+  return finish({
+    key: "cutout-cora",
+    name: "Cutout Cora",
+    blurb: "An asset-rich single homeowner past the assets-test cutout — the pension tapers to nil.",
+    covers: ["Single", "Homeowner", "Assets-test cutout", "Nil pension", "Means-test cliff"],
+    assumptions: [
+      "Today's dollars (inflation 0%); retires at 67.",
+      `Her assessable assets exceed the single-homeowner assets-test cutout (~${m(cutout)} = ${m(side.assetsFreeArea.homeowner)} free area + ${m(side.maxAnnual)} ÷ ${config.agePension.assetsTaperPerDollar.toFixed(3)}/$ taper), so the assets test tapers the pension to exactly $0 — testing the max(0, …) floor at the cliff.`,
+      `Reference data: FY${config.financialYear} config seed.`,
+    ],
+    inputs: [
+      { label: "Household", value: "Single" }, { label: "Age now → retire", value: "60 → 67" },
+      { label: "Super today", value: `${m(560_000)}` }, { label: "Salary", value: `${m(75_000)}/yr` },
+      { label: "Outside super", value: `${m(180_000)} + ${m(3_000)}/yr` },
+      { label: "Assets-test cutout", value: `~${m(cutout)} (nil pension beyond)` },
+      { label: "Return / inflation", value: "6% / 0%" },
+    ],
+    checkpoints: [
+      superCheckpoint([{ name: "Cora", person }], 6, 0, years, row.totalSuper, config),
+      outsideCheckpoint(180_000, 3_000, 6, 0, years, row.outside, config),
+      pensionCheckpoint("single", true, row.totalSuper, row.outside, 0, 0, row.agePension, config),
+    ],
+  });
+}
+
+// ── Preservation Pia (boundary: retires AT preservation age 60) ──────────────
+function preservationPia(config: EngineConfig): PersonaReport {
+  const person: Person = { currentAge: 55, superBalance: 500_000, salary: 90_000, voluntaryConcessional: 0, voluntaryNonConcessional: 0 };
+  const spend = 45_000;
+  const plan: RetirementPlan = {
+    ...DEFAULT_PLAN, household: "single", people: [person], superMode: "individual",
+    homeowner: true, outsideSuper: 120_000, annualOutsideSavings: 0,
+    retirementAge: 60, spendingMode: "flat", targetSpending: spend, investmentReturn: 6, inflation: 0, lifeExpectancy: 88,
+  };
+  const r = simulate(plan, config);
+  const years = 60 - 55;
+  const row = r.rows.find((x) => x.age === 60)!;
+
+  return finish({
+    key: "preservation-pia",
+    name: "Preservation Pia",
+    blurb: "Retires exactly at preservation age (60) — super unlocks immediately, no bridge.",
+    covers: ["Single", "Homeowner", "Preservation-age edge", "Drawdown phase"],
+    assumptions: [
+      "Today's dollars (inflation 0%).",
+      "Retires at exactly 60 — the mirror of Bridging Ben: her super is accessible from day one, so (with no Age Pension until 67 and no other income) her first-year spending is funded straight from super.",
+      "Super drawn first (it reduces assessable assets), so year-one super drawdown equals her spend.",
+      `Reference data: FY${config.financialYear} config seed.`,
+    ],
+    inputs: [
+      { label: "Household", value: "Single" }, { label: "Age now → retire", value: "55 → 60 (preservation age)" },
+      { label: "Super today", value: `${m(500_000)}` }, { label: "Salary", value: `${m(90_000)}/yr` },
+      { label: "Outside super", value: `${m(120_000)}` },
+      { label: "Spending", value: `${m(spend)}/yr flat` }, { label: "Return / inflation", value: "6% / 0%" },
+    ],
+    checkpoints: [
+      superCheckpoint([{ name: "Pia", person }], 6, 0, years, row.totalSuper, config),
+      outsideCheckpoint(120_000, 0, 6, 0, years, row.outside, config),
+      moneyCheck(
+        "Super accessible & drawn at 60", "Age 60",
+        "Independent: at preservation age super unlocks, so year-one draw = spend (no pension/other income yet)",
+        `No Age Pension until 67, no rent/work → the full ${m(spend)} spend is drawn from super (drawn before savings).`,
+        spend, Math.round(row.superDrawn), 2,
+      ),
+    ],
+  });
+}
+
 export const PERSONAS: ((config: EngineConfig) => PersonaReport)[] = [
   soloSandra, coupledCraigKim, bridgingBen, landlordLena, interestOnlyIan,
   sellingSam, smsfSamSue, cappedCarl, fullPensionFiona, clearingClare,
   downsizingDot, sellUpRita, workingWendy, ttrTom,
+  div293Dan, cutoutCora, preservationPia,
 ];
 
 export function evaluatePersonas(config: EngineConfig): PersonaReport[] {
