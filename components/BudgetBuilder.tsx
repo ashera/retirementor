@@ -797,12 +797,17 @@ function CategoryCard({
   onChange: (annual: number) => void;
 }) {
   const cfgCat = config.asfa.breakdown.categories.find((c) => c.key === meta.key);
-  const comfortable = cfgCat?.comfortable[household] ?? value;
+  const comfortable = cfgCat?.comfortable[household] ?? 5_000;
   const disp = monthly ? Math.round(value / 12) : value;
   const step = monthly ? 25 : 250;
-  const sliderMax = Math.max(
-    Math.ceil((Math.max(comfortable, value) * 2.2) / 500) * 500,
-    1000,
+  // Stable slider ceiling: generous headroom above the ASFA reference — NOT above
+  // the current value, which fed back (max grows with value → value grows with
+  // max) and ran away into the billions. Floored at any existing value so a
+  // typed-in high number isn't cut off, and capped at a sane per-category max
+  // (the number box still accepts anything higher).
+  const sliderMax = Math.min(
+    500_000,
+    Math.max(Math.ceil((comfortable * 3) / 500) * 500, value, 2_000),
   );
   const color = CATEGORY_COLOR[meta.key];
 
