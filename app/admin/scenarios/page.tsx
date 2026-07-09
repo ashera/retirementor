@@ -30,6 +30,7 @@ export default async function ScenariosPage() {
       reports={reports}
       staleCount={staleCount}
       financialYear={DEFAULT_CONFIG.financialYear}
+      runAt={now.toISOString()}
     />
   );
 }

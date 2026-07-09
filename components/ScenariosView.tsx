@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import AdminTabs from "@/components/AdminTabs";
 import { fmtCurrency } from "@/lib/au/format";
@@ -152,12 +152,24 @@ export default function ScenariosView({
   reports,
   staleCount,
   financialYear,
+  runAt,
 }: {
   email: string;
   reports: PersonaReport[];
   staleCount: number;
   financialYear: string;
+  runAt: string; // ISO timestamp of when the page (re)computed the reports server-side
 }) {
+  // These reports are recomputed live on every page load, so the request time IS
+  // the "last run" time. Format in the admin's local timezone after mount so the
+  // SSR markup (server timezone) and the hydrated client don't disagree.
+  const [runLabel, setRunLabel] = useState<string | null>(null);
+  useEffect(() => {
+    setRunLabel(
+      new Date(runAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "medium" }),
+    );
+  }, [runAt]);
+
   const total = reports.reduce((s, r) => s + r.checkpoints.length, 0);
   const passed = reports.reduce((s, r) => s + r.checkpoints.filter((c) => c.pass).length, 0);
   const allPass = passed === total;
@@ -231,7 +243,14 @@ export default function ScenariosView({
           {passed}/{total} checkpoints match the independent reference
         </span>
         <span className="text-muted">{reports.length} personas</span>
-        <span className="ml-auto text-xs text-muted">Computed against the FY{financialYear} reference data</span>
+        <span className="text-xs text-muted">Computed against the FY{financialYear} reference data</span>
+        <span className="ml-auto flex items-center gap-1.5 text-xs text-muted" title="Recomputed live from the reference on every page load — this is the request time.">
+          <span aria-hidden>🕒</span>
+          Just run ·{" "}
+          <time dateTime={runAt} className="font-medium text-slate-200 tabular-nums">
+            {runLabel ?? "moments ago"}
+          </time>
+        </span>
       </div>
 
       {/* Filter */}
