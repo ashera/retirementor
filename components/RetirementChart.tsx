@@ -215,15 +215,21 @@ export default function RetirementChart({
           tickFormatter={fmtCompact}
         />
         <Tooltip content={<AssetsTooltip baselineLabel={baselineLabel} showHome={showHome} />} />
+        {/* Both labels are CENTERED on their own line (insideTop → textAnchor
+            middle at the line's x) so it's obvious which line each names, and
+            they're staggered vertically (Retire on top, Pension a row lower) so
+            they never overlap even when the ages coincide (e.g. retire 65 vs
+            pension 67, or identical). */}
         <ReferenceLine
           x={retirementAge}
           stroke="#f59e0b"
           strokeDasharray="6 4"
           label={{
             value: `Retire ${retirementAge}`,
-            position: "insideTopLeft",
+            position: "insideTop",
             fill: "#f59e0b",
             fontSize: 11,
+            dy: 4,
           }}
         />
         <ReferenceLine
@@ -232,12 +238,10 @@ export default function RetirementChart({
           strokeDasharray="6 4"
           label={{
             value: `Pension ${result.agePensionAge}`,
-            position: "insideTopRight",
+            position: "insideTop",
             fill: "#a78bfa",
             fontSize: 11,
-            // Drop a row below the retirement label so they don't collide when the
-            // ages are close (e.g. retire 65 vs pension 67) or identical.
-            dy: 14,
+            dy: 22,
           }}
         />
         {depletedAge !== null && (
