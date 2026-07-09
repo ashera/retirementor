@@ -800,14 +800,15 @@ function CategoryCard({
   const comfortable = cfgCat?.comfortable[household] ?? 5_000;
   const disp = monthly ? Math.round(value / 12) : value;
   const step = monthly ? 25 : 250;
-  // Stable slider ceiling: generous headroom above the ASFA reference — NOT above
-  // the current value, which fed back (max grows with value → value grows with
-  // max) and ran away into the billions. Floored at any existing value so a
-  // typed-in high number isn't cut off, and capped at a sane per-category max
-  // (the number box still accepts anything higher).
+  // Generous but STABLE slider ceiling. The headroom is a multiple of the fixed
+  // ASFA reference — NOT of the current value (which fed back: max grows with
+  // value → value grows with max → runaway into the billions). Since `value` is
+  // only a FLOOR here, sliding to the end can't grow the max, so it's safe to be
+  // generous: ~$5k/mo minimum for any discretionary category, floored at any
+  // typed-in value, capped at a sane per-category max (the number box takes more).
   const sliderMax = Math.min(
     500_000,
-    Math.max(Math.ceil((comfortable * 3) / 500) * 500, value, 2_000),
+    Math.max(Math.ceil((comfortable * 6) / 1000) * 1000, value, 60_000),
   );
   const color = CATEGORY_COLOR[meta.key];
 
