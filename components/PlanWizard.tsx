@@ -294,7 +294,7 @@ export default function PlanWizard({
           />
         )}
         <Field
-          label="Annual salary"
+          label="Annual salary (excluding super)"
           value={draft.people[i].salary}
           onChange={setPerson(i, "salary")}
           min={0}
@@ -303,8 +303,8 @@ export default function PlanWizard({
           prefix="$"
           hint={
             Number.isFinite(draft.people[i].salary)
-              ? `Employer pays ${fmtCurrency(draft.people[i].salary * config.sgRate)}/yr in super (${(config.sgRate * 100).toFixed(0)}% SG).`
-              : `Your employer adds ${(config.sgRate * 100).toFixed(0)}% on top as super (the Super Guarantee).`
+              ? `Enter your base salary — your employer pays ${fmtCurrency(draft.people[i].salary * config.sgRate)}/yr super on top (${(config.sgRate * 100).toFixed(0)}% SG), so don't include it here.`
+              : `Enter your base salary before super — your employer adds ${(config.sgRate * 100).toFixed(0)}% on top (the Super Guarantee). If your package is quoted "including super", exclude that part.`
           }
         />
       </div>

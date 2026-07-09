@@ -317,8 +317,19 @@ export default function GuidedIntro({
             Projected super at retirement: <strong className="text-accent">{money(result.superAtRetirement)}</strong> at age {result.retirementAge}
           </p>
           <div className="mt-4 grid gap-x-6 gap-y-4 sm:grid-cols-2">
-            <Field label={couple ? "Your income" : "Your income"} value={sal1} onChange={setSal1} min={0} max={400_000} step={5_000} prefix="$" />
-            {couple && <Field label="Partner's income" value={sal2} onChange={setSal2} min={0} max={400_000} step={5_000} prefix="$" />}
+            <Field
+              label="Your income (excl. super)"
+              value={sal1}
+              onChange={setSal1}
+              min={0}
+              max={400_000}
+              step={5_000}
+              prefix="$"
+              hint={`Your base salary — your employer adds ${(config.sgRate * 100).toFixed(0)}% on top as super.`}
+            />
+            {couple && (
+              <Field label="Partner's income (excl. super)" value={sal2} onChange={setSal2} min={0} max={400_000} step={5_000} prefix="$" />
+            )}
             <Field label="Investment return" value={invReturn} onChange={(v) => setOReturn(v)} min={1} max={12} step={0.1} suffix="%" hint="A balanced super fund is roughly 6–8% a year." />
             <Field label="Retire at age" value={retireAge} onChange={(v) => setORetire(Math.round(v))} min={Math.min(maxAge + 1, 55)} max={75} suffix="yrs" />
           </div>
