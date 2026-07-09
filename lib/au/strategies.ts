@@ -9,6 +9,7 @@ import { getInvestmentProperties } from "./types";
 import { fmtCurrency } from "./format";
 import { propertyValueAt, capitalGainsTax, netSaleProceeds } from "./property";
 import { simulate } from "./simulate";
+import { runMonteCarlo } from "./montecarlo";
 import type { EngineConfig } from "./config";
 
 export type StrategyGroup = "home" | "mortgage" | "property" | "timing" | "work";
@@ -88,6 +89,34 @@ export function maxSustainableSpend(plan: RetirementPlan, config: EngineConfig):
   for (let i = 0; i < 20; i++) {
     const mid = (lo + hi) / 2;
     if (lasts(mid)) lo = mid;
+    else hi = mid;
+  }
+  return Math.floor(lo / 1_000) * 1_000;
+}
+
+/**
+ * The highest spend (today's $) whose Monte Carlo success rate still meets
+ * `targetSuccess` (e.g. 0.85) — a *prudent* safe-spend that accounts for
+ * sequence-of-returns risk, unlike {@link maxSustainableSpend} which only uses
+ * the assumed average return. Bisection; success falls monotonically with spend.
+ * ~12 MC runs, so callers should debounce it off the interaction path.
+ */
+export function maxSpendForConfidence(
+  plan: RetirementPlan,
+  config: EngineConfig,
+  targetSuccess: number,
+  mc: { iterations: number; seed: number },
+): number {
+  const success = (s: number) => runMonteCarlo(withSpend(plan, s), config, mc).successRate;
+  const lo0 = 10_000;
+  const hi0 = 300_000;
+  if (success(lo0) < targetSuccess) return lo0; // can't hit the target even minimally
+  if (success(hi0) >= targetSuccess) return hi0; // comfortably funded beyond the ceiling
+  let lo = lo0;
+  let hi = hi0;
+  for (let i = 0; i < 12; i++) {
+    const mid = (lo + hi) / 2;
+    if (success(mid) >= targetSuccess) lo = mid;
     else hi = mid;
   }
   return Math.floor(lo / 1_000) * 1_000;

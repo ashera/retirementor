@@ -17,6 +17,7 @@ import {
   applyStrategies,
   resolveValues,
   maxSustainableSpend,
+  maxSpendForConfidence,
   GROUP_LABEL,
   type StrategyCard,
   type StrategyGroup,
@@ -29,6 +30,12 @@ import Field from "@/components/Field";
 
 const PLAN_KEY = "au-retirement-plan";
 const GROUP_ORDER: StrategyGroup[] = ["home", "mortgage", "property", "timing", "work"];
+
+// "Safe spend" = highest spend with at least this Monte Carlo success rate. Uses
+// fewer iterations than the headline MC (it's bisected ~12×) but the same fixed
+// seed, and is debounced off the interaction path.
+const SAFE_TARGET = 0.85;
+const SAFE_MC = { iterations: 300, seed: 12345 } as const;
 
 const annualSpend = (p: RetirementPlan) =>
   Math.max(1, p.spendingMode === "stages" ? p.spendingStages.goGo : p.targetSpending);
@@ -191,6 +198,25 @@ export default function WhatIfView({
     const others = new Set(active);
     others.delete("adjust-spending");
     return maxSustainableSpend(applyStrategies(baseline, catalog, others, values), config);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [baseline, catalog, active, otherValsKey, config]);
+
+  // Prudent "safe spend" = highest spend with ≥ SAFE_TARGET Monte Carlo success.
+  // Heavy (bisected MC), so debounced off the interaction path with a pending
+  // pulse — same pattern as the composed MC above.
+  const [safeSpend, setSafeSpend] = useState<number | null>(null);
+  const [safePending, setSafePending] = useState(false);
+  useEffect(() => {
+    if (!baseline) return;
+    setSafePending(true);
+    const others = new Set(active);
+    others.delete("adjust-spending");
+    const base = applyStrategies(baseline, catalog, others, values);
+    const id = setTimeout(() => {
+      setSafeSpend(maxSpendForConfidence(base, config, SAFE_TARGET, SAFE_MC));
+      setSafePending(false);
+    }, 450);
+    return () => clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [baseline, catalog, active, otherValsKey, config]);
 
@@ -456,9 +482,14 @@ export default function WhatIfView({
                     sustainable={
                       card.id === "adjust-spending" && spendSustainable != null
                         ? {
-                            amount: spendSustainable,
+                            stretch: spendSustainable,
+                            safe: safeSpend,
+                            safePending,
+                            targetPct: Math.round(SAFE_TARGET * 100),
                             life: baseline.lifeExpectancy,
-                            onApply: () => setParam("adjust-spending", "spend", spendSustainable),
+                            onSetSafe: () => {
+                              if (safeSpend != null) setParam("adjust-spending", "spend", safeSpend);
+                            },
                           }
                         : undefined
                     }
@@ -661,7 +692,14 @@ function StrategyCardRow({
   values: Record<string, number>;
   onToggle: () => void;
   onParam: (key: string, v: number) => void;
-  sustainable?: { amount: number; life: number; onApply: () => void };
+  sustainable?: {
+    stretch: number; // deterministic max (assumed return) — the slider ceiling
+    safe: number | null; // prudent MC-based safe spend (null while first computing)
+    safePending: boolean;
+    targetPct: number;
+    life: number;
+    onSetSafe: () => void;
+  };
 }) {
   return (
     <div className={`rounded-2xl border p-4 transition ${on ? "border-accent/40 bg-accent/5" : "border-line bg-panel"}`}>
@@ -690,10 +728,11 @@ function StrategyCardRow({
             // the downsizer contribution can't exceed the equity actually freed).
             const cap = pm.dynamicMax ? pm.dynamicMax(values) : Infinity;
             let effMax = Math.min(pm.max, cap);
-            // Let the spend slider reach the sustainable max so "Set to max" lands.
-            if (sustainable && pm.key === "spend" && sustainable.amount > effMax) {
+            // Let the spend slider reach the deterministic max ("stretch") so both
+            // the safe spend and the stretch are reachable.
+            if (sustainable && pm.key === "spend" && sustainable.stretch > effMax) {
               const step = pm.step || 1_000;
-              effMax = Math.ceil(sustainable.amount / step) * step;
+              effMax = Math.ceil(sustainable.stretch / step) * step;
             }
             const hint =
               pm.dynamicMax != null
@@ -721,37 +760,46 @@ function StrategyCardRow({
           )}
           {sustainable && (
             <div className="rounded-lg border border-accent/30 bg-accent/5 px-3 py-2 text-xs">
-              {sustainable.amount <= 10_000 ? (
-                <span className="text-amber-400">
-                  Your plan may not last to {sustainable.life} even at minimal spending — try other levers first.
+              {sustainable.safe == null && sustainable.safePending ? (
+                <span className="flex items-center gap-1.5 text-muted">
+                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent" />
+                  Finding your safe spend…
                 </span>
-              ) : (
+              ) : sustainable.safe != null && sustainable.safe <= 10_000 ? (
+                <span className="text-amber-400">
+                  Even minimal spending is under {sustainable.targetPct}% likely to last to {sustainable.life} — try other
+                  levers first.
+                </span>
+              ) : sustainable.safe != null ? (
                 <>
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-slate-300">
-                      On the plan&apos;s assumed return, spending up to{" "}
-                      <span className="font-semibold text-accent">{fmtCurrency(sustainable.amount)}/yr</span> still reaches{" "}
-                      {sustainable.life}.
+                      Safe spend: up to{" "}
+                      <span className="font-semibold text-accent">{fmtCurrency(sustainable.safe)}/yr</span> — about{" "}
+                      {sustainable.targetPct}% likely to last to {sustainable.life}.
+                      {sustainable.safePending && (
+                        <span className="ml-1 inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-accent align-middle" />
+                      )}
                     </span>
                     <button
                       type="button"
-                      onClick={sustainable.onApply}
+                      onClick={sustainable.onSetSafe}
                       className="shrink-0 rounded-md border border-accent/40 bg-accent/10 px-2.5 py-1 font-semibold text-accent transition hover:bg-accent/20"
                     >
-                      Set to max
+                      Set to safe
                     </button>
                   </div>
                   <div className="mt-1 text-[11px] text-muted">
-                    Near the max there&apos;s little buffer — see &ldquo;Likely to last&rdquo; for the odds once market ups
-                    &amp; downs are included.
+                    On steady average returns it stretches to ~{fmtCurrency(sustainable.stretch)}/yr, but with little
+                    buffer for market swings.
                   </div>
-                  {values.spend > sustainable.amount + 500 && (
+                  {values.spend > sustainable.safe + 500 && (
                     <div className="mt-1 text-amber-400">
-                      You&apos;re above that — on the assumed return your money won&apos;t reach {sustainable.life}.
+                      Above your safe spend — &ldquo;Likely to last&rdquo; falls from here.
                     </div>
                   )}
                 </>
-              )}
+              ) : null}
             </div>
           )}
         </div>

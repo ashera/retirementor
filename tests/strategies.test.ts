@@ -2,7 +2,8 @@ import { describe, it, expect } from "vitest";
 import { simulate } from "../lib/au/simulate";
 import { DEFAULT_CONFIG as cfg } from "../lib/au/config";
 import { DEFAULT_PLAN, getInvestmentProperties, type PropertyDetail, type RetirementPlan } from "../lib/au/types";
-import { buildStrategyCatalog, applyStrategies, resolveValues, maxSustainableSpend, withSpend } from "../lib/au/strategies";
+import { buildStrategyCatalog, applyStrategies, resolveValues, maxSustainableSpend, maxSpendForConfidence, withSpend } from "../lib/au/strategies";
+import { runMonteCarlo } from "../lib/au/montecarlo";
 import { rowNetWorth } from "../lib/au/networth";
 import { seniorEmploymentTax } from "../lib/au/tax";
 
@@ -76,6 +77,20 @@ describe("What-If strategies", () => {
     // At the sustainable level the money lasts; a clear step above it, it doesn't.
     expect(simulate(withSpend(b, s), cfg).lastsToLifeExpectancy).toBe(true);
     expect(simulate(withSpend(b, s + 5_000), cfg).lastsToLifeExpectancy).toBe(false);
+  });
+
+  it("maxSpendForConfidence finds the highest spend meeting a Monte Carlo success target, below the deterministic max", () => {
+    const b = base({
+      people: [{ currentAge: 66, superBalance: 900_000, salary: 0, voluntaryConcessional: 0, voluntaryNonConcessional: 0 }],
+      retirementAge: 66, outsideSuper: 300_000, targetSpending: 45_000, lifeExpectancy: 90,
+    });
+    const mc = { iterations: 300, seed: 12345 };
+    const safe = maxSpendForConfidence(b, cfg, 0.85, mc);
+    // At the safe level success meets the target; a clear step above it, it doesn't.
+    expect(runMonteCarlo(withSpend(b, safe), cfg, mc).successRate).toBeGreaterThanOrEqual(0.85);
+    expect(runMonteCarlo(withSpend(b, safe + 10_000), cfg, mc).successRate).toBeLessThan(0.85);
+    // Accounting for market risk, the safe spend is below the deterministic max.
+    expect(safe).toBeLessThan(maxSustainableSpend(b, cfg));
   });
 
   it("salary-sacrifice adds concessional contributions for the primary earner", () => {
