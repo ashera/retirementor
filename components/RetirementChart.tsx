@@ -92,6 +92,7 @@ export default function RetirementChart({
   animate = true,
   height = 320,
   showHome = false,
+  showTooltip = true,
   wageInflationPct,
   cpiPct,
 }: {
@@ -104,6 +105,7 @@ export default function RetirementChart({
   animate?: boolean;
   height?: number;
   showHome?: boolean; // add the exempt-home band → a net-worth view
+  showTooltip?: boolean; // false hides the floating hover info box ("Chris's Toggle")
   // RG 276 two-stage deflators. When supplied (and wage ≠ CPI) the whole balance
   // line is drawn on a single CPI basis so it stays continuous through retirement.
   wageInflationPct?: number;
@@ -214,7 +216,7 @@ export default function RetirementChart({
           width={54}
           tickFormatter={fmtCompact}
         />
-        <Tooltip content={<AssetsTooltip baselineLabel={baselineLabel} showHome={showHome} />} />
+        {showTooltip && <Tooltip content={<AssetsTooltip baselineLabel={baselineLabel} showHome={showHome} />} />}
         {/* Both labels are CENTERED on their own line (insideTop → textAnchor
             middle at the line's x) so it's obvious which line each names, and
             they're staggered vertically (Retire on top, Pension a row lower) so

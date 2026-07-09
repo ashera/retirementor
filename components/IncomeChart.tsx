@@ -74,12 +74,14 @@ export default function IncomeChart({
   height = 220,
   onSelectYear,
   minDrawdownBands,
+  showTooltip = true,
 }: {
   result: SimResult;
   animate?: boolean;
   height?: number;
   onSelectYear?: (age: number) => void;
   minDrawdownBands?: readonly { minAge: number; rate: number }[];
+  showTooltip?: boolean; // false hides the floating hover info box ("Chris's Toggle")
 }) {
   // Show the full timeline (income is $0 through the accumulation years) so this
   // chart's x-axis lines up with the balance chart above it.
@@ -118,7 +120,7 @@ export default function IncomeChart({
           width={54}
           tickFormatter={fmtCompact}
         />
-        <Tooltip content={<IncomeTooltip />} />
+        {showTooltip && <Tooltip content={<IncomeTooltip />} />}
         {/* Super's minimum drawdown % steps up at these ages, which forces more out
             of super — nudging the super-vs-savings split and causing visible steps. */}
         {(minDrawdownBands ?? [])
