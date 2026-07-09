@@ -11,26 +11,56 @@ function val(v: number | string) {
 }
 
 // Give each persona a face. Silhouette avatars in /public/avatars, matched to
-// each persona's name/gender (couples take their lead member); every avatar is
-// used once. Falls back to a deterministic pick if a new persona lacks a mapping.
-const AVATAR_BY_KEY: Record<string, string> = {
-  "solo-sandra": "agent-1",
-  "coupled-craig-kim": "agent-4",
-  "bridging-ben": "agent-0",
-  "landlord-lena": "agent-5",
-  "interest-only-ian": "agent-2",
-  "selling-sam": "agent-9",
-  "smsf-sam-sue": "agent-3",
-  "capped-carl": "agent-7",
-  "full-pension-fiona": "agent-8",
-  "clearing-clare": "agent-6",
+// each persona's name/gender. Couples get BOTH partners (a male + female pair,
+// rendered as a subtle overlap); singles get one. Falls back to a deterministic
+// pick if a new persona lacks a mapping.
+const AVATAR_BY_KEY: Record<string, string[]> = {
+  "solo-sandra": ["agent-1"],
+  "coupled-craig-kim": ["agent-4", "agent-3"], // Craig & Kim
+  "bridging-ben": ["agent-0"],
+  "landlord-lena": ["agent-5"],
+  "interest-only-ian": ["agent-2"],
+  "selling-sam": ["agent-9"],
+  "smsf-sam-sue": ["agent-7", "agent-1"], // Sam & Sue
+  "capped-carl": ["agent-7"],
+  "full-pension-fiona": ["agent-8"],
+  "clearing-clare": ["agent-6"],
 };
 
-function avatarSrc(key: string): string {
-  const id =
+function avatarSrcs(key: string): string[] {
+  const ids =
     AVATAR_BY_KEY[key] ??
-    `agent-${[...key].reduce((h, c) => (h + c.charCodeAt(0)) % 10, 0)}`;
-  return `/avatars/${id}.jpg`;
+    [`agent-${[...key].reduce((h, c) => (h + c.charCodeAt(0)) % 10, 0)}`];
+  return ids.map((id) => `/avatars/${id}.jpg`);
+}
+
+// One face for a single, two subtly-overlapped faces for a couple. The ring is
+// the card's own background colour so the overlap reads as a clean crescent.
+function PersonaAvatar({ srcs }: { srcs: string[] }) {
+  if (srcs.length < 2) {
+    return (
+      <img
+        src={srcs[0]}
+        alt=""
+        aria-hidden
+        className="h-14 w-14 shrink-0 rounded-full object-cover ring-1 ring-line"
+      />
+    );
+  }
+  return (
+    <div className="flex shrink-0 items-center" aria-hidden>
+      <img
+        src={srcs[0]}
+        alt=""
+        className="h-12 w-12 rounded-full object-cover ring-2 ring-panel-2"
+      />
+      <img
+        src={srcs[1]}
+        alt=""
+        className="-ml-4 h-12 w-12 rounded-full object-cover ring-2 ring-panel-2"
+      />
+    </div>
+  );
 }
 
 function Checkpoint({ cp }: { cp: CheckpointResult }) {
@@ -101,12 +131,7 @@ function PersonaCard({
         >
           ▸
         </span>
-        <img
-          src={avatarSrc(report.key)}
-          alt=""
-          aria-hidden
-          className="h-14 w-14 shrink-0 rounded-full object-cover ring-1 ring-line"
-        />
+        <PersonaAvatar srcs={avatarSrcs(report.key)} />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-lg font-bold text-white">{report.name}</h2>
