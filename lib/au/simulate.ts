@@ -216,8 +216,14 @@ export function simulate(
       outside = startOutside * (1 + realReturn) + savings * outsideHalf;
       const outsideGrowth = outside - startOutside - savings;
 
+      // Held investment-property equity (value − loan) for the net-worth view.
+      // Nothing sells while working, so every property still counts. The engine
+      // otherwise only needs this in retirement (the means test), but the net-worth
+      // band spans the whole timeline, so we compute it here too.
+      const accumPropertyEquity = properties.reduce((s, prop) => s + netEquity(prop, propertyValueAt(prop, t)), 0);
+
       rows.push(
-        row(oldest, startSuper, startOutside, 0, 0, 0, 0, "accumulation", true, 0, 0, {
+        row(oldest, startSuper, startOutside, 0, 0, 0, 0, "accumulation", true, 0, accumPropertyEquity, {
           openingSuper: startSuper,
           openingOutside: startOutside,
           closingSuper: sum(balances),

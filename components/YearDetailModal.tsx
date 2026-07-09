@@ -153,6 +153,7 @@ export default function YearDetailModal({
               <div className="text-[11px] text-muted">
                 super {fmtCurrency(b.openingSuper)} · outside {fmtCurrency(b.openingOutside)}
                 {row.homeEquity > 0 && ` · home equity ${fmtCurrency(row.homeEquity)}`}
+                {row.propertyEquity > 0 && ` · property ${fmtCurrency(row.propertyEquity)}`}
               </div>
             </div>
             <div className="text-xl text-muted">→</div>

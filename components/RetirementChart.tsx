@@ -21,7 +21,7 @@ export interface SpendingBand {
   fill: string;
 }
 
-type ChartRow = Partial<YearRow> & { age: number; baselineTotal?: number };
+type ChartRow = Partial<YearRow> & { age: number; baselineTotal?: number; propertyNW?: number };
 
 function AssetsTooltip({
   active,
@@ -37,17 +37,23 @@ function AssetsTooltip({
   if (!active || !payload?.length) return null;
   const r = payload[0].payload;
   const home = showHome ? Math.max(0, r.homeEquity ?? 0) : 0;
+  const property = showHome ? Math.max(0, r.propertyNW ?? 0) : 0;
   return (
     <div className="rounded-lg border border-line bg-panel px-3 py-2 text-sm shadow-xl">
       <div className="font-semibold text-white">Age {r.age}</div>
       {r.total !== undefined && (
         <div className="tabular-nums text-slate-200">
-          {showHome ? "Net worth" : "Total"} {fmtCurrency(r.total + home)}
+          {showHome ? "Net worth" : "Total"} {fmtCurrency(r.total + home + property)}
         </div>
       )}
       {showHome && r.homeEquity !== undefined && (
         <div className="tabular-nums text-slate-400">
           Home equity {fmtCurrency(home)}
+        </div>
+      )}
+      {showHome && property > 0 && (
+        <div className="tabular-nums" style={{ color: "#fb923c" }}>
+          Investment property {fmtCurrency(property)}
         </div>
       )}
       {r.totalSuper !== undefined && (
@@ -126,7 +132,11 @@ export default function RetirementChart({
 
   // Merge current + baseline rows by age so the ghost line can span its own range.
   const byAge = new Map<number, ChartRow>();
-  for (const r of cpiBasis(result.rows)) byAge.set(r.age, { ...r });
+  // Net-worth property band = held equity plus, in the sale year only, the sale
+  // proceeds (which land in the OUTSIDE opening balance next year, not this one) —
+  // so a sale reallocates cleanly with no one-year dip.
+  for (const r of cpiBasis(result.rows))
+    byAge.set(r.age, { ...r, propertyNW: Math.max(0, (r.propertyEquity ?? 0) + (r.breakdown?.propertyProceeds ?? 0)) });
   if (baseline) {
     for (const r of cpiBasis(baseline.rows)) {
       const e = byAge.get(r.age);
@@ -178,6 +188,10 @@ export default function RetirementChart({
           <linearGradient id="homeFill" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#64748b" stopOpacity={0.4} />
             <stop offset="100%" stopColor="#64748b" stopOpacity={0.04} />
+          </linearGradient>
+          <linearGradient id="propertyFill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#fb923c" stopOpacity={0.4} />
+            <stop offset="100%" stopColor="#fb923c" stopOpacity={0.04} />
           </linearGradient>
         </defs>
         <CartesianGrid strokeDasharray="3 3" stroke="#232c40" vertical={false} />
@@ -241,6 +255,18 @@ export default function RetirementChart({
             strokeWidth={2}
             fill="url(#homeFill)"
             name="Home equity"
+            isAnimationActive={animate}
+          />
+        )}
+        {showHome && (
+          <Area
+            type="monotone"
+            dataKey="propertyNW"
+            stackId="1"
+            stroke="#fb923c"
+            strokeWidth={2}
+            fill="url(#propertyFill)"
+            name="Investment property"
             isAnimationActive={animate}
           />
         )}

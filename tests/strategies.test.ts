@@ -175,6 +175,31 @@ describe("What-If strategies", () => {
     expect(end(toSuper)).toBeGreaterThan(end(toSavings));
   });
 
+  it("selling an investment property reallocates net worth (no windfall)", () => {
+    const b = base({
+      people: [{ currentAge: 66, superBalance: 300_000, salary: 0, voluntaryConcessional: 0, voluntaryNonConcessional: 0 }],
+      retirementAge: 66, outsideSuper: 100_000, targetSpending: 50_000, lifeExpectancy: 90,
+      // purchasePrice = value + growthReal 0 → no capital gain, so the reallocation
+      // is exact (no CGT) and easy to assert against.
+      investmentProperties: [prop({ value: 600_000, purchasePrice: 600_000, loanBalance: 200_000, growthReal: 0 })],
+    });
+    const card = cardById(b, "sell-prop-0");
+    const rows = simulate(card.apply(b, resolveValues(card, { age: 70 })), cfg).rows;
+    // Net worth as the chart plots it: held equity + (in the sale year) the proceeds,
+    // which only land in the OUTSIDE opening balance the following year.
+    const nw = (age: number) => {
+      const r = rows.find((x) => x.age === age)!;
+      return r.homeEquity + r.propertyEquity + r.breakdown.propertyProceeds + r.totalSuper + r.outside;
+    };
+    // The held property's net equity ($600k − $200k loan) is on the net-worth ledger...
+    expect(rows.find((r) => r.age === 69)!.propertyEquity).toBeCloseTo(400_000, -3);
+    // ...and drops to 0 at the sale as the proceeds move into savings.
+    expect(rows.find((r) => r.age === 70)!.propertyEquity).toBe(0);
+    // No windfall: the sale-year net-worth change is ordinary drawdown, NOT a jump
+    // by the sale proceeds (the bug when held equity wasn't counted in net worth).
+    expect(Math.abs((nw(69) - nw(70)) - (nw(68) - nw(69)))).toBeLessThan(20_000);
+  });
+
   it("the home appreciates, so a later downsize frees more equity", () => {
     const b = base({
       people: [{ currentAge: 65, superBalance: 200_000, salary: 0, voluntaryConcessional: 0, voluntaryNonConcessional: 0 }],

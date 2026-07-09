@@ -336,6 +336,7 @@ export default function WhatIfView({
             <div className="mt-3 flex flex-wrap gap-4">
               {[
                 ...(chartView === "networth" ? [{ c: "#64748b", l: "Home equity" }] : []),
+                ...(chartView === "networth" && getInvestmentProperties(composed).length ? [{ c: "#fb923c", l: "Investment property" }] : []),
                 { c: "#34d399", l: "Super" },
                 { c: "#38bdf8", l: "Outside super" },
                 ...(chartView === "balance" && changed ? [{ c: "#94a3b8", l: "Baseline" }] : []),
