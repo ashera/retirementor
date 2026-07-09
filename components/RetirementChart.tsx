@@ -231,10 +231,13 @@ export default function RetirementChart({
           stroke="#a78bfa"
           strokeDasharray="6 4"
           label={{
-            value: "Pension 67",
+            value: `Pension ${result.agePensionAge}`,
             position: "insideTopRight",
             fill: "#a78bfa",
             fontSize: 11,
+            // Drop a row below the retirement label so they don't collide when the
+            // ages are close (e.g. retire 65 vs pension 67) or identical.
+            dy: 14,
           }}
         />
         {depletedAge !== null && (
