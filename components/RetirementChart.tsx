@@ -36,7 +36,7 @@ function AssetsTooltip({
 }) {
   if (!active || !payload?.length) return null;
   const r = payload[0].payload;
-  const home = showHome ? Math.max(0, r.homeValue ?? 0) : 0;
+  const home = showHome ? Math.max(0, r.homeEquity ?? 0) : 0;
   return (
     <div className="rounded-lg border border-line bg-panel px-3 py-2 text-sm shadow-xl">
       <div className="font-semibold text-white">Age {r.age}</div>
@@ -45,9 +45,9 @@ function AssetsTooltip({
           {showHome ? "Net worth" : "Total"} {fmtCurrency(r.total + home)}
         </div>
       )}
-      {showHome && r.homeValue !== undefined && (
+      {showHome && r.homeEquity !== undefined && (
         <div className="tabular-nums text-slate-400">
-          Home (exempt) {fmtCurrency(home)}
+          Home equity {fmtCurrency(home)}
         </div>
       )}
       {r.totalSuper !== undefined && (
@@ -235,12 +235,12 @@ export default function RetirementChart({
         {showHome && (
           <Area
             type="monotone"
-            dataKey="homeValue"
+            dataKey="homeEquity"
             stackId="1"
             stroke="#64748b"
             strokeWidth={2}
             fill="url(#homeFill)"
-            name="Home (exempt)"
+            name="Home equity"
             isAnimationActive={animate}
           />
         )}

@@ -135,6 +135,26 @@ describe("What-If strategies", () => {
     expect(b70.breakdown.mortgageCleared).toBe(0);
   });
 
+  it("net worth is continuous across a downsize with a mortgage (home band nets the loan)", () => {
+    const b = base({
+      people: [{ currentAge: 64, superBalance: 400_000, salary: 0, voluntaryConcessional: 0, voluntaryNonConcessional: 0 }],
+      retirementAge: 64, outsideSuper: 100_000, targetSpending: 60_000, lifeExpectancy: 90,
+      home: { value: 1_000_000, growthReal: 0 },
+      mortgage: { type: "interest_only", balance: 300_000, interestRate: 6, annualRepayment: 0, payoffAge: null, strategy: "carry" },
+    });
+    const card = cardById(b, "downsize");
+    const rows = simulate(card.apply(b, resolveValues(card, { age: 67, newValue: 600_000, toSuper: 0 })), cfg).rows;
+    const nw = (age: number) => { const r = rows.find((x) => x.age === age)!; return r.homeEquity + r.totalSuper + r.outside; };
+    // The net-worth home band already nets the $300k mortgage before the downsize,
+    // and becomes the new home value once the loan is discharged at the sale.
+    expect(rows.find((r) => r.age === 66)!.homeEquity).toBeCloseTo(700_000, -2);
+    expect(rows.find((r) => r.age === 67)!.homeEquity).toBeCloseTo(600_000, -2);
+    // The downsize adds no net-worth cliff: the drop into the downsize year is the
+    // same normal drawdown as an ordinary year, NOT the $300k loan the old gross
+    // band lost when the mortgage was discharged.
+    expect(Math.abs((nw(66) - nw(67)) - (nw(65) - nw(66)))).toBeLessThan(20_000);
+  });
+
   it("routing freed equity into super beats savings — outside earnings are taxed, super's aren't", () => {
     const b = base({
       people: [{ currentAge: 66, superBalance: 400_000, salary: 0, voluntaryConcessional: 0, voluntaryNonConcessional: 0 }],

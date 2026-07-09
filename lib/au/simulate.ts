@@ -163,6 +163,13 @@ export function simulate(
     }
     const isHomeowner = plan.homeowner && !(sellRent != null && oldest >= sellRent.atAge);
     const homeValueThisYear = homeVal;
+    // Net-worth band = home equity = market value less any mortgage still owed
+    // against it. Netting the loan keeps net worth continuous across a downsize,
+    // which discharges the loan from the sale proceeds (mortgageCleared is already
+    // set at the top of this loop when a downsize/sale happens).
+    const outstandingLoan =
+      mortgage && !mortgageCleared && isHomeowner && mortgageActiveAtAge(mortgage, oldest) ? mortgage.balance : 0;
+    const homeEquityThisYear = Math.max(0, homeValueThisYear - outstandingLoan);
 
     // Balances at the START of this year (on the birthday) — this is what each
     // data point plots, so the peak lands on the retirement age, not the year before.
@@ -240,6 +247,7 @@ export function simulate(
           homeProceeds: 0,
           homeProceedsToSuper: 0,
           homeValue: homeValueThisYear,
+          homeEquity: homeEquityThisYear,
         }),
       );
       continue;
@@ -470,6 +478,7 @@ export function simulate(
         homeProceeds: homeProceedsThisYear,
         homeProceedsToSuper: homeToSuperThisYear,
         homeValue: homeValueThisYear,
+        homeEquity: homeEquityThisYear,
       }),
     );
   }
@@ -527,6 +536,7 @@ function row(
     salaryIncome: breakdown.salaryIncome,
     workIncome: breakdown.workIncome,
     homeValue: breakdown.homeValue,
+    homeEquity: breakdown.homeEquity,
     superDrawn,
     outsideDrawn,
     spending,

@@ -335,7 +335,7 @@ export default function WhatIfView({
             />
             <div className="mt-3 flex flex-wrap gap-4">
               {[
-                ...(chartView === "networth" ? [{ c: "#64748b", l: "Home (exempt)" }] : []),
+                ...(chartView === "networth" ? [{ c: "#64748b", l: "Home equity" }] : []),
                 { c: "#34d399", l: "Super" },
                 { c: "#38bdf8", l: "Outside super" },
                 ...(chartView === "balance" && changed ? [{ c: "#94a3b8", l: "Baseline" }] : []),
@@ -348,7 +348,7 @@ export default function WhatIfView({
             </div>
             <p className="mt-2 text-xs text-muted">
               {chartView === "networth"
-                ? "Your assets incl. the exempt home (appreciating in real terms) — watch a downsize reallocate it (home shrinks, savings grow). "
+                ? "Your assets incl. your home equity (market value less any mortgage) — a downsize reallocates it (home shrinks, savings grow) without losing net worth. "
                 : "Tip: "}
               Click a year to break down that year&apos;s money flow.
             </p>

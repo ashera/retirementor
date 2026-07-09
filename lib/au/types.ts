@@ -266,7 +266,8 @@ export interface YearBreakdown {
   // opening balance, so it explains a step-up rather than a mid-year inflow.
   homeProceeds: number; // total equity freed (0 normally)
   homeProceedsToSuper: number; // portion contributed to super as a downsizer (rest → savings)
-  homeValue: number; // the home's (exempt) value this year — for the net-worth view
+  homeValue: number; // the home's (exempt) market value this year — for the net-worth view
+  homeEquity: number; // homeValue less any outstanding mortgage — the net-worth band uses this
 }
 
 export interface YearRow {
@@ -278,7 +279,8 @@ export interface YearRow {
   pension: PensionBreakdown | null; // means-test working behind agePension (null before pension age)
   salaryIncome: number; // gross household salary this year (0 once retired)
   workIncome: number; // net part-time work income this year (0 outside the work years)
-  homeValue: number; // the home's (exempt) value this year — for the net-worth view
+  homeValue: number; // the home's (exempt) market value this year — for the net-worth view
+  homeEquity: number; // homeValue less any outstanding mortgage — the net-worth band uses this
   superDrawn: number; // drawn from super this year
   outsideDrawn: number; // drawn from outside-super this year
   spending: number; // target spending this year (0 while working)
