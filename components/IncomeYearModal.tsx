@@ -73,6 +73,17 @@ export default function IncomeYearModal({
   const yearsElapsed = row.age - oldestCurrentAge;
   const propsList = getInvestmentProperties(plan);
   const propertyCount = propsList.length;
+
+  // Working-year waterfall: how gross salary is reduced to take-home. Salary
+  // sacrifice (concessional above compulsory SG) is pre-tax; income tax follows;
+  // after-tax (non-concessional) contributions come out of the take-home. SG is
+  // employer-paid on top and doesn't reduce pay.
+  const sgTotal = plan.people.reduce((s, p) => s + p.salary * config.sgRate, 0);
+  const salarySacrifice = Math.max(0, row.breakdown.contribGross - sgTotal);
+  const taxableIncome = Math.max(0, row.salaryIncome - salarySacrifice);
+  const incomeTaxAmt = Math.max(0, taxableIncome - row.takeHome);
+  const afterTaxContrib = plan.people.reduce((s, p) => s + Math.min(p.voluntaryNonConcessional, config.nonConcessionalCap), 0);
+  const leftToSpend = Math.max(0, row.takeHome - afterTaxContrib);
   // Label for a property line: its custom name, else "Property N" (or a lone
   // "Investment property"), matching the wizard's naming.
   const propLabel = (part: { name?: string; index: number }) =>
@@ -147,32 +158,69 @@ export default function IncomeYearModal({
               </div>
 
               <section>
-                <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted">Where it comes from</h3>
-                <div className="rounded-xl border border-line bg-panel px-3 py-1">
-                  <Row
-                    color="#facc15"
-                    label="Salary"
-                    sub={couple ? "Combined gross salary for the household." : "Your gross salary."}
-                    value={row.salaryIncome}
-                  />
+                <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted">From salary to take-home</h3>
+                <div className="rounded-xl border border-line bg-panel px-4 py-1 text-sm">
+                  <div className="flex items-baseline justify-between gap-4 py-2">
+                    <span className="text-slate-200">Gross salary{couple ? " (household)" : ""}</span>
+                    <span className="shrink-0 font-semibold tabular-nums text-white">{cur(row.salaryIncome)}</span>
+                  </div>
                   {couple && (
-                    <div className="space-y-0.5 border-t border-line py-2 pl-[18px]">
+                    <div className="space-y-0.5 pb-2 pl-1 text-[11px] text-muted">
                       {plan.people.map((pp, i) => (
-                        <div key={i} className="flex justify-between gap-4 text-[11px] text-muted">
+                        <div key={i} className="flex justify-between gap-4">
                           <span>
                             {i === 0 ? "You" : "Partner"}
                             {pp.currentAge + yearsElapsed > 0 && ` (age ${pp.currentAge + yearsElapsed})`}
                             {pp.salary <= 0 && " — not earning"}
                           </span>
-                          <span className="tabular-nums text-slate-200">{cur(pp.salary)}</span>
+                          <span className="tabular-nums text-slate-300">{cur(pp.salary)}</span>
                         </div>
                       ))}
                     </div>
                   )}
+                  {salarySacrifice > 0 && (
+                    <div className="flex items-baseline justify-between gap-4 py-1.5">
+                      <span className="text-muted">
+                        Salary sacrifice
+                        <span className="block text-[11px] leading-snug">before tax → into super (concessional)</span>
+                      </span>
+                      <span className="shrink-0 tabular-nums text-amber-400">−{cur(salarySacrifice)}</span>
+                    </div>
+                  )}
+                  <div className="flex items-baseline justify-between gap-4 border-b border-line py-1.5">
+                    <span className="text-muted">
+                      Income tax
+                      <span className="block text-[11px] leading-snug">on {cur(taxableIncome)} taxable income</span>
+                    </span>
+                    <span className="shrink-0 tabular-nums text-amber-400">−{cur(incomeTaxAmt)}</span>
+                  </div>
+                  <div className="flex items-baseline justify-between gap-4 py-2">
+                    <span className="font-semibold text-slate-200">Take-home pay</span>
+                    <span className="shrink-0 font-semibold tabular-nums text-yellow-400">{cur(row.takeHome)}</span>
+                  </div>
+                  {afterTaxContrib > 0 && (
+                    <>
+                      <div className="flex items-baseline justify-between gap-4 border-t border-line py-1.5">
+                        <span className="text-muted">
+                          After-tax super contributions
+                          <span className="block text-[11px] leading-snug">from your take-home (non-concessional)</span>
+                        </span>
+                        <span className="shrink-0 tabular-nums text-amber-400">−{cur(afterTaxContrib)}</span>
+                      </div>
+                      <div className="flex items-baseline justify-between gap-4 py-1.5">
+                        <span className="font-semibold text-slate-200">Left to spend &amp; save</span>
+                        <span className="shrink-0 font-semibold tabular-nums text-white">{cur(leftToSpend)}</span>
+                      </div>
+                    </>
+                  )}
                 </div>
+                <p className="mt-1 text-[11px] leading-snug text-muted">
+                  Employer Super Guarantee ({cur(sgTotal)}) is paid on top of your salary, straight into super — it
+                  doesn&apos;t come out of your pay.
+                </p>
               </section>
 
-              {(row.breakdown.contribGross > 0 || row.breakdown.savings > 0) && (
+              {(row.breakdown.contribGross > 0 || afterTaxContrib > 0 || row.breakdown.savings > 0) && (
                 <section>
                   <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted">
                     What you&apos;re putting away this year
@@ -181,9 +229,17 @@ export default function IncomeYearModal({
                     {row.breakdown.contribGross > 0 && (
                       <Row
                         color="#34d399"
-                        label="Into super"
-                        sub="Employer Super Guarantee plus any salary sacrifice, before the 15% contributions tax."
+                        label="Into super — concessional"
+                        sub={`Employer Super Guarantee${salarySacrifice > 0 ? ` (${cur(sgTotal)}) plus ${cur(salarySacrifice)} salary sacrifice` : ""}, before the 15% contributions tax.`}
                         value={row.breakdown.contribGross}
+                      />
+                    )}
+                    {afterTaxContrib > 0 && (
+                      <Row
+                        color="#22d3ee"
+                        label="Into super — after-tax"
+                        sub="Non-concessional contributions from your take-home (already taxed, so no 15% on the way in)."
+                        value={afterTaxContrib}
                       />
                     )}
                     {row.breakdown.savings > 0 && (
