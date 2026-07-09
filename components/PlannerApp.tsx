@@ -1161,6 +1161,16 @@ export default function PlannerApp({
             </button>
           </div>
         )}
+        {prudentDelta != null && !overspending && !spendHeadroom && !mcMaxPending && (
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
+            <p className="text-sm text-slate-300">
+              <span className="font-semibold text-accent">Just right!</span> Your spending is about the most you
+              can prudently afford — right around the {Math.round(MC_CONFIDENCE_TARGET * 100)}% mark. Nothing to
+              trim, nothing left on the table.
+            </p>
+            <span className="text-2xl" aria-hidden>🎯</span>
+          </div>
+        )}
       </div>
 
       <TrimSpendingModal
