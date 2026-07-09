@@ -894,14 +894,16 @@ export default function PlannerApp({
         </div>
         <IncomeChart
           result={result}
+          minDrawdownBands={config.minDrawdownBands}
           onSelectYear={(age) => {
             track("Year breakdown opened", { chart: "income" });
             setIncomeAge(age);
           }}
         />
         <p className="mt-2 text-center text-xs text-muted">
-          Tip: click any year to see why your income is that amount — your salary
-          while working, then your retirement income sources.
+          Dotted lines mark where super&apos;s <strong>minimum drawdown</strong> rate steps up (5% → 6% → 7%…) — the law
+          makes you draw a bigger slice of super at those ages, which can shift the super-vs-savings mix and cause the
+          steps you see. Click any year for the full breakdown.
         </p>
       </div>
 

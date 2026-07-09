@@ -73,11 +73,13 @@ export default function IncomeChart({
   animate = true,
   height = 220,
   onSelectYear,
+  minDrawdownBands,
 }: {
   result: SimResult;
   animate?: boolean;
   height?: number;
   onSelectYear?: (age: number) => void;
+  minDrawdownBands?: readonly { minAge: number; rate: number }[];
 }) {
   // Show the full timeline (income is $0 through the accumulation years) so this
   // chart's x-axis lines up with the balance chart above it.
@@ -117,6 +119,20 @@ export default function IncomeChart({
           tickFormatter={fmtCompact}
         />
         <Tooltip content={<IncomeTooltip />} />
+        {/* Super's minimum drawdown % steps up at these ages, which forces more out
+            of super — nudging the super-vs-savings split and causing visible steps. */}
+        {(minDrawdownBands ?? [])
+          .filter((b) => b.minAge > result.retirementAge && b.minAge > rows[0].age && b.minAge < rows[rows.length - 1].age)
+          .map((b) => (
+            <ReferenceLine
+              key={`dd-${b.minAge}`}
+              x={b.minAge}
+              stroke="#64748b"
+              strokeDasharray="2 3"
+              strokeOpacity={0.45}
+              label={{ value: `min ${Math.round(b.rate * 100)}%`, position: "top", fill: "#64748b", fontSize: 10 }}
+            />
+          ))}
         {/* Guide lines matching the balance chart so the two align vertically. */}
         <ReferenceLine
           x={result.retirementAge}

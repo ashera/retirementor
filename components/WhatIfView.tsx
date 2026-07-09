@@ -409,7 +409,7 @@ export default function WhatIfView({
 
         {chartView === "income" ? (
           <>
-            <IncomeChart result={compRes} height={300} animate={false} onSelectYear={setSelectedYear} />
+            <IncomeChart result={compRes} height={300} animate={false} minDrawdownBands={config.minDrawdownBands} onSelectYear={setSelectedYear} />
             <div className="mt-3 flex flex-wrap gap-4">
               {incomeLegend.map((it) => (
                 <span key={it.l} className="flex items-center gap-1.5 text-xs text-muted">
@@ -420,7 +420,8 @@ export default function WhatIfView({
             </div>
             <p className="mt-2 text-xs text-muted">
               {changed ? "Your income mix with the selected strategies. " : "Where your income comes from each year. "}
-              Click a year to see why it&apos;s that amount.
+              Dotted lines mark where super&apos;s minimum drawdown rate steps up (5% → 6% → 7%…), which can shift the
+              super-vs-savings mix. Click a year to see why it&apos;s that amount.
             </p>
           </>
         ) : (
