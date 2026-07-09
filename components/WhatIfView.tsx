@@ -64,6 +64,7 @@ interface Marginal {
   dollars: number; // combined "better off"
   moneyLeft: number; // change in money left at the end
   shortfallAvoided: number; // reduction in unfunded spending
+  netWorth: number; // change in total net worth (incl. home + property) at life expectancy
 }
 
 /** Compact signed dollar delta, or null when too small to bother showing. */
@@ -156,6 +157,7 @@ export default function WhatIfView({
     const life = baseline.lifeExpectancy;
     const baseScore = lastsScore(baseRes, denom, life);
     const baseParts = planParts(baseRes);
+    const baseTermNW = baseRes.rows.length ? rowNetWorth(baseRes.rows[baseRes.rows.length - 1]) : 0;
     const out: Record<string, Marginal> = {};
     for (const card of catalog) {
       const single = card.apply(baseline, resolveValues(card, values[card.id]));
@@ -163,11 +165,13 @@ export default function WhatIfView({
       const parts = planParts(res);
       const moneyLeft = parts.final - baseParts.final;
       const shortfallAvoided = baseParts.shortfall - parts.shortfall;
+      const termNW = res.rows.length ? rowNetWorth(res.rows[res.rows.length - 1]) : 0;
       out[card.id] = {
         years: lastsScore(res, denom, life) - baseScore,
         dollars: moneyLeft + shortfallAvoided,
         moneyLeft,
         shortfallAvoided,
+        netWorth: termNW - baseTermNW,
       };
     }
     return out;
@@ -427,7 +431,7 @@ export default function WhatIfView({
                     key={card.id}
                     card={card}
                     on={active.has(card.id)}
-                    delta={marginal[card.id] ?? { years: 0, dollars: 0, moneyLeft: 0, shortfallAvoided: 0 }}
+                    delta={marginal[card.id] ?? { years: 0, dollars: 0, moneyLeft: 0, shortfallAvoided: 0, netWorth: 0 }}
                     life={baseline.lifeExpectancy}
                     values={resolveValues(card, values[card.id])}
                     onToggle={() => toggle(card)}
@@ -586,20 +590,30 @@ function ImpactBreakdown({ delta, life }: { delta: Marginal; life: number }) {
   );
 }
 
-function DeltaChip({ years, dollars }: { years: number; dollars: number }) {
+function DeltaChip({ years, dollars, netWorth }: { years: number; dollars: number; netWorth: number }) {
   const yAbs = Math.abs(years);
   const yStr = yAbs < 0.05 ? null : `${years > 0 ? "+" : "−"}${yAbs >= 10 ? Math.round(yAbs) : yAbs.toFixed(1)} yrs`;
   const dStr = fmtDelta(dollars);
-  if (!yStr && !dStr) return <span className="text-xs text-muted">≈ no change</span>;
+  const nwStr = fmtDelta(netWorth);
+  if (!yStr && !dStr && !nwStr) return <span className="text-xs text-muted">≈ no change</span>;
   const tone = (v: number) => (v > 0 ? "text-accent" : "text-amber-400");
   return (
     <span
       className="shrink-0 text-right text-xs font-semibold tabular-nums"
-      title="This lever on its own: how much longer the money lasts, and how much better off you are overall (money left at the end, less any spending it couldn't fund)."
+      title="This lever on its own: how much longer the money lasts and how much better off you are for funding retirement (money left at the end, less any spending it couldn't fund), plus its effect on your total net worth (incl. home & property) at the end."
     >
-      {yStr && <span className={tone(years)}>{yStr}</span>}
-      {yStr && dStr && <span className="text-muted"> · </span>}
-      {dStr && <span className={tone(dollars)}>{dStr}</span>}
+      {(yStr || dStr) && (
+        <span className="block">
+          {yStr && <span className={tone(years)}>{yStr}</span>}
+          {yStr && dStr && <span className="text-muted"> · </span>}
+          {dStr && <span className={tone(dollars)}>{dStr}</span>}
+        </span>
+      )}
+      {nwStr && (
+        <span className="block text-[10px] font-medium text-muted">
+          net worth <span className={tone(netWorth)}>{nwStr}</span>
+        </span>
+      )}
     </span>
   );
 }
@@ -636,7 +650,7 @@ function StrategyCardRow({
         <button type="button" onClick={onToggle} className="min-w-0 flex-1 text-left">
           <div className="text-sm font-semibold text-white">{card.label}</div>
         </button>
-        <DeltaChip years={delta.years} dollars={delta.dollars} />
+        <DeltaChip years={delta.years} dollars={delta.dollars} netWorth={delta.netWorth} />
       </div>
 
       {on && (
