@@ -106,6 +106,10 @@ const EDGE: { name: string; plan: RetirementPlan }[] = [
   { name: "edge/non-concessional", plan: b0({ people: [P({ currentAge: 50, voluntaryNonConcessional: 30_000 })] }) },
   { name: "edge/already-retired", plan: b0({ people: [P({ currentAge: 68 })], retirementAge: 65 }) },
   { name: "edge/full-pension-renter", plan: b0({ people: [P({ currentAge: 66, superBalance: 120_000, salary: 40_000 })], homeowner: false, outsideSuper: 20_000 }) },
+  // What-If strategy edges — run the universal invariants over the newer levers.
+  { name: "edge/downsize", plan: b0({ people: [P({ currentAge: 60, superBalance: 400_000 })], retirementAge: 65, home: { value: 900_000, growthReal: 2, downsize: { atAge: 70, newValue: 550_000, toSuper: 150_000 } } }) },
+  { name: "edge/sell-and-rent", plan: b0({ people: [P({ currentAge: 60, superBalance: 350_000 })], retirementAge: 65, home: { value: 800_000, growthReal: 2, sellAndRent: { atAge: 72, rentPerYear: 30_000 } } }) },
+  { name: "edge/part-time-work", plan: b0({ people: [P({ currentAge: 62, superBalance: 320_000 })], retirementAge: 67, workIncome: { perYear: 30_000, untilAge: 72 } }) },
 ];
 
 const PLANS = [...buildPlans(), ...EDGE];
@@ -132,8 +136,14 @@ describe(`Stress matrix — ${PLANS.length} plans, universal invariants`, () => 
       const wedge = Math.pow((1 + (plan.inflation + cfg.livingStandardsGrowthPct) / 100) / (1 + plan.inflation / 100), n);
       for (let i = 0; i < r.rows.length - 1; i++) {
         const f = r.rows[i].phase === "accumulation" && r.rows[i + 1].phase !== "accumulation" ? wedge : 1;
-        if (!near(r.rows[i].breakdown.closingSuper * f, r.rows[i + 1].breakdown.openingSuper)) fails.push(`${name} chain super @${r.rows[i].age}`);
-        if (!near(r.rows[i].breakdown.closingOutside * f, r.rows[i + 1].breakdown.openingOutside)) fails.push(`${name} chain outside @${r.rows[i].age}`);
+        // A downsize/sell-up releases home equity into the NEXT year's opening
+        // balance (super via the downsizer contribution, the rest into savings),
+        // so the chain link carries that injection across the event.
+        const next = r.rows[i + 1].breakdown;
+        const injSuper = next.homeProceedsToSuper;
+        const injOutside = next.homeProceeds - next.homeProceedsToSuper;
+        if (!near(r.rows[i].breakdown.closingSuper * f + injSuper, next.openingSuper)) fails.push(`${name} chain super @${r.rows[i].age}`);
+        if (!near(r.rows[i].breakdown.closingOutside * f + injOutside, next.openingOutside)) fails.push(`${name} chain outside @${r.rows[i].age}`);
       }
     }
     expect(fails.slice(0, 25)).toEqual([]);
@@ -166,8 +176,9 @@ describe(`Stress matrix — ${PLANS.length} plans, universal invariants`, () => 
         const closingTotal = b.closingSuper + b.closingOutside;
         const growth = b.superGrowth + b.outsideGrowth;
         const netDrawdown = openingTotal + growth + b.propertyProceeds - b.mortgageCleared - b.fees - b.outsideTax - closingTotal;
-        if (!near(b.agePension + b.rentIncome + netDrawdown, row.spending, 2)) {
-          fails.push(`${name} @${row.age}: pension ${b.agePension.toFixed(0)} + rent ${b.rentIncome.toFixed(0)} + draw ${netDrawdown.toFixed(0)} ≠ spend ${row.spending.toFixed(0)}`);
+        // Part-time work (net of tax) also funds spending, alongside pension + rent.
+        if (!near(b.agePension + b.rentIncome + b.workIncome + netDrawdown, row.spending, 2)) {
+          fails.push(`${name} @${row.age}: pension ${b.agePension.toFixed(0)} + rent ${b.rentIncome.toFixed(0)} + work ${b.workIncome.toFixed(0)} + draw ${netDrawdown.toFixed(0)} ≠ spend ${row.spending.toFixed(0)}`);
         }
       }
     }

@@ -56,6 +56,7 @@ function moneyCheck(
 function pensionCheckpoint(
   household: Household, homeowner: boolean, assessableSuper: number, assessableOutside: number,
   propertyEquity: number, rentAssessable: number, actual: number, config: EngineConfig,
+  otherLabel = "net rent", // what the non-deemed assessable income is (rent, or work net of Work Bonus)
 ): CheckpointResult {
   const financial = assessableSuper + assessableOutside;
   const assess = financial + propertyEquity;
@@ -73,7 +74,7 @@ function pensionCheckpoint(
   const workings =
     `Assessable assets = super + outside${propertyEquity ? " + investment-property equity" : ""} = ${m(assess)} (family home exempt${homeowner ? "" : "; renter"}). ` +
     `ASSETS test: ${m(side.maxAnnual)} max − max(0, ${m(assess)} − ${m(freeArea)} free area) × $${config.agePension.assetsTaperPerDollar.toFixed(3)}/$ = ${m(assetsTest)}. ` +
-    `INCOME test: deemed on financial ${m(financial)} = ${m(deemed)}${rentAssessable ? ` + net rent ${m(rentAssessable)} (actual, not deemed)` : ""} = ${m(income)}; ${m(side.maxAnnual)} − max(0, ${m(income)} − ${m(side.incomeFreeAreaAnnual)} free area) × ${config.agePension.incomeTaperPerDollar}/$ = ${m(incomeTest)}. ` +
+    `INCOME test: deemed on financial ${m(financial)} = ${m(deemed)}${rentAssessable ? ` + ${otherLabel} ${m(rentAssessable)} (actual, not deemed)` : ""} = ${m(income)}; ${m(side.maxAnnual)} − max(0, ${m(income)} − ${m(side.incomeFreeAreaAnnual)} free area) × ${config.agePension.incomeTaperPerDollar}/$ = ${m(incomeTest)}. ` +
     `Pension = the LOWER of the two = ${pen.binding.toUpperCase()} test → ${m(pen.annual)}.`;
 
   return moneyCheck(
@@ -577,9 +578,230 @@ function clearingClare(config: EngineConfig): PersonaReport {
   });
 }
 
+// ── Downsizing Dot (What-If: downsize) ───────────────────────────────────────
+function downsizingDot(config: EngineConfig): PersonaReport {
+  const person: Person = { currentAge: 58, superBalance: 400_000, salary: 70_000, voluntaryConcessional: 0, voluntaryNonConcessional: 0 };
+  const plan: RetirementPlan = {
+    ...DEFAULT_PLAN, household: "single", people: [person], superMode: "individual",
+    homeowner: true, outsideSuper: 250_000, annualOutsideSavings: 0,
+    retirementAge: 65, spendingMode: "flat", targetSpending: 45_000,
+    investmentReturn: 6, inflation: 0, lifeExpectancy: 90,
+    home: { value: 900_000, growthReal: 2, downsize: { atAge: 70, newValue: 550_000, toSuper: 200_000 } },
+  };
+  const r = simulate(plan, config);
+  const retYears = 65 - 58;
+  const retRow = r.rows.find((x) => x.age === 65)!;
+  const dsRow = r.rows.find((x) => x.breakdown.homeProceeds > 0)!;
+  const dsYears = dsRow.age - 58;
+  const grown = ref.homeValueAt(900_000, 2, dsYears);
+  const release = ref.downsizerRelease(900_000, 2, dsYears, 550_000, 0);
+  const toSuper = Math.min(200_000, release);
+
+  return finish({
+    key: "downsizing-dot",
+    name: "Downsizing Dot",
+    blurb: "Retires at 65, downsizes her home at 70 and tips part of the freed equity into super.",
+    covers: ["Single", "Homeowner", "Downsize", "Downsizer contribution", "Home appreciation"],
+    assumptions: [
+      "Today's dollars (inflation 0%); retires at 65.",
+      "Home appreciates 2% real/yr, so the equity freed at the downsize is the GROWN value less the new (smaller) home — derived independently, not read from the engine.",
+      "Downsizer contribution is post-tax (no contributions tax), capped at the freed equity and $300k.",
+      `Reference data: FY${config.financialYear} config seed.`,
+    ],
+    inputs: [
+      { label: "Household", value: "Single" }, { label: "Age now → retire", value: "58 → 65" },
+      { label: "Super today", value: `${m(400_000)}` }, { label: "Salary", value: `${m(70_000)}/yr` },
+      { label: "Outside super", value: `${m(250_000)}` },
+      { label: "Home", value: `${m(900_000)} today, +2% real/yr` },
+      { label: "Downsize", value: `at 70 → ${m(550_000)} home; ${m(200_000)} to super` },
+      { label: "Return / inflation", value: "6% / 0%" },
+    ],
+    checkpoints: [
+      superCheckpoint([{ name: "Dot", person }], 6, 0, retYears, retRow.totalSuper, config),
+      outsideCheckpoint(250_000, 0, 6, 0, retYears, retRow.outside, config),
+      moneyCheck(
+        "Equity freed by downsizing", `Age ${dsRow.age}`,
+        "Independent: grown home value − new home − loan",
+        `${m(900_000)}×(1+2%)^${dsYears} = ${m(grown)}, − ${m(550_000)} new home (no loan) → ${m(release)} freed.`,
+        Math.round(release), Math.round(dsRow.breakdown.homeProceeds), 2,
+      ),
+      moneyCheck(
+        "Downsizer contribution to super", `Age ${dsRow.age}`,
+        "Independent: min(chosen $200k, freed equity), post-tax",
+        `min(${m(200_000)}, ${m(release)}) → ${m(toSuper)} into super; the rest goes to (deemed) savings.`,
+        Math.round(toSuper), Math.round(dsRow.breakdown.homeProceedsToSuper), 2,
+      ),
+    ],
+  });
+}
+
+// ── Sell-up Rita (What-If: sell & rent) ──────────────────────────────────────
+function sellUpRita(config: EngineConfig): PersonaReport {
+  const person: Person = { currentAge: 60, superBalance: 350_000, salary: 80_000, voluntaryConcessional: 0, voluntaryNonConcessional: 0 };
+  const plan: RetirementPlan = {
+    ...DEFAULT_PLAN, household: "single", people: [person], superMode: "individual",
+    homeowner: true, outsideSuper: 120_000, annualOutsideSavings: 0,
+    retirementAge: 65, spendingMode: "flat", targetSpending: 50_000,
+    investmentReturn: 6, inflation: 0, lifeExpectancy: 90,
+    home: { value: 800_000, growthReal: 2, sellAndRent: { atAge: 72, rentPerYear: 30_000 } },
+  };
+  const r = simulate(plan, config);
+  const retYears = 65 - 60;
+  const retRow = r.rows.find((x) => x.age === 65)!;
+  const saleRow = r.rows.find((x) => x.breakdown.homeProceeds > 0)!;
+  const saleYears = saleRow.age - 60;
+  const grown = ref.homeValueAt(800_000, 2, saleYears);
+  const release = ref.sellUpRelease(800_000, 2, saleYears, 0);
+
+  return finish({
+    key: "sell-up-rita",
+    name: "Sell-up Rita",
+    blurb: "Sells the family home at 72, banks the equity and rents from then on.",
+    covers: ["Single", "Sell & rent", "Home appreciation", "Non-homeowner switch"],
+    assumptions: [
+      "Today's dollars (inflation 0%); retires at 65.",
+      "Selling up releases ALL equity (grown value net of any loan) into savings — derived independently.",
+      "From the sale she is a NON-homeowner (higher assets free area) and pays $30k/yr rent.",
+      `Reference data: FY${config.financialYear} config seed.`,
+    ],
+    inputs: [
+      { label: "Household", value: "Single" }, { label: "Age now → retire", value: "60 → 65" },
+      { label: "Super today", value: `${m(350_000)}` }, { label: "Salary", value: `${m(80_000)}/yr` },
+      { label: "Outside super", value: `${m(120_000)}` },
+      { label: "Home", value: `${m(800_000)} today, +2% real/yr` },
+      { label: "Sell & rent", value: `at 72 → rent ${m(30_000)}/yr` },
+      { label: "Return / inflation", value: "6% / 0%" },
+    ],
+    checkpoints: [
+      superCheckpoint([{ name: "Rita", person }], 6, 0, retYears, retRow.totalSuper, config),
+      outsideCheckpoint(120_000, 0, 6, 0, retYears, retRow.outside, config),
+      moneyCheck(
+        "Equity freed by selling up", `Age ${saleRow.age}`,
+        "Independent: grown home value − loan (all to savings)",
+        `${m(800_000)}×(1+2%)^${saleYears} = ${m(grown)}, no loan → ${m(release)} released to savings.`,
+        Math.round(release), Math.round(saleRow.breakdown.homeProceeds), 2,
+      ),
+    ],
+  });
+}
+
+// ── Working Wendy (What-If: part-time work) ──────────────────────────────────
+function workingWendy(config: EngineConfig): PersonaReport {
+  const person: Person = { currentAge: 62, superBalance: 320_000, salary: 70_000, voluntaryConcessional: 0, voluntaryNonConcessional: 0 };
+  const plan: RetirementPlan = {
+    ...DEFAULT_PLAN, household: "single", people: [person], superMode: "individual",
+    homeowner: true, outsideSuper: 60_000, annualOutsideSavings: 0,
+    retirementAge: 67, spendingMode: "flat", targetSpending: 45_000,
+    investmentReturn: 6, inflation: 0, lifeExpectancy: 88,
+    workIncome: { perYear: 30_000, untilAge: 72 },
+  };
+  const r = simulate(plan, config);
+  const years = 67 - 62;
+  const row = r.rows.find((x) => x.age === 67)!;
+  const netWork = ref.netWorkIncome(30_000, 1, "single");
+  const assessableWork = ref.workBonusAssessable(30_000, 1);
+
+  return finish({
+    key: "working-wendy",
+    name: "Working Wendy",
+    blurb: "Works part-time ($30k/yr) from 67 to 72 alongside a part Age Pension.",
+    covers: ["Single", "Homeowner", "Part-time work", "Work Bonus", "Part pension"],
+    assumptions: [
+      "Today's dollars (inflation 0%); retires (stops the career job) at 67 but earns $30k/yr part-time to 72.",
+      "Part-time income is taxed at the senior (SAPTO) rate and, for the Age Pension income test, the first $7,800/yr is excluded by the Work Bonus.",
+      `Reference data: FY${config.financialYear} config seed.`,
+    ],
+    inputs: [
+      { label: "Household", value: "Single" }, { label: "Age now → retire", value: "62 → 67" },
+      { label: "Super today", value: `${m(320_000)}` }, { label: "Salary", value: `${m(70_000)}/yr` },
+      { label: "Outside super", value: `${m(60_000)}` },
+      { label: "Part-time work", value: `${m(30_000)}/yr, 67 → 72` },
+      { label: "Home", value: "Owner" }, { label: "Return / inflation", value: "6% / 0%" },
+    ],
+    checkpoints: [
+      superCheckpoint([{ name: "Wendy", person }], 6, 0, years, row.totalSuper, config),
+      outsideCheckpoint(60_000, 0, 6, 0, years, row.outside, config),
+      moneyCheck(
+        "Part-time income, net of tax", "Age 67",
+        "Independent: gross $30k less senior (SAPTO) income tax",
+        `$30k − senior income tax($30k, single) = ${m(30_000)} − ${m(30_000 - netWork)} → ${m(netWork)} net (offsets drawdown).`,
+        Math.round(netWork), Math.round(row.breakdown.workIncome), 2,
+      ),
+      pensionCheckpoint(
+        "single", true, row.totalSuper, row.outside, 0, assessableWork, row.agePension, config,
+        "work income net of the $7,800 Work Bonus",
+      ),
+    ],
+  });
+}
+
+// ── TTR Tom (What-If: transition to retirement) ──────────────────────────────
+function ttrTom(config: EngineConfig): PersonaReport {
+  const salary = 150_000;
+  const extraSacrifice = 20_000;
+  const person: Person = { currentAge: 60, superBalance: 400_000, salary, voluntaryConcessional: 0, voluntaryNonConcessional: 0 };
+  const plan: RetirementPlan = {
+    ...DEFAULT_PLAN, household: "single", people: [person], superMode: "individual",
+    homeowner: true, outsideSuper: 100_000, annualOutsideSavings: 0,
+    retirementAge: 65, spendingMode: "flat", targetSpending: 50_000,
+    investmentReturn: 6, inflation: 0, lifeExpectancy: 88,
+    ttr: { extraSacrifice },
+  };
+  const r = simulate(plan, config);
+  const years = 65 - 60;
+  const retRow = r.rows.find((x) => x.age === 65)!;
+  const ttrRow = r.rows.find((x) => x.age === 61)!;
+
+  const et = config.superEarningsTaxAccumulation;
+  const feePct = config.fees?.adminInvestmentPct ?? 0;
+  const deduction = (config.fees?.fixedAdminAnnual ?? 0) + (config.fees?.insuranceAnnual ?? 0);
+  const netContrib = ref.netAnnualContribution(
+    salary, config.sgRate, 0, config.concessionalCap, config.contributionsTax, 0,
+    config.nonConcessionalCap, config.div293Threshold, config.div293ExtraTaxRate,
+  );
+  const ttr = ref.ttrBenefit(salary, 0, extraSacrifice, config.sgRate, config.concessionalCap, config.contributionsTax);
+  const expSuper = ref.superBalanceAt(400_000, netContrib + ttr, 6, 0, et, years, feePct, deduction);
+
+  return finish({
+    key: "ttr-tom",
+    name: "TTR Tom",
+    blurb: "Uses a Transition-to-Retirement swap from 60 to boost super without cutting take-home.",
+    covers: ["Single", "Homeowner", "Transition to Retirement", "Concessional cap", "High earner"],
+    assumptions: [
+      "Today's dollars (inflation 0%). Already at preservation age (60), so the TTR swap runs every accumulation year to 65.",
+      "The swap replaces $20k of pre-tax salary with a tax-free TTR pension: take-home is unchanged; super gains the income tax saved LESS 15% contributions tax, bounded by the concessional-cap room.",
+      "The net TTR benefit is added to super each year, so the retirement balance is the closed form on (net contribution + TTR benefit).",
+      `Reference data: FY${config.financialYear} config seed.`,
+    ],
+    inputs: [
+      { label: "Household", value: "Single" }, { label: "Age now → retire", value: "60 → 65" },
+      { label: "Super today", value: `${m(400_000)}` }, { label: "Salary", value: `${m(salary)}/yr` },
+      { label: "TTR extra sacrifice", value: `${m(extraSacrifice)}/yr (from 60)` },
+      { label: "Outside super", value: `${m(100_000)}` },
+      { label: "Return / inflation", value: "6% / 0%" },
+    ],
+    checkpoints: [
+      moneyCheck(
+        "TTR benefit — net super gain", "Age 61",
+        "Independent: income tax saved on the swapped slice − 15% contributions tax",
+        `Sacrifice ${m(extraSacrifice)} (within cap room); tax saved − ${m(extraSacrifice)}×15% → ${m(ttr)}/yr added to super.`,
+        Math.round(ttr), Math.round(ttrRow.breakdown.ttrBenefit), 1,
+      ),
+      moneyCheck(
+        "Super at retirement (with TTR)", "Age 65",
+        "Closed form on (net contribution + TTR benefit), independent of the engine loop",
+        `Add-then-grow with net contribution ${m(netContrib)} + TTR ${m(ttr)} over ${years} yrs → ${m(expSuper)}.`,
+        Math.round(expSuper), Math.round(retRow.totalSuper), 2,
+      ),
+      outsideCheckpoint(100_000, 0, 6, 0, years, retRow.outside, config),
+    ],
+  });
+}
+
 export const PERSONAS: ((config: EngineConfig) => PersonaReport)[] = [
   soloSandra, coupledCraigKim, bridgingBen, landlordLena, interestOnlyIan,
   sellingSam, smsfSamSue, cappedCarl, fullPensionFiona, clearingClare,
+  downsizingDot, sellUpRita, workingWendy, ttrTom,
 ];
 
 export function evaluatePersonas(config: EngineConfig): PersonaReport[] {
