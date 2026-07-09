@@ -68,6 +68,7 @@ export default function TrimSpendingModal({
   const cutPct = nowTotal > 0 ? Math.round((cut / nowTotal) * 100) : 0;
   const beforePct = Math.round(trim.successBefore * 100);
   const afterPct = Math.round(trim.successAfter * 100);
+  const reachesTarget = trim.reachesTarget; // hit the 85% bar vs. just "lasts on average"
 
   const apply = () => {
     onApply(trim.patch);
@@ -118,8 +119,16 @@ export default function TrimSpendingModal({
                 )}
                 . Trimming discretionary to <strong className="text-white">{fmtCurrency(afterTotal)}/yr all in</strong> —
                 keeping <strong className="text-emerald-400">{trim.discretionaryKeptPct}%</strong> of it — lifts you to about{" "}
-                <strong className="text-white">{afterPct}% likely</strong> to last, allowing for market ups and downs.
+                <strong className="text-white">{afterPct}% likely</strong> to last
+                {reachesTarget ? ", allowing for market ups and downs." : " — the most trimming alone can do here."}
               </p>
+              {!reachesTarget && (
+                <p className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-2.5 text-xs text-amber-200">
+                  Trimming can&apos;t get you all the way to the {trim.targetPct}% mark on its own — it does make your
+                  money last on the average projection. To close the rest, also <strong>save more</strong> or{" "}
+                  <strong>retire later</strong> (see the levers above).
+                </p>
+              )}
 
               <div className="rounded-xl border border-line bg-panel-2 p-4">
                 <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">
@@ -160,22 +169,31 @@ export default function TrimSpendingModal({
                 </div>
               </div>
 
-              <div className="flex items-center justify-between gap-4 rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3">
+              <div
+                className={`flex items-center justify-between gap-4 rounded-xl border px-4 py-3 ${
+                  reachesTarget ? "border-emerald-500/20 bg-emerald-500/5" : "border-amber-500/20 bg-amber-500/5"
+                }`}
+              >
                 <div>
-                  <div className="font-semibold text-emerald-300">Cuts {fmtCurrency(cut)}/yr ({cutPct}%)</div>
+                  <div className={`font-semibold ${reachesTarget ? "text-emerald-300" : "text-amber-300"}`}>
+                    Cuts {fmtCurrency(cut)}/yr ({cutPct}%)
+                  </div>
                   <div className="text-xs text-muted">
-                    About {afterPct}% likely to last to age {plan.lifeExpectancy}.
+                    {reachesTarget
+                      ? `About ${afterPct}% likely to last to age ${plan.lifeExpectancy}.`
+                      : `Makes it last on the average projection — about ${afterPct}% likely once market swings are allowed for.`}
                   </div>
                 </div>
-                <span className="text-2xl" aria-hidden>✅</span>
+                <span className="text-2xl" aria-hidden>{reachesTarget ? "✅" : "⚠️"}</span>
               </div>
 
               <p className="text-xs text-muted">
                 {single
                   ? "This lowers your flat retirement income target."
                   : "Every lifestage keeps its essentials and is trimmed by the same share of discretionary, so your go-go / slow-go / no-go shape is preserved."}{" "}
-                This keeps you about {trim.targetPct}% likely to last — a buffer for market swings, not just the average
-                projection. You can fine-tune afterwards.
+                {reachesTarget
+                  ? `This keeps you about ${trim.targetPct}% likely to last — a buffer for market swings, not just the average projection. You can fine-tune afterwards.`
+                  : "You can fine-tune afterwards, or lift the other levers to push past the mark."}
               </p>
             </>
           ) : (

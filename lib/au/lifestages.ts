@@ -23,19 +23,16 @@ export function essentialsFloor(
   }
   const hh = plan.household === "couple" ? "couple" : "single";
   let ess = 0;
-  let tot = 0;
   for (const c of config.asfa.breakdown.categories) {
-    const v = c.comfortable[hh];
-    tot += v;
-    if (isEssential(c.key)) ess += v;
+    if (isEssential(c.key)) ess += c.comfortable[hh];
   }
-  const frac = tot > 0 ? ess / tot : 0.75;
-  // Reference the plan's actual top-of-retirement spend, and clamp the floor to
-  // the smallest stage (flat plans have a single amount) so discretionary ≥ 0.
+  // Use the ASFA essentials as a FIXED dollar floor (housing, food, health,
+  // energy, transport…), not a fraction of the user's spend — otherwise a big
+  // spender's "essentials" balloon and leave almost nothing to trim. Clamp to
+  // the smallest stage so a modest budget's discretionary never goes negative.
   const staged = plan.spendingMode === "stages";
-  const top = staged ? plan.spendingStages.goGo : plan.targetSpending;
   const bottom = staged ? plan.spendingStages.noGo : plan.targetSpending;
-  const floor = Math.min(top * frac, bottom);
+  const floor = Math.min(ess, bottom);
   return { value: round100(floor), estimated: true };
 }
 

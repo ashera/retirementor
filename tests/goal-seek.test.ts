@@ -105,6 +105,25 @@ describe("Spending trim (prudent, mirror of boost)", () => {
     expect(after.lastsToLifeExpectancy).toBe(true);
   });
 
+  it("best-effort: trims to 'lasts on average' when the 85% bar is out of reach", () => {
+    // Under-funded: even essentials-only can't clear 85%, but there IS discretionary
+    // to cut — so it must still offer a useful trim, not dead-end.
+    const plan: RetirementPlan = {
+      ...DEFAULT_PLAN, household: "single",
+      people: [{ ...DEFAULT_PLAN.people[0], currentAge: 60, superBalance: 300_000 }],
+      superMode: "individual", homeowner: true, outsideSuper: 60_000, annualOutsideSavings: 0,
+      retirementAge: 64, spendingMode: "flat", targetSpending: 55_000,
+      investmentReturn: 6, inflation: 2.5, lifeExpectancy: 92,
+    };
+    const trim = trimSpending(plan, cfg);
+    expect(trim.applicable).toBe(true);
+    expect(trim.feasible).toBe(true); // still offers a trim...
+    expect(trim.reachesTarget).toBe(false); // ...even though it can't hit 85%
+    expect(trim.successAfter).toBeGreaterThan(trim.successBefore); // it improves the odds
+    expect(trim.discretionaryKeptPct).toBeGreaterThan(0); // keeps some (lasts, not essentials-only)
+    expect(simulate({ ...plan, ...trim.patch }, cfg).lastsToLifeExpectancy).toBe(true);
+  });
+
   it("is not offered when the plan is already prudent (boost's territory)", () => {
     const trim = trimSpending({ ...rich, targetSpending: 45_000 }, cfg);
     expect(trim.applicable).toBe(false);

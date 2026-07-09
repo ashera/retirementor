@@ -228,7 +228,8 @@ function livingReader(patch: Partial<RetirementPlan>): (key: string) => number {
 
 export interface SpendingTrim {
   applicable: boolean; // the plan is under the confidence bar, so a trim is relevant
-  feasible: boolean; // cutting discretionary (down to the essentials floor) can reach the bar
+  feasible: boolean; // trimming discretionary meaningfully improves things (worth offering)
+  reachesTarget: boolean; // the trim gets all the way to the 85% bar (vs. just "lasts on average")
   essentials: number; // the flat essentials floor — held constant, never trimmed
   essentialsEstimated: boolean; // true when estimated from ASFA (no user budget)
   discretionaryKeptPct: number; // 0–100, share of discretionary retained after the trim
@@ -238,18 +239,21 @@ export interface SpendingTrim {
   depletedAgeIfEssentialsOnly: number | null; // when infeasible: where essentials-only still runs out
   successBefore: number; // Monte Carlo chance the CURRENT spend lasts (0–1)
   successAfter: number; // Monte Carlo chance the trimmed spend lasts (0–1)
-  targetPct: number; // the confidence bar the trim is held to (e.g. 85)
+  targetPct: number; // the confidence bar the trim aims for (e.g. 85)
 }
 
 /**
- * Trim the budget down to the most it can PRUDENTLY afford — the exact mirror of
- * {@link boostSpending}. It cuts ONLY discretionary (holding the essentials floor
- * flat) and solves for the largest `d ≤ 1` whose Monte Carlo success still clears
- * the shared confidence bar (85%). So it's relevant whenever the current spend is
- * under that bar — whether the plan runs short on average OR just lacks a prudent
- * buffer — matching the "spend up to $X (85% likely)" lever. If even `d = 0`
- * (essentials only) can't clear the bar, the trim is infeasible: a signal that
- * saving more / retiring later is needed, not belt-tightening.
+ * Trim the budget as far as it usefully can — the mirror of {@link boostSpending}.
+ * It cuts ONLY discretionary (holding the essentials floor flat) and is BEST-EFFORT
+ * so it never dead-ends while there's discretionary to cut:
+ *   1. Prefer the largest `d ≤ 1` whose Monte Carlo success clears the 85% bar
+ *      (`reachesTarget`).
+ *   2. If the bar is out of reach, fall back to the largest `d` that still lasts on
+ *      the central projection — a meaningful, achievable milestone — and report the
+ *      honest likelihood (`reachesTarget = false`).
+ *   3. Only when even that's impossible (or there's no discretionary at all) is it
+ *      infeasible: a signal that saving more / retiring later is needed, not
+ *      belt-tightening.
  */
 export function trimSpending(
   plan: RetirementPlan,
@@ -262,12 +266,24 @@ export function trimSpending(
 
   const mcSuccess = (p: RetirementPlan) => runMonteCarlo(p, config, mc).successRate;
   const prudent = (p: RetirementPlan) => mcSuccess(p) >= target;
+  const hasDiscretionary = (bd.rows[0]?.discretionary ?? 0) > 1;
 
   const successBefore = mcSuccess(plan);
-  const applicable = successBefore < target; // under the bar → a trim can lift it there
-  // Largest discretionary fraction (≤1) whose success still clears the bar.
-  const solved = applicable ? solveThreshold((dd) => prudent(sc.planAt(dd)), 0, 1, false, 0.004) : null;
-  const feasible = applicable && solved != null;
+  const applicable = successBefore < target; // under the bar → a trim can help
+
+  let solved: number | null = null;
+  let reachesTarget = false;
+  if (applicable && hasDiscretionary) {
+    // Prefer the 85% bar; else settle for "still lasts on the central projection".
+    const toTarget = solveThreshold((dd) => prudent(sc.planAt(dd)), 0, 1, false, 0.004);
+    if (toTarget != null) {
+      solved = toTarget;
+      reachesTarget = true;
+    } else {
+      solved = solveThreshold((dd) => lasts(sc.planAt(dd), config), 0, 1, false, 0.004);
+    }
+  }
+  const feasible = solved != null;
   const dd = solved ?? 0;
   const patch = sc.patchAt(dd);
   const successAfter = mcSuccess(feasible ? { ...plan, ...patch } : sc.planAt(0));
@@ -289,6 +305,7 @@ export function trimSpending(
   return {
     applicable,
     feasible,
+    reachesTarget,
     essentials,
     essentialsEstimated: bd.estimated,
     discretionaryKeptPct: Math.round(dd * 100),
