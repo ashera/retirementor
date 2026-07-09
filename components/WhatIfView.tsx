@@ -487,6 +487,9 @@ export default function WhatIfView({
                             safePending,
                             targetPct: Math.round(SAFE_TARGET * 100),
                             life: baseline.lifeExpectancy,
+                            startedPct: baseMc != null ? Math.round(baseMc * 100) : null,
+                            nowPct: compMc != null ? Math.round(compMc * 100) : null,
+                            likelihoodPending: mcPending,
                             onSetSafe: () => {
                               if (safeSpend != null) setParam("adjust-spending", "spend", safeSpend);
                             },
@@ -698,6 +701,9 @@ function StrategyCardRow({
     safePending: boolean;
     targetPct: number;
     life: number;
+    startedPct: number | null; // MC success at the current (baseline) spend — the anchor
+    nowPct: number | null; // MC success at the chosen spend (composed)
+    likelihoodPending: boolean;
     onSetSafe: () => void;
   };
 }) {
@@ -760,6 +766,34 @@ function StrategyCardRow({
           )}
           {sustainable && (
             <div className="rounded-lg border border-accent/30 bg-accent/5 px-3 py-2 text-xs">
+              {/* Likelihood at the current spend (anchor) → at the chosen spend */}
+              <div className="mb-1.5 flex items-center gap-1.5 border-b border-line pb-1.5">
+                <span className="text-muted">Likely to last:</span>
+                {sustainable.startedPct != null ? (
+                  <>
+                    <span className="font-semibold tabular-nums text-slate-200" title="At your current spending">
+                      {sustainable.startedPct}%
+                    </span>
+                    {sustainable.nowPct != null && sustainable.nowPct !== sustainable.startedPct && (
+                      <>
+                        <span className="text-muted">→</span>
+                        <span
+                          className={`font-semibold tabular-nums ${sustainable.nowPct >= sustainable.startedPct ? "text-accent" : "text-amber-400"}`}
+                          title="At the spend you've chosen"
+                        >
+                          {sustainable.nowPct}%
+                        </span>
+                      </>
+                    )}
+                  </>
+                ) : (
+                  <span className="text-muted">…</span>
+                )}
+                {sustainable.likelihoodPending && (
+                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent" aria-label="updating" />
+                )}
+                <span className="ml-auto text-[10px] text-muted">chance of lasting to {sustainable.life}</span>
+              </div>
               {sustainable.safe == null && sustainable.safePending ? (
                 <span className="flex items-center gap-1.5 text-muted">
                   <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent" />
