@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { simulate } from "../lib/au/simulate";
 import { DEFAULT_CONFIG as cfg } from "../lib/au/config";
 import { DEFAULT_PLAN, getInvestmentProperties, type PropertyDetail, type RetirementPlan } from "../lib/au/types";
-import { buildStrategyCatalog, applyStrategies, resolveValues } from "../lib/au/strategies";
+import { buildStrategyCatalog, applyStrategies, resolveValues, maxSustainableSpend, withSpend } from "../lib/au/strategies";
 import { rowNetWorth } from "../lib/au/networth";
 import { seniorEmploymentTax } from "../lib/au/tax";
 
@@ -39,7 +39,7 @@ describe("What-If strategies", () => {
     expect(ids).toContain("clear-mortgage");
     expect(ids).toContain("sell-prop-0");
     expect(ids).toContain("retire-later");
-    expect(ids).toContain("spend-less");
+    expect(ids).toContain("adjust-spending");
     expect(ids).toContain("salary-sacrifice");
   });
 
@@ -56,14 +56,26 @@ describe("What-If strategies", () => {
     expect(simulate(later, cfg).superAtRetirement).toBeGreaterThan(simulate(b, cfg).superAtRetirement);
   });
 
-  it("spend-less lowers spending and makes the money last longer", () => {
+  it("adjust-spending sets spending up or down and shifts how long the money lasts", () => {
     const b = base({ targetSpending: 90_000 });
     const bRes = simulate(b, cfg);
-    const less = applyOne(b, "spend-less", { spend: 60_000 });
-    expect(less.targetSpending).toBe(60_000);
-    const lRes = simulate(less, cfg);
     const score = (r: ReturnType<typeof simulate>) => (r.lastsToLifeExpectancy ? 999 : r.depletedAge ?? 0);
-    expect(score(lRes)).toBeGreaterThanOrEqual(score(bRes));
+    // Spend less → lasts at least as long.
+    const less = applyOne(b, "adjust-spending", { spend: 60_000 });
+    expect(less.targetSpending).toBe(60_000);
+    expect(score(simulate(less, cfg))).toBeGreaterThanOrEqual(score(bRes));
+    // Spend more → the same lever goes the other way, and money lasts no longer.
+    const more = applyOne(b, "adjust-spending", { spend: 120_000 });
+    expect(more.targetSpending).toBe(120_000);
+    expect(score(simulate(more, cfg))).toBeLessThanOrEqual(score(bRes));
+  });
+
+  it("maxSustainableSpend finds the highest spend that still lasts to life expectancy", () => {
+    const b = base({ targetSpending: 90_000, lifeExpectancy: 90 });
+    const s = maxSustainableSpend(b, cfg);
+    // At the sustainable level the money lasts; a clear step above it, it doesn't.
+    expect(simulate(withSpend(b, s), cfg).lastsToLifeExpectancy).toBe(true);
+    expect(simulate(withSpend(b, s + 5_000), cfg).lastsToLifeExpectancy).toBe(false);
   });
 
   it("salary-sacrifice adds concessional contributions for the primary earner", () => {

@@ -16,6 +16,7 @@ import {
   buildStrategyCatalog,
   applyStrategies,
   resolveValues,
+  maxSustainableSpend,
   GROUP_LABEL,
   type StrategyCard,
   type StrategyGroup,
@@ -176,6 +177,22 @@ export default function WhatIfView({
     }
     return out;
   }, [baseline, baseRes, catalog, values, config]);
+
+  // "You could spend up to $X" — the highest spend that still lasts to life
+  // expectancy, solved on the plan with the OTHER active levers applied (so it
+  // reflects the rest of the scenario) and independent of the spend slider itself.
+  const otherValsKey = useMemo(() => {
+    const o: Record<string, Record<string, number>> = { ...values };
+    delete o["adjust-spending"];
+    return JSON.stringify(o);
+  }, [values]);
+  const spendSustainable = useMemo(() => {
+    if (!baseline) return null;
+    const others = new Set(active);
+    others.delete("adjust-spending");
+    return maxSustainableSpend(applyStrategies(baseline, catalog, others, values), config);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [baseline, catalog, active, otherValsKey, config]);
 
   if (!baseline || !baseRes || !compRes || !composed) return <div className="min-h-screen bg-ink" />;
 
@@ -436,6 +453,15 @@ export default function WhatIfView({
                     values={resolveValues(card, values[card.id])}
                     onToggle={() => toggle(card)}
                     onParam={(k, v) => setParam(card.id, k, v)}
+                    sustainable={
+                      card.id === "adjust-spending" && spendSustainable != null
+                        ? {
+                            amount: spendSustainable,
+                            life: baseline.lifeExpectancy,
+                            onApply: () => setParam("adjust-spending", "spend", spendSustainable),
+                          }
+                        : undefined
+                    }
                   />
                 ))}
               </div>
@@ -626,6 +652,7 @@ function StrategyCardRow({
   values,
   onToggle,
   onParam,
+  sustainable,
 }: {
   card: StrategyCard;
   on: boolean;
@@ -634,6 +661,7 @@ function StrategyCardRow({
   values: Record<string, number>;
   onToggle: () => void;
   onParam: (key: string, v: number) => void;
+  sustainable?: { amount: number; life: number; onApply: () => void };
 }) {
   return (
     <div className={`rounded-2xl border p-4 transition ${on ? "border-accent/40 bg-accent/5" : "border-line bg-panel"}`}>
@@ -661,7 +689,12 @@ function StrategyCardRow({
             // A param can cap itself against the card's other live values (e.g.
             // the downsizer contribution can't exceed the equity actually freed).
             const cap = pm.dynamicMax ? pm.dynamicMax(values) : Infinity;
-            const effMax = Math.min(pm.max, cap);
+            let effMax = Math.min(pm.max, cap);
+            // Let the spend slider reach the sustainable max so "Set to max" lands.
+            if (sustainable && pm.key === "spend" && sustainable.amount > effMax) {
+              const step = pm.step || 1_000;
+              effMax = Math.ceil(sustainable.amount / step) * step;
+            }
             const hint =
               pm.dynamicMax != null
                 ? `Downsizing frees about ${fmtCurrency(Math.max(0, cap))} — the rest goes to savings.`
@@ -685,6 +718,41 @@ function StrategyCardRow({
             <p className="rounded-lg border border-line bg-panel-2 px-3 py-2 text-xs text-slate-300">
               {card.note(values)}
             </p>
+          )}
+          {sustainable && (
+            <div className="rounded-lg border border-accent/30 bg-accent/5 px-3 py-2 text-xs">
+              {sustainable.amount <= 10_000 ? (
+                <span className="text-amber-400">
+                  Your plan may not last to {sustainable.life} even at minimal spending — try other levers first.
+                </span>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-slate-300">
+                      On the plan&apos;s assumed return, spending up to{" "}
+                      <span className="font-semibold text-accent">{fmtCurrency(sustainable.amount)}/yr</span> still reaches{" "}
+                      {sustainable.life}.
+                    </span>
+                    <button
+                      type="button"
+                      onClick={sustainable.onApply}
+                      className="shrink-0 rounded-md border border-accent/40 bg-accent/10 px-2.5 py-1 font-semibold text-accent transition hover:bg-accent/20"
+                    >
+                      Set to max
+                    </button>
+                  </div>
+                  <div className="mt-1 text-[11px] text-muted">
+                    Near the max there&apos;s little buffer — see &ldquo;Likely to last&rdquo; for the odds once market ups
+                    &amp; downs are included.
+                  </div>
+                  {values.spend > sustainable.amount + 500 && (
+                    <div className="mt-1 text-amber-400">
+                      You&apos;re above that — on the assumed return your money won&apos;t reach {sustainable.life}.
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
           )}
         </div>
       )}

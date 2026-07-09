@@ -8,6 +8,8 @@ import type { RetirementPlan } from "./types";
 import { getInvestmentProperties } from "./types";
 import { fmtCurrency } from "./format";
 import { propertyValueAt, capitalGainsTax, netSaleProceeds } from "./property";
+import { simulate } from "./simulate";
+import type { EngineConfig } from "./config";
 
 export type StrategyGroup = "home" | "mortgage" | "property" | "timing" | "work";
 
@@ -68,6 +70,27 @@ export function withSpend(p: RetirementPlan, spend: number): RetirementPlan {
       noGo: Math.round(p.spendingStages.noGo * f),
     },
   };
+}
+
+/**
+ * The highest spend (today's $) at which the plan's money still lasts to life
+ * expectancy, found by bisection over withSpend(). Rounded down to $1,000. Used
+ * for the "you could spend up to ~$X" read-out on the Adjust spending lever.
+ */
+export function maxSustainableSpend(plan: RetirementPlan, config: EngineConfig): number {
+  const lasts = (s: number) => simulate(withSpend(plan, s), config).lastsToLifeExpectancy;
+  const lo0 = 10_000;
+  const hi0 = 400_000;
+  if (!lasts(lo0)) return lo0; // can't sustain even a minimal spend
+  if (lasts(hi0)) return hi0; // sustains beyond the search ceiling
+  let lo = lo0;
+  let hi = hi0;
+  for (let i = 0; i < 20; i++) {
+    const mid = (lo + hi) / 2;
+    if (lasts(mid)) lo = mid;
+    else hi = mid;
+  }
+  return Math.floor(lo / 1_000) * 1_000;
 }
 
 /** The default value each param takes for a plan (used when a card is toggled on
@@ -256,20 +279,20 @@ export function buildStrategyCatalog(plan: RetirementPlan): StrategyCard[] {
   }
 
   const spend = Math.round(primarySpend(plan));
-  if (spend > 25_000) {
+  if (spend > 0) {
     cards.push({
-      id: "spend-less",
+      id: "adjust-spending",
       group: "timing",
-      label: "Spend less",
-      blurb: "Trim your discretionary spending (staged amounts scale together).",
+      label: "Adjust spending",
+      blurb: "Try spending more or less — staged amounts scale together. Watch how long your money lasts and your net worth respond.",
       params: [
         {
           key: "spend",
           label: "Spend",
-          min: 20_000,
-          max: spend,
+          min: Math.min(15_000, Math.round(spend * 0.6)),
+          max: Math.min(400_000, Math.max(Math.round(spend * 2), spend + 60_000)),
           step: 1_000,
-          default: Math.round(spend * 0.9),
+          default: spend, // neutral: drag left to spend less, right to spend more
           prefix: "$",
           suffix: "/yr",
         },
