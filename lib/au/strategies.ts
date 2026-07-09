@@ -8,6 +8,7 @@ import type { RetirementPlan } from "./types";
 import { getInvestmentProperties } from "./types";
 import { fmtCurrency } from "./format";
 import { propertyValueAt, capitalGainsTax, netSaleProceeds } from "./property";
+import { budgetSplit, presetCategories } from "./budget";
 import { simulate } from "./simulate";
 import { runMonteCarlo } from "./montecarlo";
 import type { EngineConfig } from "./config";
@@ -55,6 +56,18 @@ export interface StrategyCard {
 const maxCurrentAge = (p: RetirementPlan) => Math.max(...p.people.map((x) => x.currentAge));
 const primarySpend = (p: RetirementPlan) =>
   p.spendingMode === "stages" ? p.spendingStages.goGo : p.targetSpending;
+
+/**
+ * The essential ("needs") floor of a plan's spending, held fixed by the Adjust
+ * discretionary spending lever. Uses the plan's own guided budget when it has
+ * one; otherwise the essential portion of an ASFA 'modest' budget for the
+ * household/tenure. Never exceeds current spend (you can't hold more than you spend).
+ */
+export function essentialsFloor(plan: RetirementPlan, config: EngineConfig): number {
+  const cats = plan.budget?.categories ?? presetCategories(config, plan.household, plan.homeowner, "modest");
+  const essential = budgetSplit(cats).essential;
+  return Math.min(Math.round(essential), Math.round(primarySpend(plan)));
+}
 
 /** Set the plan's spend, scaling any staged amounts proportionally to keep shape. */
 export function withSpend(p: RetirementPlan, spend: number): RetirementPlan {
@@ -312,16 +325,18 @@ export function buildStrategyCatalog(plan: RetirementPlan): StrategyCard[] {
     cards.push({
       id: "adjust-spending",
       group: "timing",
-      label: "Adjust spending",
-      blurb: "Try spending more or less — staged amounts scale together. Watch how long your money lasts and your net worth respond.",
+      label: "Adjust discretionary spending",
+      blurb: "Your essentials stay fixed — this flexes only the discretionary spending on top. Drag down to trim it or up to live it up, and watch how long your money lasts and your net worth respond.",
       params: [
         {
           key: "spend",
-          label: "Spend",
+          label: "Total spend",
+          // Floor is raised to the essentials level in the board (needs config); the
+          // draggable range above it is the discretionary portion.
           min: Math.min(15_000, Math.round(spend * 0.6)),
           max: Math.min(400_000, Math.max(Math.round(spend * 2), spend + 60_000)),
           step: 1_000,
-          default: spend, // neutral: drag left to spend less, right to spend more
+          default: spend,
           prefix: "$",
           suffix: "/yr",
         },

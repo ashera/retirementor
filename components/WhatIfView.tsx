@@ -18,6 +18,7 @@ import {
   resolveValues,
   maxSustainableSpend,
   maxSpendForConfidence,
+  essentialsFloor,
   GROUP_LABEL,
   type StrategyCard,
   type StrategyGroup,
@@ -200,6 +201,10 @@ export default function WhatIfView({
     return maxSustainableSpend(applyStrategies(baseline, catalog, others, values), config);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [baseline, catalog, active, otherValsKey, config]);
+
+  // Essentials floor held by the Adjust discretionary spending lever (from the
+  // plan's budget, or an ASFA 'modest' fallback). The spend slider can't go below it.
+  const essentials = useMemo(() => (baseline ? essentialsFloor(baseline, config) : 0), [baseline, config]);
 
   // Prudent "safe spend" = highest spend with ≥ SAFE_TARGET Monte Carlo success.
   // Heavy (bisected MC), so debounced off the interaction path with a pending
@@ -482,6 +487,7 @@ export default function WhatIfView({
                     sustainable={
                       card.id === "adjust-spending" && spendSustainable != null
                         ? {
+                            essentials,
                             stretch: spendSustainable,
                             safe: safeSpend,
                             safePending,
@@ -696,6 +702,7 @@ function StrategyCardRow({
   onToggle: () => void;
   onParam: (key: string, v: number) => void;
   sustainable?: {
+    essentials: number; // needs floor held fixed — the slider's lower bound
     stretch: number; // deterministic max (assumed return) — the slider ceiling
     safe: number | null; // prudent MC-based safe spend (null while first computing)
     safePending: boolean;
@@ -734,11 +741,13 @@ function StrategyCardRow({
             // the downsizer contribution can't exceed the equity actually freed).
             const cap = pm.dynamicMax ? pm.dynamicMax(values) : Infinity;
             let effMax = Math.min(pm.max, cap);
-            // Let the spend slider reach the deterministic max ("stretch") so both
-            // the safe spend and the stretch are reachable.
-            if (sustainable && pm.key === "spend" && sustainable.stretch > effMax) {
+            let effMin = pm.min;
+            // Spend slider: floor at essentials (only the discretionary portion
+            // above it flexes) and let it reach the deterministic max ("stretch").
+            if (sustainable && pm.key === "spend") {
               const step = pm.step || 1_000;
-              effMax = Math.ceil(sustainable.stretch / step) * step;
+              effMin = Math.max(effMin, Math.round(sustainable.essentials / step) * step);
+              if (sustainable.stretch > effMax) effMax = Math.ceil(sustainable.stretch / step) * step;
             }
             const hint =
               pm.dynamicMax != null
@@ -748,9 +757,9 @@ function StrategyCardRow({
               <Field
                 key={pm.key}
                 label={pm.label}
-                value={Math.min(values[pm.key], effMax)}
+                value={Math.min(Math.max(values[pm.key], effMin), effMax)}
                 onChange={(v) => onParam(pm.key, v)}
-                min={pm.min}
+                min={effMin}
                 max={effMax}
                 step={pm.step}
                 prefix={pm.prefix}
@@ -759,6 +768,20 @@ function StrategyCardRow({
               />
             );
           })}
+          {/* Essentials held + the discretionary portion being flexed. */}
+          {sustainable && (
+            <div className="flex flex-wrap justify-between gap-x-4 gap-y-1 rounded-lg border border-line bg-panel-2 px-3 py-2 text-xs">
+              <span className="text-muted">
+                Essentials held: <span className="font-semibold text-slate-300">{fmtCurrency(sustainable.essentials)}/yr</span>
+              </span>
+              <span className="text-muted">
+                Discretionary:{" "}
+                <span className="font-semibold text-slate-300">
+                  {fmtCurrency(Math.max(0, values.spend - sustainable.essentials))}/yr
+                </span>
+              </span>
+            </div>
+          )}
           {card.note && (
             <p className="rounded-lg border border-line bg-panel-2 px-3 py-2 text-xs text-slate-300">
               {card.note(values)}

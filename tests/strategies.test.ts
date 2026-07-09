@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { simulate } from "../lib/au/simulate";
 import { DEFAULT_CONFIG as cfg } from "../lib/au/config";
 import { DEFAULT_PLAN, getInvestmentProperties, type PropertyDetail, type RetirementPlan } from "../lib/au/types";
-import { buildStrategyCatalog, applyStrategies, resolveValues, maxSustainableSpend, maxSpendForConfidence, withSpend } from "../lib/au/strategies";
+import { buildStrategyCatalog, applyStrategies, resolveValues, maxSustainableSpend, maxSpendForConfidence, essentialsFloor, withSpend } from "../lib/au/strategies";
 import { runMonteCarlo } from "../lib/au/montecarlo";
 import { rowNetWorth } from "../lib/au/networth";
 import { seniorEmploymentTax } from "../lib/au/tax";
@@ -77,6 +77,20 @@ describe("What-If strategies", () => {
     // At the sustainable level the money lasts; a clear step above it, it doesn't.
     expect(simulate(withSpend(b, s), cfg).lastsToLifeExpectancy).toBe(true);
     expect(simulate(withSpend(b, s + 5_000), cfg).lastsToLifeExpectancy).toBe(false);
+  });
+
+  it("essentialsFloor uses the plan's own budget essentials, else an ASFA-modest fallback", () => {
+    // With a budget: sum of the essential categories (food is a need, leisure is not).
+    const withBudget = base({
+      targetSpending: 90_000,
+      budget: { tenure: "own", lifestyle: "comfortable", applyPhases: false, categories: { food: 12_000, leisure: 8_000 } },
+    });
+    expect(essentialsFloor(withBudget, cfg)).toBe(12_000);
+    // Fallback (no budget): a positive floor that never exceeds current spend.
+    const noBudget = base({ targetSpending: 30_000 });
+    const e = essentialsFloor(noBudget, cfg);
+    expect(e).toBeGreaterThan(0);
+    expect(e).toBeLessThanOrEqual(30_000);
   });
 
   it("maxSpendForConfidence finds the highest spend meeting a Monte Carlo success target, below the deterministic max", () => {
