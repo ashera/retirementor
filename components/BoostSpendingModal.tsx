@@ -1,8 +1,9 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import type { EngineConfig } from "@/lib/au/config";
 import type { RetirementPlan, SimResult } from "@/lib/au/types";
-import { boostSpending } from "@/lib/au/goalseek";
+import { boostSpending, type SpendingBoost } from "@/lib/au/goalseek";
 import { fmtCurrency } from "@/lib/au/format";
 
 /**
@@ -29,9 +30,32 @@ export default function BoostSpendingModal({
   result: SimResult;
   applyLabel?: string;
 }) {
+  // The prudent boost runs a Monte Carlo bisection (~0.4s), so compute it after the
+  // modal has painted a loading state rather than freezing the open.
+  const [boost, setBoost] = useState<SpendingBoost | null>(null);
+  useEffect(() => {
+    if (!open) {
+      setBoost(null);
+      return;
+    }
+    setBoost(null);
+    const id = setTimeout(() => setBoost(boostSpending(plan, config)), 30);
+    return () => clearTimeout(id);
+  }, [open, plan, config]);
+
   if (!open) return null;
 
-  const boost = boostSpending(plan, config);
+  if (!boost) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+        <div className="relative z-10 w-full max-w-lg rounded-2xl border border-line bg-panel p-10 text-center shadow-2xl">
+          <div className="animate-pulse text-sm text-muted">📈 Working out how much more you can safely spend…</div>
+        </div>
+      </div>
+    );
+  }
+
   const { essentials, essentialsEstimated, loanCost, stages } = boost;
   const single = stages.length === 1; // flat plan → one "Retirement" row
 
@@ -50,8 +74,6 @@ export default function BoostSpendingModal({
   const essentialsNote = essentialsEstimated
     ? "estimated from the ASFA Retirement Standard — build a budget to use your own split"
     : "from your budget";
-
-  const lastAge = boost.lastsAfter ? plan.lifeExpectancy : (boost.depletedAgeAfter ?? plan.lifeExpectancy);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
@@ -86,12 +108,12 @@ export default function BoostSpendingModal({
           {boost.hasHeadroom ? (
             <>
               <p>
-                On the central (average-return) projection your budget of{" "}
-                <strong className="text-white">{fmtCurrency(nowTotal)}/yr</strong> already lasts to
-                age {plan.lifeExpectancy}. You can lift discretionary by{" "}
+                Your budget of <strong className="text-white">{fmtCurrency(nowTotal)}/yr</strong> has room
+                to spare. You can lift discretionary by{" "}
                 <strong className="text-emerald-400">{boost.discretionaryUpliftPct}%</strong> — spending{" "}
-                <strong className="text-white">{fmtCurrency(afterTotal)}/yr all in</strong> — and it{" "}
-                still lasts to <strong className="text-white">age {plan.lifeExpectancy}</strong>.
+                <strong className="text-white">{fmtCurrency(afterTotal)}/yr all in</strong> — and it&apos;s still{" "}
+                <strong className="text-white">{Math.round(boost.successAfter * 100)}% likely</strong> to last to
+                age {plan.lifeExpectancy}, allowing for market ups and downs.
               </p>
 
               <div className="rounded-xl border border-line bg-panel-2 p-4">
@@ -137,20 +159,18 @@ export default function BoostSpendingModal({
                 <div>
                   <div className="font-semibold text-emerald-300">Adds {fmtCurrency(add)}/yr (+{addPct}%)</div>
                   <div className="text-xs text-muted">
-                    {boost.lastsAfter
-                      ? `Still lasts to age ${plan.lifeExpectancy}.`
-                      : `Lasts to age ${lastAge}.`}
+                    About {Math.round(boost.successAfter * 100)}% likely to last to age {plan.lifeExpectancy}.
                   </div>
                 </div>
-                <span className="text-2xl" aria-hidden>{boost.lastsAfter ? "🎉" : "⚠️"}</span>
+                <span className="text-2xl" aria-hidden>🎉</span>
               </div>
 
               <p className="text-xs text-muted">
                 {single
                   ? "This raises your flat retirement income target."
                   : "Every lifestage keeps its essentials and gains the same share of discretionary, so your go-go / slow-go / no-go shape is preserved."}{" "}
-                Based on the central projection — real returns vary, so check the
-                likelihood gauge for the odds. You can fine-tune afterwards.
+                This keeps you about {boost.targetPct}% likely to last — a buffer for market swings, not just
+                the average projection. You can fine-tune afterwards.
               </p>
             </>
           ) : boost.allEssentials ? (

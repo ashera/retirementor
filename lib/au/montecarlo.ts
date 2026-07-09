@@ -34,6 +34,12 @@ export interface FanPoint {
   solvent: number; // fraction of runs that still have savings at this age (0–1)
 }
 
+// A "prudent" spend recommendation is the most you can spend while your Monte
+// Carlo success rate still clears this bar — shared so every "how much can I
+// safely spend?" answer (What-If safe spend, Help-me-spend-more) uses one target.
+export const MC_CONFIDENCE_TARGET = 0.85;
+export const MC_CONFIDENCE_MC = { iterations: 300, seed: 12345 } as const;
+
 export interface MonteCarloResult {
   iterations: number;
   successRate: number; // fraction of runs that fund spending to life expectancy

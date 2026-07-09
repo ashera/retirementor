@@ -4,6 +4,7 @@
 // is a handful of deterministic simulate() calls via binary search.
 
 import { simulate } from "./simulate";
+import { runMonteCarlo, MC_CONFIDENCE_TARGET, MC_CONFIDENCE_MC } from "./montecarlo";
 import { lifestageBreakdown } from "./lifestages";
 import { budgetToStages, budgetTotal, isEssential } from "./budget";
 import type { EngineConfig } from "./config";
@@ -295,8 +296,10 @@ export interface SpendingBoost {
   stages: SpendStageView[]; // one row (flat) or three (staged)
   extraPerYear: number; // increase in the headline (go-go / flat) living spend
   newHeadlineLiving: number; // headline living after the boost
-  lastsAfter: boolean; // the boosted plan still lasts to life expectancy
+  lastsAfter: boolean; // the boosted plan still lasts to life expectancy (central projection)
   depletedAgeAfter: number | null; // where the boosted plan runs out, if it does
+  successAfter: number; // Monte Carlo chance the boosted spend still lasts (0–1)
+  targetPct: number; // the confidence bar the boost is held to (e.g. 85)
 }
 
 /**
@@ -312,17 +315,23 @@ export function boostSpending(plan: RetirementPlan, config: EngineConfig): Spend
   const sc = discretionaryScaler(plan, config);
   const { bd, essentials } = sc;
 
-  const applicable = lasts(plan, config);
+  // "Prudent" test: the spend is only recommended while its Monte Carlo success
+  // rate still clears the shared confidence bar (85%) — so we account for market
+  // ups and downs, not just the average-return projection.
+  const mcSuccess = (p: RetirementPlan) => runMonteCarlo(p, config, MC_CONFIDENCE_MC).successRate;
+  const prudent = (p: RetirementPlan) => mcSuccess(p) >= MC_CONFIDENCE_TARGET;
+
+  const applicable = prudent(plan); // already comfortably safe → room to spend more
   const headlineDisc = bd.rows[0]?.discretionary ?? 0;
   const canGrow = applicable && headlineDisc > 1;
 
-  // Largest discretionary multiple (≥1) that still lasts. d = 1 lasts by
-  // definition when `applicable`, so this only ever grows spending.
+  // Largest discretionary multiple (≥1) whose success still clears the bar.
   const DMAX = 12;
-  const solved = canGrow ? solveThreshold((dd) => lasts(sc.planAt(dd), config), 1, DMAX, false, 0.004) : null;
+  const solved = canGrow ? solveThreshold((dd) => prudent(sc.planAt(dd)), 1, DMAX, false, 0.004) : null;
   const d = solved ?? 1;
   const patch = canGrow ? sc.patchAt(d) : {};
   const after = canGrow ? simulate({ ...plan, ...patch }, config) : null;
+  const successAfter = mcSuccess(canGrow ? { ...plan, ...patch } : plan);
 
   const afterLiving = livingReader(patch);
   const stages: SpendStageView[] = bd.rows.map((r) => {
@@ -356,5 +365,7 @@ export function boostSpending(plan: RetirementPlan, config: EngineConfig): Spend
     newHeadlineLiving: headline?.totalAfter ?? 0,
     lastsAfter: after ? after.lastsToLifeExpectancy : true,
     depletedAgeAfter: after ? after.depletedAge : null,
+    successAfter,
+    targetPct: Math.round(MC_CONFIDENCE_TARGET * 100),
   };
 }

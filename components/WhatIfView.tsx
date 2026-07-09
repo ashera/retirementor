@@ -6,7 +6,7 @@ import type { EngineConfig } from "@/lib/au/config";
 import type { RetirementPlan, SimResult } from "@/lib/au/types";
 import { DEFAULT_PLAN, getInvestmentProperties } from "@/lib/au/types";
 import { simulate } from "@/lib/au/simulate";
-import { runMonteCarlo } from "@/lib/au/montecarlo";
+import { runMonteCarlo, MC_CONFIDENCE_TARGET as SAFE_TARGET, MC_CONFIDENCE_MC as SAFE_MC } from "@/lib/au/montecarlo";
 import { fmtCurrency } from "@/lib/au/format";
 import { rowNetWorth } from "@/lib/au/networth";
 import { track } from "@/lib/analytics";
@@ -31,12 +31,6 @@ import Field from "@/components/Field";
 
 const PLAN_KEY = "au-retirement-plan";
 const GROUP_ORDER: StrategyGroup[] = ["home", "mortgage", "property", "timing", "work"];
-
-// "Safe spend" = highest spend with at least this Monte Carlo success rate. Uses
-// fewer iterations than the headline MC (it's bisected ~12×) but the same fixed
-// seed, and is debounced off the interaction path.
-const SAFE_TARGET = 0.85;
-const SAFE_MC = { iterations: 300, seed: 12345 } as const;
 
 const annualSpend = (p: RetirementPlan) =>
   Math.max(1, p.spendingMode === "stages" ? p.spendingStages.goGo : p.targetSpending);
