@@ -646,7 +646,7 @@ function Sparkline({
 function ImpactBreakdown({ delta, life }: { delta: Marginal; life: number }) {
   const nwDiffers = Math.abs(delta.netWorth - delta.moneyLeft) >= 2_000;
   const rows = [
-    { label: `Super + savings at ${life}`, sub: "your liquid, spendable money", v: delta.moneyLeft },
+    { label: `Spendable funds at ${life}`, sub: "liquid super + savings", v: delta.moneyLeft },
     { label: "Spending shortfall avoided", sub: "spending you can now cover", v: delta.shortfallAvoided },
     ...(nwDiffers ? [{ label: `Net worth at ${life}`, sub: "adds your home & property", v: delta.netWorth }] : []),
   ].filter((r) => Math.abs(r.v) >= 2_000);
@@ -687,14 +687,14 @@ function DeltaChip({ years, moneyLeft, netWorth, life }: { years: number; moneyL
       {yStr && <Line label="Money lasts" value={yStr} v={years} title="On its own, how much longer your super + savings cover your spending." />}
       {mlStr && (
         <Line
-          label={`Super + savings at ${life}`}
+          label={`Spendable funds at ${life}`}
           value={mlStr}
           v={moneyLeft}
-          title={`Your liquid, spendable money — super + savings — left at age ${life}. (Net worth below also counts your home & property, so a downsize can lift this while trimming net worth.)`}
+          title={`Your liquid, spendable money — super + savings — left at age ${life}. (Net worth below also counts your home & property, so a downsize lifts this while barely changing net worth: it frees home equity into spendable funds, it isn't new wealth.)`}
         />
       )}
       {nwStr && (
-        <Line label={`Net worth at ${life}`} value={nwStr} v={netWorth} title={`Total wealth — super + savings PLUS your home & any property — at age ${life}.`} />
+        <Line label={`Net worth at ${life}`} value={nwStr} v={netWorth} title={`Total wealth — spendable funds (super + savings) PLUS your home & any property — at age ${life}.`} />
       )}
     </span>
   );
