@@ -31,7 +31,15 @@ Prerequisites: Node 20+, PostgreSQL.
 2. Create `.env.local` with your database connection (this file is gitignored):
    ```
    DATABASE_URL=postgresql://USER:PASSWORD@localhost:5432/financial
+   # Optional — enables "Continue with Google" (omit and the button is hidden):
+   GOOGLE_CLIENT_ID=xxxxx.apps.googleusercontent.com
+   GOOGLE_CLIENT_SECRET=xxxxx
    ```
+   To get those, create an **OAuth 2.0 Client ID** (type: *Web application*) in the
+   [Google Cloud Console](https://console.cloud.google.com/apis/credentials) and add
+   these **Authorized redirect URIs**: `http://localhost:3000/api/auth/google/callback`
+   (dev) and `https://YOUR_DOMAIN/api/auth/google/callback` (prod). The redirect URI is
+   derived from the request host, so no base-URL env var is needed.
 3. Set up the schema and seed reference data (idempotent — safe to re-run):
    ```bash
    npm run db:migrate
@@ -64,6 +72,9 @@ The repo is Railway-ready (`railway.json`):
    injects `DATABASE_URL` automatically — reference the Postgres service's
    `DATABASE_URL` from the app service's variables (the private `*.railway.internal`
    URL is preferred; the app also accepts a public proxy URL over TLS).
+   For Google sign-in, also set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` service
+   variables and add `https://YOUR_DOMAIN/api/auth/google/callback` as an authorized
+   redirect URI on the OAuth client.
 2. On every deploy Railway runs, in order:
    - **build** — `npm run build`
    - **pre-deploy** — `npm run db:migrate` (creates tables and seeds reference data

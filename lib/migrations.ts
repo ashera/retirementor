@@ -17,6 +17,15 @@ create table if not exists users (
 alter table users add column if not exists is_admin boolean not null default false;
 alter table users add column if not exists suspended boolean not null default false;
 alter table users add column if not exists last_login_at timestamptz;
+-- Google sign-in (OAuth). google_sub = Google's stable per-user id; name/avatar
+-- from the profile. password_hash becomes nullable so a Google-only account
+-- (never set a password) is valid. NULL google_subs are allowed to repeat
+-- (unique index treats NULLs as distinct), so password-only users are unaffected.
+alter table users add column if not exists google_sub text;
+alter table users add column if not exists name text;
+alter table users add column if not exists avatar_url text;
+alter table users alter column password_hash drop not null;
+create unique index if not exists users_google_sub_idx on users (google_sub);
 
 create table if not exists sessions (
   id uuid primary key default gen_random_uuid(),
