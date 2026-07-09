@@ -291,6 +291,12 @@ export default function PlannerApp({
     return () => clearTimeout(id);
   }, [plan, config, ready, configured]);
   const maxSpend = mcMaxSpend ?? gs.maxSpend; // prudent once settled, central meanwhile
+  // Trim vs boost is decided against the SAME prudent (85% MC) bar the spend
+  // lever shows, so the card never contradicts itself (e.g. "trim to $X" while a
+  // "spend more" button sits below). Over the bar → offer a trim; under it → a boost.
+  const prudentDelta = maxSpend != null ? maxSpend - gs.currentSpend : null;
+  const overspending = prudentDelta != null && prudentDelta <= -1000;
+  const spendHeadroom = prudentDelta != null && prudentDelta >= 1000;
 
   const tweaked = useMemo(
     () => JSON.stringify(plan) !== JSON.stringify(baseline),
@@ -1037,9 +1043,11 @@ export default function PlannerApp({
       <div className="mt-4 rounded-2xl border border-line bg-panel p-6">
         <h2 className="font-semibold text-white">What will it take?</h2>
         <p className="mb-4 mt-1 text-sm text-slate-300">
-          {gs.lasts
-            ? `Your plan funds ${fmtCurrency(goal.total)}/yr to age ${plan.lifeExpectancy} on the central projection — here's the headroom on each lever.`
-            : `To fund ${fmtCurrency(goal.total)}/yr all the way to age ${plan.lifeExpectancy}, do any one of these:`}
+          {overspending
+            ? `To keep ${fmtCurrency(goal.total)}/yr about ${Math.round(MC_CONFIDENCE_TARGET * 100)}% likely to last to age ${plan.lifeExpectancy}, ease any one of these:`
+            : gs.lasts
+              ? `Your plan funds ${fmtCurrency(goal.total)}/yr to age ${plan.lifeExpectancy} on the central projection — here's the headroom on each lever.`
+              : `To fund ${fmtCurrency(goal.total)}/yr all the way to age ${plan.lifeExpectancy}, do any one of these:`}
         </p>
         <div className="grid gap-3 sm:grid-cols-3">
           {(() => {
@@ -1114,11 +1122,11 @@ export default function PlannerApp({
           for market ups and downs); saving and retirement are on the central average-return projection. Each lever on
           its own — combine them, or check the likelihood above.
         </p>
-        {!gs.lasts && (
+        {overspending && (
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
             <p className="text-sm text-slate-300">
               Want the app to do it for you? Trim discretionary spending — keeping
-              your essentials — to make your money last to age {plan.lifeExpectancy}.
+              your essentials — to stay about {Math.round(MC_CONFIDENCE_TARGET * 100)}% likely to last to age {plan.lifeExpectancy}.
             </p>
             <button
               onClick={() => setTrimOpen(true)}
@@ -1128,7 +1136,7 @@ export default function PlannerApp({
             </button>
           </div>
         )}
-        {gs.lasts && gs.maxSpend != null && gs.maxSpend - gs.currentSpend >= 1000 && (
+        {spendHeadroom && (
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
             <p className="text-sm text-slate-300">
               Money to spare? Put your headroom to work — raise discretionary

@@ -1,17 +1,18 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import type { EngineConfig } from "@/lib/au/config";
 import type { RetirementPlan, SimResult } from "@/lib/au/types";
-import { simulate } from "@/lib/au/simulate";
-import { trimSpending } from "@/lib/au/goalseek";
+import { trimSpending, type SpendingTrim } from "@/lib/au/goalseek";
 import { fmtCurrency } from "@/lib/au/format";
 
 /**
- * "Help me trim spending" — previews the automatic budget trim that makes the
- * plan fund its spending all the way to life expectancy (the "money lasts"
- * goal). It PROTECTS the essentials floor and reduces only discretionary
- * spending; if even zero discretionary can't last, it says so plainly rather
- * than eating into essentials. Applies the change on confirm.
+ * "Help me trim spending" — the mirror of the Boost modal. When the current
+ * spend sits UNDER the shared confidence bar (85% Monte Carlo), this previews
+ * trimming ONLY discretionary spending (essentials held flat) down to the most
+ * the plan can prudently afford, and applies it on confirm. If even zero
+ * discretionary can't clear the bar, it says so plainly rather than eating into
+ * essentials.
  */
 export default function TrimSpendingModal({
   open,
@@ -30,21 +31,43 @@ export default function TrimSpendingModal({
   result: SimResult;
   applyLabel?: string;
 }) {
+  // The prudent trim runs a Monte Carlo bisection (~0.4s), so compute it after
+  // the modal has painted a loading state rather than freezing the open.
+  const [trim, setTrim] = useState<SpendingTrim | null>(null);
+  useEffect(() => {
+    if (!open) {
+      setTrim(null);
+      return;
+    }
+    setTrim(null);
+    const id = setTimeout(() => setTrim(trimSpending(plan, config)), 30);
+    return () => clearTimeout(id);
+  }, [open, plan, config]);
+
   if (!open) return null;
 
-  const trim = trimSpending(plan, config);
+  if (!trim) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+        <div className="relative z-10 w-full max-w-lg rounded-2xl border border-line bg-panel p-10 text-center shadow-2xl">
+          <div className="animate-pulse text-sm text-muted">✂️ Working out the most you can prudently spend…</div>
+        </div>
+      </div>
+    );
+  }
+
   const { essentials, essentialsEstimated, loanCost, stages } = trim;
   const single = stages.length === 1; // flat plan → one "Retirement" row
 
-  // Headline totals (include any unchanged home-loan cost).
   const nowLiving = stages[0]?.totalBefore ?? 0; // go-go / flat headline
   const afterLiving = stages[0]?.totalAfter ?? 0;
   const nowTotal = nowLiving + loanCost;
   const afterTotal = afterLiving + loanCost;
   const cut = Math.max(0, nowLiving - afterLiving);
   const cutPct = nowTotal > 0 ? Math.round((cut / nowTotal) * 100) : 0;
-
-  const after = trim.feasible ? simulate({ ...plan, ...trim.patch }, config) : null;
+  const beforePct = Math.round(trim.successBefore * 100);
+  const afterPct = Math.round(trim.successAfter * 100);
 
   const apply = () => {
     onApply(trim.patch);
@@ -62,7 +85,7 @@ export default function TrimSpendingModal({
         <div className="flex items-center justify-between border-b border-line px-6 py-4">
           <div className="flex items-center gap-2">
             <span aria-hidden>✂️</span>
-            <h2 className="text-lg font-bold text-white">Trim spending to make it last</h2>
+            <h2 className="text-lg font-bold text-white">Trim spending to a prudent level</h2>
           </div>
           <button
             type="button"
@@ -88,16 +111,14 @@ export default function TrimSpendingModal({
           {trim.feasible ? (
             <>
               <p>
-                On the central (average-return) projection your budget of{" "}
-                <strong className="text-white">{fmtCurrency(nowTotal)}/yr</strong>{" "}
-                {result.depletedAge != null ? (
-                  <>runs short at <strong className="text-amber-400">age {result.depletedAge}</strong>.</>
-                ) : (
-                  <>doesn&apos;t quite reach age {plan.lifeExpectancy}.</>
-                )}{" "}
-                Keeping <strong className="text-emerald-400">{trim.discretionaryKeptPct}% of your discretionary</strong>{" "}
-                spend — {fmtCurrency(afterTotal)}/yr all in — makes it last to{" "}
-                <strong className="text-white">age {plan.lifeExpectancy}</strong>.
+                Your budget of <strong className="text-white">{fmtCurrency(nowTotal)}/yr</strong> is only about{" "}
+                <strong className="text-amber-400">{beforePct}% likely</strong> to last to age {plan.lifeExpectancy}
+                {result.depletedAge != null && (
+                  <> (it runs short around <strong className="text-amber-400">age {result.depletedAge}</strong> on the central projection)</>
+                )}
+                . Trimming discretionary to <strong className="text-white">{fmtCurrency(afterTotal)}/yr all in</strong> —
+                keeping <strong className="text-emerald-400">{trim.discretionaryKeptPct}%</strong> of it — lifts you to about{" "}
+                <strong className="text-white">{afterPct}% likely</strong> to last, allowing for market ups and downs.
               </p>
 
               <div className="rounded-xl border border-line bg-panel-2 p-4">
@@ -143,20 +164,18 @@ export default function TrimSpendingModal({
                 <div>
                   <div className="font-semibold text-emerald-300">Cuts {fmtCurrency(cut)}/yr ({cutPct}%)</div>
                   <div className="text-xs text-muted">
-                    {after?.lastsToLifeExpectancy
-                      ? `Your savings now last to age ${plan.lifeExpectancy}.`
-                      : `Lasts to age ${after?.depletedAge ?? plan.lifeExpectancy}.`}
+                    About {afterPct}% likely to last to age {plan.lifeExpectancy}.
                   </div>
                 </div>
-                <span className="text-2xl" aria-hidden>{after?.lastsToLifeExpectancy ? "✅" : "⚠️"}</span>
+                <span className="text-2xl" aria-hidden>✅</span>
               </div>
 
               <p className="text-xs text-muted">
                 {single
                   ? "This lowers your flat retirement income target."
                   : "Every lifestage keeps its essentials and is trimmed by the same share of discretionary, so your go-go / slow-go / no-go shape is preserved."}{" "}
-                Based on the central projection — real returns vary, so check the
-                likelihood gauge for the odds. You can fine-tune afterwards.
+                This keeps you about {trim.targetPct}% likely to last — a buffer for market swings, not just the average
+                projection. You can fine-tune afterwards.
               </p>
             </>
           ) : (
@@ -164,21 +183,23 @@ export default function TrimSpendingModal({
               <div className="flex items-start gap-3 rounded-xl border border-amber-500/25 bg-amber-500/5 px-4 py-3">
                 <span className="text-lg" aria-hidden>⚠️</span>
                 <p className="text-xs text-slate-200">
-                  Trimming spending <strong>can&apos;t fix this on its own</strong>. Even cutting{" "}
+                  Trimming spending <strong>can&apos;t get you there on its own</strong>. Even cutting{" "}
                   <strong>all</strong> discretionary spending — living on just your{" "}
-                  {fmtCurrency(essentials)}/yr of essentials — your money still runs short at{" "}
-                  <strong className="text-amber-300">age {trim.depletedAgeIfEssentialsOnly ?? plan.lifeExpectancy}</strong>.
+                  {fmtCurrency(essentials)}/yr of essentials — you&apos;d still be under the{" "}
+                  <strong className="text-amber-300">{trim.targetPct}% mark</strong>
+                  {trim.depletedAgeIfEssentialsOnly != null && (
+                    <> (your money runs short at age {trim.depletedAgeIfEssentialsOnly})</>
+                  )}
+                  .
                 </p>
               </div>
               <p>
-                To reach age {plan.lifeExpectancy} you&apos;d need to lift the other
-                levers instead — <strong className="text-white">save more</strong>,{" "}
-                <strong className="text-white">retire later</strong>, or revisit your
-                essential costs. See the three levers above for the amounts each would take.
+                To get there you&apos;d need to lift the other levers instead —{" "}
+                <strong className="text-white">save more</strong>, <strong className="text-white">retire later</strong>,
+                or revisit your essential costs. See the three levers above for the amounts each would take.
               </p>
               <p className="text-xs text-muted">
-                We won&apos;t trim into your essentials automatically — that&apos;s a call
-                only you should make.
+                We won&apos;t trim into your essentials automatically — that&apos;s a call only you should make.
               </p>
             </>
           )}

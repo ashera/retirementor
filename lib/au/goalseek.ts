@@ -227,8 +227,8 @@ function livingReader(patch: Partial<RetirementPlan>): (key: string) => number {
 }
 
 export interface SpendingTrim {
-  applicable: boolean; // the plan doesn't already last, so a trim is relevant
-  feasible: boolean; // cutting discretionary (down to the essentials floor) can make it last
+  applicable: boolean; // the plan is under the confidence bar, so a trim is relevant
+  feasible: boolean; // cutting discretionary (down to the essentials floor) can reach the bar
   essentials: number; // the flat essentials floor — held constant, never trimmed
   essentialsEstimated: boolean; // true when estimated from ASFA (no user budget)
   discretionaryKeptPct: number; // 0–100, share of discretionary retained after the trim
@@ -236,24 +236,41 @@ export interface SpendingTrim {
   patch: Partial<RetirementPlan>; // the spending change to apply (meaningful when feasible)
   stages: SpendStageView[]; // one row (flat) or three (staged)
   depletedAgeIfEssentialsOnly: number | null; // when infeasible: where essentials-only still runs out
+  successBefore: number; // Monte Carlo chance the CURRENT spend lasts (0–1)
+  successAfter: number; // Monte Carlo chance the trimmed spend lasts (0–1)
+  targetPct: number; // the confidence bar the trim is held to (e.g. 85)
 }
 
 /**
- * Trim the budget so it lasts to life expectancy by cutting ONLY discretionary
- * and holding the essentials floor flat. Each stage is `essentials + d ×
- * discretionary`; we solve for the largest `d ≤ 1` that still lasts. If even
- * `d = 0` (essentials only) can't last, the trim is infeasible — a signal that
+ * Trim the budget down to the most it can PRUDENTLY afford — the exact mirror of
+ * {@link boostSpending}. It cuts ONLY discretionary (holding the essentials floor
+ * flat) and solves for the largest `d ≤ 1` whose Monte Carlo success still clears
+ * the shared confidence bar (85%). So it's relevant whenever the current spend is
+ * under that bar — whether the plan runs short on average OR just lacks a prudent
+ * buffer — matching the "spend up to $X (85% likely)" lever. If even `d = 0`
+ * (essentials only) can't clear the bar, the trim is infeasible: a signal that
  * saving more / retiring later is needed, not belt-tightening.
  */
-export function trimSpending(plan: RetirementPlan, config: EngineConfig): SpendingTrim {
+export function trimSpending(
+  plan: RetirementPlan,
+  config: EngineConfig,
+  target = MC_CONFIDENCE_TARGET,
+  mc = MC_CONFIDENCE_MC,
+): SpendingTrim {
   const sc = discretionaryScaler(plan, config);
   const { bd, essentials } = sc;
 
-  const applicable = !lasts(plan, config);
-  const d = solveThreshold((dd) => lasts(sc.planAt(dd), config), 0, 1, false, 0.004);
-  const feasible = applicable && d != null;
-  const dd = d ?? 0;
+  const mcSuccess = (p: RetirementPlan) => runMonteCarlo(p, config, mc).successRate;
+  const prudent = (p: RetirementPlan) => mcSuccess(p) >= target;
+
+  const successBefore = mcSuccess(plan);
+  const applicable = successBefore < target; // under the bar → a trim can lift it there
+  // Largest discretionary fraction (≤1) whose success still clears the bar.
+  const solved = applicable ? solveThreshold((dd) => prudent(sc.planAt(dd)), 0, 1, false, 0.004) : null;
+  const feasible = applicable && solved != null;
+  const dd = solved ?? 0;
   const patch = sc.patchAt(dd);
+  const successAfter = mcSuccess(feasible ? { ...plan, ...patch } : sc.planAt(0));
 
   const afterLiving = livingReader(patch);
   const stages: SpendStageView[] = bd.rows.map((r) => {
@@ -279,6 +296,9 @@ export function trimSpending(plan: RetirementPlan, config: EngineConfig): Spendi
     patch,
     stages,
     depletedAgeIfEssentialsOnly: simulate(sc.planAt(0), config).depletedAge,
+    successBefore,
+    successAfter,
+    targetPct: Math.round(target * 100),
   };
 }
 

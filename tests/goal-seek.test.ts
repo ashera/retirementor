@@ -75,3 +75,45 @@ describe("Spending boost (mirror of trim)", () => {
     expect(again.extraPerYear).toBeLessThan(boost.extraPerYear);
   });
 });
+
+describe("Spending trim (prudent, mirror of boost)", () => {
+  // Well-funded so a HIGH spend is under the 85% bar yet trimmable back to it
+  // (unlike the stretched `base`, where even essentials-only can't get there).
+  const rich: RetirementPlan = {
+    ...DEFAULT_PLAN,
+    people: [{ ...DEFAULT_PLAN.people[0], currentAge: 55, superBalance: 700_000, salary: 120_000, voluntaryConcessional: 0 }],
+    outsideSuper: 400_000, annualOutsideSavings: 20_000, retirementAge: 65,
+    spendingMode: "flat", investmentReturn: 7, inflation: 2.5, lifeExpectancy: 90,
+  };
+
+  it("trims an over-spending plan back toward the confidence bar, holding essentials", () => {
+    const plan: RetirementPlan = { ...rich, targetSpending: 90_000 };
+    const before = lifestageBreakdown(plan, cfg);
+    const trim = trimSpending(plan, cfg);
+
+    expect(trim.applicable).toBe(true); // current spend is under the 85% bar
+    expect(trim.feasible).toBe(true);
+    expect(trim.successBefore).toBeLessThan(0.85);
+    expect(trim.successAfter).toBeGreaterThan(trim.successBefore); // trimming lifts the odds
+    expect(trim.successAfter).toBeGreaterThanOrEqual(0.8); // ~ the 85% target
+    expect(trim.essentials).toBeCloseTo(before.essentials, 0); // floor untouched
+    expect(trim.discretionaryKeptPct).toBeGreaterThan(0);
+    expect(trim.discretionaryKeptPct).toBeLessThan(100); // something was trimmed
+
+    // The trimmed plan lasts on the central projection (a fortiori of 85% MC).
+    const after = simulate({ ...plan, ...trim.patch }, cfg);
+    expect(after.lastsToLifeExpectancy).toBe(true);
+  });
+
+  it("is not offered when the plan is already prudent (boost's territory)", () => {
+    const trim = trimSpending({ ...rich, targetSpending: 45_000 }, cfg);
+    expect(trim.applicable).toBe(false);
+  });
+
+  it("trim and boost are complementary — exactly one applies at any spend", () => {
+    for (const spend of [45_000, 90_000, 110_000]) {
+      const p: RetirementPlan = { ...rich, targetSpending: spend };
+      expect(trimSpending(p, cfg).applicable).toBe(!boostSpending(p, cfg).applicable);
+    }
+  });
+});
