@@ -24,8 +24,9 @@ import {
   RetirementIncomeGoalExplainer,
   SuperAtRetirementExplainer,
 } from "@/components/explainers";
-import { runMonteCarlo } from "@/lib/au/montecarlo";
+import { runMonteCarlo, MC_CONFIDENCE_TARGET, MC_CONFIDENCE_MC } from "@/lib/au/montecarlo";
 import { whatWillItTake } from "@/lib/au/goalseek";
+import { maxSpendForConfidence } from "@/lib/au/strategies";
 import TrimSpendingModal from "@/components/TrimSpendingModal";
 import BoostSpendingModal from "@/components/BoostSpendingModal";
 import ProbabilityYearModal from "@/components/ProbabilityYearModal";
@@ -89,19 +90,22 @@ function Lever({
   delta,
   note,
   tone = "text-muted",
+  pending = false,
 }: {
   label: string;
   value: string;
   delta?: string;
   note?: string;
   tone?: string;
+  pending?: boolean;
 }) {
   return (
     <div className="rounded-xl border border-line bg-panel-2 p-4">
-      <div className="text-xs font-semibold uppercase tracking-wide text-muted">
+      <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted">
         {label}
+        {pending && <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent" aria-label="updating" />}
       </div>
-      <div className="mt-1 text-xl font-bold tabular-nums text-white">{value}</div>
+      <div className={`mt-1 text-xl font-bold tabular-nums text-white ${pending ? "opacity-60" : ""}`}>{value}</div>
       {note && <div className="mt-0.5 text-[11px] text-muted">{note}</div>}
       {delta && <div className={`mt-0.5 text-xs ${tone}`}>{delta}</div>}
     </div>
@@ -250,6 +254,23 @@ export default function PlannerApp({
   const successTone: "accent" | "amber" | "red" =
     mc.successRate >= 0.85 ? "accent" : mc.successRate >= 0.6 ? "amber" : "red";
   const gs = useMemo(() => whatWillItTake(plan, config), [plan, config]);
+
+  // Prudent max spend: the most you can spend while Monte Carlo success still
+  // clears the shared 85% bar (matching the What-If safe spend and the boost
+  // modal). Heavier than the deterministic goal-seek, so debounce it and show a
+  // pulse; fall back to the central-projection figure until it settles.
+  const [mcMaxSpend, setMcMaxSpend] = useState<number | null>(null);
+  const [mcMaxPending, setMcMaxPending] = useState(false);
+  useEffect(() => {
+    if (!ready || !configured) return;
+    setMcMaxPending(true);
+    const id = setTimeout(() => {
+      setMcMaxSpend(maxSpendForConfidence(plan, config, MC_CONFIDENCE_TARGET, MC_CONFIDENCE_MC));
+      setMcMaxPending(false);
+    }, 400);
+    return () => clearTimeout(id);
+  }, [plan, config, ready, configured]);
+  const maxSpend = mcMaxSpend ?? gs.maxSpend; // prudent once settled, central meanwhile
 
   const tweaked = useMemo(
     () => JSON.stringify(plan) !== JSON.stringify(baseline),
@@ -982,26 +1003,23 @@ export default function PlannerApp({
         </p>
         <div className="grid gap-3 sm:grid-cols-3">
           {(() => {
-            const spendDelta = gs.maxSpend != null ? gs.maxSpend - gs.currentSpend : null;
+            const spendDelta = maxSpend != null ? maxSpend - gs.currentSpend : null;
             const retireDelta =
               gs.retireAge != null ? gs.retireAge - gs.currentRetireAge : null;
+            const targetPct = Math.round(MC_CONFIDENCE_TARGET * 100);
             return (
               <>
                 <Lever
-                  label={gs.lasts ? "Spend up to" : "Trim spending to"}
-                  value={
-                    gs.maxSpend != null
-                      ? `${fmtCurrency(gs.maxSpend + goal.loanCost)}/yr`
-                      : "—"
-                  }
+                  label={spendDelta != null && spendDelta < 0 ? "Trim spending to" : "Spend up to"}
+                  value={maxSpend != null ? `${fmtCurrency(maxSpend + goal.loanCost)}/yr` : "—"}
                   note={
-                    goal.loanCost > 0 && gs.maxSpend != null
-                      ? `${fmtCurrency(gs.maxSpend)} living + ${fmtCurrency(goal.loanCost)} home loan`
+                    maxSpend != null
+                      ? `${goal.loanCost > 0 ? `${fmtCurrency(maxSpend)} living + ${fmtCurrency(goal.loanCost)} loan · ` : ""}${targetPct}% likely to last`
                       : undefined
                   }
                   delta={
                     spendDelta == null
-                      ? "even a low spend runs short"
+                      ? "even a low spend is risky"
                       : spendDelta >= 0
                         ? `${fmtCurrency(spendDelta)} of headroom`
                         : `${fmtCurrency(-spendDelta)} less than now`
@@ -1011,6 +1029,7 @@ export default function PlannerApp({
                       ? "text-emerald-400"
                       : "text-amber-400"
                   }
+                  pending={mcMaxPending}
                 />
                 <Lever
                   label={gs.extraSavings ? "Save an extra" : "Extra saving"}
@@ -1051,8 +1070,9 @@ export default function PlannerApp({
           })()}
         </div>
         <p className="mt-3 text-xs text-muted">
-          Each lever on its own, on the central (average-return) projection —
-          combine them, or check the likelihood above for the odds.
+          Spend is the most you can spend at a {Math.round(MC_CONFIDENCE_TARGET * 100)}% chance of lasting (allowing
+          for market ups and downs); saving and retirement are on the central average-return projection. Each lever on
+          its own — combine them, or check the likelihood above.
         </p>
         {!gs.lasts && (
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
