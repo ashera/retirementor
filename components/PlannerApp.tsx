@@ -1054,7 +1054,7 @@ export default function PlannerApp({
                   tone={gs.extraSavings ? "text-amber-400" : "text-emerald-400"}
                 />
                 <Lever
-                  label={retireDelta && retireDelta > 0 ? "Retire at" : "Retire from"}
+                  label={retireDelta && retireDelta > 0 ? "Retire at" : "Retire as early as"}
                   value={gs.retireAge != null ? `age ${gs.retireAge}` : "—"}
                   delta={
                     retireDelta == null
@@ -1062,7 +1062,7 @@ export default function PlannerApp({
                       : retireDelta > 0
                         ? `${retireDelta} yr${retireDelta === 1 ? "" : "s"} later`
                         : retireDelta < 0
-                          ? `${-retireDelta} yr earlier is possible`
+                          ? `${-retireDelta} yr${retireDelta === -1 ? "" : "s"} sooner than your plan`
                           : "as planned"
                   }
                   tone={retireDelta && retireDelta > 0 ? "text-amber-400" : "text-emerald-400"}
