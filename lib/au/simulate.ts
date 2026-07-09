@@ -15,7 +15,7 @@ import { minDrawdownRate, type EngineConfig } from "./config";
 import { agePension, deemedIncome } from "./agePension";
 import { getInvestmentProperties, spendingForAge, startingSuperBalances } from "./types";
 import { mortgageActiveAtAge, mortgageAnnualCost } from "./mortgage";
-import { seniorIncomeTax } from "./tax";
+import { incomeTax, seniorIncomeTax } from "./tax";
 import {
   capitalGainsTax,
   netEquity,
@@ -184,6 +184,7 @@ export function simulate(
       let superGrowth = 0;
       let earningsTax = 0;
       let feesPaid = 0;
+      let takeHome = 0; // net cash from salary after income tax and pre-tax sacrifice
       // Contributions arrive through the year, so grow ~half a year on average.
       const superHalf = Math.pow(1 + superAccumReturn, 0.5);
       plan.people.forEach((p, i) => {
@@ -191,6 +192,13 @@ export function simulate(
           p.salary * config.sgRate + p.voluntaryConcessional,
           config.concessionalCap,
         );
+        // Take-home pay: salary sacrifice (the concessional above compulsory SG,
+        // within the cap) is pre-tax, so it lowers taxable income — and thus your
+        // pay packet. Income tax uses the resident scale (no Medicare levy, matching
+        // the rest of the model). SG is employer-paid on top, so it doesn't reduce pay.
+        const sacrificed = Math.max(0, concessional - p.salary * config.sgRate);
+        const taxable = Math.max(0, p.salary - sacrificed);
+        takeHome += taxable - incomeTax(taxable);
         const ncc = Math.min(p.voluntaryNonConcessional, config.nonConcessionalCap);
         // Division 293: an extra 15% on the concessional contributions that push
         // income (salary + concessional) over the high-income threshold.
@@ -233,6 +241,7 @@ export function simulate(
           contribNet,
           savings,
           salaryIncome: plan.people.reduce((s, p) => s + p.salary, 0),
+          takeHome,
           workIncome: 0,
           superGrowth,
           outsideGrowth,
@@ -464,6 +473,7 @@ export function simulate(
         contribNet: 0,
         savings: 0,
         salaryIncome: 0,
+        takeHome: 0,
         workIncome: netWork,
         superGrowth,
         outsideGrowth,
@@ -540,6 +550,7 @@ function row(
     agePension: agePensionAmt,
     pension: breakdown.pension,
     salaryIncome: breakdown.salaryIncome,
+    takeHome: breakdown.takeHome,
     workIncome: breakdown.workIncome,
     homeValue: breakdown.homeValue,
     homeEquity: breakdown.homeEquity,

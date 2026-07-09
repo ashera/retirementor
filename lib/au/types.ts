@@ -240,6 +240,7 @@ export interface YearBreakdown {
   contribNet: number; // net amount added to super (concessional net + non-concessional)
   savings: number; // added to outside-super this year
   salaryIncome: number; // gross household salary this year (accumulation only; 0 in retirement)
+  takeHome: number; // net pay after income tax + pre-tax salary sacrifice (working years; 0 in retirement)
   workIncome: number; // net part-time work income this year (retirement only; after tax)
   // Investment growth (super growth is net of accumulation earnings tax AND the
   // % investment/admin fee; the fixed $ fees + insurance are the `fees` line)
@@ -278,6 +279,7 @@ export interface YearRow {
   agePension: number; // Age Pension received this year
   pension: PensionBreakdown | null; // means-test working behind agePension (null before pension age)
   salaryIncome: number; // gross household salary this year (0 once retired)
+  takeHome: number; // net pay after income tax + pre-tax salary sacrifice (working years; 0 in retirement)
   workIncome: number; // net part-time work income this year (0 outside the work years)
   homeValue: number; // the home's (exempt) market value this year — for the net-worth view
   homeEquity: number; // homeValue less any outstanding mortgage — the net-worth band uses this

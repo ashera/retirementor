@@ -244,7 +244,7 @@ export default function WhatIfView({
   // Legend for the income-sources view (only the bands the composed plan uses).
   const composedWorking = Math.max(...composed.people.map((pp) => pp.currentAge)) < composed.retirementAge;
   const incomeLegend = [
-    ...(composedWorking ? [{ c: "#facc15", l: "Salary" }] : []),
+    ...(composedWorking ? [{ c: "#facc15", l: "Take-home pay" }] : []),
     ...(composed.workIncome ? [{ c: "#f472b6", l: "Part-time work" }] : []),
     { c: "#a78bfa", l: "Age Pension" },
     { c: "#34d399", l: "Super" },

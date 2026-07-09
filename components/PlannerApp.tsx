@@ -863,7 +863,7 @@ export default function PlannerApp({
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
           <h2 className="font-semibold text-white">Income sources</h2>
           <div className="flex flex-wrap gap-4">
-            <LegendDot color="#facc15" label="Salary" />
+            <LegendDot color="#facc15" label="Take-home pay" />
             {plan.workIncome && <LegendDot color="#f472b6" label="Part-time work" />}
             <LegendDot color="#a78bfa" label="Age Pension" />
             <LegendDot color="#34d399" label="Super" />
