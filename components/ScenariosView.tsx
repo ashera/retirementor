@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import Link from "next/link";
 import AdminTabs from "@/components/AdminTabs";
 import { fmtCurrency } from "@/lib/au/format";
@@ -32,6 +32,140 @@ function avatarSrcs(key: string): string[] {
     AVATAR_BY_KEY[key] ??
     [`agent-${[...key].reduce((h, c) => (h + c.charCodeAt(0)) % 10, 0)}`];
   return ids.map((id) => `/avatars/${id}.jpg`);
+}
+
+// Canonical capabilities we want the persona suite to exercise, each satisfied
+// by one or more of the personas' `covers` tags. Drives the coverage matrix — a
+// feature with no covering persona shows up as a gap.
+const FEATURE_GROUPS: { group: string; features: { label: string; tags: string[] }[] }[] = [
+  { group: "Household", features: [
+    { label: "Single", tags: ["Single"] },
+    { label: "Couple", tags: ["Couple"] },
+    { label: "Individual super", tags: ["Individual super"] },
+    { label: "Joint / SMSF super", tags: ["Joint SMSF"] },
+  ] },
+  { group: "Home & tenure", features: [
+    { label: "Homeowner", tags: ["Homeowner"] },
+    { label: "Renter", tags: ["Renter", "Non-homeowner switch"] },
+    { label: "Downsize", tags: ["Downsize"] },
+    { label: "Downsizer contribution", tags: ["Downsizer contribution"] },
+    { label: "Sell & rent", tags: ["Sell & rent"] },
+    { label: "Home appreciation", tags: ["Home appreciation"] },
+  ] },
+  { group: "Retirement timing", features: [
+    { label: "Standard (at pension age)", tags: ["Standard retirement"] },
+    { label: "Early / bridge", tags: ["Early retirement", "Bridge phase"] },
+    { label: "Preservation-age edge", tags: ["Preservation-age edge"] },
+  ] },
+  { group: "Age Pension means test", features: [
+    { label: "Assets-test binding", tags: ["Assets-test binding"] },
+    { label: "Income-test binding", tags: ["Income-test binding"] },
+    { label: "Assets-test cutout (nil)", tags: ["Assets-test cutout", "Nil pension"] },
+    { label: "Full pension", tags: ["Full pension"] },
+    { label: "Part pension", tags: ["Part pension"] },
+  ] },
+  { group: "Contributions & tax", features: [
+    { label: "Concessional cap", tags: ["Concessional cap", "Concessional cap hit"] },
+    { label: "Division 293", tags: ["Division 293"] },
+    { label: "Transition to Retirement", tags: ["Transition to Retirement"] },
+  ] },
+  { group: "Property & mortgage", features: [
+    { label: "Investment property + rent", tags: ["Investment property", "Rental income"] },
+    { label: "Property sale + CGT", tags: ["Property sale", "Capital gains tax"] },
+    { label: "Interest-only mortgage", tags: ["Interest-only mortgage"] },
+    { label: "Clear loan with super", tags: ["Clear loan with super"] },
+  ] },
+  { group: "Work", features: [
+    { label: "Part-time work", tags: ["Part-time work"] },
+    { label: "Work Bonus", tags: ["Work Bonus"] },
+  ] },
+];
+
+// A feature × persona grid so an auditor can see, at a glance, which persona
+// exercises each capability — and spot any capability with no coverage.
+function CoverageMatrix({ reports }: { reports: PersonaReport[] }) {
+  const [open, setOpen] = useState(false);
+  const covers = (tags: string[], r: PersonaReport) => tags.some((t) => r.covers.includes(t));
+  const allFeatures = FEATURE_GROUPS.flatMap((g) => g.features);
+  const gaps = allFeatures.filter((f) => !reports.some((r) => covers(f.tags, r)));
+  return (
+    <div className="mb-6 overflow-hidden rounded-2xl border border-line bg-panel">
+      <button
+        onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left transition hover:bg-panel-2/40"
+      >
+        <span className="flex items-center gap-2">
+          <span className={`text-muted transition-transform ${open ? "rotate-90" : ""}`} aria-hidden>▸</span>
+          <span className="text-sm font-semibold text-white">Coverage matrix</span>
+          <span className="hidden text-xs text-muted sm:inline">— which persona exercises each capability</span>
+        </span>
+        <span
+          className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+            gaps.length ? "bg-amber-500/15 text-amber-400" : "bg-emerald-500/15 text-emerald-400"
+          }`}
+        >
+          {gaps.length ? `${gaps.length} uncovered` : `all ${allFeatures.length} covered`}
+        </span>
+      </button>
+      {open && (
+        <div className="border-t border-line">
+          {gaps.length > 0 && (
+            <div className="border-b border-line bg-amber-500/5 px-5 py-2 text-xs text-amber-300">
+              No persona covers: {gaps.map((g) => g.label).join(", ")} — add one.
+            </div>
+          )}
+          <div className="overflow-x-auto px-4 py-3">
+            <table className="border-separate border-spacing-0 text-xs">
+              <thead>
+                <tr>
+                  <th className="sticky left-0 z-10 bg-panel px-2 py-1" />
+                  {reports.map((r) => (
+                    <th key={r.key} className="px-1 pb-2 align-bottom" title={r.name}>
+                      <img
+                        src={avatarSrcs(r.key)[0]}
+                        alt=""
+                        className="mx-auto h-6 w-6 rounded-full object-cover ring-1 ring-line"
+                      />
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {FEATURE_GROUPS.map((g) => (
+                  <Fragment key={g.group}>
+                    <tr>
+                      <td
+                        colSpan={reports.length + 1}
+                        className="sticky left-0 bg-panel px-2 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-wide text-accent"
+                      >
+                        {g.group}
+                      </td>
+                    </tr>
+                    {g.features.map((f) => {
+                      const n = reports.filter((r) => covers(f.tags, r)).length;
+                      return (
+                        <tr key={f.label} className="hover:bg-panel-2/40">
+                          <td className={`sticky left-0 z-10 whitespace-nowrap bg-panel px-2 py-1 ${n === 0 ? "text-amber-400" : "text-slate-300"}`}>
+                            {f.label}
+                          </td>
+                          {reports.map((r) => (
+                            <td key={r.key} className="px-1 py-1 text-center" title={covers(f.tags, r) ? `${r.name} covers ${f.label}` : undefined}>
+                              {covers(f.tags, r) ? <span className="text-accent">●</span> : <span className="text-line">·</span>}
+                            </td>
+                          ))}
+                        </tr>
+                      );
+                    })}
+                  </Fragment>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 // One face for a single, two subtly-overlapped faces for a couple. The ring is
@@ -306,6 +440,8 @@ export default function ScenariosView({
           </time>
         </span>
       </div>
+
+      <CoverageMatrix reports={reports} />
 
       {/* Filter */}
       <div className="mb-4 space-y-3 rounded-2xl border border-line bg-panel-2 p-4">
