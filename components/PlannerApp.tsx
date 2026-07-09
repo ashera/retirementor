@@ -1095,7 +1095,8 @@ export default function PlannerApp({
             <p className="text-sm text-slate-300">
               Money to spare? Put your headroom to work — raise discretionary
               spending (essentials kept) to the most your plan can afford while
-              still lasting to age {plan.lifeExpectancy}.
+              staying about {Math.round(MC_CONFIDENCE_TARGET * 100)}% likely to
+              last to age {plan.lifeExpectancy}.
             </p>
             <button
               onClick={() => setBoostOpen(true)}
