@@ -69,9 +69,8 @@ function planParts(res: SimResult): { final: number; shortfall: number } {
 }
 
 interface Marginal {
-  years: number;
-  dollars: number; // combined "better off"
-  moneyLeft: number; // change in money left at the end
+  years: number; // change in how long the money lasts (a "lasts to" score, incl. end buffer)
+  moneyLeft: number; // change in liquid super + savings left at life expectancy
   shortfallAvoided: number; // reduction in unfunded spending
   netWorth: number; // change in total net worth (incl. home + property) at life expectancy
   takeHomeNow: number; // working-year take-home pay with this lever alone (salary-sacrifice hit)
@@ -178,7 +177,6 @@ export default function WhatIfView({
       const termNW = res.rows.length ? rowNetWorth(res.rows[res.rows.length - 1]) : 0;
       out[card.id] = {
         years: lastsScore(res, denom, life) - baseScore,
-        dollars: moneyLeft + shortfallAvoided,
         moneyLeft,
         shortfallAvoided,
         netWorth: termNW - baseTermNW,
@@ -486,7 +484,7 @@ export default function WhatIfView({
                     key={card.id}
                     card={card}
                     on={active.has(card.id)}
-                    delta={marginal[card.id] ?? { years: 0, dollars: 0, moneyLeft: 0, shortfallAvoided: 0, netWorth: 0, takeHomeNow: 0 }}
+                    delta={marginal[card.id] ?? { years: 0, moneyLeft: 0, shortfallAvoided: 0, netWorth: 0, takeHomeNow: 0 }}
                     life={baseline.lifeExpectancy}
                     baseTakeHome={baseRes.rows[0]?.takeHome ?? 0}
                     values={resolveValues(card, values[card.id])}
@@ -646,47 +644,52 @@ function Sparkline({
 }
 
 function ImpactBreakdown({ delta, life }: { delta: Marginal; life: number }) {
+  const nwDiffers = Math.abs(delta.netWorth - delta.moneyLeft) >= 2_000;
   const rows = [
-    { label: `Money left at ${life}`, v: delta.moneyLeft },
-    { label: "Spending shortfall avoided", v: delta.shortfallAvoided },
+    { label: `Money left at ${life}`, sub: "liquid super + savings", v: delta.moneyLeft },
+    { label: "Spending shortfall avoided", sub: "spending you can now cover", v: delta.shortfallAvoided },
+    ...(nwDiffers ? [{ label: `Net worth at ${life}`, sub: "incl. your home & property", v: delta.netWorth }] : []),
   ].filter((r) => Math.abs(r.v) >= 2_000);
   if (!rows.length) return null;
   return (
     <div className="rounded-lg border border-line bg-panel px-3 py-2 text-xs">
-      <div className="mb-1 text-[10px] uppercase tracking-wide text-muted">On its own — where the dollars come from</div>
+      <div className="mb-1 text-[10px] uppercase tracking-wide text-muted">On its own — the impact</div>
       {rows.map((r) => (
-        <div key={r.label} className="flex justify-between gap-4 py-0.5">
-          <span className="text-muted">{r.label}</span>
-          <span className={`font-semibold tabular-nums ${r.v > 0 ? "text-accent" : "text-amber-400"}`}>{fmtDelta(r.v)}</span>
+        <div key={r.label} className="flex items-baseline justify-between gap-4 py-0.5">
+          <span className="text-muted">
+            {r.label}
+            <span className="ml-1 text-[10px] text-muted/70">{r.sub}</span>
+          </span>
+          <span className={`shrink-0 font-semibold tabular-nums ${r.v > 0 ? "text-accent" : "text-amber-400"}`}>{fmtDelta(r.v)}</span>
         </div>
       ))}
     </div>
   );
 }
 
-function DeltaChip({ years, dollars, netWorth }: { years: number; dollars: number; netWorth: number }) {
+function DeltaChip({ years, moneyLeft, netWorth, life }: { years: number; moneyLeft: number; netWorth: number; life: number }) {
   const yAbs = Math.abs(years);
   const yStr = yAbs < 0.05 ? null : `${years > 0 ? "+" : "−"}${yAbs >= 10 ? Math.round(yAbs) : yAbs.toFixed(1)} yrs`;
-  const dStr = fmtDelta(dollars);
   const nwStr = fmtDelta(netWorth);
-  if (!yStr && !dStr && !nwStr) return <span className="text-xs text-muted">≈ no change</span>;
+  // Only surface the liquid "money left" when it meaningfully differs from net
+  // worth (i.e. asset levers move the home/property) — otherwise it's redundant.
+  const mlStr = Math.abs(moneyLeft - netWorth) >= 2_000 ? fmtDelta(moneyLeft) : null;
+  if (!yStr && !mlStr && !nwStr) return <span className="text-xs text-muted">≈ no change</span>;
   const tone = (v: number) => (v > 0 ? "text-accent" : "text-amber-400");
+  const Line = ({ label, value, v, title }: { label: string; value: string; v: number; title: string }) => (
+    <span className="flex items-baseline justify-end gap-1.5" title={title}>
+      <span className="text-[10px] font-normal text-muted">{label}</span>
+      <span className={tone(v)}>{value}</span>
+    </span>
+  );
   return (
-    <span
-      className="shrink-0 text-right text-xs font-semibold tabular-nums"
-      title="This lever on its own: how much longer the money lasts and how much better off you are for funding retirement (money left at the end, less any spending it couldn't fund), plus its effect on your total net worth (incl. home & property) at the end."
-    >
-      {(yStr || dStr) && (
-        <span className="block">
-          {yStr && <span className={tone(years)}>{yStr}</span>}
-          {yStr && dStr && <span className="text-muted"> · </span>}
-          {dStr && <span className={tone(dollars)}>{dStr}</span>}
-        </span>
+    <span className="shrink-0 space-y-0.5 text-right text-xs font-semibold tabular-nums">
+      {yStr && <Line label="Money lasts" value={yStr} v={years} title="On its own, how much longer your super + savings cover your spending." />}
+      {mlStr && (
+        <Line label="Money left" value={mlStr} v={moneyLeft} title={`Liquid super + savings left at ${life}.`} />
       )}
       {nwStr && (
-        <span className="block text-[10px] font-medium text-muted">
-          net worth <span className={tone(netWorth)}>{nwStr}</span>
-        </span>
+        <Line label="Net worth" value={nwStr} v={netWorth} title={`Total wealth — incl. your home & any property — at ${life}.`} />
       )}
     </span>
   );
@@ -739,7 +742,7 @@ function StrategyCardRow({
         <button type="button" onClick={onToggle} className="min-w-0 flex-1 text-left">
           <div className="text-sm font-semibold text-white">{card.label}</div>
         </button>
-        <DeltaChip years={delta.years} dollars={delta.dollars} netWorth={delta.netWorth} />
+        <DeltaChip years={delta.years} moneyLeft={delta.moneyLeft} netWorth={delta.netWorth} life={life} />
       </div>
 
       {on && (
