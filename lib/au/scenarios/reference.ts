@@ -168,6 +168,84 @@ export function incomeTax(taxable: number): number {
   return 51_638 + (t - 190_000) * 0.45;
 }
 
+// ── Seniors & Pensioners Tax Offset (SAPTO) ──────────────────────────────────
+// Max SAPTO per person (ATO). Makes modest senior income effectively tax-free
+// (single ~$35k; each of a couple ~$32k). Re-stated from the published figure so
+// the reference doesn't share the engine's tax module.
+const SAPTO_MAX = { single: 2_230, couple: 1_602 } as const;
+
+/** Resident income tax on a senior/pensioner, per person: ordinary tax less
+ *  SAPTO (floored at 0). Ignores the high-income phase-out + Medicare levy (as
+ *  the engine does). Covers part-time employment AND outside investment earnings. */
+export function seniorIncomeTax(income: number, household: Household): number {
+  return Math.max(0, incomeTax(income) - SAPTO_MAX[household]);
+}
+
+/** Tax on a retiree's outside-super (nominal) earnings, charged as the MARGINAL
+ *  amount stacked on top of any part-time work income — so the tax-free
+ *  threshold + SAPTO aren't used twice (matches the engine). `grownOutside` is
+ *  the outside balance AFTER the year's growth (the base the engine taxes). */
+export function outsideEarningsTax(
+  grownOutside: number, nomReturnPct: number, grossWork: number, workers: number, household: Household,
+): number {
+  const earnings = Math.max(0, grownOutside * (nomReturnPct / 100));
+  if (earnings <= 0) return 0;
+  const workPer = grossWork / workers;
+  const earnPer = earnings / workers;
+  return workers * Math.max(0, seniorIncomeTax(workPer + earnPer, household) - seniorIncomeTax(workPer, household));
+}
+
+// ── Part-time work in retirement (Work Bonus + tax) ──────────────────────────
+/** Work Bonus: the first $300/fortnight ($7,800/yr) of employment income per
+ *  person is excluded from the Age Pension INCOME test (Services Australia). */
+export const WORK_BONUS_ANNUAL = 7_800;
+export function workBonusAssessable(grossWork: number, workers: number): number {
+  return Math.max(0, grossWork - WORK_BONUS_ANNUAL * workers);
+}
+/** Net part-time work income after senior income tax (this is what offsets the
+ *  household's drawdown need). */
+export function netWorkIncome(grossWork: number, workers: number, household: Household): number {
+  return grossWork - workers * seniorIncomeTax(grossWork / workers, household);
+}
+
+// ── Transition to Retirement arbitrage ───────────────────────────────────────
+/** Net gain to super from swapping `extraSacrifice` of pre-tax salary into a
+ *  tax-free TTR pension: income tax saved on that slice LESS the 15%
+ *  contributions tax, bounded by the remaining concessional-cap room. Negative
+ *  when the marginal rate is under 15%. Person 0 only, from preservation age. */
+export function ttrBenefit(
+  salary: number, volConcessional: number, extraSacrifice: number,
+  sgRate: number, concessionalCap: number, contribTax: number,
+): number {
+  const concessional = Math.min(salary * sgRate + volConcessional, concessionalCap);
+  const sacrificed = Math.max(0, concessional - salary * sgRate);
+  const taxable = Math.max(0, salary - sacrificed);
+  const ttrSacrificed = Math.min(extraSacrifice, Math.max(0, concessionalCap - concessional));
+  if (ttrSacrificed <= 0) return 0;
+  const taxSaved = incomeTax(taxable) - incomeTax(Math.max(0, taxable - ttrSacrificed));
+  return taxSaved - ttrSacrificed * contribTax;
+}
+
+// ── Home as an asset: appreciation, downsize & sell-up equity release ─────────
+/** The (exempt) home's value after `years`, appreciating at a real rate. */
+export function homeValueAt(value: number, growthRealPct: number, years: number): number {
+  return value * Math.pow(1 + growthRealPct / 100, years);
+}
+/** Equity freed by downsizing to `newValue` at `years` — the grown home less the
+ *  new (smaller) home and any loan. A `toSuper` slice becomes a downsizer
+ *  contribution; the remainder lands in (deemed) savings. */
+export function downsizerRelease(
+  value: number, growthRealPct: number, years: number, newValue: number, loan = 0,
+): number {
+  return Math.max(0, homeValueAt(value, growthRealPct, years) - newValue - loan);
+}
+/** Equity freed by selling up and renting at `years` — all grown equity net of any loan. */
+export function sellUpRelease(
+  value: number, growthRealPct: number, years: number, loan = 0,
+): number {
+  return Math.max(0, homeValueAt(value, growthRealPct, years) - loan);
+}
+
 /** Assert two dollar figures agree within `tol` (default $1), with a helpful message. */
 export function near(actual: number, expected: number, label: string, tol = 1): void {
   if (Math.abs(actual - expected) > tol) {
