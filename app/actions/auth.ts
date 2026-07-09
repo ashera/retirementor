@@ -5,6 +5,7 @@ import { query } from "@/lib/db";
 import {
   createSession,
   destroySession,
+  getCurrentUser,
   hashPassword,
   verifyPassword,
   issueResetToken,
@@ -72,6 +73,22 @@ export async function login(
 export async function logout(): Promise<void> {
   await destroySession();
   redirect("/");
+}
+
+/** Disconnect Google from the current account. Refused if the account has no
+ *  password, since that would leave the user with no way to sign in. */
+export async function disconnectGoogle(): Promise<void> {
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+  const r = await query<{ has_password: boolean }>(
+    "select password_hash is not null as has_password from users where id = $1",
+    [user.id],
+  );
+  if (!r.rows[0]?.has_password) {
+    redirect("/account?error=no_password");
+  }
+  await query("update users set google_sub = null where id = $1", [user.id]);
+  redirect("/account?disconnected=1");
 }
 
 /** Start a reset: email a one-time link if the address is registered. Always

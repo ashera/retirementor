@@ -52,7 +52,7 @@ export default async function Page() {
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <PlannerApp
-        user={user ? { email: user.email, isAdmin: user.is_admin } : null}
+        user={user ? { email: user.email, isAdmin: user.is_admin, name: user.name, avatarUrl: user.avatar_url } : null}
         savedPlans={savedPlans}
         draft={draft}
         config={config}

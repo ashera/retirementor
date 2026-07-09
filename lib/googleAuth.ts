@@ -11,6 +11,7 @@ const AUTH_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth";
 const TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
 
 export const GOOGLE_STATE_COOKIE = "g_oauth_state";
+export const GOOGLE_LINK_COOKIE = "g_oauth_link"; // set when connecting Google to an already-logged-in account
 export const CALLBACK_PATH = "/api/auth/google/callback";
 
 /** The live origin (scheme + host) of the incoming request, honouring the proxy
@@ -128,4 +129,28 @@ export async function findOrCreateGoogleUser(
     [p.email, p.sub, p.name, p.picture],
   );
   return created.rows[0];
+}
+
+/**
+ * Connect a Google identity to an already-logged-in account (from the account
+ * page). Refuses if that Google account is already linked to a DIFFERENT user.
+ */
+export async function linkGoogleToUser(
+  userId: string,
+  p: GoogleProfile,
+): Promise<{ ok: true } | { ok: false; error: "in_use" }> {
+  const taken = await query<{ id: string }>(
+    "select id from users where google_sub = $1 and id <> $2",
+    [p.sub, userId],
+  );
+  if (taken.rows[0]) return { ok: false, error: "in_use" };
+  await query(
+    `update users
+        set google_sub = $1,
+            name = coalesce(name, $2),
+            avatar_url = coalesce(avatar_url, $3)
+      where id = $4`,
+    [p.sub, p.name, p.picture, userId],
+  );
+  return { ok: true };
 }

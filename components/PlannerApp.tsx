@@ -137,7 +137,7 @@ export default function PlannerApp({
   config,
   reviewDue = 0,
 }: {
-  user: { email: string; isAdmin: boolean } | null;
+  user: { email: string; isAdmin: boolean; name?: string | null; avatarUrl?: string | null } | null;
   savedPlans: SavedPlan[];
   draft?: PlanDraft | null;
   config: EngineConfig;
@@ -525,7 +525,21 @@ export default function PlannerApp({
                 )}
               </Link>
             )}
-            <span className="text-muted">{user.email}</span>
+            <Link
+              href="/account"
+              className="flex items-center gap-2 rounded-lg px-1.5 py-1 text-slate-200 transition hover:text-white"
+              title="Account settings"
+            >
+              {user.avatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={user.avatarUrl} alt="" className="h-7 w-7 rounded-full object-cover ring-1 ring-line" />
+              ) : (
+                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-panel-2 text-xs font-semibold text-slate-300 ring-1 ring-line">
+                  {(user.name ?? user.email).charAt(0).toUpperCase()}
+                </span>
+              )}
+              <span className="max-w-[12rem] truncate">{user.name ?? user.email}</span>
+            </Link>
             <form action={logout}>
               <button className="rounded-lg border border-line px-3 py-1.5 font-medium text-slate-200 transition hover:border-accent/50 hover:text-white">
                 Log out
