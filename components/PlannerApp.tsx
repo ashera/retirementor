@@ -660,6 +660,15 @@ export default function PlannerApp({
                 >
                   {sp.name}
                 </button>
+                {sp.data.whatIf && (
+                  <Link
+                    href={`/what-if?edit=${sp.id}`}
+                    title={`Reopen ${sp.name}'s strategies in What-if`}
+                    className="rounded px-1 text-muted hover:text-accent"
+                  >
+                    ✎ What-if
+                  </Link>
+                )}
                 <Link
                   href={`/report/${sp.id}`}
                   target="_blank"

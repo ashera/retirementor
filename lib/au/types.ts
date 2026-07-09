@@ -143,6 +143,17 @@ export interface RetirementPlan {
   // "none"), so plan-completeness can reach 100% honestly and the dashboard ring
   // matches the wizard. Not used by the engine.
   answered?: { contributions?: boolean; outside?: boolean; property?: boolean };
+  // UI-only: the What-If board selection that produced this saved scenario, so it
+  // can be reopened and tweaked ("Edit in What-If"). Ignored by the engine.
+  whatIf?: WhatIfSaved;
+}
+
+/** The What-If board selection (which strategies are on + their params + the
+ *  chosen baseline), stored alongside a saved scenario so it can be reopened. */
+export interface WhatIfSaved {
+  active: string[]; // strategy card ids that are toggled on
+  values: Record<string, Record<string, number>>; // per-card param values
+  baselineId: string; // "current" or a saved-plan id
 }
 
 /** All investment properties on a plan, tolerating the legacy single-property

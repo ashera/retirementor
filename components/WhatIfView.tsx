@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import type { EngineConfig } from "@/lib/au/config";
-import type { RetirementPlan, SimResult } from "@/lib/au/types";
+import type { RetirementPlan, SimResult, WhatIfSaved } from "@/lib/au/types";
 import { DEFAULT_PLAN, getInvestmentProperties } from "@/lib/au/types";
 import { simulate } from "@/lib/au/simulate";
 import { runMonteCarlo, MC_CONFIDENCE_TARGET as SAFE_TARGET, MC_CONFIDENCE_MC as SAFE_MC } from "@/lib/au/montecarlo";
@@ -30,6 +30,7 @@ import IncomeYearModal from "@/components/IncomeYearModal";
 import Field from "@/components/Field";
 
 const PLAN_KEY = "au-retirement-plan";
+const WHATIF_KEY = "au-whatif-board"; // persists the board selection across visits
 const GROUP_ORDER: StrategyGroup[] = ["home", "mortgage", "property", "timing", "work"];
 
 const annualSpend = (p: RetirementPlan) =>
@@ -106,14 +107,53 @@ export default function WhatIfView({
   const [chartView, setChartView] = useState<"balance" | "networth" | "income">("balance");
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
 
+  // Don't persist the board until after the initial restore has been applied,
+  // so the empty first render can't clobber the saved selection.
+  const persistReady = useRef(false);
+
   useEffect(() => {
+    let cur: RetirementPlan = DEFAULT_PLAN;
     try {
       const raw = localStorage.getItem(PLAN_KEY);
-      setCurrent(raw ? { ...DEFAULT_PLAN, ...JSON.parse(raw) } : DEFAULT_PLAN);
-    } catch {
-      setCurrent(DEFAULT_PLAN);
+      if (raw) cur = { ...DEFAULT_PLAN, ...JSON.parse(raw) };
+    } catch {}
+    setCurrent(cur);
+
+    // (B) "Edit in What-If": /what-if?edit=<planId> reopens that saved
+    // scenario's exact strategy selection. (A) Otherwise restore the last board
+    // state from localStorage so returning to the page keeps your work.
+    let restore: WhatIfSaved | undefined;
+    try {
+      const editId = new URLSearchParams(window.location.search).get("edit");
+      const editPlan = editId ? savedPlans.find((s) => s.id === editId) : undefined;
+      if (editPlan?.data.whatIf) {
+        restore = editPlan.data.whatIf;
+        window.history.replaceState(null, "", "/what-if"); // don't re-trigger on refresh
+      } else {
+        const raw = localStorage.getItem(WHATIF_KEY);
+        if (raw) restore = JSON.parse(raw) as WhatIfSaved;
+      }
+    } catch {}
+
+    if (restore) {
+      if (restore.baselineId) setBaselineId(restore.baselineId);
+      setActive(new Set(restore.active ?? []));
+      setValues(restore.values ?? {});
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Persist the board selection (Part A). Skips the very first run so the empty
+  // initial state doesn't overwrite what we're about to restore above.
+  useEffect(() => {
+    if (!persistReady.current) {
+      persistReady.current = true;
+      return;
+    }
+    try {
+      localStorage.setItem(WHATIF_KEY, JSON.stringify({ baselineId, active: [...active], values }));
+    } catch {}
+  }, [baselineId, active, values]);
 
   const baseline: RetirementPlan | null = useMemo(() => {
     if (!current) return null;
@@ -124,12 +164,15 @@ export default function WhatIfView({
 
   const catalog = useMemo(() => (baseline ? buildStrategyCatalog(baseline) : []), [baseline]);
 
-  // Reset toggles when the baseline changes (its catalog differs).
-  useEffect(() => {
+  // Switching the baseline resets the toggles (its catalog differs). This is an
+  // explicit handler, not an effect, so restoring a saved selection on mount
+  // (which sets baselineId) does NOT wipe the restored toggles.
+  const switchBaseline = (id: string) => {
+    setBaselineId(id);
     setActive(new Set());
     setValues({});
     setSaveMsg(null);
-  }, [baselineId]);
+  };
 
   const composed = useMemo(
     () => (baseline ? applyStrategies(baseline, catalog, active, values) : null),
@@ -302,11 +345,14 @@ export default function WhatIfView({
     setSaving(true);
     setSaveMsg(null);
     const name = saveName.trim() || "What-if scenario";
-    const res = await savePlan(name, composed);
+    // Store the board selection alongside the composed plan so the scenario can
+    // be reopened and tweaked later via "Edit in What-If".
+    const whatIf: WhatIfSaved = { active: [...active], values, baselineId };
+    const res = await savePlan(name, { ...composed, whatIf });
     setSaving(false);
     if (res.error) setSaveMsg(res.error);
     else {
-      setSaveMsg(`Saved “${name}” — find it on the dashboard and in Compare.`);
+      setSaveMsg(`Saved “${name}” — reopen it any time from the dashboard (“Edit in What-If”).`);
       setSaveName("");
       track("What-if saved");
     }
@@ -330,7 +376,7 @@ export default function WhatIfView({
             Baseline:
             <select
               value={baselineId}
-              onChange={(e) => setBaselineId(e.target.value)}
+              onChange={(e) => switchBaseline(e.target.value)}
               className="rounded-lg border border-line bg-panel-2 px-3 py-1.5 text-sm font-medium text-slate-200"
             >
               <option value="current">Current plan</option>
