@@ -7,6 +7,7 @@
 import type { RetirementPlan } from "./types";
 import { getInvestmentProperties } from "./types";
 import { fmtCurrency } from "./format";
+import { propertyValueAt, capitalGainsTax, netSaleProceeds } from "./property";
 
 export type StrategyGroup = "home" | "mortgage" | "property" | "timing" | "work";
 
@@ -42,6 +43,9 @@ export interface StrategyCard {
   blurb?: string;
   exclusive?: string; // only one active card per exclusivity key (e.g. "home")
   params: StrategyParam[];
+  // Optional live consequence line derived from the card's current param values
+  // (e.g. the CGT and net proceeds at the chosen sale age). Shown under the params.
+  note?: (values: Record<string, number>) => string;
   apply: (plan: RetirementPlan, values: Record<string, number>) => RetirementPlan;
 }
 
@@ -212,6 +216,14 @@ export function buildStrategyCatalog(plan: RetirementPlan): StrategyCard[] {
           suffix: "yrs",
         },
       ],
+      // Live tax read-out at the chosen sale age: sale price, CGT and what's left.
+      note: (v) => {
+        const value = propertyValueAt(pr, Math.max(0, v.age - oldest));
+        const cgt = capitalGainsTax(pr, value);
+        const loan = pr.loanBalance ?? 0;
+        const net = netSaleProceeds(pr, value);
+        return `At age ${v.age}: sells for ~${fmtCurrency(value)}${loan ? `, less the ${fmtCurrency(loan)} loan` : ""}, less ~${fmtCurrency(cgt)} CGT → ~${fmtCurrency(net)} into savings.`;
+      },
       apply: (p, v) => {
         const arr = getInvestmentProperties(p).map((q, qi) =>
           qi === i ? { ...q, strategy: "sell" as const, sellAtAge: v.age } : q,
