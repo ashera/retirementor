@@ -10,6 +10,29 @@ function val(v: number | string) {
   return typeof v === "number" ? fmtCurrency(v) : v;
 }
 
+// Give each persona a face. Silhouette avatars in /public/avatars, matched to
+// each persona's name/gender (couples take their lead member); every avatar is
+// used once. Falls back to a deterministic pick if a new persona lacks a mapping.
+const AVATAR_BY_KEY: Record<string, string> = {
+  "solo-sandra": "agent-1",
+  "coupled-craig-kim": "agent-4",
+  "bridging-ben": "agent-0",
+  "landlord-lena": "agent-5",
+  "interest-only-ian": "agent-2",
+  "selling-sam": "agent-9",
+  "smsf-sam-sue": "agent-3",
+  "capped-carl": "agent-7",
+  "full-pension-fiona": "agent-8",
+  "clearing-clare": "agent-6",
+};
+
+function avatarSrc(key: string): string {
+  const id =
+    AVATAR_BY_KEY[key] ??
+    `agent-${[...key].reduce((h, c) => (h + c.charCodeAt(0)) % 10, 0)}`;
+  return `/avatars/${id}.jpg`;
+}
+
 function Checkpoint({ cp }: { cp: CheckpointResult }) {
   return (
     <div className="rounded-xl border border-line bg-panel">
@@ -78,6 +101,12 @@ function PersonaCard({
         >
           ▸
         </span>
+        <img
+          src={avatarSrc(report.key)}
+          alt=""
+          aria-hidden
+          className="h-14 w-14 shrink-0 rounded-full object-cover ring-1 ring-line"
+        />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-lg font-bold text-white">{report.name}</h2>
