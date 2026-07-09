@@ -285,9 +285,14 @@ export default function WhatIfView({
     }
   };
 
-  const groups = GROUP_ORDER.map((g) => ({ group: g, cards: catalog.filter((c) => c.group === g) })).filter(
-    (x) => x.cards.length > 0,
-  );
+  // Show TTR only once the (composed) retirement age clears 60 — so it also
+  // appears when the Retire later lever opens a working-past-60 window, and hides
+  // again if retirement drops back to 60 or below.
+  const cardVisible = (c: StrategyCard) => !(c.id === "ttr" && composed.retirementAge <= 60);
+  const groups = GROUP_ORDER.map((g) => ({
+    group: g,
+    cards: catalog.filter((c) => c.group === g && cardVisible(c)),
+  })).filter((x) => x.cards.length > 0);
 
   return (
     <div className="mx-auto max-w-4xl px-5 py-8">

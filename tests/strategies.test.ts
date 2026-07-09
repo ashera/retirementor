@@ -103,12 +103,12 @@ describe("What-If strategies", () => {
     expect(simulate(ttr, cfg).superAtRetirement).toBeGreaterThan(simulate(b, cfg).superAtRetirement);
   });
 
-  it("Transition to Retirement is only offered when there's a 60→retirement working window", () => {
-    const withWindow = base({ people: [{ currentAge: 58, superBalance: 400_000, salary: 120_000, voluntaryConcessional: 0, voluntaryNonConcessional: 0 }], retirementAge: 65 });
-    expect(buildStrategyCatalog(withWindow).some((c) => c.id === "ttr")).toBe(true);
-    // Retiring at 60 leaves no window while 60+ and working.
-    const noWindow = base({ people: [{ currentAge: 50, superBalance: 400_000, salary: 120_000, voluntaryConcessional: 0, voluntaryNonConcessional: 0 }], retirementAge: 60 });
-    expect(buildStrategyCatalog(noWindow).some((c) => c.id === "ttr")).toBe(false);
+  it("Transition to Retirement is offered to any worker (the board hides it until retirement clears 60)", () => {
+    const worker = base({ people: [{ currentAge: 58, superBalance: 400_000, salary: 120_000, voluntaryConcessional: 0, voluntaryNonConcessional: 0 }], retirementAge: 65 });
+    expect(buildStrategyCatalog(worker).some((c) => c.id === "ttr")).toBe(true);
+    // Not for someone already retired (no working years) or not earning.
+    const retired = base({ people: [{ currentAge: 66, superBalance: 400_000, salary: 0, voluntaryConcessional: 0, voluntaryNonConcessional: 0 }], retirementAge: 66 });
+    expect(buildStrategyCatalog(retired).some((c) => c.id === "ttr")).toBe(false);
   });
 
   it("maxSustainableSpend finds the highest spend that still lasts to life expectancy", () => {

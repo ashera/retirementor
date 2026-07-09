@@ -387,12 +387,12 @@ export function buildStrategyCatalog(plan: RetirementPlan): StrategyCard[] {
     });
   }
 
-  // Transition to Retirement — only when there's a window to run it in: from
-  // preservation age (60) up to retirement, while still working.
-  if (working && plan.people[0]?.salary > 0 && plan.retirementAge > 60) {
+  // Transition to Retirement — offered to any worker; the board only shows it
+  // once the (composed) retirement age clears 60, so it also surfaces when the
+  // Retire later lever opens a working-past-60 window. The engine applies it only
+  // in years the person is 60+ and still working.
+  if (working && plan.people[0]?.salary > 0) {
     const p0 = plan.people[0];
-    const startAge = Math.max(60, oldest);
-    const windowYears = Math.max(0, plan.retirementAge - startAge);
     cards.push({
       id: "ttr",
       group: "timing",
@@ -405,7 +405,7 @@ export function buildStrategyCatalog(plan: RetirementPlan): StrategyCard[] {
         const taxable = Math.max(0, p0.salary - p0.voluntaryConcessional);
         const taxSaved = incomeTax(taxable) - incomeTax(Math.max(0, taxable - v.extra));
         const benefit = Math.max(0, taxSaved - v.extra * 0.15);
-        return `Ages ${startAge}–${plan.retirementAge} (${windowYears} yr${windowYears === 1 ? "" : "s"}): take-home unchanged, about ${fmtCurrency(benefit)}/yr of tax saving into super (capped at the concessional limit).`;
+        return `From age 60 until you retire: take-home unchanged, about ${fmtCurrency(benefit)}/yr of tax saving into super (capped at the concessional limit). Pairs with working past 60.`;
       },
       apply: (p, v) => ({ ...p, ttr: { extraSacrifice: v.extra } }),
     });
