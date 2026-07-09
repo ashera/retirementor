@@ -74,6 +74,7 @@ interface Marginal {
   moneyLeft: number; // change in money left at the end
   shortfallAvoided: number; // reduction in unfunded spending
   netWorth: number; // change in total net worth (incl. home + property) at life expectancy
+  takeHomeNow: number; // working-year take-home pay with this lever alone (salary-sacrifice hit)
 }
 
 /** Compact signed dollar delta, or null when too small to bother showing. */
@@ -181,6 +182,7 @@ export default function WhatIfView({
         moneyLeft,
         shortfallAvoided,
         netWorth: termNW - baseTermNW,
+        takeHomeNow: res.rows[0]?.takeHome ?? 0,
       };
     }
     return out;
@@ -479,8 +481,9 @@ export default function WhatIfView({
                     key={card.id}
                     card={card}
                     on={active.has(card.id)}
-                    delta={marginal[card.id] ?? { years: 0, dollars: 0, moneyLeft: 0, shortfallAvoided: 0, netWorth: 0 }}
+                    delta={marginal[card.id] ?? { years: 0, dollars: 0, moneyLeft: 0, shortfallAvoided: 0, netWorth: 0, takeHomeNow: 0 }}
                     life={baseline.lifeExpectancy}
+                    baseTakeHome={baseRes.rows[0]?.takeHome ?? 0}
                     values={resolveValues(card, values[card.id])}
                     onToggle={() => toggle(card)}
                     onParam={(k, v) => setParam(card.id, k, v)}
@@ -689,6 +692,7 @@ function StrategyCardRow({
   on,
   delta,
   life,
+  baseTakeHome,
   values,
   onToggle,
   onParam,
@@ -698,6 +702,7 @@ function StrategyCardRow({
   on: boolean;
   delta: Marginal;
   life: number;
+  baseTakeHome: number;
   values: Record<string, number>;
   onToggle: () => void;
   onParam: (key: string, v: number) => void;
@@ -768,6 +773,19 @@ function StrategyCardRow({
               />
             );
           })}
+          {/* Live take-home hit while working (only shows when the lever moves it). */}
+          {baseTakeHome > 0 && Math.round(delta.takeHomeNow) !== Math.round(baseTakeHome) && (
+            <div className="flex items-center justify-between gap-3 rounded-lg border border-line bg-panel-2 px-3 py-2 text-xs">
+              <span className="text-muted">Take-home pay while working</span>
+              <span className="tabular-nums">
+                <span className="text-muted line-through">{fmtCurrency(baseTakeHome)}</span>{" "}
+                <span className="text-muted">→</span>{" "}
+                <span className={`font-semibold ${delta.takeHomeNow >= baseTakeHome ? "text-accent" : "text-amber-400"}`}>
+                  {fmtCurrency(delta.takeHomeNow)}/yr
+                </span>
+              </span>
+            </div>
+          )}
           {/* Essentials held + the discretionary portion being flexed. */}
           {sustainable && (
             <div className="flex flex-wrap justify-between gap-x-4 gap-y-1 rounded-lg border border-line bg-panel-2 px-3 py-2 text-xs">
