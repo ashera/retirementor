@@ -687,14 +687,14 @@ function DeltaChip({ years, moneyLeft, netWorth, life }: { years: number; moneyL
       {yStr && <Line label="Money lasts" value={yStr} v={years} title="On its own, how much longer your super + savings cover your spending." />}
       {mlStr && (
         <Line
-          label="Super + savings"
+          label={`Super + savings at ${life}`}
           value={mlStr}
           v={moneyLeft}
-          title={`Your liquid, spendable money — super + savings — left at ${life}. (Net worth below also counts your home & property, so a downsize can lift this while trimming net worth.)`}
+          title={`Your liquid, spendable money — super + savings — left at age ${life}. (Net worth below also counts your home & property, so a downsize can lift this while trimming net worth.)`}
         />
       )}
       {nwStr && (
-        <Line label="Net worth" value={nwStr} v={netWorth} title={`Total wealth — super + savings PLUS your home & any property — at ${life}.`} />
+        <Line label={`Net worth at ${life}`} value={nwStr} v={netWorth} title={`Total wealth — super + savings PLUS your home & any property — at age ${life}.`} />
       )}
     </span>
   );
