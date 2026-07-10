@@ -331,6 +331,30 @@ If it sounds useful — early access + founding pricing here: ${site} — or jus
 RetireWiz`,
     },
     {
+      kind: "outreach",
+      title: "Ensombl partnership enquiry — advisers",
+      audience: "advisers",
+      pinned: false,
+      body: `SUBJECT: Partnership enquiry — a retirement-modelling tool for your adviser audience
+
+BODY:
+Hi Ensombl team,
+
+I'm building RetireWiz — a retirement & Age Pension modelling tool for Australian advisers and accountants. On current AU rules and in today's dollars it models super, the means-tested Age Pension (income & assets tests, deeming), early-retirement bridging, fees and tax, with live "what-if" strategies you can run in a client meeting — all cross-checked against ASIC's Moneysmart. General information only; the adviser gives the advice.
+
+I'm opening early access to a first group of practices and would love to reach the Ensombl community — the advisers who'd actually use it. Rather than post cold into the community, I'd like to do it properly: could you share your partnership options — podcast sponsorship, newsletter, community/app placements, or a sponsored piece?
+
+Happy to give you a 10-minute walkthrough. The early-access page is ${site}.
+
+What's the best way to explore this?
+
+Thanks,
+[Your name]
+RetireWiz — [your email]
+
+WHERE TO SEND: Ensombl (ensombl.com) — find their "partner with us" / advertising / contact page, or email the partnerships/media team. The same pitch works for the trade press (ifa, Professional Planner, Money Management) if you want a sponsored-article angle instead.`,
+    },
+    {
       kind: "note",
       title: "How to work the adviser kit",
       audience: "advisers",
