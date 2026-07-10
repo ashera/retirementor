@@ -911,10 +911,10 @@ function StrategyCardRow({
               effMin = Math.max(effMin, Math.round(sustainable.essentials / step) * step);
               if (sustainable.stretch > effMax) effMax = Math.ceil(sustainable.stretch / step) * step;
             }
-            const hint =
-              pm.dynamicMax != null
-                ? `Downsizing frees about ${fmtCurrency(Math.max(0, cap))} — the rest goes to savings.`
-                : pm.hint;
+            // The freed-equity split is now spelled out in the strategy's note
+            // card, so the slider just uses its own hint (the dynamicMax still
+            // caps it at the equity actually freed).
+            const hint = pm.hint;
             return (
               <Field
                 key={pm.key}
