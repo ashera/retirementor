@@ -412,15 +412,20 @@ export function simulate(
     // per-property flooring when there's a single property).
     const rentAssessable = Math.max(0, rentCash);
 
-    // Part-time work in early retirement. Income tax applies (with SAPTO, so
-    // modest amounts are near tax-free): the AFTER-TAX amount offsets drawdown,
+    // Retirement-phase income tax. SAPTO (the seniors offset) only applies from
+    // Age Pension age — before that, part-time work and outside-super earnings are
+    // taxed on the ordinary resident scale. Worked out per person: each of a
+    // couple has their own threshold/offset, and their own age decides SAPTO.
+    const taxAtAge = (inc: number, age: number) =>
+      age >= pensionAge ? seniorIncomeTax(inc, plan.household) : incomeTax(inc);
+
+    // Part-time work in early retirement: the AFTER-TAX amount offsets drawdown,
     // while the GROSS amount is assessable under the Age Pension income test, net
-    // of the Work Bonus ($300/fortnight, i.e. $7,800/yr per person). Tax is worked
-    // out per person (split across a couple → two thresholds/offsets).
+    // of the Work Bonus ($300/fortnight, i.e. $7,800/yr per person).
     const work = plan.workIncome;
     const workers = plan.people.length;
     const grossWork = work && oldest < work.untilAge ? Math.max(0, work.perYear) : 0;
-    const workTax = grossWork > 0 ? workers * seniorIncomeTax(grossWork / workers, plan.household) : 0;
+    const workTax = grossWork > 0 ? ages.reduce((s, a) => s + taxAtAge(grossWork / workers, a), 0) : 0;
     const netWork = grossWork - workTax;
     const assessableWork = Math.max(0, grossWork - 7_800 * workers);
     // A still-working partner's salary is ordinary assessable income for the
@@ -523,19 +528,21 @@ export function simulate(
 
     // Super's real edge: pension-phase super earnings are tax-free, but earnings
     // on money held OUTSIDE super are taxable. In retirement we tax the (nominal)
-    // outside-super earnings at the senior marginal rate, stacked on top of any
+    // outside-super earnings at each person's marginal rate, stacked on top of any
     // part-time work income so the tax-free threshold + SAPTO aren't double-used.
-    // SAPTO shields modest amounts, so this mainly bites larger balances — which
-    // is exactly when a downsizer contribution into super pays off. (Accumulation-
-    // phase outside earnings are left untaxed, as before.)
+    // Before Age Pension age it's the ordinary scale (no SAPTO), so an early
+    // retiree living off sizeable savings does pay some tax; from pension age SAPTO
+    // shields modest amounts. (Accumulation-phase outside earnings are left untaxed.)
     let outsideTax = 0;
     if (!accumPhase) {
       const outsideEarnings = Math.max(0, outside * (nom / 100)); // nominal, today's $
       if (outsideEarnings > 0) {
         const workPer = grossWork / workers;
         const earnPer = outsideEarnings / workers; // household earnings split per person
-        outsideTax =
-          workers * Math.max(0, seniorIncomeTax(workPer + earnPer, plan.household) - seniorIncomeTax(workPer, plan.household));
+        outsideTax = ages.reduce(
+          (s, a) => s + Math.max(0, taxAtAge(workPer + earnPer, a) - taxAtAge(workPer, a)),
+          0,
+        );
         outside = Math.max(0, outside - outsideTax);
       }
     }

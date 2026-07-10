@@ -698,7 +698,7 @@ function workingWendy(config: EngineConfig): PersonaReport {
   const r = simulate(plan, config);
   const years = 67 - 62;
   const row = r.rows.find((x) => x.age === 67)!;
-  const netWork = ref.netWorkIncome(30_000, 1, "single");
+  const netWork = ref.netWorkIncome(30_000, 1, "single", true); // measured at 67 → SAPTO applies
   const assessableWork = ref.workBonusAssessable(30_000, 1);
 
   return finish({

@@ -374,7 +374,7 @@ export default function YearDetailModal({
               {b.outsideTax > 0 && (
                 <Line
                   label="Tax on savings earnings (outside super)"
-                  sub="earnings on money held outside super are taxable (SAPTO applied); super pension earnings are tax-free"
+                  sub="earnings on money held outside super are taxable at your marginal rate (the seniors offset, SAPTO, only applies from Age Pension age); super pension earnings are tax-free"
                   value={fmtCurrency(Math.round(b.outsideTax))}
                   tone="text-amber-400"
                 />

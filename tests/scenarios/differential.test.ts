@@ -78,8 +78,27 @@ describe("Differential — one-lever deltas match an independent delta", () => {
     const b = base({ retirementAge: 63 });
     const w = base({ retirementAge: 63, workIncome: { perYear: 25_000, untilAge: 70 } });
     const engine = drawAt(w, 64) - drawAt(b, 64);
-    const netWork = ref.netWorkIncome(25_000, 1, "single");
+    const netWork = ref.netWorkIncome(25_000, 1, "single", false); // age 64 → pre-SAPTO, ordinary tax
     expect(near(engine, -netWork, 2), `drawdown Δ${engine.toFixed(0)} vs −netWork ${(-netWork).toFixed(0)}`).toBe(true);
+  });
+
+  it("outside-super earnings: ordinary tax before Age Pension age, SAPTO from 67", () => {
+    // Early retiree living off sizeable savings — the case flagged as showing
+    // 'no tax' despite investment income.
+    const plan = base({
+      people: [P({ currentAge: 58, salary: 0 })],
+      retirementAge: 58, outsideSuper: 800_000, targetSpending: 40_000,
+    });
+    const rows = simulate(plan, cfg).rows;
+    for (const age of [63, 70]) {
+      const row = rows.find((r) => r.age === age)!;
+      const grownOutside = row.breakdown.closingOutside + row.breakdown.outsideTax; // pre-tax base
+      const senior = age >= cfg.agePensionAge;
+      const expected = ref.outsideEarningsTax(grownOutside, 6, 0, 1, "single", senior);
+      expect(near(row.breakdown.outsideTax, expected, 2), `age ${age}: engine ${row.breakdown.outsideTax.toFixed(0)} vs ref ${expected.toFixed(0)}`).toBe(true);
+    }
+    // The fix: pre-67 it's genuinely taxed (was $0 when SAPTO wrongly applied).
+    expect(rows.find((r) => r.age === 63)!.breakdown.outsideTax).toBeGreaterThan(500);
   });
 
   it("downsizer split: $ moved to super reallocates from savings 1:1, release unchanged", () => {

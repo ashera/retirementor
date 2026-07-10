@@ -181,18 +181,24 @@ export function seniorIncomeTax(income: number, household: Household): number {
   return Math.max(0, incomeTax(income) - SAPTO_MAX[household]);
 }
 
+/** Retirement-phase per-person income tax. SAPTO only applies from Age Pension
+ *  age; before that it's the ordinary resident scale. */
+export function retireeIncomeTax(income: number, household: Household, senior: boolean): number {
+  return senior ? seniorIncomeTax(income, household) : incomeTax(income);
+}
+
 /** Tax on a retiree's outside-super (nominal) earnings, charged as the MARGINAL
  *  amount stacked on top of any part-time work income — so the tax-free
  *  threshold + SAPTO aren't used twice (matches the engine). `grownOutside` is
  *  the outside balance AFTER the year's growth (the base the engine taxes). */
 export function outsideEarningsTax(
-  grownOutside: number, nomReturnPct: number, grossWork: number, workers: number, household: Household,
+  grownOutside: number, nomReturnPct: number, grossWork: number, workers: number, household: Household, senior: boolean,
 ): number {
   const earnings = Math.max(0, grownOutside * (nomReturnPct / 100));
   if (earnings <= 0) return 0;
   const workPer = grossWork / workers;
   const earnPer = earnings / workers;
-  return workers * Math.max(0, seniorIncomeTax(workPer + earnPer, household) - seniorIncomeTax(workPer, household));
+  return workers * Math.max(0, retireeIncomeTax(workPer + earnPer, household, senior) - retireeIncomeTax(workPer, household, senior));
 }
 
 // ── Part-time work in retirement (Work Bonus + tax) ──────────────────────────
@@ -204,8 +210,8 @@ export function workBonusAssessable(grossWork: number, workers: number): number 
 }
 /** Net part-time work income after senior income tax (this is what offsets the
  *  household's drawdown need). */
-export function netWorkIncome(grossWork: number, workers: number, household: Household): number {
-  return grossWork - workers * seniorIncomeTax(grossWork / workers, household);
+export function netWorkIncome(grossWork: number, workers: number, household: Household, senior: boolean): number {
+  return grossWork - workers * retireeIncomeTax(grossWork / workers, household, senior);
 }
 
 // ── Transition to Retirement arbitrage ───────────────────────────────────────
