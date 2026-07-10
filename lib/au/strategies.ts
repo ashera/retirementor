@@ -152,6 +152,9 @@ export function buildStrategyCatalog(plan: RetirementPlan): StrategyCard[] {
   const cards: StrategyCard[] = [];
   const oldest = maxCurrentAge(plan);
   const working = oldest < plan.retirementAge;
+  // These levers act on person 0 ("you") — retirement age, salary sacrifice, TTR.
+  // For a couple, spell that out so it's clear the partner isn't affected.
+  const isCouple = plan.people.length > 1;
   const props = getInvestmentProperties(plan);
 
   // --- Your home ---
@@ -356,11 +359,13 @@ export function buildStrategyCatalog(plan: RetirementPlan): StrategyCard[] {
       ],
       note: (v) => {
         const n = Math.max(0, v.age - plan.retirementAge);
-        return n === 0
-          ? `Retiring at ${v.age} — the same as your current plan.`
-          : `Working to age ${v.age} instead of ${plan.retirementAge} adds ${n} more year${n === 1 ? "" : "s"} of super ` +
-            `contributions and growth, and ${n} fewer retirement year${n === 1 ? "" : "s"} to fund — so your balance at ` +
-            `retirement is higher and has to stretch over a shorter retirement.`;
+        if (n === 0) return `Retiring at ${v.age} — the same as your current plan.`;
+        const lead = isCouple
+          ? `You retiring at ${v.age} instead of ${plan.retirementAge} (your partner's retirement age is unchanged)`
+          : `Working to age ${v.age} instead of ${plan.retirementAge}`;
+        return `${lead} adds ${n} more year${n === 1 ? "" : "s"} of super contributions and growth, ` +
+          `and ${n} fewer retirement year${n === 1 ? "" : "s"} to fund — so your balance at retirement is higher ` +
+          `and has to stretch over a shorter retirement.`;
       },
       apply: (p, v) => ({ ...p, retirementAge: v.age }),
     });
@@ -442,7 +447,8 @@ export function buildStrategyCatalog(plan: RetirementPlan): StrategyCard[] {
         { key: "extra", label: "Extra per year", min: 0, max: 30_000, step: 1_000, default: 10_000, prefix: "$", suffix: "/yr" },
       ],
       note: (v) =>
-        `Putting an extra ${fmtCurrency(v.extra)}/yr of pre-tax pay into super each working year. It's taxed going in at ` +
+        `Putting an extra ${fmtCurrency(v.extra)}/yr of your pre-tax pay into super each working year` +
+        `${isCouple ? " (this is you — your partner's contributions are unchanged)" : ""}. It's taxed going in at ` +
         `15% instead of your marginal rate, so more of it lands in super — but it's locked away until you can access super (from age 60).`,
       apply: (p, v) => ({
         ...p,
@@ -471,7 +477,7 @@ export function buildStrategyCatalog(plan: RetirementPlan): StrategyCard[] {
         const taxable = Math.max(0, p0.salary - p0.voluntaryConcessional);
         const taxSaved = incomeTax(taxable) - incomeTax(Math.max(0, taxable - v.extra));
         const benefit = Math.max(0, taxSaved - v.extra * 0.15);
-        return `From age 60 until you retire: take-home unchanged, about ${fmtCurrency(benefit)}/yr of tax saving into super (capped at the concessional limit). Pairs with working past 60.`;
+        return `From age 60 until you retire: take-home unchanged, about ${fmtCurrency(benefit)}/yr of tax saving into super${isCouple ? " (for you; your partner isn't affected)" : ""} (capped at the concessional limit). Pairs with working past 60.`;
       },
       apply: (p, v) => ({ ...p, ttr: { extraSacrifice: v.extra } }),
     });
