@@ -6,7 +6,7 @@ import { DEFAULT_CONFIG } from "@/lib/au/config";
 import { evaluatePersonas } from "@/lib/au/scenarios/personas";
 import ScenariosView from "@/components/ScenariosView";
 
-export const metadata = { title: "Backoffice — Scenarios" };
+export const metadata = { title: "Backoffice — Persona Tests" };
 
 export default async function ScenariosPage() {
   const user = await getCurrentUser();

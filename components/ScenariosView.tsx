@@ -406,9 +406,9 @@ export default function ScenariosView({
 
       <header className="mb-6">
         <div className="text-sm font-semibold uppercase tracking-widest text-accent">
-          Backoffice · Scenarios
+          Backoffice · Persona Tests
         </div>
-        <h1 className="mt-1 text-3xl font-bold text-white">Independent scenario verification</h1>
+        <h1 className="mt-1 text-3xl font-bold text-white">Independent persona verification</h1>
         <p className="mt-2 max-w-3xl text-muted">
           Each named persona is projected by the calculation engine and, <em>separately</em>, has its
           key values re-derived from first principles — closed-form superannuation maths and the

@@ -4,7 +4,7 @@ import { getLatestTestRun, listSources } from "@/lib/refdata";
 import { computeStaleness } from "@/lib/au/staleness";
 import TestsView from "@/components/TestsView";
 
-export const metadata = { title: "Backoffice — Tests" };
+export const metadata = { title: "Backoffice — Feature Tests" };
 
 export default async function TestsPage() {
   const user = await getCurrentUser();

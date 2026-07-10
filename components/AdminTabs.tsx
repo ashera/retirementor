@@ -41,8 +41,8 @@ export default function AdminTabs({
       {tab("/admin/review", "review", "Review", 0)}
       {tab("/admin", "parameters", "Parameters", 0)}
       {tab("/admin/sources", "sources", "Sources", staleCount)}
-      {tab("/admin/tests", "tests", "Tests", 0)}
-      {tab("/admin/scenarios", "scenarios", "Scenarios", 0)}
+      {tab("/admin/tests", "tests", "Feature Tests", 0)}
+      {tab("/admin/scenarios", "scenarios", "Persona Tests", 0)}
       {tab("/admin/moneysmart", "moneysmart", "Moneysmart", 0)}
       {tab("/admin/users", "users", "Users", 0)}
       {tab("/admin/feedback", "feedback", "Feedback", feedbackCount)}

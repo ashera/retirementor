@@ -113,9 +113,9 @@ export default function TestsView({
 
       <header className="mb-6">
         <div className="text-sm font-semibold uppercase tracking-widest text-accent">
-          Backoffice · Tests
+          Backoffice · Feature Tests
         </div>
-        <h1 className="mt-1 text-3xl font-bold text-white">Test suite</h1>
+        <h1 className="mt-1 text-3xl font-bold text-white">Feature test suite</h1>
         <p className="mt-2 text-muted">
           Engine unit tests, grouped by area. Recorded by{" "}
           <code className="text-slate-200">npm run test:record</code>.
