@@ -23,9 +23,19 @@ export interface InitialWithdrawal {
   minDriven: boolean; // true when the ATO minimum forces a draw above the spending need
 }
 
-/** The first drawdown year's rate — the standard "initial withdrawal rate". */
+/** The first drawdown year's rate — the standard "initial withdrawal rate".
+ *  We wait until the household is FULLY retired (no partner still earning a
+ *  salary). During a staggered-retirement gap a working partner's pay funds most
+ *  of the spend, so super barely moves — measuring there would understate the
+ *  rate and leave the goal→super-draw reconciliation not adding up. `salaryIncome`
+ *  on a retirement row is exactly that still-working partner's salary. */
 export function initialWithdrawal(result: SimResult): InitialWithdrawal | null {
-  const row = result.rows.find((r) => r.phase !== "accumulation" && r.superDrawn > 0 && r.totalSuper > 0);
+  const drawsFromSuper = (r: YearRow) =>
+    r.phase !== "accumulation" && r.superDrawn > 0 && r.totalSuper > 0;
+  const row =
+    result.rows.find((r) => drawsFromSuper(r) && (r.salaryIncome ?? 0) <= 1) ??
+    // Fallback (shouldn't happen): a plan that never reaches full retirement.
+    result.rows.find(drawsFromSuper);
   if (!row) return null;
   const b = row.breakdown;
   const spend = b.livingSpend + b.mortgageCost;

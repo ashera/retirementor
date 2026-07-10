@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { simulate } from "../lib/au/simulate";
+import { initialWithdrawal } from "../lib/au/withdrawal";
 import { DEFAULT_CONFIG as cfg } from "../lib/au/config";
 import {
   DEFAULT_PLAN,
@@ -85,6 +86,19 @@ describe("Staggered retirement", () => {
     const early = simulate(withPartnerRetiring(58), cfg); // partner first, at 58
     expect(early.superAtRetirement).toBeLessThan(base.superAtRetirement);
     expect(early.partnerRetirementAge).toBe(58);
+  });
+
+  it("measures the initial withdrawal rate once fully retired, not during the gap", () => {
+    const stag = withPartnerRetiring(67);
+    const res = simulate(stag, cfg);
+    const w = initialWithdrawal(res)!;
+    // The chosen year must not be a staggered gap year (no still-working salary),
+    // so the goal → super-draw reconciliation on the card actually adds up.
+    const row = res.rows.find((r) => r.age === w.age)!;
+    expect(row.salaryIncome).toBeLessThanOrEqual(1);
+    expect(w.age).toBeGreaterThanOrEqual(67);
+    // Super now funds the real spend rather than a small salary-masked slice.
+    expect(w.drawn).toBeGreaterThan(50_000);
   });
 
   it("keeps a single-person plan unaffected", () => {

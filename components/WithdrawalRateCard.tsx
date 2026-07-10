@@ -1,6 +1,6 @@
 "use client";
 
-import type { RetirementPlan, SimResult } from "@/lib/au/types";
+import { hasStaggeredRetirement, type RetirementPlan, type SimResult } from "@/lib/au/types";
 import { fmtCurrency } from "@/lib/au/format";
 import { retirementGoal, type GoalBreakdown } from "@/lib/au/goal";
 import { initialWithdrawal, withdrawalBand, type InitialWithdrawal } from "@/lib/au/withdrawal";
@@ -56,6 +56,7 @@ export default function WithdrawalRateCard({ result, plan, successPct }: { resul
       </div>
       <div className="mt-0.5 text-xs text-muted">
         {fmtCurrency(w.drawn)} of {fmtCurrency(w.balance)} at age {w.age}
+        {hasStaggeredRetirement(plan) && " (your first year both retired, once no salary is coming in)"}
         {w.minDriven ? (
           <> — the ATO minimum, above what your {fmtCurrency(goal.total)} goal needs from super; the surplus is reinvested outside super.</>
         ) : reds.length > 0 ? (
