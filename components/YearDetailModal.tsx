@@ -3,6 +3,7 @@
 import { fmtCurrency } from "@/lib/au/format";
 import { mortgageAnnualCost } from "@/lib/au/mortgage";
 import { rowWithdrawalRate, withdrawalBand } from "@/lib/au/withdrawal";
+import { yearFlow } from "@/lib/au/yearFlow";
 import type { RetirementPlan, YearRow } from "@/lib/au/types";
 
 const WR_TONE: Record<"accent" | "amber" | "red", string> = {
@@ -70,10 +71,34 @@ export default function YearDetailModal({
   canNext: boolean;
 }) {
   const b = row.breakdown;
-  const openingTotal = b.openingSuper + b.openingOutside;
-  const closingTotal = b.closingSuper + b.closingOutside;
-  const growth = b.superGrowth + b.outsideGrowth;
-  const netChange = closingTotal - openingTotal;
+  // Signed drivers that sum EXACTLY from opening to closing (the waterfall).
+  const flow = yearFlow(row);
+  const flowSub = (key: string, amount: number): string | undefined => {
+    switch (key) {
+      case "growth":
+        return `super ${fmtCurrency(b.superGrowth)} · outside ${fmtCurrency(b.outsideGrowth)}, after inflation`;
+      case "fees":
+        return "fixed admin + insurance (the % investment fee is already in the growth)";
+      case "contrib":
+        return `${fmtCurrency(b.contribGross)} in (employer + salary sacrifice), less 15% tax`;
+      case "savings":
+        return "added to your outside-super investments";
+      case "funding":
+        return amount >= 0
+          ? "income beyond your spending, kept in savings"
+          : "your spending, less the Age Pension and any other income";
+      case "proceeds":
+        return "home downsize or property sale, net of costs";
+      case "loan":
+        return "one-off lump sum from super";
+      case "outsideTax":
+        return "on outside-super earnings (super's pension earnings are tax-free)";
+      case "other":
+        return "property CGT timing and rounding";
+      default:
+        return undefined;
+    }
+  };
   const isWorking = row.phase === "accumulation";
   // Staggered-retirement "gap" year: the household is retired but a partner is
   // still working — their salary sits on the retirement row (salaryIncome/takeHome),
@@ -154,24 +179,46 @@ export default function YearDetailModal({
 
         {/* Body */}
         <div className="flex-1 space-y-4 overflow-y-auto px-6 py-5">
-          {/* Opening → closing */}
-          <div className="flex items-center justify-between gap-3 rounded-xl border border-line bg-panel-2 p-4">
-            <div>
-              <div className="text-[11px] font-medium uppercase tracking-wide text-muted">Opening</div>
-              <div className="text-lg font-bold tabular-nums text-white">{fmtCurrency(openingTotal)}</div>
-              <div className="text-[11px] text-muted">
-                super {fmtCurrency(b.openingSuper)} · outside {fmtCurrency(b.openingOutside)}
-                {row.homeEquity > 0 && ` · home equity ${fmtCurrency(row.homeEquity)}`}
-                {row.propertyEquity > 0 && ` · property ${fmtCurrency(row.propertyEquity)}`}
-              </div>
+          {/* Waterfall — Opening → drivers → Closing. The lines sum exactly to
+              the change, so the year always ties out. */}
+          <div className="rounded-xl border border-line bg-panel-2 p-4">
+            <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted">
+              How your savings changed
             </div>
-            <div className="text-xl text-muted">→</div>
-            <div className="text-right">
-              <div className="text-[11px] font-medium uppercase tracking-wide text-muted">Closing</div>
-              <div className="text-lg font-bold tabular-nums text-white">{fmtCurrency(closingTotal)}</div>
-              <div className={`text-[11px] font-semibold ${netChange >= 0 ? "text-accent" : "text-amber-400"}`}>
-                {money(netChange)} over the year
-              </div>
+            <div className="flex items-baseline justify-between gap-3">
+              <span className="text-sm font-semibold text-slate-200">Opening balance</span>
+              <span className="text-base font-bold tabular-nums text-white">{fmtCurrency(flow.opening)}</span>
+            </div>
+            <div className="mb-1 text-[11px] text-muted">
+              super {fmtCurrency(b.openingSuper)} · outside {fmtCurrency(b.openingOutside)}
+              {row.homeEquity > 0 && ` · home equity ${fmtCurrency(row.homeEquity)}`}
+              {row.propertyEquity > 0 && ` · property ${fmtCurrency(row.propertyEquity)}`}
+            </div>
+
+            <div className="my-2 space-y-1.5 border-y border-line py-2">
+              {flow.lines.map((l) => (
+                <div key={l.key} className="flex items-baseline justify-between gap-3">
+                  <span className="text-sm text-slate-300">
+                    {l.label}
+                    {flowSub(l.key, l.amount) && (
+                      <span className="mt-0.5 block text-[11px] leading-snug text-muted">{flowSub(l.key, l.amount)}</span>
+                    )}
+                  </span>
+                  <span className={`shrink-0 text-sm font-semibold tabular-nums ${l.amount >= 0 ? "text-emerald-400" : "text-amber-400"}`}>
+                    {money(l.amount)}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex items-baseline justify-between gap-3">
+              <span className="text-sm font-semibold text-slate-200">Closing balance</span>
+              <span className="text-right">
+                <span className="text-base font-bold tabular-nums text-white">{fmtCurrency(flow.closing)}</span>
+                <span className={`ml-2 text-[11px] font-semibold ${flow.net >= 0 ? "text-accent" : "text-amber-400"}`}>
+                  {money(flow.net)}
+                </span>
+              </span>
             </div>
           </div>
 
@@ -204,80 +251,6 @@ export default function YearDetailModal({
               </p>
             </div>
           )}
-
-          {/* Money in */}
-          <Section title="Money in — income & how it was earned">
-            <Line
-              label="Investment growth"
-              sub={`super ${fmtCurrency(b.superGrowth)} · outside ${fmtCurrency(b.outsideGrowth)} (real, after inflation)`}
-              value={money(growth)}
-              tone="text-emerald-400"
-            />
-            {b.fees > 0 && (
-              <Line
-                label="Super fees"
-                sub="fixed admin + insurance (the % investment fee is already netted from the growth above)"
-                value={money(-b.fees)}
-                tone="text-amber-400"
-              />
-            )}
-            {isWorking && (
-              <>
-                <Line
-                  label="Super contributions"
-                  sub={`${fmtCurrency(b.contribGross)} employer + salary sacrifice, less 15% tax`}
-                  value={money(b.contribNet)}
-                  tone="text-emerald-400"
-                />
-                <Line label="Savings added" value={money(b.savings)} tone="text-emerald-400" />
-              </>
-            )}
-            {partnerStillWorking && (
-              <>
-                <Line
-                  label="Salary — a partner is still working"
-                  sub="take-home after income tax & super; it helps fund your spending during the gap"
-                  value={money(b.takeHome)}
-                  tone="text-emerald-400"
-                />
-                {b.contribNet > 0 && (
-                  <Line
-                    label="Super contributions"
-                    sub={`${fmtCurrency(b.contribGross)} employer + salary sacrifice, less 15% tax`}
-                    value={money(b.contribNet)}
-                    tone="text-emerald-400"
-                  />
-                )}
-              </>
-            )}
-            {!isWorking && b.agePension > 0 && (
-              <Line label="Age Pension" value={money(b.agePension)} tone="text-emerald-400" />
-            )}
-            {!isWorking && b.rentIncome !== 0 && (
-              <Line
-                label="Net rent (investment property)"
-                sub="rent after costs & loan interest"
-                value={money(b.rentIncome)}
-                tone={b.rentIncome < 0 ? "text-amber-400" : "text-emerald-400"}
-              />
-            )}
-            {b.propertyProceeds > 0 && (
-              <Line
-                label="Property sale (net proceeds)"
-                sub={`after clearing the loan and ${fmtCurrency(b.propertyCgt)} capital gains tax`}
-                value={money(b.propertyProceeds)}
-                tone="text-emerald-400"
-              />
-            )}
-            {savedFromIncome > 1 && !partnerStillWorking && (
-              <Line
-                label="Income saved to savings"
-                sub="income beyond your spending, kept in outside super"
-                value={money(savedFromIncome)}
-                tone="text-emerald-400"
-              />
-            )}
-          </Section>
 
           {/* Money out */}
           {!isWorking && (spending > 0 || b.mortgageCleared > 0) && (
@@ -313,7 +286,7 @@ export default function YearDetailModal({
               <span className="text-slate-200">{fmtCurrency(spending)}/yr of spending</span> funded by{" "}
               {fundingText}.
               {partnerStillWorking && savedFromIncome > 1 && (
-                <> The remaining {fmtCurrency(Math.round(savedFromIncome))} of that salary is saved to your outside super — which is why it appears in &ldquo;Money in&rdquo; but the spending is covered.</>
+                <> The remaining {fmtCurrency(Math.round(savedFromIncome))} of that salary stays in your savings — it&apos;s the &ldquo;income kept in savings&rdquo; line in the waterfall above.</>
               )}
               {wr !== null && (
                 <div className="mt-1">
