@@ -96,7 +96,7 @@ export default function AssumptionsModal({
             <Row label="Income test: free area / taper" value={`${fmtCurrency(Math.round(ap.incomeFreeAreaAnnual))}/yr · ${Math.round(config.agePension.incomeTaperPerDollar * 100)}c per $1 over`} />
             <Row label="Assets free area (homeowner / renter)" value={`${fmtCurrency(ap.assetsFreeArea.homeowner)} / ${fmtCurrency(ap.assetsFreeArea.nonHomeowner)}`} />
             <Row label="Assets test taper" value={`${fmtCurrency(Math.round(config.agePension.assetsTaperPerDollar * 1000))}/yr per $1,000 over`} />
-            <Row label="Deeming (below / above threshold)" value={`${pct(config.deeming.lowerRate * 100)} / ${pct(config.deeming.upperRate * 100)} over ${fmtCurrency(config.deeming.threshold[hh])}`} />
+            <Row label="Deeming (below / above threshold)" value={`${pct(config.deeming.lowerRate * 100, 2)} / ${pct(config.deeming.upperRate * 100, 2)} over ${fmtCurrency(config.deeming.threshold[hh])}`} />
           </Section>
 
           <Section title="Likelihood (Monte Carlo)">
