@@ -27,6 +27,7 @@ import RetirementChart from "@/components/RetirementChart";
 import IncomeChart from "@/components/IncomeChart";
 import YearDetailModal from "@/components/YearDetailModal";
 import IncomeYearModal from "@/components/IncomeYearModal";
+import AssumptionsModal from "@/components/AssumptionsModal";
 import Field from "@/components/Field";
 
 const PLAN_KEY = "au-retirement-plan";
@@ -106,6 +107,7 @@ export default function WhatIfView({
   const [saving, setSaving] = useState(false);
   const [chartView, setChartView] = useState<"balance" | "networth" | "income">("balance");
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
+  const [assumptionsOpen, setAssumptionsOpen] = useState(false);
 
   // Don't persist the board until after the initial restore has been applied,
   // so the empty first render can't clobber the saved selection.
@@ -402,6 +404,13 @@ export default function WhatIfView({
             scenario</strong> below to keep a separate copy.
           </span>
         </p>
+        <button
+          type="button"
+          onClick={() => setAssumptionsOpen(true)}
+          className="mt-2 text-sm font-medium text-accent hover:underline"
+        >
+          🔍 See the assumptions behind these numbers
+        </button>
       </header>
 
       {/* Headline metrics */}
@@ -626,6 +635,9 @@ export default function WhatIfView({
         {!signedIn && <p className="mt-2 text-xs text-muted">Sign in to save scenarios to your account.</p>}
         {saveMsg && <p className="mt-2 text-xs text-accent">{saveMsg}</p>}
       </div>
+
+      <AssumptionsModal open={assumptionsOpen} onClose={() => setAssumptionsOpen(false)} config={config} plan={composed} />
+
 
       {/* Year explainer for the composed ("with strategies") plan. */}
       {selectedYear != null &&
