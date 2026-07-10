@@ -207,6 +207,24 @@ export function buildStrategyCatalog(plan: RetirementPlan): StrategyCard[] {
           dynamicMax: freedEquity,
         },
       ],
+      note: (v) => {
+        const yrs = Math.max(0, (v.age ?? oldestNow) - oldestNow);
+        const grown = Math.round(homeVal * Math.pow(1 + homeGrowth, yrs));
+        const newV = Math.round(v.newValue ?? homeVal * 0.6);
+        const freed = Math.round(freedEquity(v));
+        const toSuper = Math.min(Math.max(0, v.toSuper ?? 0), freed);
+        const toSavings = freed - toSuper;
+        return (
+          `By age ${v.age} your ${fmtCurrency(homeVal)} home is projected to be worth about ` +
+          `${fmtCurrency(grown)} in today's dollars (it keeps appreciating until you sell). ` +
+          `Downsizing then frees ${fmtCurrency(freed)} — the ${fmtCurrency(grown)} sale price` +
+          `${loan ? `, less the ${fmtCurrency(loan)} mortgage payoff,` : ""} less ` +
+          `${fmtCurrency(newV)} for your new home` +
+          `${toSuper > 0
+            ? `, of which ${fmtCurrency(toSuper)} goes into super and ${fmtCurrency(toSavings)} into savings.`
+            : ` — all into savings.`}`
+        );
+      },
       apply: (p, v) => ({
         ...p,
         // Keep the ORIGINAL home value; the new (smaller) value lives on the
