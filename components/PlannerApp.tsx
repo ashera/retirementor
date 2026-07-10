@@ -736,7 +736,7 @@ export default function PlannerApp({
         <StatCard
           label="Super at retirement"
           value={fmtCurrency(result.superAtRetirement)}
-          sub={`at age ${result.retirementAge}`}
+          sub={`at age ${result.retirementAge} · today's dollars`}
           highlight
           explainer={
             <SuperAtRetirementExplainer

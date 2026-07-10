@@ -930,7 +930,7 @@ export default function PlanWizard({
         {previewReady ? (
           <div className="mx-6 mb-2 flex items-center justify-between rounded-xl border border-line bg-panel-2 px-4 py-3">
             <div>
-              <div className="text-xs text-muted">Super at retirement</div>
+              <div className="text-xs text-muted">Super at retirement <span className="text-muted/70">(today&apos;s $)</span></div>
               <div className="text-base font-bold tabular-nums text-white">
                 {fmtCurrency(preview.superAtRetirement)}
               </div>

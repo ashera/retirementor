@@ -344,6 +344,9 @@ export default function GuidedIntro({
               <p className="mt-2 text-center text-sm">
                 Projected super at retirement: <strong className="text-accent">{money(result.superAtRetirement)}</strong> at age {result.retirementAge}
               </p>
+              <p className="text-center text-xs text-muted">
+                in today&apos;s dollars — comparable to money now, not an inflated future figure
+              </p>
             </>
           ) : (
             <div className="mt-3 rounded-xl border border-dashed border-accent/40 bg-accent/[0.06] px-4 py-6 text-center text-sm text-muted">
