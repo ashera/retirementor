@@ -66,8 +66,15 @@ export default function IncomeYearModal({
   // salary is household income too (on the retirement row as salaryIncome/takeHome).
   const partnerStillWorking = retired && row.salaryIncome > 1;
   const salaryTakeHome = retired ? row.breakdown.takeHome : 0;
-  const total = pension + rent + fromSuper + fromOutside + salaryTakeHome;
   const spend = row.spending;
+  // Spending the household must fund from savings, after income (pension, rent,
+  // a still-working partner's salary). The ATO minimum can force super out beyond
+  // that — the surplus is reinvested, not spent, so it isn't spendable income
+  // this year. Count only the super that actually funds spending.
+  const need = Math.max(0, spend - pension - rent - salaryTakeHome);
+  const superReinvested = Math.max(0, fromSuper - need);
+  const spendableSuper = fromSuper - superReinvested;
+  const total = pension + rent + spendableSuper + fromOutside + salaryTakeHome;
   const shortfall = Math.max(0, spend - total);
 
   // Per-person salary split for a couple's working years (salary is constant in
@@ -124,9 +131,10 @@ export default function IncomeYearModal({
   const minRate = minDrawdownRate(row.age, config);
   const minDraw = row.breakdown.minDrawdown;
   const parts = row.breakdown.minDrawdownParts;
-  const target = Math.max(privateNeed, minDraw);
-  const capped = fromSuper > 1 && fromSuper < target - 1; // hit the accessible-super ceiling
-  const minDriven = minDraw > privateNeed + 1 && !capped; // minimum exceeds need → surplus saved
+  // Outside-first drawdown: super pays its ATO minimum, outside savings cover the
+  // rest, and super only draws ABOVE its minimum once savings run out.
+  const superToppedUp = fromSuper > minDraw + 1; // savings exhausted → super drew beyond the minimum
+  const minReinvested = superReinvested > 1; // ATO minimum exceeded the shortfall → surplus reinvested
 
   let pensionReason: string;
   if (belowPensionAge) pensionReason = `Not yet — the Age Pension starts at ${config.agePensionAge}.`;
@@ -302,8 +310,8 @@ export default function IncomeYearModal({
                   {rent > 0 && (
                     <Row color="#fb923c" label="Net rent" sub="Actual rent from your investment property, after costs and loan interest." value={rent} />
                   )}
-                  {fromSuper > 0 && (
-                    <Row color="#34d399" label="From your super" sub="Drawn tax-free (accessible from 60) — see the working below." value={fromSuper} />
+                  {spendableSuper > 0 && (
+                    <Row color="#34d399" label="From your super" sub="Drawn tax-free (accessible from 60) — see the working below." value={spendableSuper} />
                   )}
                   {fromOutside > 0 && (
                     <Row color="#38bdf8" label="From outside super" sub="Drawn from your savings outside super to cover the rest." value={fromOutside} />
@@ -437,19 +445,22 @@ export default function IncomeYearModal({
                       </div>
                     </div>
                     <div className="border-t border-line pt-1.5 text-slate-300">
-                      You draw the <strong className="text-white">greater</strong> of the shortfall and the
-                      minimum, capped at your balance →{" "}
-                      <strong className="text-accent">{cur(fromSuper)}</strong> from super.
+                      Super&apos;s earnings are tax-free, so spending comes from outside-super
+                      savings first. Super pays its <strong className="text-white">minimum</strong>
+                      {fromOutside > 1
+                        ? `, and your outside savings cover the remaining ${cur(fromOutside)}`
+                        : ""}
+                      {superToppedUp
+                        ? `; with savings run down, super also draws a further ${cur(fromSuper - minDraw)} to meet the shortfall`
+                        : ""}{" "}
+                      →{" "}
+                      <strong className="text-accent">{cur(fromSuper)}</strong> from super
+                      {fromOutside > 1 ? ` and ${cur(fromOutside)} from savings` : ""}.
                     </div>
-                    {minDriven && (
+                    {minReinvested && (
                       <p className="text-[11px] text-muted">
-                        The minimum is more than you needed, so the surplus{" "}
-                        {cur(fromSuper - privateNeed)} is added back to your outside savings — not spent.
-                      </p>
-                    )}
-                    {capped && (
-                      <p className="text-[11px] font-medium text-amber-400">
-                        Your super couldn&apos;t cover the full shortfall — the rest came from your outside savings.
+                        The minimum is more than the shortfall, so the surplus{" "}
+                        {cur(superReinvested)} is reinvested into your outside savings — not spent.
                       </p>
                     )}
                   </div>
@@ -461,11 +472,23 @@ export default function IncomeYearModal({
               )}
 
               <div className="rounded-xl border border-line bg-panel-2 px-4 py-3 text-xs leading-relaxed text-muted">
-                Each year we draw just enough to meet your spending. The means-tested{" "}
-                <span className="text-slate-200">Age Pension</span> comes first — a floor
-                that <em>grows</em> as your assessable assets fall — then any rent, then
-                top-ups from super and other savings. That&apos;s why the mix shifts toward
-                the Age Pension later in retirement.
+                {partnerStillWorking ? (
+                  <>
+                    While a partner is still working, their salary covers the household&apos;s
+                    spending, so little or nothing needs to come from your savings. Super must
+                    still pay its <span className="text-slate-200">ATO minimum</span>, but with
+                    the spending already covered that&apos;s simply reinvested. Once they retire,
+                    your income switches to super, savings and the means-tested Age Pension.
+                  </>
+                ) : (
+                  <>
+                    Each year we draw just enough to meet your spending. The means-tested{" "}
+                    <span className="text-slate-200">Age Pension</span> comes first — a floor
+                    that <em>grows</em> as your assessable assets fall — then any rent, then
+                    top-ups from super and other savings. That&apos;s why the mix shifts toward
+                    the Age Pension later in retirement.
+                  </>
+                )}
                 {shortfall > 1 && (
                   <div className="mt-1.5 font-semibold text-amber-400">
                     ⚠ Your savings are exhausted, so your income here is just the Age Pension{rent > 0 ? " and rent" : ""} — below your target.
