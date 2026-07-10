@@ -101,6 +101,22 @@ create table if not exists adviser_leads (
 );
 create index if not exists adviser_leads_created_idx on adviser_leads (created_at desc);
 
+-- Marketing assets & ideas library — one findable home for outreach copy, ideas,
+-- snippets and links so they're easy to reuse. Seeded once with the adviser
+-- outreach kit (see seedMarketingAssets); fully user-editable thereafter.
+create table if not exists marketing_assets (
+  id uuid primary key default gen_random_uuid(),
+  kind text not null default 'idea',   -- outreach | idea | snippet | link | note
+  title text not null,
+  body text,
+  url text,
+  audience text,                        -- advisers | consumers | all (optional)
+  pinned boolean not null default false,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists marketing_assets_pinned_idx on marketing_assets (pinned desc, created_at desc);
+
 -- Effective-dated reference-data versions (one per financial year).
 create table if not exists ref_data_versions (
   id uuid primary key default gen_random_uuid(),
@@ -243,10 +259,110 @@ export async function seedSources(c: Client): Promise<void> {
   console.log(`  sources: upserted ${SOURCE_SEEDS.length} (review intervals backfilled, other attributes preserved).`);
 }
 
+/**
+ * Seed the marketing library with the adviser outreach kit, but ONLY if the
+ * table is empty — so it appears once for a fresh install and is never
+ * re-inserted or allowed to clobber the user's own edits/additions.
+ */
+export async function seedMarketingAssets(c: Client): Promise<void> {
+  const existing = await c.query("select 1 from marketing_assets limit 1");
+  if (existing.rows.length) {
+    console.log("  marketing: assets already present — left untouched.");
+    return;
+  }
+
+  const site = "https://www.retirewiz.com.au/for-advisers";
+  const seeds: { kind: string; title: string; audience: string; pinned: boolean; body: string }[] = [
+    {
+      kind: "outreach",
+      title: "LinkedIn post — advisers (cast a net)",
+      audience: "advisers",
+      pinned: true,
+      body: `I've been building a retirement modelling tool for Australian advisers & accountants, and I want feedback from the people who'd actually use it.
+
+The itch: client-facing retirement modelling is either locked inside heavy, expensive platforms — or done in spreadsheets no client will ever understand. I wanted something you can open in a review meeting and a client immediately gets.
+
+What it does today — all on current AU rules, in today's dollars:
+• Super, the means-tested Age Pension (income & assets tests, deeming), early-retirement bridging, fees & tax
+• Live "what-if" strategies — downsizing, TTR, salary-sacrifice, part-time work, retiring later — with the impact on balance, income and how long the money lasts, instantly, in the room
+• Every assumption on show (returns, tax, thresholds, fees, the Monte Carlo confidence bar), cross-checked against ASIC's Moneysmart so the numbers hold up
+• General information only — you give the advice, it does the maths
+
+Coming next, and where I'd love your input: white-label client reports, a "share this scenario with my client" flow, and multi-client management.
+
+I'm opening early access to a first group of practices — founding pricing, and you'll shape what gets built. If you advise on retirement, take a look (and tell me where it's wrong):
+👉 ${site}
+
+TIP: post as text (no link preview); drop the URL in the first comment if reach dips. Reply to every comment — the algorithm rewards it.`,
+    },
+    {
+      kind: "outreach",
+      title: "LinkedIn DM — advisers (1:1, highest conversion)",
+      audience: "advisers",
+      pinned: true,
+      body: `Hi [First name] — I'm building a retirement & Age Pension modelling tool for AU advisers: current rules, live "what-if" strategies you can run in a client meeting, every assumption transparent, and cross-checked against Moneysmart. General info only — you give the advice.
+
+I'm opening early access to a first group of practices and would genuinely value your take (I want to hear where it's wrong). 20-second waitlist: ${site} — or happy to give you a quick walkthrough. No pitch either way.`,
+    },
+    {
+      kind: "outreach",
+      title: "Cold email — advisers",
+      audience: "advisers",
+      pinned: true,
+      body: `SUBJECT LINES (A/B test):
+- Retirement modelling your clients would actually understand
+- Early access: an AU retirement modeller for advisers
+- Would this be useful in your review meetings?
+
+BODY:
+Hi [First name],
+
+Quick one — I'm building a retirement & Age Pension modelling tool for Australian advisers, and I'm looking for a first group of practices to shape it.
+
+The gap I kept hitting: client-facing modelling is either buried in heavy platforms or done in spreadsheets clients don't follow. I wanted something you can open in a review and a client immediately gets.
+
+What it does today — on current AU rules, in today's dollars:
+- Super, the means-tested Age Pension (income & assets tests, deeming), early-retirement bridging, fees & tax
+- Live strategies — downsize, TTR, salary-sacrifice, part-time, retire later — showing the impact on balance, income and how long the money lasts, instantly
+- Every assumption on show, cross-checked against ASIC's Moneysmart. General information only — you give the advice.
+
+Coming next (your input welcome): white-label client reports, share-with-client, and multi-client.
+
+If it sounds useful — early access + founding pricing here: ${site} — or just reply and I'll give you a 10-minute walkthrough. And if it's not for you, no worries at all.
+
+[Your name]
+RetireWiz`,
+    },
+    {
+      kind: "note",
+      title: "How to work the adviser kit",
+      audience: "advisers",
+      pinned: false,
+      body: `WHO to target first: independent/boutique retirement-focused advisers and SMSF accountants — they feel the tooling pain most and can say yes without a committee. Skip big licensees (locked into XPLAN/Midwinter) for now.
+
+WHERE: LinkedIn (post + DMs), the XY Adviser / Ensombl community, adviser Facebook groups, and a short list of 20–30 practices found via Google/LinkedIn.
+
+HOW: personalise the first line every time ("saw you focus on retirement/SMSF clients…"). 5 tailored DMs beat 50 copy-pastes.
+
+SUCCESS BAR: ~30–50 quality visits → if 5–10 waitlist signups come with real "would-pay" answers, that's a genuine signal to build the B2B features. Crickets after honest effort is ALSO a signal — rethink the wedge before building.`,
+    },
+  ];
+
+  for (const s of seeds) {
+    await c.query(
+      `insert into marketing_assets (kind, title, body, audience, pinned)
+       values ($1, $2, $3, $4, $5)`,
+      [s.kind, s.title, s.body, s.audience, s.pinned],
+    );
+  }
+  console.log(`  marketing: seeded ${seeds.length} assets (adviser outreach kit).`);
+}
+
 /** Run the full idempotent migration: schema + all seeds. */
 export async function migrate(c: Client): Promise<void> {
   await applySchema(c);
   console.log("  schema: applied.");
   await seedRefData(c);
   await seedSources(c);
+  await seedMarketingAssets(c);
 }
