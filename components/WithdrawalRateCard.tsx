@@ -166,7 +166,11 @@ function WithdrawalRateExplainer({
             {fmtCurrency(goal.loanCost)} loan cost is smaller by age {w.age}.
           </p>
         )}
-        <p className="mt-2">Before Age Pension age, with no pension yet, the super draw usually equals your spend.</p>
+        <p className="mt-2">
+          Spending is funded from your outside-super savings first (super&apos;s earnings are
+          tax-free, so it&apos;s worth preserving) plus super&apos;s ATO minimum — so the super
+          draw starts low and climbs as those savings run down.
+        </p>
       </div>
 
       <div>

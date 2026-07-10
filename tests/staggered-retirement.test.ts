@@ -97,8 +97,8 @@ describe("Staggered retirement", () => {
     const row = res.rows.find((r) => r.age === w.age)!;
     expect(row.salaryIncome).toBeLessThanOrEqual(1);
     expect(w.age).toBeGreaterThanOrEqual(67);
-    // Super now funds the real spend rather than a small salary-masked slice.
-    expect(w.drawn).toBeGreaterThan(50_000);
+    // Clearly a real drawdown year, not the tiny salary-masked gap-year slice.
+    expect(w.drawn).toBeGreaterThan(25_000);
   });
 
   it("keeps a single-person plan unaffected", () => {

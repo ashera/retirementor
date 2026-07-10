@@ -898,8 +898,8 @@ function preservationPia(config: EngineConfig): PersonaReport {
     covers: ["Single", "Homeowner", "Preservation-age edge", "Drawdown phase"],
     assumptions: [
       "Today's dollars (inflation 0%).",
-      "Retires at exactly 60 — the mirror of Bridging Ben: her super is accessible from day one, so (with no Age Pension until 67 and no other income) her first-year spending is funded straight from super.",
-      "Super drawn first (it reduces assessable assets), so year-one super drawdown equals her spend.",
+      "Retires at exactly 60 — the mirror of Bridging Ben: her super is accessible from day one, so there's no early-retirement bridge.",
+      "Outside savings are spent first (super's pension-phase earnings are tax-free), so year-one super drawdown is just the ATO minimum — 4% under age 65.",
       `Reference data: FY${config.financialYear} config seed.`,
     ],
     inputs: [
@@ -912,10 +912,10 @@ function preservationPia(config: EngineConfig): PersonaReport {
       superCheckpoint([{ name: "Pia", person }], 6, 0, years, row.totalSuper, config),
       outsideCheckpoint(120_000, 0, 6, 0, years, row.outside, config),
       moneyCheck(
-        "Super accessible & drawn at 60", "Age 60",
-        "Independent: at preservation age super unlocks, so year-one draw = spend (no pension/other income yet)",
-        `No Age Pension until 67, no rent/work → the full ${m(spend)} spend is drawn from super (drawn before savings).`,
-        spend, Math.round(row.superDrawn), 2,
+        "Min super drawdown at 60", "Age 60",
+        "Independent: outside savings fund the spend first, so super draws only the ATO minimum (4% under 65)",
+        `Her ${m(spend)} spend is met from outside savings first; super draws the ATO minimum — 4% of its ${m(Math.round(row.totalSuper))} balance.`,
+        Math.round(0.04 * row.totalSuper), Math.round(row.superDrawn), 2,
       ),
     ],
   });

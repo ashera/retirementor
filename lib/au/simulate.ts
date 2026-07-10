@@ -470,27 +470,36 @@ export function simulate(
     const privateNeed = Math.max(0, spending - externalIncome);
     if (externalIncome > spending) outside += externalIncome - spending;
 
-    // Draw from super first (reduces assessable assets), enforcing minimum drawdown.
+    // Super must pay at least its ATO minimum each year; beyond that we spend
+    // OUTSIDE super FIRST. Super in pension phase earns tax-free, whereas money
+    // held outside is taxed on its earnings — so preserving the super pool for
+    // longer is more tax-efficient and makes the plan last longer. The order is
+    // neutral for the Age Pension (both pools are assessed, and the same total is
+    // spent either way), so there's no means-test cost to it. A member still
+    // under preservation age has no accessible super, so the outside pool
+    // naturally funds the early-retirement bridge.
     const minDrawdownParts = accessibleIdx.map((i) => {
       const rate = minDrawdownRate(ages[i], config);
       return { age: ages[i], balance: balances[i], rate, amount: balances[i] * rate };
     });
     const minDraw = minDrawdownParts.reduce((s, pt) => s + pt.amount, 0);
-    const fromSuper = Math.min(Math.max(privateNeed, minDraw), accessibleSuper);
+    const minDrawCapped = Math.min(accessibleSuper, minDraw);
+    // Outside super covers whatever the need is after the mandatory super minimum.
+    const needAfterMin = Math.max(0, privateNeed - minDrawCapped);
+    const outsideDrawn = Math.min(needAfterMin, outside);
+    // Only top up from super above the minimum once outside savings are exhausted.
+    const extraSuper = Math.min(needAfterMin - outsideDrawn, Math.max(0, accessibleSuper - minDrawCapped));
+    const fromSuper = minDrawCapped + extraSuper;
     if (accessibleSuper > EPS && fromSuper > 0) {
-      const ratio = fromSuper / accessibleSuper;
+      const ratio = Math.min(1, fromSuper / accessibleSuper);
       accessibleIdx.forEach((i) => {
         balances[i] -= balances[i] * ratio;
       });
     }
-
-    // Any mandatory super drawn beyond need is reinvested outside super.
+    outside -= outsideDrawn;
+    // A mandatory minimum drawn beyond the actual need is reinvested outside super.
     const surplus = Math.max(0, fromSuper - privateNeed);
     outside += surplus;
-
-    const stillNeed = Math.max(0, privateNeed - fromSuper);
-    const outsideDrawn = Math.min(stillNeed, outside);
-    outside -= outsideDrawn;
 
     const funded = externalIncome + fromSuper + outsideDrawn + EPS >= spending;
 
