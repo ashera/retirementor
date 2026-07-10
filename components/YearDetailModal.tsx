@@ -269,7 +269,7 @@ export default function YearDetailModal({
                 tone="text-emerald-400"
               />
             )}
-            {savedFromIncome > 1 && (
+            {savedFromIncome > 1 && !partnerStillWorking && (
               <Line
                 label="Income saved to savings"
                 sub="income beyond your spending, kept in outside super"
@@ -312,6 +312,9 @@ export default function YearDetailModal({
             <div className="rounded-xl border border-line bg-panel-2 px-4 py-3 text-xs text-muted">
               <span className="text-slate-200">{fmtCurrency(spending)}/yr of spending</span> funded by{" "}
               {fundingText}.
+              {partnerStillWorking && savedFromIncome > 1 && (
+                <> The remaining {fmtCurrency(Math.round(savedFromIncome))} of that salary is saved to your outside super — which is why it appears in &ldquo;Money in&rdquo; but the spending is covered.</>
+              )}
               {wr !== null && (
                 <div className="mt-1">
                   Withdrawal rate:{" "}
