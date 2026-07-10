@@ -260,18 +260,15 @@ export async function seedSources(c: Client): Promise<void> {
 }
 
 /**
- * Seed the marketing library with the adviser outreach kit, but ONLY if the
- * table is empty — so it appears once for a fresh install and is never
- * re-inserted or allowed to clobber the user's own edits/additions.
+ * Seed the marketing library with the curated starter kit (adviser outreach +
+ * consumer/Reddit copy). Idempotent by TITLE: only inserts a curated asset the
+ * table doesn't already have, so new seeds ship on deploy without duplicating,
+ * and edits to existing seeds are preserved. (An asset the admin deletes will
+ * reappear on the next migration — acceptable for a curated starter set.)
  */
 export async function seedMarketingAssets(c: Client): Promise<void> {
-  const existing = await c.query("select 1 from marketing_assets limit 1");
-  if (existing.rows.length) {
-    console.log("  marketing: assets already present — left untouched.");
-    return;
-  }
-
   const site = "https://www.retirewiz.com.au/for-advisers";
+  const home = "https://www.retirewiz.com.au";
   const seeds: { kind: string; title: string; audience: string; pinned: boolean; body: string }[] = [
     {
       kind: "outreach",
@@ -346,16 +343,72 @@ HOW: personalise the first line every time ("saw you focus on retirement/SMSF cl
 
 SUCCESS BAR: ~30–50 quality visits → if 5–10 waitlist signups come with real "would-pay" answers, that's a genuine signal to build the B2B features. Crickets after honest effort is ALSO a signal — rethink the wedge before building.`,
     },
+    {
+      kind: "outreach",
+      title: "Reddit post — r/fiaustralia (free tool, OC share)",
+      audience: "consumers",
+      pinned: false,
+      body: `TITLE: I got frustrated with retirement calculators, so I built a free one that models the Age Pension + lets you test strategies — feedback welcome
+
+BODY:
+Long-time lurker. I kept hitting the same wall with retirement calculators: most ignore the Age Pension (which does a lot of the heavy lifting for most Australians), hide their assumptions, or won't let you test "what if I downsized / salary-sacrificed / retired at 60".
+
+So I built RetireWiz — free, no signup to run it:
+• Models super + the means-tested Age Pension (income & assets tests, deeming), tax and fees, all in today's dollars
+• Live "what-if" strategies — downsize, salary-sacrifice, retire later, work part-time — showing the impact on your balance, income and how long the money lasts
+• Every assumption is on show, and I cross-checked the core numbers against ASIC's Moneysmart so they line up
+
+It's general information, not advice — just the maths. I'd genuinely value this crowd's feedback on where the modelling could be sharper (edge cases, assumptions you'd change).
+
+${home}
+
+(Mods — happy to pull this if it breaks the rules. It's free, no upsell, no signup wall.)
+
+TIP: post with OC/Tool flair, reply to every comment for the first few hours, and don't cross-post the same link to other subs the same day.`,
+    },
+    {
+      kind: "snippet",
+      title: "Reddit comment — 'how much super / will it last' answer",
+      audience: "consumers",
+      pinned: false,
+      body: `Reusable helpful reply for the recurring "how much super do I need" / "will my super last" threads. Lead with the useful info; only add the tool line where it genuinely answers the question, and disclose you built it.
+
+---
+The honest answer is "it depends on the Age Pension" — which most calculators skip. A single homeowner can get up to roughly $29k/yr and a couple ~$44k/yr (means-tested on income & assets), so your super often only needs to top that up to your target rather than fund the whole thing. For a benchmark, ASFA's "comfortable" standard is about $52k/yr single and $73k/yr for a couple.
+
+Two free tools worth a look: ASIC's Moneysmart retirement calculator, and RetireWiz (${home}) — I built the second one; it adds the Age Pension means test and lets you test strategies like downsizing or salary-sacrifice. Both show figures in today's dollars, no signup needed.
+
+Happy to sanity-check if you share your rough numbers.`,
+    },
+    {
+      kind: "note",
+      title: "Reddit etiquette (don't get banned)",
+      audience: "consumers",
+      pinned: false,
+      body: `• READ each subreddit's rules first. r/fiaustralia is more OC/tool-friendly; r/AusFinance is larger and much stricter on self-promo — there, contribute helpful comments rather than posting your link.
+• DISCLOSE you built it, every time. Reddit rewards transparency and nukes stealth marketing.
+• VALUE FIRST: the post/comment must be useful even if nobody clicks. No signup wall, no upsell language.
+• DON'T drop-and-run — reply to every comment for the first few hours.
+• ONE sub at a time, spaced out. The same link across several subs in a day trips spam filters and gets bans.
+• FLAIR as OC/Tool where required; offer to remove if mods object.
+• LONG GAME: become a genuinely helpful regular and let the tool come up naturally in relevant threads — that converts far better than a one-off post.`,
+    },
   ];
 
+  let added = 0;
   for (const s of seeds) {
+    const exists = await c.query("select 1 from marketing_assets where title = $1 limit 1", [s.title]);
+    if (exists.rows.length) continue;
     await c.query(
       `insert into marketing_assets (kind, title, body, audience, pinned)
        values ($1, $2, $3, $4, $5)`,
       [s.kind, s.title, s.body, s.audience, s.pinned],
     );
+    added++;
   }
-  console.log(`  marketing: seeded ${seeds.length} assets (adviser outreach kit).`);
+  console.log(
+    added ? `  marketing: added ${added} new curated asset(s).` : "  marketing: curated assets already present.",
+  );
 }
 
 /** Run the full idempotent migration: schema + all seeds. */
