@@ -28,6 +28,7 @@ import IncomeChart from "@/components/IncomeChart";
 import YearDetailModal from "@/components/YearDetailModal";
 import IncomeYearModal from "@/components/IncomeYearModal";
 import AssumptionsModal from "@/components/AssumptionsModal";
+import StrategyAssumptionsModal from "@/components/StrategyAssumptionsModal";
 import Field from "@/components/Field";
 
 const PLAN_KEY = "au-retirement-plan";
@@ -108,6 +109,7 @@ export default function WhatIfView({
   const [chartView, setChartView] = useState<"balance" | "networth" | "income">("balance");
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
   const [assumptionsOpen, setAssumptionsOpen] = useState(false);
+  const [assumptionsCard, setAssumptionsCard] = useState<StrategyCard | null>(null);
 
   // Don't persist the board until after the initial restore has been applied,
   // so the empty first render can't clobber the saved selection.
@@ -585,6 +587,7 @@ export default function WhatIfView({
                     values={resolveValues(card, values[card.id])}
                     onToggle={() => toggle(card)}
                     onParam={(k, v) => setParam(card.id, k, v)}
+                    onAssumptions={() => setAssumptionsCard(card)}
                     sustainable={
                       card.id === "adjust-spending" && spendSustainable != null
                         ? {
@@ -637,6 +640,14 @@ export default function WhatIfView({
       </div>
 
       <AssumptionsModal open={assumptionsOpen} onClose={() => setAssumptionsOpen(false)} config={config} plan={composed} />
+      <StrategyAssumptionsModal
+        open={assumptionsCard != null}
+        onClose={() => setAssumptionsCard(null)}
+        strategyId={assumptionsCard?.id ?? null}
+        strategyLabel={assumptionsCard?.label ?? null}
+        config={config}
+        plan={composed}
+      />
 
 
       {/* Year explainer for the composed ("with strategies") plan. */}
@@ -838,6 +849,7 @@ function StrategyCardRow({
   values,
   onToggle,
   onParam,
+  onAssumptions,
   sustainable,
 }: {
   card: StrategyCard;
@@ -850,6 +862,7 @@ function StrategyCardRow({
   values: Record<string, number>;
   onToggle: () => void;
   onParam: (key: string, v: number) => void;
+  onAssumptions: () => void;
   sustainable?: {
     essentials: number; // needs floor held fixed — the slider's lower bound
     stretch: number; // deterministic max (assumed return) — the slider ceiling
@@ -959,6 +972,15 @@ function StrategyCardRow({
               <span>{card.note(values)}</span>
             </div>
           )}
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={onAssumptions}
+              className="text-[11px] font-medium text-muted underline-offset-2 transition hover:text-accent hover:underline"
+            >
+              🔍 Assumptions used in this strategy
+            </button>
+          </div>
           {sustainable && (
             <div className="rounded-lg border border-accent/30 bg-accent/5 px-3 py-2 text-xs">
               {/* Likelihood at the current spend (anchor) → at the chosen spend */}
