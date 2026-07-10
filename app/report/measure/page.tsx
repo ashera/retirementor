@@ -43,6 +43,8 @@ const base = (over: Partial<RetirementPlan>): RetirementPlan => ({
 const CASES: Record<string, RetirementPlan> = {
   simple: base({}),
   couple: base({ household: "couple", people: [person({}), person({ currentAge: 53, superBalance: 250_000, salary: 70_000 })] }),
+  // Staggered retirement — partners retire at different ages.
+  staggered: base({ household: "couple", retirementAge: 60, targetSpending: 70_000, people: [person({ currentAge: 58 }), person({ currentAge: 58, superBalance: 250_000, salary: 80_000, retirementAge: 67 })] }),
   // Heaviest page-1 inputs (couple + mortgage + property) and page-2 budget table.
   heavy: withBudget(
     base({

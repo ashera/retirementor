@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import type { EngineConfig } from "@/lib/au/config";
 import type { RetirementPlan } from "@/lib/au/types";
-import { DEFAULT_PLAN } from "@/lib/au/types";
+import { DEFAULT_PLAN, hasStaggeredRetirement, personRetirementAge } from "@/lib/au/types";
 import { simulate } from "@/lib/au/simulate";
 import { runMonteCarlo } from "@/lib/au/montecarlo";
 import { retirementGoal } from "@/lib/au/goal";
@@ -90,7 +90,7 @@ export default function CompareView({ config, savedPlans }: { config: EngineConf
 
   const rows: MetricRow[] = [
     { label: "Household", input: true, cell: (c) => (c.plan.household === "couple" ? "Couple" : "Single") },
-    { label: "Retirement age", input: true, cell: (c) => `${c.plan.retirementAge}` },
+    { label: "Retirement age", input: true, cell: (c) => (hasStaggeredRetirement(c.plan) ? `${c.plan.retirementAge} & ${personRetirementAge(c.plan, 1)}` : `${c.plan.retirementAge}`) },
     { label: "Annual spend", input: true, cell: (c) => `${fmtCurrency(Math.round(c.goal.total))}/yr` },
     { label: "Investment return", input: true, cell: (c) => `${c.plan.investmentReturn}%` },
     { label: "Plan until age", input: true, cell: (c) => `${c.plan.lifeExpectancy}` },

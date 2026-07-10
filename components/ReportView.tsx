@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { EngineConfig } from "@/lib/au/config";
-import { getInvestmentProperties, type RetirementPlan, type SimResult } from "@/lib/au/types";
+import { getInvestmentProperties, hasStaggeredRetirement, personRetirementAge, type RetirementPlan, type SimResult } from "@/lib/au/types";
 import type { MonteCarloResult } from "@/lib/au/montecarlo";
 import { retirementGoal } from "@/lib/au/goal";
 import { fmtCurrency } from "@/lib/au/format";
@@ -160,7 +160,12 @@ export default function ReportView({
     })),
     { label: "Outside super", value: `${money(plan.outsideSuper)} + ${money(plan.annualOutsideSavings)}/yr` },
     { label: "Home", value: plan.homeowner ? "Homeowner" : "Renting" },
-    { label: "Retirement age", value: `${plan.retirementAge}` },
+    {
+      label: "Retirement age",
+      value: hasStaggeredRetirement(plan)
+        ? `${plan.retirementAge} (you) & ${personRetirementAge(plan, 1)} (partner)`
+        : `${plan.retirementAge}`,
+    },
     { label: "Investment return", value: `${plan.investmentReturn}% p.a. (nominal)` },
     { label: "Inflation (CPI)", value: `${plan.inflation}% — pre-retirement deflator ${wageInfl}% (wage)` },
     {
@@ -286,11 +291,15 @@ export default function ReportView({
         <div className="break-before-page">
           <Section title="Income sources">
             <Lead>
-              Your income across the whole plan: your gross salary while working
-              (yellow), then in retirement — tax-free super drawdowns (green),
-              withdrawals from outside super (blue), any net property rent (orange),
-              and from Age Pension age the means-tested Age Pension (purple). As
-              assets draw down, the pension typically grows to fill the gap.
+              Your income across the whole plan: your take-home pay while working
+              (yellow)
+              {hasStaggeredRetirement(plan)
+                ? " — including a still-working partner's pay into early retirement, since you retire at different ages —"
+                : ","}{" "}
+              then in retirement, tax-free super drawdowns (green), withdrawals
+              from outside super (blue), any net property rent (orange), and from
+              Age Pension age the means-tested Age Pension (purple). As assets draw
+              down, the pension typically grows to fill the gap.
             </Lead>
             <div className="rounded-lg border border-slate-200 bg-slate-50 p-2">
               <IncomeChart result={result} animate={false} height={175} />
