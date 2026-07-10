@@ -39,6 +39,9 @@ const vanilla: Record<string, RetirementPlan> = {
   "high-outside": single({ people: [{ currentAge: 66, superBalance: 500_000, salary: 0, voluntaryConcessional: 0, voluntaryNonConcessional: 0 }], retirementAge: 66, outsideSuper: 900_000, targetSpending: 80_000 }),
   staggered,
   "held-property": single({ investmentProperties: [prop] }),
+  // Recontribution is a net-zero savings reallocation (outside→super), so the
+  // savings waterfall must still tie with no "other".
+  recontribute: single({ recontribute: { perYear: 20_000, untilAge: 72 } }),
 };
 
 // Plans with one-off equity/loan events — the total must still tie (an "other"

@@ -143,6 +143,7 @@ export interface RetirementPlan {
   workIncome?: { perYear: number; untilAge: number }; // part-time work in early retirement (offsets drawdown; income-test assessable net of the Work Bonus)
   ttr?: { extraSacrifice: number }; // Transition to Retirement: extra pre-tax sacrifice/yr from preservation age → retirement, take-home held by a tax-free TTR pension
   lumpSum?: { atAge: number; amount: number }; // one-off tax-free super withdrawal at an age (spent), capped at the accessible super balance then
+  recontribute?: { perYear: number; untilAge: number }; // recontribution: annual after-tax (non-concessional) top-up of super from outside savings, to age ≤75, within the NCC + total-super caps
   investmentProperties?: PropertyDetail[]; // income-producing properties (source of truth)
   investmentProperty?: PropertyDetail; // DEPRECATED legacy single property — read via getInvestmentProperties()
   // Which optional sections the user has explicitly answered in the wizard (incl.
@@ -314,6 +315,7 @@ export interface YearBreakdown {
   mortgageCost: number;
   mortgageCleared: number; // one-off super lump sum used to clear the home loan
   lumpSum: number; // one-off tax-free lump sum withdrawn from super this year (spent)
+  recontribution: number; // after-tax amount moved from savings into super this year (non-concessional)
   // Investment property sale
   propertyProceeds: number; // net proceeds added to outside super
   propertyCgt: number; // CGT paid on the sale

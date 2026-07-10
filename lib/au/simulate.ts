@@ -103,6 +103,8 @@ export function simulate(
   // Optional one-off lump sum withdrawn (and spent) from super at a chosen age.
   const lumpSum = plan.lumpSum;
   let lumpSumTaken = false;
+  // Optional recontribution: annual after-tax top-up of super from outside savings.
+  const recontribute = plan.recontribute;
   // The (exempt) home value tracked for the net-worth view: the current value
   // until a downsize (→ the smaller home) or a sale (→ 0). Homeowners without a
   // stated value get the same default the downsize lever assumes. It appreciates
@@ -300,6 +302,7 @@ export function simulate(
           mortgageCost: 0,
           mortgageCleared: 0,
           lumpSum: 0,
+          recontribution: 0,
           propertyProceeds: 0,
           propertyCgt: 0,
           homeProceeds: 0,
@@ -390,6 +393,29 @@ export function simulate(
         lumpSumNow = take;
       }
       lumpSumTaken = true;
+    }
+
+    // Recontribution: each year (to age 75) move an after-tax amount from outside
+    // savings back INTO super — a non-concessional contribution. It shelters money
+    // in super's tax-free environment and pushes back against the age-based minimum
+    // drawdown that would otherwise leak super into taxable savings. Capped at the
+    // annual NCC cap, available savings, and the room under the total-super cap.
+    let recontributionNow = 0;
+    if (
+      recontribute &&
+      ages[0] <= 75 &&
+      ages[0] <= recontribute.untilAge &&
+      outside > EPS &&
+      sum(balances) < config.transferBalanceCap
+    ) {
+      const room = config.transferBalanceCap - sum(balances);
+      const take = Math.min(Math.max(0, recontribute.perYear), config.nonConcessionalCap, outside, room);
+      if (take > 0) {
+        outside -= take;
+        balances[0] += take;
+        if (ages[0] >= preservationAge) accessibleSuper += take; // joins the drawable/assessed pool
+        recontributionNow = take;
+      }
     }
 
     // Steady-state spend plus any ongoing loan cost. A repayment/interest bill is
@@ -605,6 +631,7 @@ export function simulate(
         mortgageCost,
         mortgageCleared: mortgageClearedNow,
         lumpSum: lumpSumNow,
+        recontribution: recontributionNow,
         propertyProceeds,
         propertyCgt,
         homeProceeds: homeProceedsThisYear,

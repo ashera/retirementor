@@ -281,6 +281,27 @@ describe("What-If strategies", () => {
     expect(capped.breakdown.lumpSum).toBeLessThanOrEqual(capped.totalSuper + 1);
   });
 
+  it("recontribution: moves savings into super yearly, capped at the NCC + age-75 limits", () => {
+    const b = base({ people: [{ currentAge: 62, superBalance: 400_000, salary: 0, voluntaryConcessional: 0, voluntaryNonConcessional: 0 }], retirementAge: 62, outsideSuper: 500_000, targetSpending: 45_000 });
+    expect(buildStrategyCatalog(b).some((c) => c.id === "recontribute")).toBe(true);
+    expect(applyOne(b, "recontribute", { amount: 20_000, untilAge: 75 }).recontribute).toEqual({ perYear: 20_000, untilAge: 75 });
+
+    const rows = simulate({ ...b, recontribute: { perYear: 20_000, untilAge: 75 } }, cfg).rows;
+    const y65 = rows.find((r) => r.age === 65)!;
+    expect(y65.breakdown.recontribution).toBeCloseTo(20_000, 0); // moved from savings into super
+    // It's a reallocation: super higher, outside lower vs baseline; total ~unchanged.
+    const base65 = simulate(b, cfg).rows.find((r) => r.age === 65)!;
+    expect(y65.totalSuper).toBeGreaterThan(base65.totalSuper + 40_000);
+    expect(y65.outside).toBeLessThan(base65.outside - 40_000);
+    expect(Math.abs(y65.total - base65.total)).toBeLessThan(2_000); // net worth barely moves
+    // Never past age 75, even if asked.
+    const ages = simulate({ ...b, recontribute: { perYear: 20_000, untilAge: 90 } }, cfg).rows.filter((r) => r.breakdown.recontribution > 0).map((r) => r.age);
+    expect(Math.max(...ages)).toBe(75);
+    // Capped at the annual non-concessional cap.
+    const bigRow = simulate({ ...b, recontribute: { perYear: 500_000, untilAge: 75 } }, cfg).rows.find((r) => r.age === 63)!;
+    expect(bigRow.breakdown.recontribution).toBeLessThanOrEqual(cfg.nonConcessionalCap + 1);
+  });
+
   it("selling an investment property reallocates net worth (no windfall)", () => {
     const b = base({
       people: [{ currentAge: 66, superBalance: 300_000, salary: 0, voluntaryConcessional: 0, voluntaryNonConcessional: 0 }],

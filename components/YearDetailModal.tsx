@@ -285,6 +285,14 @@ export default function YearDetailModal({
             </p>
           )}
 
+          {b.recontribution > 0 && (
+            <p className="rounded-xl border border-accent/30 bg-accent/5 px-4 py-3 text-[11px] leading-snug text-muted">
+              You recontributed <span className="font-semibold text-accent">{fmtCurrency(Math.round(b.recontribution))}</span> from
+              your savings into super this year (after-tax). It&apos;s a reallocation — your total is unchanged — but its
+              earnings are now tax-free inside super instead of taxed in your savings.
+            </p>
+          )}
+
           {/* Home equity freed this year (downsize / sell-up-and-rent) */}
           {b.homeProceeds > 0 && (
             <div className="rounded-xl border border-accent/30 bg-accent/5 px-4 py-3">

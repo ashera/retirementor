@@ -427,6 +427,30 @@ export function buildStrategyCatalog(
     });
   }
 
+  // Recontribute: move money from outside savings back into super each year as an
+  // after-tax (non-concessional) contribution. Needs outside savings to draw on.
+  if (plan.outsideSuper > 0 || plan.annualOutsideSavings > 0) {
+    const startAge = Math.min(75, Math.max(60, Math.round(plan.retirementAge)));
+    cards.push({
+      id: "recontribute",
+      group: "timing",
+      label: "Recontribute savings to super",
+      blurb:
+        "Move money from your outside-super savings back INTO super each year as an after-tax (non-concessional) contribution. Inside super its earnings are tax-free, instead of taxed in your own name outside — so the bigger your outside balance, the more this saves. Allowed to age 75, within the non-concessional cap, your available savings and the total-super cap. (Its other real benefit — lower tax for your beneficiaries on death — isn't modelled here.)",
+      params: [
+        { key: "amount", label: "Per year from savings", min: 0, max: 130_000, step: 5_000, prefix: "$", suffix: "/yr", default: 20_000 },
+        { key: "untilAge", label: "Until age", min: startAge, max: 75, step: 1, default: 75, suffix: "yrs" },
+      ],
+      note: (v) =>
+        `Each year until age ${v.untilAge}, move ${fmtCurrency(v.amount)} from your savings into super as an after-tax ` +
+        `contribution — no tax going in, and its earnings are then tax-free inside super rather than taxed outside. It's a ` +
+        `reallocation (your net worth barely moves the year you do it); the payoff is the tax saved on those earnings over ` +
+        `time, largest when your outside balance is big. The minimum drawdown will pull some back out each year. Capped at ` +
+        `the non-concessional limit, your available savings and the total-super cap; not past 75.`,
+      apply: (p, v) => ({ ...p, recontribute: { perYear: v.amount, untilAge: v.untilAge } }),
+    });
+  }
+
   const spend = Math.round(primarySpend(plan));
   if (spend > 0) {
     cards.push({
