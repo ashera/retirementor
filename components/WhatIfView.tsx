@@ -654,8 +654,10 @@ export default function WhatIfView({
       {selectedYear != null &&
         (() => {
           const ages = compRes.rows.map((r) => r.age);
-          const row = compRes.rows.find((r) => r.age === selectedYear);
+          const idx = compRes.rows.findIndex((r) => r.age === selectedYear);
+          const row = idx >= 0 ? compRes.rows[idx] : undefined;
           if (!row) return null;
+          const nextRow = compRes.rows[idx + 1];
           const min = ages[0];
           const max = ages[ages.length - 1];
           const nav = {
@@ -668,7 +670,13 @@ export default function WhatIfView({
           return chartView === "income" ? (
             <IncomeYearModal row={row} plan={composed} config={config} {...nav} />
           ) : (
-            <YearDetailModal row={row} plan={composed} {...nav} />
+            <YearDetailModal
+              row={row}
+              nextRow={nextRow}
+              view={chartView === "networth" ? "networth" : "savings"}
+              plan={composed}
+              {...nav}
+            />
           );
         })()}
     </div>

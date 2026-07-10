@@ -4,6 +4,7 @@ import { DEFAULT_CONFIG as cfg } from "../lib/au/config";
 import { buildStrategyCatalog, resolveValues } from "../lib/au/strategies";
 import { deriveStages, type PropertyDetail, type RetirementPlan } from "../lib/au/types";
 import { yearFlow } from "../lib/au/yearFlow";
+import { rowNetWorth } from "../lib/au/networth";
 
 const single = (over: Partial<RetirementPlan> = {}): RetirementPlan => ({
   household: "single",
@@ -64,6 +65,19 @@ describe("Year-flow waterfall reconciliation", () => {
       for (const row of simulate(plan, cfg).rows) {
         const other = yearFlow(row).lines.find((l) => l.key === "other");
         expect(other, `unexpected "other" of ${Math.round(other?.amount ?? 0)} at age ${row.age} (${row.phase})`).toBeUndefined();
+      }
+    });
+  }
+
+  // The net-worth modal headline (savings + home + property) must equal the
+  // chart's rowNetWorth for every year, or it won't match the bar you clicked.
+  for (const [label, plan] of Object.entries({ "held-property": vanilla["held-property"], downsize: eventful.downsize, "sell-property": eventful["sell-property"] })) {
+    it(`net-worth opening = savings + home + property, matching the chart (${label})`, () => {
+      for (const row of simulate(plan, cfg).rows) {
+        const f = yearFlow(row);
+        const home = Math.max(0, row.homeEquity ?? 0);
+        const prop = Math.max(0, (row.propertyEquity ?? 0) + (row.breakdown.propertyProceeds ?? 0));
+        expect(Math.abs(f.opening + home + prop - rowNetWorth(row))).toBeLessThan(1);
       }
     });
   }

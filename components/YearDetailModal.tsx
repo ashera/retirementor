@@ -4,6 +4,7 @@ import { fmtCurrency } from "@/lib/au/format";
 import { mortgageAnnualCost } from "@/lib/au/mortgage";
 import { rowWithdrawalRate, withdrawalBand } from "@/lib/au/withdrawal";
 import { yearFlow } from "@/lib/au/yearFlow";
+import { rowNetWorth } from "@/lib/au/networth";
 import type { RetirementPlan, YearRow } from "@/lib/au/types";
 
 const WR_TONE: Record<"accent" | "amber" | "red", string> = {
@@ -56,6 +57,8 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 export default function YearDetailModal({
   row,
   plan,
+  nextRow,
+  view = "savings",
   onClose,
   onPrev,
   onNext,
@@ -64,6 +67,12 @@ export default function YearDetailModal({
 }: {
   row: YearRow;
   plan: RetirementPlan;
+  // The following year's row, so a net-worth view can compute the change in
+  // illiquid home/property equity (start-of-next-year = end-of-this-year).
+  nextRow?: YearRow;
+  // Which chart opened this: "savings" (super + outside) or "networth" (also
+  // home + property). The headline and waterfall match that chart's total.
+  view?: "savings" | "networth";
   onClose: () => void;
   onPrev: () => void;
   onNext: () => void;
@@ -71,14 +80,36 @@ export default function YearDetailModal({
   canNext: boolean;
 }) {
   const b = row.breakdown;
-  // Signed drivers that sum EXACTLY from opening to closing (the waterfall).
+  // Signed drivers that sum EXACTLY from opening to closing (the savings waterfall).
   const flow = yearFlow(row);
-  // Net worth = these savings PLUS illiquid home/property equity. Shown as a
-  // separate note (not in the savings waterfall) so the year opened from the
-  // net-worth chart reconciles, without breaking the savings tie-out.
+  // Net worth = these savings PLUS illiquid home/property equity. Use the shared
+  // rowNetWorth so the modal's total can't drift from the chart's total (it also
+  // bridges a property sale's proceeds the same way the chart does).
+  const isNetWorth = view === "networth";
   const nwHome = Math.max(0, row.homeEquity ?? 0);
-  const nwProp = Math.max(0, row.propertyEquity ?? 0);
-  const nwTotal = flow.opening + nwHome + nwProp;
+  const nwProp = Math.max(0, (row.propertyEquity ?? 0) + (b.propertyProceeds ?? 0));
+  const nwTotal = rowNetWorth(row); // = flow.opening + nwHome + nwProp
+  // Net worth at year end = the next year's start (or held flat on the final row).
+  // The home/property change is whatever isn't explained by the savings drivers.
+  const nwClosing = nextRow ? rowNetWorth(nextRow) : nwTotal;
+  const homePropChange = nwClosing - nwTotal - flow.net;
+  // The waterfall shown — savings or net worth — matching the chart clicked.
+  const wf = {
+    title: isNetWorth ? "How your net worth changed" : "How your savings changed",
+    openingLabel: isNetWorth ? "Opening net worth" : "Opening balance",
+    closingLabel: isNetWorth ? "Closing net worth" : "Closing balance",
+    opening: isNetWorth ? nwTotal : flow.opening,
+    closing: isNetWorth ? nwClosing : flow.closing,
+    sub: isNetWorth
+      ? `super ${fmtCurrency(b.openingSuper)} · outside ${fmtCurrency(b.openingOutside)}` +
+        `${nwHome > 0 ? ` · home ${fmtCurrency(nwHome)}` : ""}${nwProp > 0 ? ` · property ${fmtCurrency(nwProp)}` : ""}`
+      : `super ${fmtCurrency(b.openingSuper)} · outside ${fmtCurrency(b.openingOutside)}`,
+    lines:
+      isNetWorth && Math.abs(homePropChange) > 0.5
+        ? [...flow.lines, { key: "homeprop", label: "Home & property value change", amount: homePropChange }]
+        : flow.lines,
+  };
+  const wfNet = wf.closing - wf.opening;
   const flowSub = (key: string, amount: number): string | undefined => {
     switch (key) {
       case "growth":
@@ -99,6 +130,8 @@ export default function YearDetailModal({
         return "one-off lump sum from super";
       case "outsideTax":
         return "on outside-super earnings (super's pension earnings are tax-free)";
+      case "homeprop":
+        return "your home and any investment property, tracking property prices";
       case "other":
         return "property CGT timing and rounding";
       default:
@@ -189,18 +222,16 @@ export default function YearDetailModal({
               the change, so the year always ties out. */}
           <div className="rounded-xl border border-line bg-panel-2 p-4">
             <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted">
-              How your savings changed
+              {wf.title}
             </div>
             <div className="flex items-baseline justify-between gap-3">
-              <span className="text-sm font-semibold text-slate-200">Opening balance</span>
-              <span className="text-base font-bold tabular-nums text-white">{fmtCurrency(flow.opening)}</span>
+              <span className="text-sm font-semibold text-slate-200">{wf.openingLabel}</span>
+              <span className="text-base font-bold tabular-nums text-white">{fmtCurrency(wf.opening)}</span>
             </div>
-            <div className="mb-1 text-[11px] text-muted">
-              super {fmtCurrency(b.openingSuper)} · outside {fmtCurrency(b.openingOutside)}
-            </div>
+            <div className="mb-1 text-[11px] text-muted">{wf.sub}</div>
 
             <div className="my-2 space-y-1.5 border-y border-line py-2">
-              {flow.lines.map((l) => (
+              {wf.lines.map((l) => (
                 <div key={l.key} className="flex items-baseline justify-between gap-3">
                   <span className="text-sm text-slate-300">
                     {l.label}
@@ -216,23 +247,30 @@ export default function YearDetailModal({
             </div>
 
             <div className="flex items-baseline justify-between gap-3">
-              <span className="text-sm font-semibold text-slate-200">Closing balance</span>
+              <span className="text-sm font-semibold text-slate-200">{wf.closingLabel}</span>
               <span className="text-right">
-                <span className="text-base font-bold tabular-nums text-white">{fmtCurrency(flow.closing)}</span>
-                <span className={`ml-2 text-[11px] font-semibold ${flow.net >= 0 ? "text-accent" : "text-amber-400"}`}>
-                  {money(flow.net)}
+                <span className="text-base font-bold tabular-nums text-white">{fmtCurrency(wf.closing)}</span>
+                <span className={`ml-2 text-[11px] font-semibold ${wfNet >= 0 ? "text-accent" : "text-amber-400"}`}>
+                  {money(wfNet)}
                 </span>
               </span>
             </div>
 
-            {(nwHome > 0 || nwProp > 0) && (
+            {isNetWorth ? (
               <p className="mt-2 border-t border-line pt-2 text-[11px] leading-snug text-muted">
-                This tracks your <span className="text-slate-300">savings</span> (super + outside). Your
-                net worth also counts home equity ({fmtCurrency(nwHome)})
-                {nwProp > 0 ? ` and investment property (${fmtCurrency(nwProp)})` : ""} — about{" "}
-                <span className="text-slate-300">{fmtCurrency(nwTotal)}</span> all up at the start of this
-                year. Those move with property prices, so they sit outside this money flow.
+                Net worth is your <span className="text-slate-300">savings</span> (super + outside) plus
+                home &amp; property equity. The spending and funding below break down the savings part.
               </p>
+            ) : (
+              (nwHome > 0 || nwProp > 0) && (
+                <p className="mt-2 border-t border-line pt-2 text-[11px] leading-snug text-muted">
+                  This tracks your <span className="text-slate-300">savings</span> (super + outside). Your
+                  net worth also counts home equity ({fmtCurrency(nwHome)})
+                  {nwProp > 0 ? ` and investment property (${fmtCurrency(nwProp)})` : ""} — about{" "}
+                  <span className="text-slate-300">{fmtCurrency(nwTotal)}</span> all up at the start of this
+                  year. Those move with property prices, so they sit outside this money flow.
+                </p>
+              )
             )}
           </div>
 
