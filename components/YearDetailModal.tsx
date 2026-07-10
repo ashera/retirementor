@@ -75,14 +75,20 @@ export default function YearDetailModal({
   const growth = b.superGrowth + b.outsideGrowth;
   const netChange = closingTotal - openingTotal;
   const isWorking = row.phase === "accumulation";
+  // Staggered-retirement "gap" year: the household is retired but a partner is
+  // still working — their salary sits on the retirement row (salaryIncome/takeHome),
+  // and their super keeps growing from contributions.
+  const partnerStillWorking = !isWorking && b.salaryIncome > 1;
   const spending = b.livingSpend + b.rentCost + b.mortgageCost;
   // This year's super withdrawal rate (share of the balance drawn).
   const wr = !isWorking && row.superDrawn > 0 && row.totalSuper > 0 ? rowWithdrawalRate(row) : null;
 
   // Split what funded spending: external income, then super and outside savings.
   // A minimum-drawdown surplus is drawn from super but reinvested outside, so the
-  // super figure here is only the part that actually funded spending.
-  const external = b.agePension + b.rentIncome + row.workIncome;
+  // super figure here is only the part that actually funded spending. A still-
+  // working partner's take-home is household income too, so include it — otherwise
+  // super/savings look like they must cover the whole spend (a phantom shortfall).
+  const external = b.agePension + b.rentIncome + row.workIncome + b.takeHome;
   const privateNeed = Math.max(0, spending - external);
   const drawnFromSuper = Math.max(0, Math.min(row.superDrawn, privateNeed));
   const drawnFromOutside = Math.max(0, row.outsideDrawn);
@@ -93,6 +99,7 @@ export default function YearDetailModal({
   const savedFromIncome = Math.max(0, external - spending);
 
   const fundingParts: string[] = [];
+  if (b.takeHome > 1) fundingParts.push(`a partner's ${fmtCurrency(Math.round(b.takeHome))} salary`);
   if (b.agePension > 0) fundingParts.push(`Age Pension ${fmtCurrency(Math.round(b.agePension))}`);
   if (b.rentIncome > 0) fundingParts.push(`net rent ${fmtCurrency(Math.round(b.rentIncome))}`);
   if (row.workIncome > 0) fundingParts.push(`part-time work ${fmtCurrency(Math.round(row.workIncome))}`);
@@ -127,7 +134,9 @@ export default function YearDetailModal({
             </div>
             <h2 className="mt-0.5 text-lg font-bold text-white">
               Age {row.age}{" "}
-              <span className="text-sm font-medium text-muted">· {PHASE_LABEL[row.phase]}</span>
+              <span className="text-sm font-medium text-muted">
+                · {partnerStillWorking ? "one partner still working, one retired" : PHASE_LABEL[row.phase]}
+              </span>
             </h2>
           </div>
           <div className="flex items-center gap-1">
@@ -221,6 +230,24 @@ export default function YearDetailModal({
                   tone="text-emerald-400"
                 />
                 <Line label="Savings added" value={money(b.savings)} tone="text-emerald-400" />
+              </>
+            )}
+            {partnerStillWorking && (
+              <>
+                <Line
+                  label="Salary — a partner is still working"
+                  sub="take-home after income tax & super; it helps fund your spending during the gap"
+                  value={money(b.takeHome)}
+                  tone="text-emerald-400"
+                />
+                {b.contribNet > 0 && (
+                  <Line
+                    label="Super contributions"
+                    sub={`${fmtCurrency(b.contribGross)} employer + salary sacrifice, less 15% tax`}
+                    value={money(b.contribNet)}
+                    tone="text-emerald-400"
+                  />
+                )}
               </>
             )}
             {!isWorking && b.agePension > 0 && (

@@ -62,7 +62,11 @@ export default function IncomeYearModal({
   const pension = row.agePension;
   const fromSuper = row.superDrawn;
   const fromOutside = row.outsideDrawn;
-  const total = pension + rent + fromSuper + fromOutside;
+  // Staggered-retirement gap year: a partner is still working, so their take-home
+  // salary is household income too (on the retirement row as salaryIncome/takeHome).
+  const partnerStillWorking = retired && row.salaryIncome > 1;
+  const salaryTakeHome = retired ? row.breakdown.takeHome : 0;
+  const total = pension + rent + fromSuper + fromOutside + salaryTakeHome;
   const spend = row.spending;
   const shortfall = Math.max(0, spend - total);
 
@@ -116,7 +120,7 @@ export default function IncomeYearModal({
 
   // Why is the super draw this amount? Uses the engine's actual minimum (summed
   // per person — a couple with an age gap has different rates each).
-  const privateNeed = Math.max(0, spend - pension - rent);
+  const privateNeed = Math.max(0, spend - pension - rent - salaryTakeHome);
   const minRate = minDrawdownRate(row.age, config);
   const minDraw = row.breakdown.minDrawdown;
   const parts = row.breakdown.minDrawdownParts;
@@ -136,7 +140,7 @@ export default function IncomeYearModal({
       <div className="relative z-10 flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-line bg-panel shadow-2xl">
         <div className="flex items-center justify-between border-b border-line px-6 py-4">
           <div>
-            <div className="text-xs font-semibold uppercase tracking-widest text-accent">{retired ? "Retirement income" : "Working income"}</div>
+            <div className="text-xs font-semibold uppercase tracking-widest text-accent">{!retired ? "Working income" : partnerStillWorking ? "Retirement income · a partner still working" : "Retirement income"}</div>
             <h2 className="mt-0.5 text-lg font-bold text-white">Age {row.age}</h2>
           </div>
           <div className="flex items-center gap-1">
@@ -284,6 +288,14 @@ export default function IncomeYearModal({
               <section>
                 <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted">Where it comes from</h3>
                 <div className="rounded-xl border border-line bg-panel px-3 py-1">
+                  {partnerStillWorking && (
+                    <Row
+                      color="#fbbf24"
+                      label="A partner's salary (take-home)"
+                      sub="One of you is still working — their take-home pay funds most of the household's spending during the gap."
+                      value={salaryTakeHome}
+                    />
+                  )}
                   {(pension > 0 || row.age >= config.agePensionAge) && (
                     <Row color="#a78bfa" label="Age Pension" sub={pensionReason} value={pension} />
                   )}
@@ -389,6 +401,7 @@ export default function IncomeYearModal({
                     <DLine label="Your spending goal" value={spend} />
                     <DLine label="− Age Pension" value={pension} />
                     {rent > 0 && <DLine label="− Net rent" value={rent} />}
+                    {salaryTakeHome > 1 && <DLine label="− A partner's salary (take-home)" value={salaryTakeHome} />}
                     <div className="border-t border-line pt-1.5">
                       <DLine label="= Shortfall to fund from savings" value={privateNeed} strong />
                     </div>
