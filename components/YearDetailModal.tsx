@@ -128,6 +128,8 @@ export default function YearDetailModal({
         return "home downsize or property sale, net of costs";
       case "loan":
         return "one-off lump sum from super";
+      case "lumpSum":
+        return "a one-off tax-free withdrawal from super, spent this year";
       case "outsideTax":
         return "on outside-super earnings (super's pension earnings are tax-free)";
       case "homeprop":
@@ -305,7 +307,7 @@ export default function YearDetailModal({
           )}
 
           {/* Money out */}
-          {!isWorking && (spending > 0 || b.mortgageCleared > 0) && (
+          {!isWorking && (spending > 0 || b.mortgageCleared > 0 || b.lumpSum > 0) && (
             <Section title="Money out — spending">
               {b.livingSpend > 0 && (
                 <Line label="Living costs" value={money(-b.livingSpend)} tone="text-amber-400" />
@@ -326,6 +328,14 @@ export default function YearDetailModal({
                   label="Cleared the home loan"
                   sub="one-off lump sum from super"
                   value={money(-b.mortgageCleared)}
+                  tone="text-amber-400"
+                />
+              )}
+              {b.lumpSum > 0 && (
+                <Line
+                  label="Lump sum from super"
+                  sub="a one-off tax-free withdrawal you spent this year"
+                  value={money(-b.lumpSum)}
                   tone="text-amber-400"
                 />
               )}

@@ -142,6 +142,7 @@ export interface RetirementPlan {
   home?: HomeDetail; // the principal home as an asset (exempt; net-worth context only)
   workIncome?: { perYear: number; untilAge: number }; // part-time work in early retirement (offsets drawdown; income-test assessable net of the Work Bonus)
   ttr?: { extraSacrifice: number }; // Transition to Retirement: extra pre-tax sacrifice/yr from preservation age → retirement, take-home held by a tax-free TTR pension
+  lumpSum?: { atAge: number; amount: number }; // one-off tax-free super withdrawal at an age (spent), capped at the accessible super balance then
   investmentProperties?: PropertyDetail[]; // income-producing properties (source of truth)
   investmentProperty?: PropertyDetail; // DEPRECATED legacy single property — read via getInvestmentProperties()
   // Which optional sections the user has explicitly answered in the wizard (incl.
@@ -312,6 +313,7 @@ export interface YearBreakdown {
   rentCost: number; // rent paid this year after selling up (0 otherwise)
   mortgageCost: number;
   mortgageCleared: number; // one-off super lump sum used to clear the home loan
+  lumpSum: number; // one-off tax-free lump sum withdrawn from super this year (spent)
   // Investment property sale
   propertyProceeds: number; // net proceeds added to outside super
   propertyCgt: number; // CGT paid on the sale

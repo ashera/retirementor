@@ -61,6 +61,7 @@ export function yearFlow(row: YearRow): YearFlow {
     },
     { key: "proceeds", label: "Home / property sale", amount: proceeds },
     { key: "loan", label: "Home loan cleared from super", amount: -b.mortgageCleared },
+    { key: "lumpSum", label: "Lump sum withdrawn from super", amount: -(b.lumpSum ?? 0) },
     { key: "outsideTax", label: "Tax on savings earnings", amount: -b.outsideTax },
   ];
 

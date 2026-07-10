@@ -166,7 +166,17 @@ export default function WhatIfView({
     return sp ? { ...DEFAULT_PLAN, ...sp.data } : current;
   }, [current, baselineId, savedPlans]);
 
-  const catalog = useMemo(() => (baseline ? buildStrategyCatalog(baseline) : []), [baseline]);
+  const baseRes = useMemo(() => (baseline ? simulate(baseline, config) : null), [baseline, config]);
+  // Projected total super at an age (start-of-year), so the lump-sum lever can cap
+  // its slider/note at the balance that will be there.
+  const superAtAge = useMemo(() => {
+    const byAge = new Map(baseRes?.rows.map((r) => [r.age, r.totalSuper]) ?? []);
+    return (age: number) => byAge.get(Math.round(age)) ?? 0;
+  }, [baseRes]);
+  const catalog = useMemo(
+    () => (baseline ? buildStrategyCatalog(baseline, { superAtAge }) : []),
+    [baseline, superAtAge],
+  );
 
   // Switching the baseline resets the toggles (its catalog differs). This is an
   // explicit handler, not an effect, so restoring a saved selection on mount
@@ -183,7 +193,6 @@ export default function WhatIfView({
     [baseline, catalog, active, values],
   );
 
-  const baseRes = useMemo(() => (baseline ? simulate(baseline, config) : null), [baseline, config]);
   const compRes = useMemo(() => (composed ? simulate(composed, config) : null), [composed, config]);
 
   // Monte Carlo success %. A FIXED seed means baseline and composed run against the

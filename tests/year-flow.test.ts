@@ -47,6 +47,7 @@ const eventful: Record<string, RetirementPlan> = {
   "sell-property": single({ investmentProperties: [{ ...prop, strategy: "sell", sellAtAge: 70 }] }),
   downsize: apply(single({ people: [{ currentAge: 64, superBalance: 400_000, salary: 90_000, voluntaryConcessional: 0, voluntaryNonConcessional: 0 }], retirementAge: 65, home: { value: 1_200_000, growthReal: 0 } }), "downsize", { age: 70, newValue: 700_000, toSuper: 200_000 }),
   "clear-mortgage": apply(single({ mortgage: { type: "principal_interest", balance: 180_000, interestRate: 6, annualRepayment: 16_000, payoffAge: 78, strategy: "carry" } }), "clear-mortgage"),
+  "lump-sum": single({ lumpSum: { atAge: 72, amount: 90_000 } }),
 };
 
 describe("Year-flow waterfall reconciliation", () => {

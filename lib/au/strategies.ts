@@ -147,8 +147,14 @@ export function resolveValues(card: StrategyCard, overrides?: Record<string, num
   return { ...defaultValues(card), ...(overrides ?? {}) };
 }
 
-/** Build the strategy catalog applicable to a baseline plan. */
-export function buildStrategyCatalog(plan: RetirementPlan): StrategyCard[] {
+/** Build the strategy catalog applicable to a baseline plan. `opts.superAtAge`
+ *  (when supplied — the board passes it from the baseline simulation) returns the
+ *  projected total super at an age, so a lump-sum lever can cap its slider and
+ *  note at the balance that will actually be there. */
+export function buildStrategyCatalog(
+  plan: RetirementPlan,
+  opts?: { superAtAge?: (age: number) => number },
+): StrategyCard[] {
   const cards: StrategyCard[] = [];
   const oldest = maxCurrentAge(plan);
   const working = oldest < plan.retirementAge;
@@ -368,6 +374,56 @@ export function buildStrategyCatalog(plan: RetirementPlan): StrategyCard[] {
           `and has to stretch over a shorter retirement.`;
       },
       apply: (p, v) => ({ ...p, retirementAge: v.age }),
+    });
+  }
+
+  // Take a one-off lump sum out of super at a chosen age (tax-free from 60), for a
+  // big expense. The slider is capped at the projected balance when available; the
+  // engine hard-caps it regardless, so it can never exceed what's there.
+  {
+    const superAtAge = opts?.superAtAge;
+    const minAge = Math.max(60, Math.min(plan.lifeExpectancy - 1, plan.retirementAge));
+    cards.push({
+      id: "lump-sum",
+      group: "timing",
+      label: "Take a lump sum",
+      blurb:
+        "Withdraw a one-off amount from super at a chosen age — a car, a renovation, a big trip, helping the kids. It's tax-free once you're 60, but it's spent, so it steps down what's left to fund the rest of retirement. Capped at your super balance at that age.",
+      params: [
+        {
+          key: "age",
+          label: "At age",
+          min: minAge,
+          max: plan.lifeExpectancy,
+          step: 1,
+          default: Math.min(plan.lifeExpectancy, Math.max(minAge, plan.retirementAge + 5)),
+          suffix: "yrs",
+        },
+        {
+          key: "amount",
+          label: "Amount",
+          min: 0,
+          max: 1_000_000,
+          step: 5_000,
+          prefix: "$",
+          default: 50_000,
+          // Can't take more than the super projected to be there at the chosen age.
+          dynamicMax: (v) => (superAtAge ? Math.max(0, superAtAge(v.age ?? minAge)) : Infinity),
+        },
+      ],
+      note: (v) => {
+        const bal = superAtAge ? Math.round(superAtAge(v.age ?? minAge)) : null;
+        const take = bal != null ? Math.min(v.amount, bal) : v.amount;
+        const balPart =
+          bal != null
+            ? ` Your super is projected to be about ${fmtCurrency(bal)} then, so you'd take ${fmtCurrency(take)}${take < v.amount ? " (capped at the balance)" : ""}.`
+            : "";
+        return (
+          `Take ${fmtCurrency(v.amount)} out of super at age ${v.age}, tax-free (you're 60+).${balPart} ` +
+          `It's a one-off you spend, so your balance — and how long it lasts — steps down from there.`
+        );
+      },
+      apply: (p, v) => ({ ...p, lumpSum: { atAge: v.age, amount: v.amount } }),
     });
   }
 

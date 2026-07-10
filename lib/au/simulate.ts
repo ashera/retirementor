@@ -100,6 +100,9 @@ export function simulate(
   // (non-homeowner means test + ongoing rent) from `atAge`.
   const sellRent = plan.home?.sellAndRent;
   let soldHome = false;
+  // Optional one-off lump sum withdrawn (and spent) from super at a chosen age.
+  const lumpSum = plan.lumpSum;
+  let lumpSumTaken = false;
   // The (exempt) home value tracked for the net-worth view: the current value
   // until a downsize (→ the smaller home) or a sale (→ 0). Homeowners without a
   // stated value get the same default the downsize lever assumes. It appreciates
@@ -296,6 +299,7 @@ export function simulate(
           rentCost: 0,
           mortgageCost: 0,
           mortgageCleared: 0,
+          lumpSum: 0,
           propertyProceeds: 0,
           propertyCgt: 0,
           homeProceeds: 0,
@@ -368,6 +372,24 @@ export function simulate(
       accessibleSuper -= mortgage.balance;
       mortgageCleared = true;
       mortgageClearedNow = mortgage.balance;
+    }
+
+    // One-off lump sum withdrawn from super at a chosen age. Only accessible super
+    // (preservation age 60+) can be drawn, so it's tax-free; HARD-CAPPED at the
+    // accessible balance so it can never exceed what's actually there. It's spent
+    // (leaves the portfolio) and lowers assessable assets for the Age Pension below.
+    let lumpSumNow = 0;
+    if (lumpSum && !lumpSumTaken && oldest >= lumpSum.atAge && accessibleSuper > EPS) {
+      const take = Math.min(Math.max(0, lumpSum.amount), accessibleSuper);
+      if (take > 0) {
+        const ratio = take / accessibleSuper;
+        accessibleIdx.forEach((i) => {
+          balances[i] -= balances[i] * ratio;
+        });
+        accessibleSuper -= take;
+        lumpSumNow = take;
+      }
+      lumpSumTaken = true;
     }
 
     // Steady-state spend plus any ongoing loan cost. A repayment/interest bill is
@@ -582,6 +604,7 @@ export function simulate(
         rentCost: rentExpense,
         mortgageCost,
         mortgageCleared: mortgageClearedNow,
+        lumpSum: lumpSumNow,
         propertyProceeds,
         propertyCgt,
         homeProceeds: homeProceedsThisYear,

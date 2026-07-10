@@ -260,6 +260,27 @@ describe("What-If strategies", () => {
     expect(totalOutsideTax(toSuper)).toBeLessThan(savingsTax);
   });
 
+  it("lump sum: taken once at the chosen age, hard-capped at the super balance", () => {
+    const b = base({ people: [{ currentAge: 60, superBalance: 500_000, salary: 0, voluntaryConcessional: 0, voluntaryNonConcessional: 0 }], retirementAge: 60, outsideSuper: 100_000, targetSpending: 45_000 });
+    // The lever is in the catalog, and applying it sets plan.lumpSum.
+    expect(buildStrategyCatalog(b).some((c) => c.id === "lump-sum")).toBe(true);
+    const applied = applyOne(b, "lump-sum", { age: 68, amount: 80_000 });
+    expect(applied.lumpSum).toEqual({ atAge: 68, amount: 80_000 });
+
+    const rows = simulate({ ...b, lumpSum: { atAge: 68, amount: 80_000 } }, cfg).rows;
+    const taken = rows.filter((r) => r.breakdown.lumpSum > 0);
+    expect(taken.length).toBe(1); // one-off
+    expect(taken[0].age).toBe(68);
+    expect(taken[0].breakdown.lumpSum).toBeCloseTo(80_000, 0);
+    // It's spent: end wealth drops by at least the lump sum.
+    const end = (p: RetirementPlan) => simulate(p, cfg).rows.at(-1)!.total;
+    expect(end(b) - end({ ...b, lumpSum: { atAge: 68, amount: 80_000 } })).toBeGreaterThan(80_000 - 1);
+    // Hard cap: asking for far more than the balance withdraws only what's there.
+    const capped = simulate({ ...b, lumpSum: { atAge: 88, amount: 5_000_000 } }, cfg).rows.find((r) => r.age === 88)!;
+    expect(capped.breakdown.lumpSum).toBeGreaterThan(0);
+    expect(capped.breakdown.lumpSum).toBeLessThanOrEqual(capped.totalSuper + 1);
+  });
+
   it("selling an investment property reallocates net worth (no windfall)", () => {
     const b = base({
       people: [{ currentAge: 66, superBalance: 300_000, salary: 0, voluntaryConcessional: 0, voluntaryNonConcessional: 0 }],
