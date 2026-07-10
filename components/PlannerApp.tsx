@@ -718,7 +718,7 @@ export default function PlannerApp({
           </Link>
           <Link
             href="/what-if"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-panel-2 px-3 py-1.5 text-sm font-medium text-slate-200 transition hover:border-accent/50 hover:text-white"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-accent/40 bg-accent/10 px-3 py-1.5 text-sm font-semibold text-accent transition hover:bg-accent/20"
           >
             🎛 What if…
             <span aria-hidden>→</span>
@@ -809,6 +809,29 @@ export default function PlannerApp({
           }
         />
       </div>
+
+      {/* Flagship feature invite — users told us they didn't realise What-If
+          exists, so make it a prominent, unmissable call-out here (shown to
+          everyone with a plan, signed in or not). */}
+      <Link
+        href="/what-if"
+        onClick={() => track("What-if promo clicked")}
+        className="group mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-accent/40 bg-accent/[0.07] px-5 py-4 transition hover:border-accent/70 hover:bg-accent/10"
+      >
+        <div className="flex items-start gap-3">
+          <span className="text-2xl" aria-hidden>🎛</span>
+          <div>
+            <div className="font-semibold text-white">What if you changed something?</div>
+            <div className="text-sm text-muted">
+              Try strategies — downsize, retire later, salary-sacrifice, work part-time and more — and watch how
+              your balance, income and how long it lasts respond. It never touches this plan.
+            </div>
+          </div>
+        </div>
+        <span className="shrink-0 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-ink transition group-hover:brightness-110">
+          Try What-If →
+        </span>
+      </Link>
 
       {/* Withdrawal-rate diagnostic */}
       <WithdrawalRateCard result={result} plan={plan} successPct={successPct} />
