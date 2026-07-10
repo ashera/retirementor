@@ -946,8 +946,16 @@ function StrategyCardRow({
           )}
           {card.note && (
             <div className="flex items-start gap-3 rounded-xl border border-accent/30 bg-accent/[0.06] px-4 py-3 text-xs leading-relaxed text-slate-200 shadow-sm ring-1 ring-inset ring-white/5">
-              {/* Placeholder icon — swap for the supplied image once provided. */}
-              <span className="mt-0.5 shrink-0 text-lg leading-none" aria-hidden>💡</span>
+              {/* RetireWiz mark. The artwork sits on solid black — mix-blend
+                  'lighten' drops that against the card, like the header logo. */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/whatif-icon.png"
+                alt=""
+                aria-hidden
+                className="mt-0.5 h-9 w-9 shrink-0"
+                style={{ mixBlendMode: "lighten" }}
+              />
               <span>{card.note(values)}</span>
             </div>
           )}
