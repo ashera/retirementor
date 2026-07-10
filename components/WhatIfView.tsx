@@ -945,9 +945,11 @@ function StrategyCardRow({
             </div>
           )}
           {card.note && (
-            <p className="rounded-lg border border-line bg-panel-2 px-3 py-2 text-xs text-slate-300">
-              {card.note(values)}
-            </p>
+            <div className="flex items-start gap-3 rounded-xl border border-accent/30 bg-accent/[0.06] px-4 py-3 text-xs leading-relaxed text-slate-200 shadow-sm ring-1 ring-inset ring-white/5">
+              {/* Placeholder icon — swap for the supplied image once provided. */}
+              <span className="mt-0.5 shrink-0 text-lg leading-none" aria-hidden>💡</span>
+              <span>{card.note(values)}</span>
+            </div>
           )}
           {sustainable && (
             <div className="rounded-lg border border-accent/30 bg-accent/5 px-3 py-2 text-xs">
