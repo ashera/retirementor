@@ -394,6 +394,14 @@ export default function WhatIfView({
           Turn retirement strategies on and off and see the effect on your super, your income, and
           how long it lasts. Each toggle shows its own impact; the numbers up top show them combined.
         </p>
+        <p className="mt-3 flex max-w-2xl items-start gap-2 rounded-lg border border-line bg-panel-2 px-3 py-2 text-sm text-slate-300">
+          <span aria-hidden>🧪</span>
+          <span>
+            This is a safe sandbox — experimenting here <strong className="text-white">never changes your saved
+            plan</strong>. It just starts from it. Like a combination? <strong className="text-white">Save it as a
+            scenario</strong> below to keep a separate copy.
+          </span>
+        </p>
       </header>
 
       {/* Headline metrics */}
@@ -612,6 +620,9 @@ export default function WhatIfView({
             {saving ? "Saving…" : "Save as scenario"}
           </button>
         </div>
+        <p className="mt-2 text-xs text-muted">
+          Saves a separate copy — your dashboard plan stays exactly as it is.
+        </p>
         {!signedIn && <p className="mt-2 text-xs text-muted">Sign in to save scenarios to your account.</p>}
         {saveMsg && <p className="mt-2 text-xs text-accent">{saveMsg}</p>}
       </div>
