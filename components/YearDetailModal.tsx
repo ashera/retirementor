@@ -73,6 +73,12 @@ export default function YearDetailModal({
   const b = row.breakdown;
   // Signed drivers that sum EXACTLY from opening to closing (the waterfall).
   const flow = yearFlow(row);
+  // Net worth = these savings PLUS illiquid home/property equity. Shown as a
+  // separate note (not in the savings waterfall) so the year opened from the
+  // net-worth chart reconciles, without breaking the savings tie-out.
+  const nwHome = Math.max(0, row.homeEquity ?? 0);
+  const nwProp = Math.max(0, row.propertyEquity ?? 0);
+  const nwTotal = flow.opening + nwHome + nwProp;
   const flowSub = (key: string, amount: number): string | undefined => {
     switch (key) {
       case "growth":
@@ -218,6 +224,16 @@ export default function YearDetailModal({
                 </span>
               </span>
             </div>
+
+            {(nwHome > 0 || nwProp > 0) && (
+              <p className="mt-2 border-t border-line pt-2 text-[11px] leading-snug text-muted">
+                This tracks your <span className="text-slate-300">savings</span> (super + outside). Your
+                net worth also counts home equity ({fmtCurrency(nwHome)})
+                {nwProp > 0 ? ` and investment property (${fmtCurrency(nwProp)})` : ""} — about{" "}
+                <span className="text-slate-300">{fmtCurrency(nwTotal)}</span> all up at the start of this
+                year. Those move with property prices, so they sit outside this money flow.
+              </p>
+            )}
           </div>
 
           {/* What the outside-super pool is (shown when there's a balance) */}
