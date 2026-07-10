@@ -84,6 +84,23 @@ alter table feedback add column if not exists notified_at timestamptz;
 create index if not exists feedback_created_idx on feedback (created_at desc);
 create index if not exists feedback_unnotified_idx on feedback (created_at) where notified_at is null;
 
+-- Adviser / accountant early-access waitlist — demand validation for a B2B
+-- (client-facing modelling) offering. Captured from the /for-advisers page.
+create table if not exists adviser_leads (
+  id uuid primary key default gen_random_uuid(),
+  email text not null,
+  name text,
+  firm text,
+  role text,              -- financial adviser | accountant | mortgage broker | other
+  practice_size text,     -- solo | 2-5 | 6-20 | 20+
+  would_pay text,         -- rough willingness-to-pay signal
+  message text,
+  user_id uuid references users(id) on delete set null,
+  user_agent text,
+  created_at timestamptz not null default now()
+);
+create index if not exists adviser_leads_created_idx on adviser_leads (created_at desc);
+
 -- Effective-dated reference-data versions (one per financial year).
 create table if not exists ref_data_versions (
   id uuid primary key default gen_random_uuid(),

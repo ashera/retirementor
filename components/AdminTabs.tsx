@@ -1,15 +1,17 @@
 import Link from "next/link";
 
-type Tab = "review" | "parameters" | "sources" | "tests" | "scenarios" | "moneysmart" | "users" | "media" | "feedback";
+type Tab = "review" | "parameters" | "sources" | "tests" | "scenarios" | "moneysmart" | "users" | "media" | "feedback" | "advisers";
 
 export default function AdminTabs({
   active,
   staleCount = 0,
   feedbackCount = 0,
+  adviserCount = 0,
 }: {
   active: Tab;
   staleCount?: number;
   feedbackCount?: number;
+  adviserCount?: number;
 }) {
   const tab = (href: string, key: Tab, label: string, badge: number) => {
     const isActive = active === key;
@@ -46,6 +48,7 @@ export default function AdminTabs({
       {tab("/admin/moneysmart", "moneysmart", "Moneysmart", 0)}
       {tab("/admin/users", "users", "Users", 0)}
       {tab("/admin/feedback", "feedback", "Feedback", feedbackCount)}
+      {tab("/admin/advisers", "advisers", "Advisers", adviserCount)}
       {tab("/admin/media", "media", "Media", 0)}
     </nav>
   );
