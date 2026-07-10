@@ -111,7 +111,7 @@ export default function RetirementChart({
   wageInflationPct?: number;
   cpiPct?: number;
 }) {
-  const { retirementAge, depletedAge } = result;
+  const { retirementAge, partnerRetirementAge, depletedAge } = result;
 
   // The engine expresses accumulation in wage-indexed dollars and re-bases the
   // stock to CPI dollars at retirement (retiree spending and the Age Pension both
@@ -227,13 +227,27 @@ export default function RetirementChart({
           stroke="#f59e0b"
           strokeDasharray="6 4"
           label={{
-            value: `Retire ${retirementAge}`,
+            value: partnerRetirementAge != null ? `You ${retirementAge}` : `Retire ${retirementAge}`,
             position: "insideTop",
             fill: "#f59e0b",
             fontSize: 11,
             dy: 4,
           }}
         />
+        {partnerRetirementAge != null && (
+          <ReferenceLine
+            x={partnerRetirementAge}
+            stroke="#38bdf8"
+            strokeDasharray="6 4"
+            label={{
+              value: `Partner ${partnerRetirementAge}`,
+              position: "insideTop",
+              fill: "#38bdf8",
+              fontSize: 11,
+              dy: 40,
+            }}
+          />
+        )}
         <ReferenceLine
           x={result.agePensionAge}
           stroke="#a78bfa"

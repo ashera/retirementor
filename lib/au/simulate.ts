@@ -13,7 +13,15 @@
 
 import { minDrawdownRate, type EngineConfig } from "./config";
 import { agePension, deemedIncome } from "./agePension";
-import { getInvestmentProperties, spendingForAge, startingSuperBalances } from "./types";
+import {
+  getInvestmentProperties,
+  hasStaggeredRetirement,
+  householdRetirementOffset,
+  personRetirementAge,
+  personRetirementOffset,
+  spendingForAge,
+  startingSuperBalances,
+} from "./types";
 import { mortgageActiveAtAge, mortgageAnnualCost } from "./mortgage";
 import { incomeTax, seniorIncomeTax } from "./tax";
 import {
@@ -23,7 +31,7 @@ import {
   netSaleProceeds,
   propertyValueAt,
 } from "./property";
-import type { Phase, RetirementPlan, SimResult, YearBreakdown, YearRow } from "./types";
+import type { Person, Phase, RetirementPlan, SimResult, YearBreakdown, YearRow } from "./types";
 
 const EPS = 1e-6;
 
@@ -60,10 +68,13 @@ export function simulate(
 
   const startOldest = Math.max(...plan.people.map((p) => p.currentAge));
   const horizon = Math.max(0, Math.round(plan.lifeExpectancy - startOldest));
-  const retireOffset = Math.max(
-    0,
-    Math.round(plan.retirementAge - plan.people[0].currentAge),
-  );
+  // Per-person retirement offsets (years from now). The household enters the
+  // retirement/spending phase at the EARLIEST of them; a partner retiring later
+  // keeps earning and contributing through the gap (their salary offsets the
+  // drawdown). With a single shared retirement age these all coincide, so the
+  // whole staggered path collapses to the original single-boundary behaviour.
+  const retireOffsets = plan.people.map((_, i) => personRetirementOffset(plan, i));
+  const earliestOffset = householdRetirementOffset(plan);
 
   const rows: YearRow[] = [];
   let depletedAge: number | null = null;
@@ -101,17 +112,65 @@ export function simulate(
   for (let t = 0; t <= horizon; t++) {
     const ages = plan.people.map((p) => p.currentAge + t);
     const oldest = Math.max(...ages);
-    const working = t < retireOffset;
+    // Household accumulation phase: BEFORE anyone has retired. Once the first
+    // person retires the household is "in retirement" even if a partner still
+    // works (handled per-person inside the retirement branch below).
+    const accumPhase = t < earliestOffset;
 
     // This year's returns (constant mean, or a Monte Carlo draw).
     const nom = nominalReturns ? (nominalReturns[t] ?? plan.investmentReturn) : plan.investmentReturn;
-    // Deflate by wage inflation while working (pre-retirement), CPI once retired.
-    const deflator = working ? wageInflation : cpi;
+    // Deflate by wage inflation pre-retirement, CPI from the household boundary on.
+    const deflator = accumPhase ? wageInflation : cpi;
     const realReturn = realRate(nom, deflator); // outside super (no super fee)
     // Super returns are net of the % investment/admin fee. Accumulation also pays
     // 15% earnings tax; pension-phase super is tax-free.
     const superAccumReturn = realRate(nom * (1 - config.superEarningsTaxAccumulation) - feePct, deflator);
     const superPensionReturn = realRate(nom - feePct, deflator);
+
+    // Per-person accumulation for a still-working member. `scale` converts a
+    // wage-real-constant salary into this year's CPI-real terms: 1 during the
+    // pre-retirement accumulation phase, and ((1+wage)/(1+cpi))^t during a
+    // staggered gap (after the household's wage→CPI boundary), so a partner who
+    // keeps working carries the same real wage growth their contributions had
+    // before the boundary. Returns the new balance and ledger deltas.
+    const superHalf = Math.pow(1 + superAccumReturn, 0.5);
+    const contribute = (p: Person, opening: number, scale: number, ttrEligible: boolean) => {
+      const salary = p.salary * scale;
+      const cap = config.concessionalCap * scale;
+      const nccCap = config.nonConcessionalCap * scale;
+      const div293Threshold = config.div293Threshold * scale;
+      const concessional = Math.min(salary * config.sgRate + p.voluntaryConcessional * scale, cap);
+      const sacrificed = Math.max(0, concessional - salary * config.sgRate);
+      const taxable = Math.max(0, salary - sacrificed);
+      const takeHome = taxable - incomeTax(taxable);
+      let ttrBenefit = 0;
+      if (ttrEligible && plan.ttr && plan.ttr.extraSacrifice > 0) {
+        const ttrSacrificed = Math.min(plan.ttr.extraSacrifice * scale, Math.max(0, cap - concessional));
+        if (ttrSacrificed > 0) {
+          const taxSaved = incomeTax(taxable) - incomeTax(Math.max(0, taxable - ttrSacrificed));
+          ttrBenefit = taxSaved - ttrSacrificed * config.contributionsTax;
+        }
+      }
+      const ncc = Math.min(p.voluntaryNonConcessional * scale, nccCap);
+      const div293Income = salary + concessional;
+      const taxed293 = Math.min(concessional, Math.max(0, div293Income - div293Threshold));
+      const extra293 = taxed293 * config.div293ExtraTaxRate;
+      const added = concessional * (1 - config.contributionsTax) - extra293 + ncc;
+      const fee = fixedAdmin + insurance;
+      const net = added - fee + ttrBenefit;
+      const newBalance = opening * (1 + superAccumReturn) + net * superHalf;
+      return {
+        newBalance,
+        contribGross: concessional,
+        contribTax: concessional * config.contributionsTax + extra293,
+        contribNet: added,
+        feesPaid: fee,
+        earningsTax: opening * (superPensionReturn - superAccumReturn),
+        superGrowth: newBalance - opening - net,
+        takeHome,
+        ttrBenefit,
+      };
+    };
 
     // RG 276 two-stage boundary. The accumulation trajectory is expressed in
     // WAGE-deflated today's dollars; everything from retirement onward is
@@ -122,8 +181,8 @@ export function simulate(
     // years, so nominal/(1+wage)ⁿ becomes nominal/(1+cpi)ⁿ by scaling the whole
     // pool by ((1+wage)/(1+cpi))ⁿ. It also makes the means test assess the same
     // CPI-real balance the retiree actually holds. (No-op when wage == cpi.)
-    if (t === retireOffset && retireOffset > 0) {
-      const rebase = Math.pow((1 + wageInflation / 100) / (1 + cpi / 100), retireOffset);
+    if (t === earliestOffset && earliestOffset > 0) {
+      const rebase = Math.pow((1 + wageInflation / 100) / (1 + cpi / 100), earliestOffset);
       for (let i = 0; i < balances.length; i++) balances[i] *= rebase;
       outside *= rebase;
     }
@@ -176,7 +235,7 @@ export function simulate(
     const startSuper = sum(balances);
     const startOutside = outside;
 
-    if (working) {
+    if (accumPhase) {
       // --- Accumulation: add contributions (net of 15%), then grow. ---
       let contribGross = 0;
       let contribTax = 0;
@@ -186,56 +245,17 @@ export function simulate(
       let feesPaid = 0;
       let takeHome = 0; // net cash from salary after income tax and pre-tax sacrifice
       let ttrBenefit = 0; // net super gained from a Transition-to-Retirement swap this year
-      // Contributions arrive through the year, so grow ~half a year on average.
-      const superHalf = Math.pow(1 + superAccumReturn, 0.5);
       plan.people.forEach((p, i) => {
-        const concessional = Math.min(
-          p.salary * config.sgRate + p.voluntaryConcessional,
-          config.concessionalCap,
-        );
-        // Take-home pay: salary sacrifice (the concessional above compulsory SG,
-        // within the cap) is pre-tax, so it lowers taxable income — and thus your
-        // pay packet. Income tax uses the resident scale (no Medicare levy, matching
-        // the rest of the model). SG is employer-paid on top, so it doesn't reduce pay.
-        const sacrificed = Math.max(0, concessional - p.salary * config.sgRate);
-        const taxable = Math.max(0, p.salary - sacrificed);
-        takeHome += taxable - incomeTax(taxable);
-
-        // Transition to Retirement swap (age ≥ preservation age, still working):
-        // an extra pre-tax sacrifice is replaced by a tax-free TTR pension, so
-        // take-home is unchanged (above) while the net gain to super is the income
-        // tax saved less the 15% contributions tax — the marginal-vs-15% arbitrage.
-        // Bounded by the remaining concessional-cap room. Can be negative if the
-        // marginal rate is under 15% (then TTR isn't worthwhile).
-        let ttrBenefitI = 0;
-        if (plan.ttr && i === 0 && ages[i] >= preservationAge && plan.ttr.extraSacrifice > 0) {
-          const ttrSacrificed = Math.min(plan.ttr.extraSacrifice, Math.max(0, config.concessionalCap - concessional));
-          if (ttrSacrificed > 0) {
-            const taxSaved = incomeTax(taxable) - incomeTax(Math.max(0, taxable - ttrSacrificed));
-            ttrBenefitI = taxSaved - ttrSacrificed * config.contributionsTax;
-          }
-        }
-        ttrBenefit += ttrBenefitI;
-
-        const ncc = Math.min(p.voluntaryNonConcessional, config.nonConcessionalCap);
-        // Division 293: an extra 15% on the concessional contributions that push
-        // income (salary + concessional) over the high-income threshold.
-        const div293Income = p.salary + concessional;
-        const taxed293 = Math.min(concessional, Math.max(0, div293Income - config.div293Threshold));
-        const extra293 = taxed293 * config.div293ExtraTaxRate;
-        const added = concessional * (1 - config.contributionsTax) - extra293 + ncc;
-        const fee = fixedAdmin + insurance; // fixed admin + insurance while working
-        const net = added - fee + ttrBenefitI;
-        const opening = balances[i];
-        // Opening grows a full year; this year's net contribution grows half a year.
-        balances[i] = opening * (1 + superAccumReturn) + net * superHalf;
-        contribGross += concessional;
-        contribTax += concessional * config.contributionsTax + extra293;
-        contribNet += added;
-        feesPaid += fee;
-        superGrowth += balances[i] - opening - net;
-        // Isolate the earnings tax (vs a tax-free, same-fee pool).
-        earningsTax += opening * (superPensionReturn - superAccumReturn);
+        const r = contribute(p, balances[i], 1, i === 0 && ages[i] >= preservationAge);
+        balances[i] = r.newBalance;
+        contribGross += r.contribGross;
+        contribTax += r.contribTax;
+        contribNet += r.contribNet;
+        feesPaid += r.feesPaid;
+        superGrowth += r.superGrowth;
+        earningsTax += r.earningsTax;
+        takeHome += r.takeHome;
+        ttrBenefit += r.ttrBenefit;
       });
       const savings = plan.annualOutsideSavings;
       const outsideHalf = Math.pow(1 + realReturn, 0.5);
@@ -287,15 +307,46 @@ export function simulate(
       continue;
     }
 
-    // --- Retirement year ---
-    if (t === retireOffset) {
+    // --- Retirement year (at least one person has retired) ---
+    if (t === earliestOffset) {
       superAtRetirement = startSuper;
       totalAtRetirement = startSuper + startOutside;
     }
 
+    // A still-working partner (staggered retirement): keep accumulating their
+    // super and bank their salary. Their take-home offsets the household's
+    // drawdown; their gross salary is assessable for the Age Pension income test.
+    // `gapScale` re-expresses their wage-real salary in this year's CPI-real
+    // terms (see contribute()). With a shared retirement age no one is working
+    // here, so all of this is a no-op and the original path is unchanged.
+    const gapScale = Math.pow((1 + wageInflation / 100) / (1 + cpi / 100), t);
+    let workContribGross = 0;
+    let workContribTax = 0;
+    let workContribNet = 0;
+    let workFees = 0;
+    let workSuperGrowth = 0;
+    let workEarningsTax = 0;
+    let workTakeHome = 0; // still-working partners' net salary → offsets spending
+    let workGrossSalary = 0; // gross → Age Pension income test
+    plan.people.forEach((p, i) => {
+      if (t >= retireOffsets[i]) return; // already retired — drawn down below
+      const r = contribute(p, balances[i], gapScale, i === 0 && ages[i] >= preservationAge);
+      balances[i] = r.newBalance;
+      workContribGross += r.contribGross;
+      workContribTax += r.contribTax;
+      workContribNet += r.contribNet;
+      workFees += r.feesPaid;
+      workSuperGrowth += r.superGrowth;
+      workEarningsTax += r.earningsTax;
+      workTakeHome += r.takeHome;
+      workGrossSalary += p.salary * gapScale;
+    });
+
+    // Only RETIRED members at/over preservation age can draw down (and are
+    // assessed as financial assets); a partner still working keeps accumulating.
     const accessibleIdx = plan.people
       .map((_, i) => i)
-      .filter((i) => ages[i] >= preservationAge);
+      .filter((i) => t >= retireOffsets[i] && ages[i] >= preservationAge);
     let accessibleSuper = accessibleIdx.reduce((s, i) => s + balances[i], 0);
 
     // Clear-at-retirement: once retired, pay the loan off from super as soon as
@@ -372,7 +423,9 @@ export function simulate(
     const workTax = grossWork > 0 ? workers * seniorIncomeTax(grossWork / workers, plan.household) : 0;
     const netWork = grossWork - workTax;
     const assessableWork = Math.max(0, grossWork - 7_800 * workers);
-    const assessableOther = rentAssessable + assessableWork;
+    // A still-working partner's salary is ordinary assessable income for the
+    // pension income test (no Work Bonus — that's for pension-age workers).
+    const assessableOther = rentAssessable + assessableWork + workGrossSalary;
 
     // Age Pension (household level, from pension age). Financial assets are deemed;
     // an investment property's equity is assessable but NOT deemed, and its rent is
@@ -410,9 +463,10 @@ export function simulate(
       }
     }
 
-    // Rent offsets the spending the household must fund from super/outside; any
-    // surplus income (pension + rent beyond spending) is saved to outside super.
-    const externalIncome = agePensionAmt + rentCash + netWork;
+    // External income offsets the spending the household must fund from
+    // super/outside; any surplus (income beyond spending — e.g. a working
+    // partner's salary covering the retiree's needs) is saved to outside super.
+    const externalIncome = agePensionAmt + rentCash + netWork + workTakeHome;
     const privateNeed = Math.max(0, spending - externalIncome);
     if (externalIncome > spending) outside += externalIncome - spending;
 
@@ -442,9 +496,12 @@ export function simulate(
 
     // Deduct the fixed admin fee (no insurance in retirement), then grow. Pension-
     // phase super (≥ preservation age) is tax-free; both are net of the % fee.
-    let superGrowth = 0;
-    let feesPaid = 0;
+    // Still-working members were already grown (and fee'd) by contribute() above,
+    // so they carry their accumulation figures and are skipped here.
+    let superGrowth = workSuperGrowth;
+    let feesPaid = workFees;
     plan.people.forEach((_, i) => {
+      if (t < retireOffsets[i]) return; // still working — handled by contribute()
       const fee = Math.min(fixedAdmin, Math.max(0, balances[i]));
       balances[i] -= fee;
       feesPaid += fee;
@@ -463,7 +520,7 @@ export function simulate(
     // is exactly when a downsizer contribution into super pays off. (Accumulation-
     // phase outside earnings are left untaxed, as before.)
     let outsideTax = 0;
-    if (!working) {
+    if (!accumPhase) {
       const outsideEarnings = Math.max(0, outside * (nom / 100)); // nominal, today's $
       if (outsideEarnings > 0) {
         const workPer = grossWork / workers;
@@ -487,18 +544,18 @@ export function simulate(
         openingOutside: startOutside,
         closingSuper: sum(balances),
         closingOutside: outside,
-        contribGross: 0,
-        contribTax: 0,
-        contribNet: 0,
+        contribGross: workContribGross,
+        contribTax: workContribTax,
+        contribNet: workContribNet,
         savings: 0,
-        salaryIncome: 0,
-        takeHome: 0,
+        salaryIncome: workGrossSalary,
+        takeHome: workTakeHome,
         ttrBenefit: 0,
         workIncome: netWork,
         superGrowth,
         outsideGrowth,
         fees: feesPaid,
-        earningsTax: 0,
+        earningsTax: Math.max(0, workEarningsTax),
         outsideTax,
         agePension: agePensionAmt,
         pension: pensionBreakdown,
@@ -534,6 +591,7 @@ export function simulate(
   return {
     rows,
     retirementAge: plan.retirementAge,
+    partnerRetirementAge: hasStaggeredRetirement(plan) ? personRetirementAge(plan, 1) : null,
     agePensionAge: pensionAge,
     superAtRetirement,
     totalAtRetirement,

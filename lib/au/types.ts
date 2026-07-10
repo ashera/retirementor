@@ -10,6 +10,11 @@ export interface Person {
   salary: number; // gross annual salary (drives Super Guarantee)
   voluntaryConcessional: number; // annual salary-sacrifice / personal deductible contributions
   voluntaryNonConcessional: number; // annual after-tax contributions
+  // Couples only: the age THIS person retires. Person 0's retirement age is
+  // plan.retirementAge; a partner may retire at a different age. When unset, a
+  // partner retires at the same TIME as person 0 (so age-gap couples that never
+  // set this are unchanged from the single-retirement-age model).
+  retirementAge?: number;
 }
 
 // How retirement spending is modelled over time.
@@ -169,6 +174,40 @@ export function hasInvestmentProperty(plan: RetirementPlan): boolean {
   return getInvestmentProperties(plan).length > 0;
 }
 
+/**
+ * Years from the start of the projection until person `i` retires.
+ * Person 0 always uses plan.retirementAge. A partner with an explicit
+ * `retirementAge` retires at their own age; without one they default to
+ * retiring at the SAME TIME as person 0 — so a plan that never sets a partner
+ * retirement age behaves exactly as the old single-retirement-age model.
+ * Rounded to whole years to match the yearly simulation grid.
+ */
+export function personRetirementOffset(plan: RetirementPlan, i: number): number {
+  const primary = Math.max(0, Math.round(plan.retirementAge - plan.people[0].currentAge));
+  if (i === 0) return primary;
+  const ra = plan.people[i]?.retirementAge;
+  if (ra == null || !Number.isFinite(ra)) return primary;
+  return Math.max(0, Math.round(ra - plan.people[i].currentAge));
+}
+
+/** The household enters the retirement (spending) phase when the FIRST person
+ *  retires — i.e. the earliest per-person retirement offset. */
+export function householdRetirementOffset(plan: RetirementPlan): number {
+  return Math.min(...plan.people.map((_, i) => personRetirementOffset(plan, i)));
+}
+
+/** The age (their own) at which person `i` retires. */
+export function personRetirementAge(plan: RetirementPlan, i: number): number {
+  return plan.people[i].currentAge + personRetirementOffset(plan, i);
+}
+
+/** True when a couple has partners retiring at genuinely different times. */
+export function hasStaggeredRetirement(plan: RetirementPlan): boolean {
+  if (plan.people.length < 2) return false;
+  const first = personRetirementOffset(plan, 0);
+  return plan.people.some((_, i) => personRetirementOffset(plan, i) !== first);
+}
+
 /** Household spending for a given age, honouring the flat/staged mode. */
 export function spendingForAge(plan: RetirementPlan, age: number): number {
   if (plan.spendingMode !== "stages") return plan.targetSpending;
@@ -309,6 +348,9 @@ export interface YearRow {
 export interface SimResult {
   rows: YearRow[];
   retirementAge: number;
+  // A partner who retires at a different time (staggered retirement); null when
+  // there's no partner or both retire together. Drives a second chart marker.
+  partnerRetirementAge: number | null;
   agePensionAge: number; // from the active config (used for chart markers)
   superAtRetirement: number; // combined super when retirement begins
   totalAtRetirement: number; // total investable assets when retirement begins

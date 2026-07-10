@@ -15,6 +15,7 @@ import {
   DEFAULT_PLAN,
   getInvestmentProperties,
   hasInvestmentProperty,
+  personRetirementAge,
   type Household,
   type Person,
   type PropertyDetail,
@@ -490,7 +491,7 @@ export default function PlanWizard({
     body: (
       <div className="space-y-6">
         <Field
-          label="Retirement age"
+          label={isCouple ? "Your retirement age" : "Retirement age"}
           value={draft.retirementAge}
           onChange={(v) => patch({ retirementAge: v })}
           min={40}
@@ -502,6 +503,17 @@ export default function PlanWizard({
               : "Super is accessible from age 60."
           }
         />
+        {isCouple && (
+          <Field
+            label="Partner's retirement age"
+            value={draft.people[1]?.retirementAge ?? personRetirementAge(draft, 1)}
+            onChange={(v) => setPerson(1, "retirementAge")(v)}
+            min={40}
+            max={75}
+            suffix="yrs"
+            hint="Partners can retire at different ages. Whoever's still working keeps earning and paying into super, and their pay helps cover the household's spending until they retire too."
+          />
+        )}
 
         {/* Spending is set exclusively in the budget builder — one source of
             truth, so the wizard and budget can never disagree. */}
