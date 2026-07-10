@@ -1039,6 +1039,39 @@ export default function PlannerApp({
                   .
                 </p>
               )}
+
+              {(() => {
+                const ahead = Math.round(mc.aheadRate * 100);
+                const behind = 100 - ahead;
+                return (
+                  <div className="mt-3 rounded-xl border border-line bg-panel-2/50 p-3">
+                    <div className="mb-1.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5 text-xs">
+                      <span className="font-medium text-slate-300">
+                        How you finish vs your central projection
+                      </span>
+                      <span className="text-muted">
+                        projected ~{fmtCurrency(mc.centralTerminalBalance)} left at {plan.lifeExpectancy}
+                      </span>
+                    </div>
+                    <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-line">
+                      <div className="bg-emerald-500/70" style={{ width: `${ahead}%` }} />
+                      <div className="bg-amber-500/60" style={{ width: `${behind}%` }} />
+                    </div>
+                    <div className="mt-1.5 flex justify-between text-xs">
+                      <span className="text-emerald-400">Ahead in {ahead}% of runs</span>
+                      <span className="text-amber-400">Behind in {behind}%</span>
+                    </div>
+                    <p className="mt-1.5 text-xs text-muted">
+                      The ups and downs mean the typical run ends near{" "}
+                      {fmtCurrency(mc.medianTerminalBalance)}
+                      {mc.medianTerminalBalance < mc.centralTerminalBalance
+                        ? " — below the smooth-return line, which is why one central number flatters the plan"
+                        : ""}
+                      .
+                    </p>
+                  </div>
+                );
+              })()}
             </div>
           );
         })()}

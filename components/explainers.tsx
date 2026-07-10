@@ -528,6 +528,18 @@ export function LikelihoodExplainer({
         </div>
       )}
 
+      <div>
+        <h3 className="mb-1 font-semibold text-white">Ahead of or behind your plan</h3>
+        <p>
+          The <strong>ahead / behind</strong> bar compares each run&apos;s{" "}
+          <em>ending balance</em> with your central (smooth-return) projection.
+          Because of volatility drag, most runs finish a little below that single
+          line — so if you&apos;re only ahead in, say, 40% of runs, it&apos;s a
+          reminder that the one headline projection is on the optimistic side,
+          even when the plan still &lsquo;works&rsquo; most of the time.
+        </p>
+      </div>
+
       <p className="text-xs text-muted">
         The Age Pension is still a floor, so &lsquo;runs short&rsquo; means below
         your target lifestyle, not $0 income. Volatility is an assumption — a

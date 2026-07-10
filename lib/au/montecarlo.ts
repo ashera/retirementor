@@ -46,6 +46,9 @@ export interface MonteCarloResult {
   fan: FanPoint[]; // percentile balance paths by age
   medianDepletionAge: number | null; // median age money runs short among failures
   worstCaseDepletionAge: number | null; // 10th-percentile (early) depletion age
+  centralTerminalBalance: number; // deterministic ending balance at life expectancy (the central projection)
+  medianTerminalBalance: number; // typical (p50) ending balance across runs
+  aheadRate: number; // fraction of runs ending ahead of the central projection
 }
 
 function percentile(sortedAsc: number[], p: number): number {
@@ -102,11 +105,29 @@ export function runMonteCarlo(
 
   const depSorted = depletionAges.slice().sort((a, b) => a - b);
 
+  // "Ahead / behind your plan": compare each run's ending balance to the
+  // deterministic central projection (constant mean return every year). Because
+  // of volatility drag, the typical run usually finishes BELOW the smooth-return
+  // line — so this exposes how optimistic the single central estimate is.
+  const centralReturns = new Array(horizon + 1).fill(mean);
+  const central = simulate(plan, config, centralReturns);
+  const centralTerminalBalance = central.rows.length
+    ? central.rows[central.rows.length - 1].total
+    : 0;
+  const terminals = totalsByYear[horizon] ?? [];
+  const terminalsSorted = terminals.slice().sort((a, b) => a - b);
+  const aheadRate = terminals.length
+    ? terminals.filter((v) => v > centralTerminalBalance).length / terminals.length
+    : 0;
+
   return {
     iterations,
     successRate: successes / iterations,
     fan,
     medianDepletionAge: depSorted.length ? percentile(depSorted, 50) : null,
     worstCaseDepletionAge: depSorted.length ? percentile(depSorted, 10) : null,
+    centralTerminalBalance,
+    medianTerminalBalance: percentile(terminalsSorted, 50),
+    aheadRate,
   };
 }
