@@ -88,9 +88,11 @@ export default function GuidedIntro({
   const [oSuper1, setOSuper1] = useState<number | null>(null);
   const [oSuper2, setOSuper2] = useState<number | null>(null);
   const [oJoint, setOJoint] = useState<number | null>(null);
-  // Phase 2 — growth
-  const [sal1, setSal1] = useState(95_000);
-  const [sal2, setSal2] = useState(95_000);
+  // Phase 2 — growth. Salary starts blank (NaN) so the user must enter their real
+  // income rather than us assuming a figure — it's the biggest lever on the
+  // projection, so a wrong default would quietly mislead.
+  const [sal1, setSal1] = useState<number>(NaN);
+  const [sal2, setSal2] = useState<number>(NaN);
   const [oReturn, setOReturn] = useState<number | null>(null);
   const [oRetire, setORetire] = useState<number | null>(null);
   // Phase 3 — income
@@ -117,6 +119,10 @@ export default function GuidedIntro({
   const comfortable = couple ? config.asfa.comfortable.couple : config.asfa.comfortable.single;
   const targetSpending = oSpend ?? comfortable;
   const volatility = oVol ?? 11;
+
+  // Every income figure needed for the projection must be entered before we
+  // show a super-at-retirement number or let the walkthrough advance past growth.
+  const salaryReady = Number.isFinite(sal1) && (!couple || Number.isFinite(sal2));
 
   const plan: RetirementPlan = useMemo(() => {
     const mk = (age: number, superBalance: number, salary: number): Person => ({
@@ -180,10 +186,24 @@ export default function GuidedIntro({
 
   const next = () => setStep((s) => s + 1);
 
-  const Actions = ({ label, onClick }: { label: string; onClick: () => void }) => (
+  const Actions = ({
+    label,
+    onClick,
+    disabled,
+    disabledHint,
+  }: {
+    label: string;
+    onClick: () => void;
+    disabled?: boolean;
+    disabledHint?: string;
+  }) => (
     <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
       <span className="text-xs text-muted">
-        {step >= 2 ? `Phase ${phaseOf(step)} of ${PHASES}` : "About a minute"}
+        {disabled && disabledHint
+          ? disabledHint
+          : step >= 2
+            ? `Phase ${phaseOf(step)} of ${PHASES}`
+            : "About a minute"}
       </span>
       <div className="flex items-center gap-3">
         <button
@@ -196,7 +216,12 @@ export default function GuidedIntro({
         <button
           type="button"
           onClick={onClick}
-          className="rounded-lg bg-accent px-5 py-2 text-sm font-semibold text-ink transition hover:bg-accent-soft"
+          disabled={disabled}
+          className={`rounded-lg px-5 py-2 text-sm font-semibold transition ${
+            disabled
+              ? "cursor-not-allowed bg-panel-2 text-muted"
+              : "bg-accent text-ink hover:bg-accent-soft"
+          }`}
         >
           {label}
         </button>
@@ -308,14 +333,23 @@ export default function GuidedIntro({
           </h2>
           <p className="mt-1 text-sm text-muted">
             This projects your super forward. The big levers are your income (which
-            drives contributions), your investment return, and when you retire.
+            drives contributions), your investment return, and when you retire —
+            so start with your real salary below.
           </p>
-          <div className="mt-3">
-            <RetirementChart result={result} animate height={230} wageInflationPct={plan.inflation + (config.livingStandardsGrowthPct ?? 0)} cpiPct={plan.inflation} />
-          </div>
-          <p className="mt-2 text-center text-sm">
-            Projected super at retirement: <strong className="text-accent">{money(result.superAtRetirement)}</strong> at age {result.retirementAge}
-          </p>
+          {salaryReady ? (
+            <>
+              <div className="mt-3">
+                <RetirementChart result={result} animate height={230} wageInflationPct={plan.inflation + (config.livingStandardsGrowthPct ?? 0)} cpiPct={plan.inflation} />
+              </div>
+              <p className="mt-2 text-center text-sm">
+                Projected super at retirement: <strong className="text-accent">{money(result.superAtRetirement)}</strong> at age {result.retirementAge}
+              </p>
+            </>
+          ) : (
+            <div className="mt-3 rounded-xl border border-dashed border-accent/40 bg-accent/[0.06] px-4 py-6 text-center text-sm text-muted">
+              Enter your {couple ? "incomes" : "income"} below and we&apos;ll project your super forward.
+            </div>
+          )}
           <div className="mt-4 grid gap-x-6 gap-y-4 sm:grid-cols-2">
             <Field
               label="Your income (excl. super)"
@@ -333,7 +367,14 @@ export default function GuidedIntro({
             <Field label="Investment return" value={invReturn} onChange={(v) => setOReturn(v)} min={1} max={12} step={0.1} suffix="%" hint="A balanced super fund is roughly 6–8% a year." />
             <Field label="Retire at age" value={retireAge} onChange={(v) => setORetire(Math.round(v))} min={Math.min(maxAge + 1, 55)} max={75} suffix="yrs" />
           </div>
-          {step === 4 && <Actions label="Set my retirement income →" onClick={next} />}
+          {step === 4 && (
+            <Actions
+              label="Set my retirement income →"
+              onClick={next}
+              disabled={!salaryReady}
+              disabledHint={couple ? "Enter both incomes to continue" : "Enter your income to continue"}
+            />
+          )}
         </Panel>
       )}
 
