@@ -257,6 +257,16 @@ export function buildStrategyCatalog(plan: RetirementPlan): StrategyCard[] {
         },
         { key: "rent", label: "Rent", min: 0, max: 80_000, step: 1_000, default: 30_000, prefix: "$", suffix: "/yr" },
       ],
+      note: (v) => {
+        const yrs = Math.max(0, (v.age ?? oldestNow) - oldestNow);
+        const grown = Math.round(homeVal * Math.pow(1 + homeGrowth, yrs));
+        const freed = Math.max(0, grown - loan);
+        return (
+          `By age ${v.age} your ${fmtCurrency(homeVal)} home is projected to be worth about ${fmtCurrency(grown)} in ` +
+          `today's dollars. Selling frees ${fmtCurrency(freed)}${loan ? ` — the ${fmtCurrency(grown)} sale price less the ${fmtCurrency(loan)} mortgage` : ""} — ` +
+          `into your savings. From then you pay ${fmtCurrency(v.rent)}/yr rent and, as a non-homeowner, sit under the higher Age Pension asset thresholds; the home is no longer an exempt asset.`
+        );
+      },
       apply: (p, v) => ({
         ...p,
         home: {
@@ -276,6 +286,15 @@ export function buildStrategyCatalog(plan: RetirementPlan): StrategyCard[] {
       label: "Clear the mortgage with super",
       blurb: "Repay the balance with a tax-free super lump sum at retirement — lowers your assessable assets, which can lift the Age Pension.",
       params: [],
+      note: () => {
+        const m = plan.mortgage!;
+        const annual = Math.round(m.type === "interest_only" ? m.balance * (m.interestRate / 100) : m.annualRepayment);
+        return (
+          `At retirement you draw the ${fmtCurrency(m.balance)} loan balance from super (tax-free once you're 60+) and clear ` +
+          `the mortgage. That ends the ~${fmtCurrency(annual)}/yr repayments, and because it lowers your assessable super it can ` +
+          `lift your Age Pension — the trade-off is a one-off drop in your super balance.`
+        );
+      },
       apply: (p) => (p.mortgage ? { ...p, mortgage: { ...p.mortgage, strategy: "clear_at_retirement" } } : p),
     });
   }
@@ -335,6 +354,14 @@ export function buildStrategyCatalog(plan: RetirementPlan): StrategyCard[] {
           suffix: "yrs",
         },
       ],
+      note: (v) => {
+        const n = Math.max(0, v.age - plan.retirementAge);
+        return n === 0
+          ? `Retiring at ${v.age} — the same as your current plan.`
+          : `Working to age ${v.age} instead of ${plan.retirementAge} adds ${n} more year${n === 1 ? "" : "s"} of super ` +
+            `contributions and growth, and ${n} fewer retirement year${n === 1 ? "" : "s"} to fund — so your balance at ` +
+            `retirement is higher and has to stretch over a shorter retirement.`;
+      },
       apply: (p, v) => ({ ...p, retirementAge: v.age }),
     });
   }
@@ -360,6 +387,15 @@ export function buildStrategyCatalog(plan: RetirementPlan): StrategyCard[] {
           suffix: "/yr",
         },
       ],
+      note: (v) => {
+        const diff = v.spend - spend;
+        return (
+          `You're setting total spend to ${fmtCurrency(v.spend)}/yr` +
+          `${Math.abs(diff) >= 500 ? ` (${diff > 0 ? "+" : "−"}${fmtCurrency(Math.abs(diff))} vs now)` : ""}. ` +
+          `Your essentials stay fixed underneath — only the discretionary on top moves. Spending more runs your savings ` +
+          `down faster (fewer years); spending less makes them last longer.`
+        );
+      },
       apply: (p, v) => withSpend(p, v.spend),
     });
   }
@@ -383,6 +419,15 @@ export function buildStrategyCatalog(plan: RetirementPlan): StrategyCard[] {
           suffix: "yrs",
         },
       ],
+      note: (v) => {
+        const people = plan.people.length;
+        const bonus = 7_800 * people;
+        return (
+          `Earning ${fmtCurrency(v.perYear)}/yr until age ${v.untilAge} means you draw about that much less from savings in ` +
+          `each of those years. For the Age Pension income test the first ${fmtCurrency(bonus)}${people > 1 ? ` (${fmtCurrency(7_800)} each)` : ""} ` +
+          `is exempt (the Work Bonus); the rest counts as income and is taxed at the senior rate.`
+        );
+      },
       apply: (p, v) => ({ ...p, workIncome: { perYear: v.perYear, untilAge: v.untilAge } }),
     });
   }
@@ -396,6 +441,9 @@ export function buildStrategyCatalog(plan: RetirementPlan): StrategyCard[] {
       params: [
         { key: "extra", label: "Extra per year", min: 0, max: 30_000, step: 1_000, default: 10_000, prefix: "$", suffix: "/yr" },
       ],
+      note: (v) =>
+        `Putting an extra ${fmtCurrency(v.extra)}/yr of pre-tax pay into super each working year. It's taxed going in at ` +
+        `15% instead of your marginal rate, so more of it lands in super — but it's locked away until you can access super (from age 60).`,
       apply: (p, v) => ({
         ...p,
         people: p.people.map((pp, i) =>
