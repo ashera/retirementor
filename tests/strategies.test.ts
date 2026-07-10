@@ -249,9 +249,10 @@ describe("What-If strategies", () => {
     const toSuper = run(300_000);
     const totalOutsideTax = (rows: typeof toSavings) =>
       rows.reduce((s, r) => s + r.breakdown.outsideTax, 0);
-    // A large outside-super balance is taxed on its earnings in retirement...
+    // A large outside-super balance is taxed on its earnings in retirement
+    // (less LITO + SAPTO, so it's modest but real)...
     const savingsTax = totalOutsideTax(toSavings);
-    expect(savingsTax).toBeGreaterThan(5_000);
+    expect(savingsTax).toBeGreaterThan(2_500);
     // ...so routing the freed equity into (tax-free) super removes that tax.
     // (With outside-super spent down FIRST, and the ATO minimum forcing more out
     // of a larger super balance, the end-wealth difference is marginal — the

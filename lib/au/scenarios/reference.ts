@@ -168,23 +168,39 @@ export function incomeTax(taxable: number): number {
   return 51_638 + (t - 190_000) * 0.45;
 }
 
+// ── Low Income Tax Offset (LITO) ─────────────────────────────────────────────
+// Non-refundable, available to all residents. $700 to $37.5k, withdrawn to $325
+// at $45k, then to $0 at $66,667. Re-stated from the ATO figures.
+export function lito(taxable: number): number {
+  const i = Math.max(0, taxable);
+  if (i <= 37_500) return 700;
+  if (i <= 45_000) return 700 - 0.05 * (i - 37_500);
+  if (i <= 66_667) return Math.max(0, 325 - 0.015 * (i - 45_000));
+  return 0;
+}
+
+/** Ordinary resident income tax after LITO (non-refundable). */
+export function residentIncomeTax(taxable: number): number {
+  return Math.max(0, incomeTax(taxable) - lito(taxable));
+}
+
 // ── Seniors & Pensioners Tax Offset (SAPTO) ──────────────────────────────────
 // Max SAPTO per person (ATO). Makes modest senior income effectively tax-free
 // (single ~$35k; each of a couple ~$32k). Re-stated from the published figure so
 // the reference doesn't share the engine's tax module.
 const SAPTO_MAX = { single: 2_230, couple: 1_602 } as const;
 
-/** Resident income tax on a senior/pensioner, per person: ordinary tax less
- *  SAPTO (floored at 0). Ignores the high-income phase-out + Medicare levy (as
+/** Resident income tax on a senior/pensioner, per person: ordinary tax less LITO
+ *  AND SAPTO (floored at 0). Ignores the high-income phase-out + Medicare levy (as
  *  the engine does). Covers part-time employment AND outside investment earnings. */
 export function seniorIncomeTax(income: number, household: Household): number {
-  return Math.max(0, incomeTax(income) - SAPTO_MAX[household]);
+  return Math.max(0, incomeTax(income) - lito(income) - SAPTO_MAX[household]);
 }
 
 /** Retirement-phase per-person income tax. SAPTO only applies from Age Pension
- *  age; before that it's the ordinary resident scale. */
+ *  age; before that it's the ordinary resident scale (with LITO). */
 export function retireeIncomeTax(income: number, household: Household, senior: boolean): number {
-  return senior ? seniorIncomeTax(income, household) : incomeTax(income);
+  return senior ? seniorIncomeTax(income, household) : residentIncomeTax(income);
 }
 
 /** Tax on a retiree's outside-super (nominal) earnings, charged as the MARGINAL
@@ -228,7 +244,7 @@ export function ttrBenefit(
   const taxable = Math.max(0, salary - sacrificed);
   const ttrSacrificed = Math.min(extraSacrifice, Math.max(0, concessionalCap - concessional));
   if (ttrSacrificed <= 0) return 0;
-  const taxSaved = incomeTax(taxable) - incomeTax(Math.max(0, taxable - ttrSacrificed));
+  const taxSaved = residentIncomeTax(taxable) - residentIncomeTax(Math.max(0, taxable - ttrSacrificed));
   return taxSaved - ttrSacrificed * contribTax;
 }
 

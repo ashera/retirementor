@@ -23,7 +23,7 @@ import {
   startingSuperBalances,
 } from "./types";
 import { mortgageActiveAtAge, mortgageAnnualCost } from "./mortgage";
-import { incomeTax, seniorIncomeTax } from "./tax";
+import { residentIncomeTax, seniorIncomeTax } from "./tax";
 import {
   capitalGainsTax,
   netEquity,
@@ -142,12 +142,12 @@ export function simulate(
       const concessional = Math.min(salary * config.sgRate + p.voluntaryConcessional * scale, cap);
       const sacrificed = Math.max(0, concessional - salary * config.sgRate);
       const taxable = Math.max(0, salary - sacrificed);
-      const takeHome = taxable - incomeTax(taxable);
+      const takeHome = taxable - residentIncomeTax(taxable);
       let ttrBenefit = 0;
       if (ttrEligible && plan.ttr && plan.ttr.extraSacrifice > 0) {
         const ttrSacrificed = Math.min(plan.ttr.extraSacrifice * scale, Math.max(0, cap - concessional));
         if (ttrSacrificed > 0) {
-          const taxSaved = incomeTax(taxable) - incomeTax(Math.max(0, taxable - ttrSacrificed));
+          const taxSaved = residentIncomeTax(taxable) - residentIncomeTax(Math.max(0, taxable - ttrSacrificed));
           ttrBenefit = taxSaved - ttrSacrificed * config.contributionsTax;
         }
       }
@@ -417,7 +417,7 @@ export function simulate(
     // taxed on the ordinary resident scale. Worked out per person: each of a
     // couple has their own threshold/offset, and their own age decides SAPTO.
     const taxAtAge = (inc: number, age: number) =>
-      age >= pensionAge ? seniorIncomeTax(inc, plan.household) : incomeTax(inc);
+      age >= pensionAge ? seniorIncomeTax(inc, plan.household) : residentIncomeTax(inc);
 
     // Part-time work in early retirement: the AFTER-TAX amount offsets drawdown,
     // while the GROSS amount is assessable under the Age Pension income test, net
