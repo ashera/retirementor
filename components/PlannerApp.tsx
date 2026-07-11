@@ -1087,25 +1087,52 @@ export default function PlannerApp({
           Click a year to see the range of possible outcomes — and why they spread.
         </p>
 
-        <div className="mt-3 border-t border-line pt-3 sm:max-w-sm">
-          <Field
-            label="Return volatility"
-            value={plan.returnVolatility}
-            onChange={(v) => quickAdjust({ returnVolatility: v })}
-            min={0}
-            max={20}
-            step={0.5}
-            suffix="%"
-            hint="Higher volatility = wider outcomes and more sequencing risk."
-          />
-        </div>
+        {(() => {
+          const oReturn = plan.outsideReturn ?? plan.investmentReturn;
+          const oVol = plan.outsideVolatility ?? plan.returnVolatility;
+          // Only surface the outside pool here when it's genuinely set apart from
+          // super — otherwise this card stays a single, uncluttered volatility control.
+          const split =
+            (plan.outsideReturn != null && plan.outsideReturn !== plan.investmentReturn) ||
+            (plan.outsideVolatility != null && plan.outsideVolatility !== plan.returnVolatility);
+          return (
+            <>
+              <div className="mt-3 space-y-3 border-t border-line pt-3 sm:max-w-sm">
+                <Field
+                  label={split ? "Super volatility" : "Return volatility"}
+                  value={plan.returnVolatility}
+                  onChange={(v) => quickAdjust({ returnVolatility: v })}
+                  min={0}
+                  max={20}
+                  step={0.5}
+                  suffix="%"
+                  hint="Higher volatility = wider outcomes and more sequencing risk."
+                />
+                {split && (
+                  <Field
+                    label="Outside-super volatility"
+                    value={oVol}
+                    onChange={(v) => quickAdjust({ outsideVolatility: v })}
+                    min={0}
+                    max={20}
+                    step={0.5}
+                    suffix="%"
+                    hint="Swing on money outside super — set near 0 for cash."
+                  />
+                )}
+              </div>
 
-        <p className="mt-3 text-xs text-muted">
-          Based on {mc.iterations.toLocaleString()} randomised runs (avg{" "}
-          {plan.investmentReturn}% return, ±{plan.returnVolatility}% a year). The
-          Age Pension is still a floor, so &lsquo;runs short&rsquo; means below
-          your target — not $0 income.
-        </p>
+              <p className="mt-3 text-xs text-muted">
+                Based on {mc.iterations.toLocaleString()} randomised runs{" "}
+                {split
+                  ? `(avg ${plan.investmentReturn}% super / ${oReturn}% outside, ±${plan.returnVolatility}% / ±${oVol}% a year)`
+                  : `(avg ${plan.investmentReturn}% return, ±${plan.returnVolatility}% a year)`}
+                . The Age Pension is still a floor, so &lsquo;runs short&rsquo; means
+                below your target — not $0 income.
+              </p>
+            </>
+          );
+        })()}
       </div>
 
       {/* What will it take? (goal-seek) */}
