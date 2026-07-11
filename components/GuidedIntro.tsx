@@ -11,7 +11,7 @@ import {
   type RetirementPlan,
 } from "@/lib/au/types";
 import { simulate } from "@/lib/au/simulate";
-import { runMonteCarlo } from "@/lib/au/montecarlo";
+import { runMonteCarlo, MC_CONFIDENCE_TARGET } from "@/lib/au/montecarlo";
 import { fmtCurrency } from "@/lib/au/format";
 import { averageSuperForAge } from "@/lib/au/averageSuper";
 import RetirementChart from "@/components/RetirementChart";
@@ -164,6 +164,14 @@ export default function GuidedIntro({
   const successPct = Math.round(mc.successRate * 100);
   const lasts = result.lastsToLifeExpectancy;
   const tone = lasts ? "text-emerald-400" : "text-amber-400";
+  // The reliability panel states a likelihood, so it's toned by the Monte Carlo
+  // success (85% bar), not by whether the smooth-return line happens to survive.
+  const mcTone =
+    successPct >= Math.round(MC_CONFIDENCE_TARGET * 100)
+      ? "text-emerald-400"
+      : successPct >= 60
+        ? "text-amber-400"
+        : "text-red-400";
 
   // On-track vs the average balance for their age(s).
   const ratio = benchmark > 0 ? totalSuper / benchmark : 1;
@@ -447,7 +455,7 @@ export default function GuidedIntro({
           <div className="mt-3">
             <FanChart fan={mc.fan} retirementAge={result.retirementAge} agePensionAge={result.agePensionAge} height={200} />
           </div>
-          <p className={`mt-2 text-center text-sm ${tone}`}>
+          <p className={`mt-2 text-center text-sm ${mcTone}`}>
             Your target is fully covered in about <strong>{successPct} of every 100</strong> of them.
           </p>
           <p className="mx-auto mt-2 max-w-md text-center text-xs text-muted">

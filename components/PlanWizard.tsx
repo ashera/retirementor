@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Field from "@/components/Field";
 import CompletenessRing from "@/components/CompletenessRing";
 import BudgetBuilder from "@/components/BudgetBuilder";
 import PropertyCard from "@/components/PropertyCard";
 import { simulate } from "@/lib/au/simulate";
+import { runMonteCarlo, MC_CONFIDENCE_MC, MC_CONFIDENCE_TARGET } from "@/lib/au/montecarlo";
 import type { EngineConfig } from "@/lib/au/config";
 import { fmtCompact, fmtCurrency } from "@/lib/au/format";
 import { planCompleteness } from "@/lib/au/completeness";
@@ -241,6 +242,17 @@ export default function PlanWizard({
     Number.isFinite(previewSuper) &&
     Number.isFinite(previewSpend) &&
     Number.isFinite(draft.retirementAge);
+
+  // The honest "will it last?" answer is the Monte Carlo likelihood, not whether it
+  // survives on a single smooth-return line (which a very early retirement can pass
+  // at a ~46% real-world chance). Use the same run + 85% bar as the "maximise spend"
+  // tool. Memoised on the draft so it only recomputes when inputs actually change.
+  const previewMc = useMemo(
+    () => (previewReady ? runMonteCarlo(draft, config, MC_CONFIDENCE_MC) : null),
+    [previewReady, draft, config],
+  );
+  const successPct = previewMc ? Math.round(previewMc.successRate * 100) : 0;
+  const passesBar = previewMc ? previewMc.successRate >= MC_CONFIDENCE_TARGET : false;
 
   // Build steps dynamically (partner step only for couples).
   const personStep = (i: number, title: string, subtitle: string) => ({
@@ -1002,15 +1014,17 @@ export default function PlanWizard({
               </div>
             </div>
             <div className="text-right">
-              <div className="text-xs text-muted">Money lasts</div>
+              <div className="text-xs text-muted">Chance it lasts to {draft.lifeExpectancy}</div>
               <div
                 className={`text-base font-bold tabular-nums ${
-                  preview.lastsToLifeExpectancy ? "text-accent" : "text-amber-400"
+                  successPct >= Math.round(MC_CONFIDENCE_TARGET * 100)
+                    ? "text-accent"
+                    : successPct >= 60
+                      ? "text-amber-400"
+                      : "text-red-400"
                 }`}
               >
-                {preview.lastsToLifeExpectancy
-                  ? `to age ${draft.lifeExpectancy} ✓`
-                  : `to age ${preview.depletedAge}`}
+                {successPct}%{passesBar ? " ✓" : ""}
               </div>
             </div>
           </div>
