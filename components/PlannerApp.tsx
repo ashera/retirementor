@@ -1035,11 +1035,18 @@ export default function PlannerApp({
         className="mt-4 scroll-mt-6 rounded-2xl border border-line bg-panel p-6"
       >
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-          <h2 className="flex items-center gap-2 font-semibold text-white">
-            <MonteCarloMark className="h-7 w-auto shrink-0" />
-            How likely is this plan to work?
-            <LikelihoodExplainer plan={plan} mc={mc} />
-          </h2>
+          <div>
+            <div className="mb-1.5 flex items-center gap-2">
+              <MonteCarloMark className="h-7 w-auto shrink-0" />
+              <span className="text-[13px] font-bold uppercase tracking-[0.22em] text-slate-300">
+                Monte Carlo
+              </span>
+            </div>
+            <h2 className="flex items-center gap-2 font-semibold text-white">
+              How likely is this plan to work?
+              <LikelihoodExplainer plan={plan} mc={mc} />
+            </h2>
+          </div>
           <div className="flex gap-4">
             <LegendDot color="#34d399" label="Median" />
             <span className="flex items-center gap-1.5 text-xs text-muted">
