@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Cell, Pie, PieChart } from "recharts";
 import type { EngineConfig } from "@/lib/au/config";
 import { fmtCurrency } from "@/lib/au/format";
@@ -94,6 +94,15 @@ export default function BudgetBuilder({ plan, config, onApply, onClose }: Budget
   const [applyPhases, setApplyPhases] = useState(plan.budget?.applyPhases ?? true);
   const [monthly, setMonthly] = useState(true);
   const [open, setOpen] = useState<Set<string>>(new Set());
+  // Directly-editable total: type a figure and every category scales by the same
+  // factor, so the essentials/discretionary mix (the pie) stays put — lets people
+  // dial the whole budget without opening individual line items.
+  const [editingTotal, setEditingTotal] = useState(false);
+  const [totalText, setTotalText] = useState("");
+  // Snapshot of the category mix taken when total-editing starts, so every
+  // keystroke scales from the ORIGINAL mix (not the already-scaled interim, which
+  // would collapse the shares to zero as you type the first digits).
+  const baseCatsRef = useRef<Record<string, number> | null>(null);
 
   const total = budgetTotal(categories);
   const { essential, discretionary } = budgetSplit(categories);
@@ -148,6 +157,28 @@ export default function BudgetBuilder({ plan, config, onApply, onClose }: Budget
 
   const setCat = (key: string, annual: number) =>
     setCategories((prev) => ({ ...prev, [key]: Math.max(0, Math.round(annual)) }));
+
+  // Scale a base category mix so it lands on a typed annual total, preserving each
+  // category's share. The rounding residual goes on the largest category so the
+  // total is exact.
+  const scaleFrom = (base: Record<string, number>, newAnnual: number) => {
+    const cur = budgetTotal(base);
+    if (cur <= 0 || !Number.isFinite(newAnnual) || newAnnual < 0) return;
+    const f = newAnnual / cur;
+    const keys = Object.keys(base);
+    const next: Record<string, number> = {};
+    let sum = 0;
+    for (const k of keys) {
+      next[k] = Math.max(0, Math.round(base[k] * f));
+      sum += next[k];
+    }
+    const residual = Math.round(newAnnual) - sum;
+    if (residual !== 0 && keys.length) {
+      const big = keys.reduce((a, b) => (next[b] > next[a] ? b : a), keys[0]);
+      next[big] = Math.max(0, next[big] + residual);
+    }
+    setCategories(next);
+  };
 
   const applyPreset = (ls: BudgetLifestyle) => {
     setLifestyle(ls);
@@ -247,12 +278,42 @@ export default function BudgetBuilder({ plan, config, onApply, onClose }: Budget
               <div className="text-[11px] font-medium uppercase tracking-wide text-muted">
                 Your budget
               </div>
-              <div className="text-2xl font-bold tabular-nums text-accent" aria-live="polite">
-                {monthly ? fmtCurrency(Math.round(total / 12)) : fmtCurrency(total)}
-                <span className="ml-1 text-sm font-medium text-muted">
-                  {monthly ? "/mo" : "/yr"}
-                </span>
-              </div>
+              {(() => {
+                const disp = monthly ? Math.round(total / 12) : total;
+                const shown = editingTotal ? totalText : disp.toLocaleString();
+                return (
+                  <div className="flex items-baseline text-2xl font-bold tabular-nums text-accent">
+                    <span className="text-lg">$</span>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      aria-label={`Total budget per ${monthly ? "month" : "year"}`}
+                      title="Type a total — every category scales to match"
+                      value={shown}
+                      size={Math.max(5, shown.length + 1)}
+                      onFocus={() => {
+                        setEditingTotal(true);
+                        setTotalText(String(disp));
+                        baseCatsRef.current = categories;
+                      }}
+                      onChange={(e) => {
+                        const raw = e.target.value.replace(/[^0-9]/g, "");
+                        setTotalText(raw);
+                        const v = parseFloat(raw);
+                        if (!Number.isNaN(v)) scaleFrom(baseCatsRef.current ?? categories, monthly ? v * 12 : v);
+                      }}
+                      onBlur={() => setEditingTotal(false)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                      }}
+                      className="border-b border-dashed border-accent/40 bg-transparent text-accent outline-none focus:border-accent"
+                    />
+                    <span className="ml-1 text-sm font-medium text-muted">
+                      {monthly ? "/mo" : "/yr"}
+                    </span>
+                  </div>
+                );
+              })()}
             </div>
             <div className="text-right">
               <button
