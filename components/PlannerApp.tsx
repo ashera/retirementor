@@ -935,16 +935,40 @@ export default function PlannerApp({
               step={1000}
               prefix="$"
             />
-            <Field
-              label="Investment return (before fees)"
-              value={plan.investmentReturn}
-              onChange={(v) => quickAdjust({ investmentReturn: v })}
-              min={1}
-              max={12}
-              step={0.1}
-              suffix="%"
-              hint={`Before fees — funds usually quote returns after fees. We deduct the ${plan.fees?.adminInvestmentPct ?? config.fees.adminInvestmentPct}% fee separately (≈ ${+(plan.investmentReturn - (plan.fees?.adminInvestmentPct ?? config.fees.adminInvestmentPct)).toFixed(2)}% after).`}
-            />
+            {(() => {
+              const feePct = plan.fees?.adminInvestmentPct ?? config.fees.adminInvestmentPct;
+              // Only split the return control when the outside pool is genuinely set
+              // apart (in the wizard's advanced box) — otherwise one clean field.
+              const split =
+                (plan.outsideReturn != null && plan.outsideReturn !== plan.investmentReturn) ||
+                (plan.outsideVolatility != null && plan.outsideVolatility !== plan.returnVolatility);
+              return (
+                <>
+                  <Field
+                    label={split ? "Super return (before fees)" : "Investment return (before fees)"}
+                    value={plan.investmentReturn}
+                    onChange={(v) => quickAdjust({ investmentReturn: v })}
+                    min={1}
+                    max={12}
+                    step={0.1}
+                    suffix="%"
+                    hint={`Before fees — funds usually quote returns after fees. We deduct the ${feePct}% fee separately (≈ ${+(plan.investmentReturn - feePct).toFixed(2)}% after).`}
+                  />
+                  {split && (
+                    <Field
+                      label="Outside-super return"
+                      value={plan.outsideReturn ?? plan.investmentReturn}
+                      onChange={(v) => quickAdjust({ outsideReturn: v })}
+                      min={0}
+                      max={12}
+                      step={0.1}
+                      suffix="%"
+                      hint="Return on money outside super — no super fee; its earnings are taxed at your marginal rate in retirement."
+                    />
+                  )}
+                </>
+              );
+            })()}
             <Field
               label="Plan until age"
               value={plan.lifeExpectancy}
