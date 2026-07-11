@@ -937,15 +937,14 @@ export default function PlannerApp({
             />
             {(() => {
               const feePct = plan.fees?.adminInvestmentPct ?? config.fees.adminInvestmentPct;
-              // Only split the return control when the outside pool is genuinely set
-              // apart (in the wizard's advanced box) — otherwise one clean field.
-              const split =
-                (plan.outsideReturn != null && plan.outsideReturn !== plan.investmentReturn) ||
-                (plan.outsideVolatility != null && plan.outsideVolatility !== plan.returnVolatility);
+              // Show the split return controls once the user has opted in (the pool
+              // is present, even if still equal to super) — the toggle below turns
+              // it on/off. Otherwise a single clean "Investment return" field.
+              const enabled = plan.outsideReturn != null || plan.outsideVolatility != null;
               return (
                 <>
                   <Field
-                    label={split ? "Super return (before fees)" : "Investment return (before fees)"}
+                    label={enabled ? "Super return (before fees)" : "Investment return (before fees)"}
                     value={plan.investmentReturn}
                     onChange={(v) => quickAdjust({ investmentReturn: v })}
                     min={1}
@@ -954,7 +953,7 @@ export default function PlannerApp({
                     suffix="%"
                     hint={`Before fees — funds usually quote returns after fees. We deduct the ${feePct}% fee separately (≈ ${+(plan.investmentReturn - feePct).toFixed(2)}% after).`}
                   />
-                  {split && (
+                  {enabled && (
                     <Field
                       label="Outside-super return"
                       value={plan.outsideReturn ?? plan.investmentReturn}
@@ -978,6 +977,24 @@ export default function PlannerApp({
               suffix="yrs"
             />
           </div>
+          {(() => {
+            const enabled = plan.outsideReturn != null || plan.outsideVolatility != null;
+            return enabled ? (
+              <button
+                onClick={() => quickAdjust({ outsideReturn: undefined, outsideVolatility: undefined })}
+                className="mt-3 text-xs font-medium text-muted transition hover:text-white"
+              >
+                ← Grow outside super at the same return as super
+              </button>
+            ) : (
+              <button
+                onClick={() => quickAdjust({ outsideReturn: plan.investmentReturn, outsideVolatility: plan.returnVolatility })}
+                className="mt-3 text-xs font-medium text-accent transition hover:underline"
+              >
+                + Hold outside super at a different return? (e.g. cash)
+              </button>
+            );
+          })()}
         </div>
       </div>
 
@@ -1114,16 +1131,16 @@ export default function PlannerApp({
         {(() => {
           const oReturn = plan.outsideReturn ?? plan.investmentReturn;
           const oVol = plan.outsideVolatility ?? plan.returnVolatility;
-          // Only surface the outside pool here when it's genuinely set apart from
-          // super — otherwise this card stays a single, uncluttered volatility control.
-          const split =
-            (plan.outsideReturn != null && plan.outsideReturn !== plan.investmentReturn) ||
-            (plan.outsideVolatility != null && plan.outsideVolatility !== plan.returnVolatility);
+          // Show the outside-super slider once opted in (present), so it's editable
+          // straight away; only switch the caption to the split format once the
+          // values genuinely differ, to keep it clean when they still match.
+          const enabled = plan.outsideReturn != null || plan.outsideVolatility != null;
+          const differs = oReturn !== plan.investmentReturn || oVol !== plan.returnVolatility;
           return (
             <>
               <div className="mt-3 space-y-3 border-t border-line pt-3 sm:max-w-sm">
                 <Field
-                  label={split ? "Super volatility" : "Return volatility"}
+                  label={enabled ? "Super volatility" : "Return volatility"}
                   value={plan.returnVolatility}
                   onChange={(v) => quickAdjust({ returnVolatility: v })}
                   min={0}
@@ -1132,7 +1149,7 @@ export default function PlannerApp({
                   suffix="%"
                   hint="Higher volatility = wider outcomes and more sequencing risk."
                 />
-                {split && (
+                {enabled && (
                   <Field
                     label="Outside-super volatility"
                     value={oVol}
@@ -1148,7 +1165,7 @@ export default function PlannerApp({
 
               <p className="mt-3 text-xs text-muted">
                 Based on {mc.iterations.toLocaleString()} randomised runs{" "}
-                {split
+                {differs
                   ? `(avg ${plan.investmentReturn}% super / ${oReturn}% outside, ±${plan.returnVolatility}% / ±${oVol}% a year)`
                   : `(avg ${plan.investmentReturn}% return, ±${plan.returnVolatility}% a year)`}
                 . The Age Pension is still a floor, so &lsquo;runs short&rsquo; means
