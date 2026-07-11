@@ -556,16 +556,22 @@ export default function PlanWizard({
     subtitle: "The long-run numbers behind the projection.",
     body: (
       <div className="space-y-6">
-        <Field
-          label="Investment return"
-          value={draft.investmentReturn}
-          onChange={(v) => patch({ investmentReturn: v })}
-          min={1}
-          max={12}
-          step={0.1}
-          suffix="%"
-          hint="Nominal annual return (super in accumulation is taxed 15% on earnings)."
-        />
+        {(() => {
+          const feePct = draft.fees?.adminInvestmentPct ?? config.fees.adminInvestmentPct;
+          const afterFees = +(draft.investmentReturn - feePct).toFixed(2);
+          return (
+            <Field
+              label="Investment return (before fees)"
+              value={draft.investmentReturn}
+              onChange={(v) => patch({ investmentReturn: v })}
+              min={1}
+              max={12}
+              step={0.1}
+              suffix="%"
+              hint={`Gross return, before fees — super funds usually quote returns AFTER investment fees, so this sits a little higher. We take the ${feePct}% fee out separately (≈ ${afterFees}% after fees) and 15% earnings tax while you're working.`}
+            />
+          );
+        })()}
         <Field
           label="Inflation"
           value={draft.inflation}

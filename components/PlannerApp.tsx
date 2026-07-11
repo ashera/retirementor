@@ -936,13 +936,14 @@ export default function PlannerApp({
               prefix="$"
             />
             <Field
-              label="Investment return"
+              label="Investment return (before fees)"
               value={plan.investmentReturn}
               onChange={(v) => quickAdjust({ investmentReturn: v })}
               min={1}
               max={12}
               step={0.1}
               suffix="%"
+              hint={`Before fees — funds usually quote returns after fees. We deduct the ${plan.fees?.adminInvestmentPct ?? config.fees.adminInvestmentPct}% fee separately (≈ ${+(plan.investmentReturn - (plan.fees?.adminInvestmentPct ?? config.fees.adminInvestmentPct)).toFixed(2)}% after).`}
             />
             <Field
               label="Plan until age"

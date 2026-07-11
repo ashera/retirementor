@@ -75,6 +75,7 @@ export default function AssumptionsModal({
 
           <Section title="Economic">
             <Row label="Investment return (before fees)" value={pct(plan.investmentReturn)} />
+            <Row label="↳ after the % investment fee" value={`${pct(plan.investmentReturn - config.fees.adminInvestmentPct, 2)} (what funds usually quote)`} />
             <Row label="Return volatility (for the likelihood)" value={pct(plan.returnVolatility)} />
             <Row label="Inflation (CPI, in retirement)" value={pct(plan.inflation)} />
             <Row label={`Wage growth (pre-retirement = CPI + ${pct(config.livingStandardsGrowthPct ?? 0)})`} value={pct(wageGrowth)} />

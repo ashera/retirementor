@@ -111,7 +111,7 @@ export default function VariantEditor({
 
           <Field label="Retirement age" value={retireAge} onChange={(v) => setRetireAge(Math.round(v))} min={40} max={75} suffix="yrs" />
           <Field label="Annual spend" value={spend} onChange={(v) => setSpend(Math.round(v))} min={20_000} max={400_000} step={1000} prefix="$" hint="Scales the staged amounts proportionally." />
-          <Field label="Investment return" value={ret} onChange={setRet} min={1} max={12} step={0.1} suffix="%" />
+          <Field label="Investment return (before fees)" value={ret} onChange={setRet} min={1} max={12} step={0.1} suffix="%" hint="Before fees — funds usually quote returns after fees; we deduct fees separately." />
           <Field label="Plan until age" value={life} onChange={(v) => setLife(Math.round(v))} min={75} max={105} suffix="yrs" />
 
           {bp.mortgage && (

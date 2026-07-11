@@ -166,7 +166,7 @@ export default function ReportView({
         ? `${plan.retirementAge} (you) & ${personRetirementAge(plan, 1)} (partner)`
         : `${plan.retirementAge}`,
     },
-    { label: "Investment return", value: `${plan.investmentReturn}% p.a. (nominal)` },
+    { label: "Investment return", value: `${plan.investmentReturn}% p.a. (nominal, before fees)` },
     { label: "Inflation (CPI)", value: `${plan.inflation}% — pre-retirement deflator ${wageInfl}% (wage)` },
     {
       label: "Spending goal",

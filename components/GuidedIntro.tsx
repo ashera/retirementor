@@ -367,7 +367,7 @@ export default function GuidedIntro({
             {couple && (
               <Field label="Partner's income (excl. super)" value={sal2} onChange={setSal2} min={0} max={400_000} step={5_000} prefix="$" />
             )}
-            <Field label="Investment return" value={invReturn} onChange={(v) => setOReturn(v)} min={1} max={12} step={0.1} suffix="%" hint="A balanced super fund is roughly 6–8% a year." />
+            <Field label="Investment return (before fees)" value={invReturn} onChange={(v) => setOReturn(v)} min={1} max={12} step={0.1} suffix="%" hint={`Before fees — super funds usually quote returns after fees. A balanced fund is ~7–9% before fees; we take the ${config.fees.adminInvestmentPct}% fee out (≈ ${+(invReturn - config.fees.adminInvestmentPct).toFixed(2)}% after).`} />
             <Field label="Retire at age" value={retireAge} onChange={(v) => setORetire(Math.round(v))} min={Math.min(maxAge + 1, 55)} max={75} suffix="yrs" />
           </div>
           {step === 4 && (
