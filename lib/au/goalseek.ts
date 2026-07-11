@@ -125,6 +125,57 @@ export function whatWillItTake(
   };
 }
 
+// ── Earliest retirement age (the FIRE lens) ──────────────────────────────────
+
+export interface EarliestRetirement {
+  age: number | null; // earliest retirement age whose Monte Carlo success clears the bar (null if even 75 can't)
+  currentRetireAge: number;
+  currentClears: boolean; // does the current retirement age already clear the bar?
+  successAtEarliest: number; // Monte Carlo success at `age` (0–1)
+  targetPct: number; // the confidence bar (e.g. 85)
+}
+
+/**
+ * The mirror of {@link boostSpending}, on the time axis: holding spending and
+ * everything else fixed, find the EARLIEST retirement age whose Monte Carlo
+ * success still clears the confidence bar. Answers "how much sooner could I
+ * retire and still be okay?" — the question the FIRE crowd actually asks, rather
+ * than "how much more could I spend?". Success is (heuristically) non-decreasing
+ * in retirement age, so a binary search over [40, 75] finds it in a handful of
+ * runs. `age > currentRetireAge` means the current plan doesn't clear the bar
+ * (they'd need to work longer); `null` means even retiring at 75 wouldn't.
+ */
+export function earliestRetirement(
+  plan: RetirementPlan,
+  config: EngineConfig,
+  target = MC_CONFIDENCE_TARGET,
+  mc = MC_CONFIDENCE_MC,
+): EarliestRetirement {
+  const currentRetireAge = plan.retirementAge;
+  const targetPct = Math.round(target * 100);
+  // Floor at 40 to match the retirement-age control's range (and keep results
+  // realistic); never below "retire now".
+  const lo = Math.max(plan.people[0].currentAge, 40);
+  const hi = 75;
+
+  const successAt = (age: number) =>
+    runMonteCarlo({ ...plan, retirementAge: Math.round(age) }, config, mc).successRate;
+
+  if (lo >= hi) {
+    return { age: null, currentRetireAge, currentClears: successAt(lo) >= target, successAtEarliest: 0, targetPct };
+  }
+
+  const minAge = solveThreshold((v) => successAt(v) >= target, lo, hi, true, 0.5);
+  const age = minAge != null ? Math.min(hi, Math.ceil(minAge)) : null;
+  return {
+    age,
+    currentRetireAge,
+    currentClears: age != null && age <= currentRetireAge,
+    successAtEarliest: age != null ? successAt(age) : 0,
+    targetPct,
+  };
+}
+
 // ── Essentials-protected spend levers (trim & boost) ─────────────────────────
 
 const floorTo = (v: number, step: number) => Math.max(0, Math.floor(v / step) * step);

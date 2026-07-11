@@ -26,7 +26,7 @@ import {
   SuperAtRetirementExplainer,
 } from "@/components/explainers";
 import { runMonteCarlo, MC_CONFIDENCE_TARGET, MC_CONFIDENCE_MC } from "@/lib/au/montecarlo";
-import { whatWillItTake } from "@/lib/au/goalseek";
+import { whatWillItTake, earliestRetirement } from "@/lib/au/goalseek";
 import { maxSpendForConfidence } from "@/lib/au/strategies";
 import TrimSpendingModal from "@/components/TrimSpendingModal";
 import BoostSpendingModal from "@/components/BoostSpendingModal";
@@ -275,6 +275,9 @@ export default function PlannerApp({
   const successTone: "accent" | "amber" | "red" =
     mc.successRate >= 0.85 ? "accent" : mc.successRate >= 0.6 ? "amber" : "red";
   const gs = useMemo(() => whatWillItTake(plan, config), [plan, config]);
+  // "How early can I retire?" — earliest retirement age that still clears the
+  // Monte Carlo confidence bar, holding spend fixed (the FIRE lens).
+  const earliest = useMemo(() => earliestRetirement(plan, config), [plan, config]);
 
   // Prudent max spend: the most you can spend while Monte Carlo success still
   // clears the shared 85% bar (matching the What-If safe spend and the boost
@@ -913,14 +916,24 @@ export default function PlannerApp({
             )}
           </div>
           <div className="grid gap-x-8 gap-y-5 sm:grid-cols-2">
-            <Field
-              label="Retirement age"
-              value={plan.retirementAge}
-              onChange={(v) => quickAdjust({ retirementAge: v })}
-              min={40}
-              max={75}
-              suffix="yrs"
-            />
+            <div>
+              <Field
+                label="Retirement age"
+                value={plan.retirementAge}
+                onChange={(v) => quickAdjust({ retirementAge: v })}
+                min={40}
+                max={75}
+                suffix="yrs"
+              />
+              {earliest.age != null && earliest.age < plan.retirementAge && (
+                <button
+                  onClick={() => quickAdjust({ retirementAge: earliest.age! })}
+                  className="mt-1.5 text-xs font-medium text-accent transition hover:underline"
+                >
+                  ⌁ retire as early as {earliest.age} at {earliest.targetPct}% →
+                </button>
+              )}
+            </div>
             <Field
               label={isStaged ? "Go-go spend" : "Spend/yr"}
               value={isStaged ? stages.goGo : plan.targetSpending}
@@ -1081,6 +1094,41 @@ export default function PlannerApp({
                   style={{ width: `${s * 100}%`, backgroundColor: hex }}
                 />
               </div>
+              {(() => {
+                const e = earliest;
+                if (e.age == null) {
+                  return (
+                    <p className="mt-2.5 text-sm text-amber-300">
+                      ⌁ Even retiring at 75 wouldn&apos;t clear {e.targetPct}% at this spend — see{" "}
+                      <a href="#what-will-it-take" className="underline underline-offset-2 hover:text-amber-200">
+                        what will it take
+                      </a>
+                      .
+                    </p>
+                  );
+                }
+                const SetAge = () => (
+                  <button
+                    onClick={() => quickAdjust({ retirementAge: e.age! })}
+                    className="font-bold text-accent underline-offset-2 hover:underline"
+                  >
+                    {e.age}
+                  </button>
+                );
+                return (
+                  <p className="mt-2.5 text-sm text-slate-200">
+                    <span aria-hidden className="mr-1 text-accent">⌁</span>
+                    {e.age < e.currentRetireAge ? (
+                      <>You could retire as early as <SetAge /> and still clear {e.targetPct}% — you&apos;re planning {e.currentRetireAge}.</>
+                    ) : e.age === e.currentRetireAge ? (
+                      <>Age {e.age} is about the earliest you can retire and still clear {e.targetPct}%.</>
+                    ) : (
+                      <>To clear {e.targetPct}% you&apos;d need to retire around{" "}
+                        <span className="font-bold text-amber-300">{e.age}</span> — you&apos;re planning {e.currentRetireAge}.</>
+                    )}
+                  </p>
+                );
+              })()}
               {mc.worstCaseDepletionAge !== null && mc.medianDepletionAge !== null && (
                 <p className="mt-2 text-xs text-muted">
                   When your money does run short, it&apos;s typically around age{" "}
@@ -1186,7 +1234,7 @@ export default function PlannerApp({
       </div>
 
       {/* What will it take? (goal-seek) */}
-      <div className="mt-4 rounded-2xl border border-line bg-panel p-6">
+      <div id="what-will-it-take" className="mt-4 scroll-mt-6 rounded-2xl border border-line bg-panel p-6">
         <h2 className="font-semibold text-white">What will it take?</h2>
         <p className="mb-4 mt-1 text-sm text-slate-300">
           {overspending
