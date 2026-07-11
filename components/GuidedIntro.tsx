@@ -342,7 +342,8 @@ export default function GuidedIntro({
           <p className="mt-1 text-sm text-muted">
             This projects your super forward. The big levers are your income (which
             drives contributions), your investment return, and when you retire —
-            so start with your real salary below.
+            so start with your real salary below. Extra contributions and savings
+            outside super come later, on your dashboard.
           </p>
           {salaryReady ? (
             <>
@@ -474,6 +475,17 @@ export default function GuidedIntro({
               to save this and compare scenarios side by side.
             </p>
           )}
+          <div className="mt-5 rounded-xl border border-line bg-panel-2 px-4 py-3 text-sm">
+            <div className="font-semibold text-slate-100">This was the quick version — there&apos;s more you can add</div>
+            <p className="mt-1 text-muted">
+              We kept setup simple on purpose. Your dashboard models the full picture whenever
+              you&apos;re ready: <span className="text-slate-200">extra super contributions</span> (salary
+              sacrifice or after-tax), <span className="text-slate-200">savings &amp; investments outside
+              super</span>, an <span className="text-slate-200">investment property</span> or{" "}
+              <span className="text-slate-200">mortgage</span>, and the return/fee assumptions. Just tap the
+              completeness ring (<span className="text-slate-200">&ldquo;Edit scenario · add detail&rdquo;</span>) any time.
+            </p>
+          </div>
           {step === 6 && <Actions label="Take me to the full dashboard →" onClick={() => onExit(plan, true)} />}
         </Panel>
       )}
