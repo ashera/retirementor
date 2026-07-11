@@ -76,7 +76,13 @@ export default function AssumptionsModal({
           <Section title="Economic">
             <Row label="Investment return (before fees)" value={pct(plan.investmentReturn)} />
             <Row label="↳ after the % investment fee" value={`${pct(plan.investmentReturn - config.fees.adminInvestmentPct, 2)} (what funds usually quote)`} />
+            {(plan.outsideReturn != null && plan.outsideReturn !== plan.investmentReturn) && (
+              <Row label="Outside-super return (no super fee)" value={pct(plan.outsideReturn)} />
+            )}
             <Row label="Return volatility (for the likelihood)" value={pct(plan.returnVolatility)} />
+            {(plan.outsideVolatility != null && plan.outsideVolatility !== plan.returnVolatility) && (
+              <Row label="Outside-super volatility" value={pct(plan.outsideVolatility)} />
+            )}
             <Row label="Inflation (CPI, in retirement)" value={pct(plan.inflation)} />
             <Row label={`Wage growth (pre-retirement = CPI + ${pct(config.livingStandardsGrowthPct ?? 0)})`} value={pct(wageGrowth)} />
           </Section>

@@ -39,12 +39,17 @@ function realRate(nominalPct: number, inflationPct: number): number {
   return (1 + nominalPct / 100) / (1 + inflationPct / 100) - 1;
 }
 
-// Optional per-year NOMINAL returns (percent). When omitted the deterministic mean
-// (plan.investmentReturn) is used every year. Monte Carlo passes a random sequence.
+// Optional per-year NOMINAL returns (percent), one entry per year. When omitted the
+// deterministic means are used every year — plan.investmentReturn for super and
+// plan.outsideReturn (falling back to investmentReturn) for the outside-super pool.
+// Monte Carlo passes random sequences for each. `outsideReturns` defaults to
+// `nominalReturns` when only one is supplied, so callers that don't care about the
+// split keep the old single-sequence behaviour.
 export function simulate(
   plan: RetirementPlan,
   config: EngineConfig,
   nominalReturns?: number[],
+  outsideReturns?: number[],
 ): SimResult {
   const preservationAge = config.preservationAge;
   const pensionAge = config.agePensionAge;
@@ -62,6 +67,12 @@ export function simulate(
   const fixedAdmin = fees?.fixedAdminAnnual ?? 0;
   const insurance = fees?.insuranceAnnual ?? 0;
   const meanRealReturn = realRate(plan.investmentReturn, cpi);
+  // Outside-super money can be held with its own return (e.g. conservative/cash),
+  // defaulting to the super return so unset plans are unchanged.
+  const outsideMeanNom = plan.outsideReturn ?? plan.investmentReturn;
+  // When only the super sequence is supplied, the outside pool shares it (old
+  // single-return behaviour); its deterministic mean falls back likewise.
+  const outsideSeq = outsideReturns ?? nominalReturns;
 
   const balances = startingSuperBalances(plan);
   let outside = plan.outsideSuper;
@@ -122,11 +133,13 @@ export function simulate(
     // works (handled per-person inside the retirement branch below).
     const accumPhase = t < earliestOffset;
 
-    // This year's returns (constant mean, or a Monte Carlo draw).
+    // This year's returns (constant mean, or a Monte Carlo draw). Super and the
+    // outside pool each carry their own nominal return.
     const nom = nominalReturns ? (nominalReturns[t] ?? plan.investmentReturn) : plan.investmentReturn;
+    const outsideNom = outsideSeq ? (outsideSeq[t] ?? outsideMeanNom) : outsideMeanNom;
     // Deflate by wage inflation pre-retirement, CPI from the household boundary on.
     const deflator = accumPhase ? wageInflation : cpi;
-    const realReturn = realRate(nom, deflator); // outside super (no super fee)
+    const realReturn = realRate(outsideNom, deflator); // outside super (no super fee)
     // Super returns are net of the % investment/admin fee. Accumulation also pays
     // 15% earnings tax; pension-phase super is tax-free.
     const superAccumReturn = realRate(nom * (1 - config.superEarningsTaxAccumulation) - feePct, deflator);
@@ -586,7 +599,7 @@ export function simulate(
     // shields modest amounts. (Accumulation-phase outside earnings are left untaxed.)
     let outsideTax = 0;
     if (!accumPhase) {
-      const outsideEarnings = Math.max(0, outside * (nom / 100)); // nominal, today's $
+      const outsideEarnings = Math.max(0, outside * (outsideNom / 100)); // nominal, today's $
       if (outsideEarnings > 0) {
         const workPer = grossWork / workers;
         const earnPer = outsideEarnings / workers; // household earnings split per person

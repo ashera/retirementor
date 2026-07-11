@@ -631,6 +631,54 @@ export default function PlanWizard({
             </div>
           );
         })()}
+        {(() => {
+          const oReturn = draft.outsideReturn ?? draft.investmentReturn;
+          const oVol = draft.outsideVolatility ?? draft.returnVolatility;
+          const differs = draft.outsideReturn != null || draft.outsideVolatility != null;
+          return (
+            <div className="space-y-4 rounded-xl border border-line bg-panel-2 p-4">
+              <div className="flex items-center justify-between">
+                <div className="text-xs font-semibold uppercase tracking-wide text-muted">
+                  Outside-super investments (advanced)
+                </div>
+                {differs && (
+                  <button
+                    type="button"
+                    onClick={() => patch({ outsideReturn: undefined, outsideVolatility: undefined })}
+                    className="text-[11px] font-medium text-accent hover:underline"
+                  >
+                    Reset to super
+                  </button>
+                )}
+              </div>
+              <p className="text-xs text-muted">
+                By default your outside-super money grows at the same return as your super.
+                Set these if you hold it differently — e.g. more conservatively, or as cash
+                (a low return with low volatility).
+              </p>
+              <Field
+                label="Outside-super return"
+                value={oReturn}
+                onChange={(v) => patch({ outsideReturn: v })}
+                min={0}
+                max={12}
+                step={0.1}
+                suffix="%"
+                hint="Nominal return on money outside super. No super fee applies; its earnings are taxed at your marginal rate in retirement."
+              />
+              <Field
+                label="Outside-super volatility"
+                value={oVol}
+                onChange={(v) => patch({ outsideVolatility: v })}
+                min={0}
+                max={20}
+                step={0.5}
+                suffix="%"
+                hint="Year-to-year swing for the outside pool (for the likelihood). Set near 0 for cash."
+              />
+            </div>
+          );
+        })()}
       </div>
     ),
   };

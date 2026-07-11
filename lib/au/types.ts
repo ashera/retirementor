@@ -132,8 +132,16 @@ export interface RetirementPlan {
   spendingMode: SpendingMode;
   targetSpending: number; // flat annual spend (and the go-go base when deriving stages)
   spendingStages: SpendingStages; // used when spendingMode === "stages"
-  investmentReturn: number; // nominal annual return, percent
+  investmentReturn: number; // nominal annual return, percent (super, and the default for outside)
   returnVolatility: number; // annual return standard deviation, percent (for Monte Carlo)
+  // Optional: model outside-super money with its own return/volatility (e.g. held
+  // more conservatively, or a cash-heavy pool). Both default to the super figures
+  // above when unset, so plans that don't set them are unchanged. In the Monte
+  // Carlo the two pools share one market shock each year (perfect correlation, a
+  // fair simplification) but scale it by their own volatility — so a low-return,
+  // low-volatility outside pool behaves like cash.
+  outsideReturn?: number; // nominal outside-super return, percent (defaults to investmentReturn)
+  outsideVolatility?: number; // outside-super return std deviation, percent (defaults to returnVolatility)
   inflation: number; // annual inflation, percent
   lifeExpectancy: number; // simulate until the oldest person reaches this age
   fees?: SuperFees; // optional per-plan fee override (else the config default applies)

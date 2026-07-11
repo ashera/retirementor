@@ -19,11 +19,10 @@ function mulberry32(seed: number): () => number {
 }
 
 /** One standard-normal draw via Box–Muller. */
-function normal(rand: () => number, mean: number, sd: number): number {
+function standardNormal(rand: () => number): number {
   const u1 = Math.max(1e-9, rand());
   const u2 = rand();
-  const z = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
-  return mean + sd * z;
+  return Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
 }
 
 export interface FanPoint {
@@ -69,6 +68,13 @@ export function runMonteCarlo(
   const rand = mulberry32(opts?.seed ?? 0x9e3779b9);
   const mean = plan.investmentReturn;
   const sd = Math.max(0, plan.returnVolatility);
+  // Outside-super money may carry its own return/volatility (e.g. cash). Each pool
+  // shares the SAME market shock z each year (perfect correlation — super and
+  // outside investments move together) but scales it by its own volatility, so a
+  // low-return, low-vol outside pool stays stable like cash. Both default to super.
+  const outsideMean = plan.outsideReturn ?? plan.investmentReturn;
+  const outsideSd = Math.max(0, plan.outsideVolatility ?? plan.returnVolatility);
+  const splitPools = outsideMean !== mean || outsideSd !== sd;
 
   const startOldest = Math.max(...plan.people.map((p) => p.currentAge));
   const horizon = Math.max(0, Math.round(plan.lifeExpectancy - startOldest));
@@ -80,9 +86,14 @@ export function runMonteCarlo(
 
   for (let iter = 0; iter < iterations; iter++) {
     const returns = new Array(horizon + 1);
-    for (let t = 0; t <= horizon; t++) returns[t] = normal(rand, mean, sd);
+    const outsideReturns = splitPools ? new Array(horizon + 1) : undefined;
+    for (let t = 0; t <= horizon; t++) {
+      const z = standardNormal(rand);
+      returns[t] = mean + sd * z;
+      if (outsideReturns) outsideReturns[t] = outsideMean + outsideSd * z;
+    }
 
-    const r = simulate(plan, config, returns);
+    const r = simulate(plan, config, returns, outsideReturns);
     if (r.lastsToLifeExpectancy) successes++;
     else if (r.depletedAge !== null) depletionAges.push(r.depletedAge);
 
@@ -109,8 +120,9 @@ export function runMonteCarlo(
   // deterministic central projection (constant mean return every year). Because
   // of volatility drag, the typical run usually finishes BELOW the smooth-return
   // line — so this exposes how optimistic the single central estimate is.
-  const centralReturns = new Array(horizon + 1).fill(mean);
-  const central = simulate(plan, config, centralReturns);
+  // No sequences → each pool uses its own deterministic mean (super = mean,
+  // outside = outsideMean), which is exactly the central projection.
+  const central = simulate(plan, config);
   const centralTerminalBalance = central.rows.length
     ? central.rows[central.rows.length - 1].total
     : 0;
