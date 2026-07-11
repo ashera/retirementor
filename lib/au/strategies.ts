@@ -147,13 +147,14 @@ export function resolveValues(card: StrategyCard, overrides?: Record<string, num
   return { ...defaultValues(card), ...(overrides ?? {}) };
 }
 
-/** Build the strategy catalog applicable to a baseline plan. `opts.superAtAge`
- *  (when supplied — the board passes it from the baseline simulation) returns the
- *  projected total super at an age, so a lump-sum lever can cap its slider and
- *  note at the balance that will actually be there. */
+/** Build the strategy catalog applicable to a baseline plan. `opts.superAtAge` /
+ *  `opts.outsideAtAge` (when supplied — the board passes them from the baseline
+ *  simulation) return the projected super / outside-savings balance at an age, so
+ *  the lump-sum and recontribution levers can cap their sliders and notes at the
+ *  balance that will actually be there. */
 export function buildStrategyCatalog(
   plan: RetirementPlan,
-  opts?: { superAtAge?: (age: number) => number },
+  opts?: { superAtAge?: (age: number) => number; outsideAtAge?: (age: number) => number },
 ): StrategyCard[] {
   const cards: StrategyCard[] = [];
   const oldest = maxCurrentAge(plan);
@@ -427,27 +428,52 @@ export function buildStrategyCatalog(
     });
   }
 
-  // Recontribute: move money from outside savings back into super each year as an
-  // after-tax (non-concessional) contribution. Needs outside savings to draw on.
+  // Recontribute: move money from outside savings back into super as an after-tax
+  // (non-concessional) contribution — a one-off (From age == Until age) or a yearly
+  // stream (From age < Until age). Needs outside savings to draw on.
   if (plan.outsideSuper > 0 || plan.annualOutsideSavings > 0) {
+    const outsideAtAge = opts?.outsideAtAge;
     const startAge = Math.min(75, Math.max(60, Math.round(plan.retirementAge)));
     cards.push({
       id: "recontribute",
       group: "timing",
       label: "Recontribute savings to super",
       blurb:
-        "Move money from your outside-super savings back INTO super each year as an after-tax (non-concessional) contribution. Inside super its earnings are tax-free, instead of taxed in your own name outside — so the bigger your outside balance, the more this saves. Allowed to age 75, within the non-concessional cap, your available savings and the total-super cap. (Its other real benefit — lower tax for your beneficiaries on death — isn't modelled here.)",
+        "Move money from your outside-super savings back INTO super as an after-tax (non-concessional) contribution — a one-off, or every year over a range. Inside super its earnings are tax-free, instead of taxed in your own name outside, so the bigger your outside balance the more this saves. Allowed to age 75, within the non-concessional cap, your available savings and the total-super cap. (Its other real benefit — lower tax for your beneficiaries on death — isn't modelled here.)",
       params: [
-        { key: "amount", label: "Per year from savings", min: 0, max: 130_000, step: 5_000, prefix: "$", suffix: "/yr", default: 20_000 },
-        { key: "untilAge", label: "Until age", min: startAge, max: 75, step: 1, default: 75, suffix: "yrs" },
+        {
+          key: "amount",
+          label: "Amount (each year in the range)",
+          min: 0,
+          max: 130_000,
+          step: 5_000,
+          prefix: "$",
+          default: 20_000,
+          // Can't recontribute more in a year than your savings hold then.
+          dynamicMax: (v) => (outsideAtAge ? Math.max(0, outsideAtAge(v.fromAge ?? startAge)) : Infinity),
+        },
+        { key: "fromAge", label: "From age", min: startAge, max: 75, step: 1, default: startAge, suffix: "yrs" },
+        { key: "untilAge", label: "Until age (same as From = one-off)", min: startAge, max: 75, step: 1, default: 75, suffix: "yrs" },
       ],
-      note: (v) =>
-        `Each year until age ${v.untilAge}, move ${fmtCurrency(v.amount)} from your savings into super as an after-tax ` +
-        `contribution — no tax going in, and its earnings are then tax-free inside super rather than taxed outside. It's a ` +
-        `reallocation (your net worth barely moves the year you do it); the payoff is the tax saved on those earnings over ` +
-        `time, largest when your outside balance is big. The minimum drawdown will pull some back out each year. Capped at ` +
-        `the non-concessional limit, your available savings and the total-super cap; not past 75.`,
-      apply: (p, v) => ({ ...p, recontribute: { perYear: v.amount, untilAge: v.untilAge } }),
+      note: (v) => {
+        const until = Math.max(v.fromAge, v.untilAge);
+        const avail = outsideAtAge ? Math.round(outsideAtAge(v.fromAge)) : null;
+        const take = avail != null ? Math.min(v.amount, avail) : v.amount;
+        const availPart =
+          avail != null
+            ? ` Your savings outside super are projected to be about ${fmtCurrency(avail)} at ${v.fromAge}, so a year's contribution is capped at ${fmtCurrency(take)}${take < v.amount ? " (limited by your savings)" : ""}.`
+            : "";
+        const when =
+          v.fromAge === until
+            ? `A one-off ${fmtCurrency(v.amount)} from your savings into super at age ${v.fromAge}`
+            : `Move ${fmtCurrency(v.amount)} from your savings into super each year from ${v.fromAge} to ${until}`;
+        return (
+          `${when}, as an after-tax contribution — no tax going in, and its earnings are then tax-free inside super rather ` +
+          `than taxed outside.${availPart} It's a reallocation (net worth barely moves); the payoff is the tax saved over ` +
+          `time, largest when your outside balance is big. Also capped at the non-concessional limit and the total-super cap; not past 75.`
+        );
+      },
+      apply: (p, v) => ({ ...p, recontribute: { perYear: v.amount, fromAge: v.fromAge, untilAge: Math.max(v.fromAge, v.untilAge) } }),
     });
   }
 

@@ -41,7 +41,7 @@ const vanilla: Record<string, RetirementPlan> = {
   "held-property": single({ investmentProperties: [prop] }),
   // Recontribution is a net-zero savings reallocation (outside→super), so the
   // savings waterfall must still tie with no "other".
-  recontribute: single({ recontribute: { perYear: 20_000, untilAge: 72 } }),
+  recontribute: single({ recontribute: { perYear: 20_000, fromAge: 65, untilAge: 72 } }),
 };
 
 // Plans with one-off equity/loan events — the total must still tie (an "other"

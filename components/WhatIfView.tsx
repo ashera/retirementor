@@ -167,15 +167,19 @@ export default function WhatIfView({
   }, [current, baselineId, savedPlans]);
 
   const baseRes = useMemo(() => (baseline ? simulate(baseline, config) : null), [baseline, config]);
-  // Projected total super at an age (start-of-year), so the lump-sum lever can cap
-  // its slider/note at the balance that will be there.
+  // Projected super / outside-savings at an age (start-of-year), so the lump-sum
+  // and recontribution levers can cap their sliders/notes at the balance there.
   const superAtAge = useMemo(() => {
     const byAge = new Map(baseRes?.rows.map((r) => [r.age, r.totalSuper]) ?? []);
     return (age: number) => byAge.get(Math.round(age)) ?? 0;
   }, [baseRes]);
+  const outsideAtAge = useMemo(() => {
+    const byAge = new Map(baseRes?.rows.map((r) => [r.age, r.outside]) ?? []);
+    return (age: number) => byAge.get(Math.round(age)) ?? 0;
+  }, [baseRes]);
   const catalog = useMemo(
-    () => (baseline ? buildStrategyCatalog(baseline, { superAtAge }) : []),
-    [baseline, superAtAge],
+    () => (baseline ? buildStrategyCatalog(baseline, { superAtAge, outsideAtAge }) : []),
+    [baseline, superAtAge, outsideAtAge],
   );
 
   // Switching the baseline resets the toggles (its catalog differs). This is an

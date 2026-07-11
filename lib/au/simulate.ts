@@ -401,10 +401,13 @@ export function simulate(
     // drawdown that would otherwise leak super into taxable savings. Capped at the
     // annual NCC cap, available savings, and the room under the total-super cap.
     let recontributionNow = 0;
+    const reconFrom = recontribute?.fromAge ?? 60;
+    const reconUntil = Math.max(reconFrom, recontribute?.untilAge ?? reconFrom);
     if (
       recontribute &&
+      ages[0] >= reconFrom &&
+      ages[0] <= reconUntil &&
       ages[0] <= 75 &&
-      ages[0] <= recontribute.untilAge &&
       outside > EPS &&
       sum(balances) < config.transferBalanceCap
     ) {
