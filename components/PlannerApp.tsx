@@ -911,7 +911,7 @@ export default function PlannerApp({
               </button>
             )}
           </div>
-          <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-x-8 gap-y-5 sm:grid-cols-2">
             <Field
               label="Retirement age"
               value={plan.retirementAge}
@@ -937,39 +937,25 @@ export default function PlannerApp({
             />
             {(() => {
               const feePct = plan.fees?.adminInvestmentPct ?? config.fees.adminInvestmentPct;
-              // Show the split return controls once the user has opted in (the pool
-              // is present, even if still equal to super) — the toggle below turns
-              // it on/off. Otherwise a single clean "Investment return" field.
+              // When the outside pool is split out, this is the super-only return
+              // (the outside return lives in its own row below); otherwise it's the
+              // single all-money return.
               const enabled = plan.outsideReturn != null || plan.outsideVolatility != null;
               return (
-                <>
-                  <Field
-                    label={enabled ? "Super return (before fees)" : "Investment return (before fees)"}
-                    value={plan.investmentReturn}
-                    onChange={(v) => quickAdjust({ investmentReturn: v })}
-                    min={1}
-                    max={12}
-                    step={0.1}
-                    suffix="%"
-                    hint={`Before fees — funds usually quote returns after fees. We deduct the ${feePct}% fee separately (≈ ${+(plan.investmentReturn - feePct).toFixed(2)}% after).`}
-                  />
-                  {enabled && (
-                    <Field
-                      label="Outside-super return"
-                      value={plan.outsideReturn ?? plan.investmentReturn}
-                      onChange={(v) => quickAdjust({ outsideReturn: v })}
-                      min={0}
-                      max={12}
-                      step={0.1}
-                      suffix="%"
-                      hint="Return on money outside super — no super fee; its earnings are taxed at your marginal rate in retirement."
-                    />
-                  )}
-                </>
+                <Field
+                  label={enabled ? "Super return" : "Investment return"}
+                  value={plan.investmentReturn}
+                  onChange={(v) => quickAdjust({ investmentReturn: v })}
+                  min={1}
+                  max={12}
+                  step={0.1}
+                  suffix="%"
+                  hint={`Before fees — funds usually quote returns after fees. We deduct the ${feePct}% fee separately (≈ ${+(plan.investmentReturn - feePct).toFixed(2)}% after).`}
+                />
               );
             })()}
             <Field
-              label="Plan until age"
+              label="Plan to age"
               value={plan.lifeExpectancy}
               onChange={(v) => quickAdjust({ lifeExpectancy: v })}
               min={75}
@@ -980,16 +966,30 @@ export default function PlannerApp({
           {(() => {
             const enabled = plan.outsideReturn != null || plan.outsideVolatility != null;
             return enabled ? (
-              <button
-                onClick={() => quickAdjust({ outsideReturn: undefined, outsideVolatility: undefined })}
-                className="mt-3 text-xs font-medium text-muted transition hover:text-white"
-              >
-                ← Grow outside super at the same return as super
-              </button>
+              <div className="mt-5 flex flex-col gap-x-8 gap-y-2 border-t border-line pt-4 sm:flex-row sm:items-center">
+                <div className="sm:w-72">
+                  <Field
+                    label="Outside-super return"
+                    value={plan.outsideReturn ?? plan.investmentReturn}
+                    onChange={(v) => quickAdjust({ outsideReturn: v })}
+                    min={0}
+                    max={12}
+                    step={0.1}
+                    suffix="%"
+                    hint="Money outside super — no super fee; earnings taxed at your marginal rate in retirement."
+                  />
+                </div>
+                <button
+                  onClick={() => quickAdjust({ outsideReturn: undefined, outsideVolatility: undefined })}
+                  className="self-start text-xs font-medium text-muted transition hover:text-white sm:self-center"
+                >
+                  ← Grow it at the same return as super
+                </button>
+              </div>
             ) : (
               <button
                 onClick={() => quickAdjust({ outsideReturn: plan.investmentReturn, outsideVolatility: plan.returnVolatility })}
-                className="mt-3 text-xs font-medium text-accent transition hover:underline"
+                className="mt-4 text-xs font-medium text-accent transition hover:underline"
               >
                 + Hold outside super at a different return? (e.g. cash)
               </button>
