@@ -9,6 +9,7 @@ import YearDetailModal from "@/components/YearDetailModal";
 import IncomeYearModal from "@/components/IncomeYearModal";
 import IncomeChart from "@/components/IncomeChart";
 import FanChart from "@/components/FanChart";
+import MonteCarloMark from "@/components/MonteCarloMark";
 import PlanWizard from "@/components/PlanWizard";
 import BudgetBuilder from "@/components/BudgetBuilder";
 import Field from "@/components/Field";
@@ -1035,6 +1036,7 @@ export default function PlannerApp({
       >
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
           <h2 className="flex items-center gap-2 font-semibold text-white">
+            <MonteCarloMark className="h-7 w-auto shrink-0" />
             How likely is this plan to work?
             <LikelihoodExplainer plan={plan} mc={mc} />
           </h2>
