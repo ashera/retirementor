@@ -561,6 +561,26 @@ export default function PlanWizard({
     ),
   };
 
+  // Have the model/economic assumptions been moved off the app defaults? (returns,
+  // volatility, inflation, super fees, and the outside-super overrides). Life
+  // expectancy is a personal planning choice, not an assumption, so it's excluded.
+  const assumptionsTuned =
+    draft.investmentReturn !== DEFAULT_PLAN.investmentReturn ||
+    draft.returnVolatility !== DEFAULT_PLAN.returnVolatility ||
+    draft.inflation !== DEFAULT_PLAN.inflation ||
+    draft.outsideReturn != null ||
+    draft.outsideVolatility != null ||
+    (!!draft.fees && JSON.stringify(draft.fees) !== JSON.stringify(config.fees));
+  const resetAssumptions = () =>
+    patch({
+      investmentReturn: DEFAULT_PLAN.investmentReturn,
+      returnVolatility: DEFAULT_PLAN.returnVolatility,
+      inflation: DEFAULT_PLAN.inflation,
+      fees: undefined,
+      outsideReturn: undefined,
+      outsideVolatility: undefined,
+    });
+
   const assumptionsStep = {
     key: "assumptions",
     nav: "Assumptions",
@@ -568,6 +588,17 @@ export default function PlanWizard({
     subtitle: "The long-run numbers behind the projection.",
     body: (
       <div className="space-y-6">
+        {assumptionsTuned && (
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={resetAssumptions}
+              className="text-xs font-medium text-accent transition hover:underline"
+            >
+              ↺ Reset assumptions to defaults
+            </button>
+          </div>
+        )}
         {(() => {
           const feePct = draft.fees?.adminInvestmentPct ?? config.fees.adminInvestmentPct;
           const afterFees = +(draft.investmentReturn - feePct).toFixed(2);
