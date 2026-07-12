@@ -30,6 +30,7 @@ import YearDetailModal from "@/components/YearDetailModal";
 import IncomeYearModal from "@/components/IncomeYearModal";
 import AssumptionsModal from "@/components/AssumptionsModal";
 import StrategyAssumptionsModal from "@/components/StrategyAssumptionsModal";
+import GuardrailsTimelineModal from "@/components/GuardrailsTimelineModal";
 import Field from "@/components/Field";
 
 const PLAN_KEY = "au-retirement-plan";
@@ -117,6 +118,7 @@ export default function WhatIfView({
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
   const [assumptionsOpen, setAssumptionsOpen] = useState(false);
   const [assumptionsCard, setAssumptionsCard] = useState<StrategyCard | null>(null);
+  const [timelineOpen, setTimelineOpen] = useState(false);
 
   // Don't persist the board until after the initial restore has been applied,
   // so the empty first render can't clobber the saved selection.
@@ -655,6 +657,7 @@ export default function WhatIfView({
                     onToggle={() => toggle(card)}
                     onParam={(k, v) => setParam(card.id, k, v)}
                     onAssumptions={() => setAssumptionsCard(card)}
+                    onTimeline={card.id === "guardrails" ? () => setTimelineOpen(true) : undefined}
                     guardrails={
                       card.id === "guardrails" && grOutlook
                         ? {
@@ -732,6 +735,7 @@ export default function WhatIfView({
       </div>
       )}
 
+      <GuardrailsTimelineModal open={timelineOpen} onClose={() => setTimelineOpen(false)} plan={composed} config={config} />
       <AssumptionsModal open={assumptionsOpen} onClose={() => setAssumptionsOpen(false)} config={config} plan={composed} />
       <StrategyAssumptionsModal
         open={assumptionsCard != null}
@@ -951,6 +955,7 @@ function StrategyCardRow({
   onToggle,
   onParam,
   onAssumptions,
+  onTimeline,
   guardrails,
   sustainable,
 }: {
@@ -965,6 +970,7 @@ function StrategyCardRow({
   onToggle: () => void;
   onParam: (key: string, v: number) => void;
   onAssumptions: () => void;
+  onTimeline?: () => void; // guardrails: open the raise/cut timeline modal
   guardrails?: {
     outlook: GuardrailsOutlook;
     pending: boolean;
@@ -1111,17 +1117,30 @@ function StrategyCardRow({
                   </span>
                 )}
               </div>
-              {guardrails.outlook.centralPath.length > 2 && (
-                <div className="flex items-center gap-2 pt-0.5">
-                  <span className="shrink-0 text-[10px] text-muted">Spend path</span>
-                  <Sparkline
-                    series={[guardrails.outlook.centralPath.map((p) => ({ age: p.age, v: p.spend }))]}
-                    colors={["#34d399"]}
-                    width={220}
-                    height={36}
-                  />
-                </div>
-              )}
+              <div className="flex items-center justify-between gap-2 pt-0.5">
+                {guardrails.outlook.centralPath.length > 2 ? (
+                  <div className="flex items-center gap-2">
+                    <span className="shrink-0 text-[10px] text-muted">Spend path</span>
+                    <Sparkline
+                      series={[guardrails.outlook.centralPath.map((p) => ({ age: p.age, v: p.spend }))]}
+                      colors={["#34d399"]}
+                      width={180}
+                      height={34}
+                    />
+                  </div>
+                ) : (
+                  <span />
+                )}
+                {onTimeline && (
+                  <button
+                    type="button"
+                    onClick={onTimeline}
+                    className="shrink-0 rounded-md border border-accent/40 bg-accent/10 px-2.5 py-1 text-[11px] font-semibold text-accent transition hover:bg-accent/20"
+                  >
+                    Why? See the timeline →
+                  </button>
+                )}
+              </div>
             </div>
           )}
           {card.note && (

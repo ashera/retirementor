@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { simulate } from "../lib/au/simulate";
 import { runMonteCarlo } from "../lib/au/montecarlo";
-import { guardrailsOutlook } from "../lib/au/guardrails";
+import { guardrailsOutlook, guardrailsTimeline } from "../lib/au/guardrails";
 import { buildStrategyCatalog } from "../lib/au/strategies";
 import { DEFAULT_CONFIG as cfg } from "../lib/au/config";
 import { DEFAULT_PLAN, type RetirementPlan } from "../lib/au/types";
@@ -78,6 +78,18 @@ describe("Guyton-Klinger guardrails", () => {
     const o = guardrailsOutlook({ ...base, targetSpending: 30_000, guardrails: {} }, cfg, { iterations: 80 });
     expect(o.everRaises).toBe(true); // plenty of headroom → the central path lifts spending
     expect(o.worstCutPct).toBeLessThan(0.2); // rarely, if ever, forced to cut deeply
+  });
+
+  it("timeline: retire-into-downturn cuts to the floor, then a pension-driven recovery plateaus below the start", () => {
+    const tl = guardrailsTimeline({ ...base, targetSpending: 62_000, guardrails: {} }, cfg);
+    expect(tl.start).toBe(62_000);
+    expect(tl.points.some((p) => p.action === "cut")).toBe(true); // cuts cascade
+    expect(Math.min(...tl.points.map((p) => p.spend))).toBeLessThanOrEqual(tl.floor + 1); // reaches the floor
+    expect(tl.points.some((p) => p.action === "raise")).toBe(true); // then recovers a step
+    expect(tl.pensionAge).not.toBeNull(); // the Age Pension is what drives it
+    expect(tl.plateauSpend).toBeLessThan(tl.start); // but settles below where it started
+    expect(tl.lowerRail).toBeLessThan(tl.wr0); // rails straddle the initial rate
+    expect(tl.upperRail).toBeGreaterThan(tl.wr0);
   });
 
   it("offers a What-If lever that enables guardrails, once", () => {
