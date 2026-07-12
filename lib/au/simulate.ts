@@ -549,7 +549,11 @@ export function simulate(
     // naturally funds the early-retirement bridge.
     const minDrawdownParts = accessibleIdx.map((i) => {
       const rate = minDrawdownRate(ages[i], config);
-      return { age: ages[i], balance: balances[i], rate, amount: balances[i] * rate };
+      // The legislated minimum applies only to the pension-phase balance (up to the
+      // Transfer Balance Cap); any accumulation excess above the cap has no forced
+      // drawdown. Under the cap this is just the full balance (unchanged).
+      const pensionBalance = Math.min(balances[i], config.transferBalanceCap);
+      return { age: ages[i], balance: pensionBalance, rate, amount: pensionBalance * rate };
     });
     const minDraw = minDrawdownParts.reduce((s, pt) => s + pt.amount, 0);
     const minDrawCapped = Math.min(accessibleSuper, minDraw);
@@ -583,9 +587,21 @@ export function simulate(
       const fee = Math.min(fixedAdmin, Math.max(0, balances[i]));
       balances[i] -= fee;
       feesPaid += fee;
-      const rate = ages[i] >= preservationAge ? superPensionReturn : superAccumReturn;
-      superGrowth += balances[i] * rate;
-      balances[i] *= 1 + rate;
+      if (ages[i] >= preservationAge) {
+        // Pension phase up to the Transfer Balance Cap earns tax-free; any excess
+        // must stay in accumulation, so its earnings are taxed at 15% (the
+        // superAccumReturn). Under the cap (accumPart = 0) this is exactly the old
+        // tax-free pension growth, so most retirees are unchanged.
+        const pensionPart = Math.min(balances[i], config.transferBalanceCap);
+        const accumPart = Math.max(0, balances[i] - config.transferBalanceCap);
+        const grown = pensionPart * (1 + superPensionReturn) + accumPart * (1 + superAccumReturn);
+        superGrowth += grown - balances[i];
+        balances[i] = grown;
+      } else {
+        // Retired but under preservation age — super stays preserved in accumulation.
+        superGrowth += balances[i] * superAccumReturn;
+        balances[i] *= 1 + superAccumReturn;
+      }
     });
     const outsideGrowth = outside * realReturn;
     outside *= 1 + realReturn;
