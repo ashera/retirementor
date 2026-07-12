@@ -93,6 +93,12 @@ export default function YearDetailModal({
   // The home/property change is whatever isn't explained by the savings drivers.
   const nwClosing = nextRow ? rowNetWorth(nextRow) : nwTotal;
   const homePropChange = nwClosing - nwTotal - flow.net;
+  // Above the Transfer Balance Cap, show how the opening super splits between the
+  // tax-free pension pool and the taxed accumulation pool.
+  const superLabel =
+    b.accumSuper > 1
+      ? `super ${fmtCurrency(b.openingSuper)} (pension ${fmtCurrency(Math.round(b.pensionSuper))} · accum ${fmtCurrency(Math.round(b.accumSuper))})`
+      : `super ${fmtCurrency(b.openingSuper)}`;
   // The waterfall shown — savings or net worth — matching the chart clicked.
   const wf = {
     title: isNetWorth ? "How your net worth changed" : "How your savings changed",
@@ -101,9 +107,9 @@ export default function YearDetailModal({
     opening: isNetWorth ? nwTotal : flow.opening,
     closing: isNetWorth ? nwClosing : flow.closing,
     sub: isNetWorth
-      ? `super ${fmtCurrency(b.openingSuper)} · outside ${fmtCurrency(b.openingOutside)}` +
+      ? `${superLabel} · outside ${fmtCurrency(b.openingOutside)}` +
         `${nwHome > 0 ? ` · home ${fmtCurrency(nwHome)}` : ""}${nwProp > 0 ? ` · property ${fmtCurrency(nwProp)}` : ""}`
-      : `super ${fmtCurrency(b.openingSuper)} · outside ${fmtCurrency(b.openingOutside)}`,
+      : `${superLabel} · outside ${fmtCurrency(b.openingOutside)}`,
     lines:
       isNetWorth && Math.abs(homePropChange) > 0.5
         ? [...flow.lines, { key: "homeprop", label: "Home & property value change", amount: homePropChange }]
@@ -277,12 +283,11 @@ export default function YearDetailModal({
 
             {b.accumSuper > 1 && (
               <p className="mt-2 border-t border-line pt-2 text-[11px] leading-snug text-muted">
-                Your super is split:{" "}
-                <span className="font-semibold text-emerald-300">{fmtCurrency(Math.round(b.pensionSuper))}</span> in
-                the tax-free <span className="text-slate-300">pension pool</span> and{" "}
-                <span className="font-semibold text-amber-300">{fmtCurrency(Math.round(b.accumSuper))}</span> in{" "}
-                <span className="text-slate-300">accumulation</span> — the amount that couldn&apos;t fit under
-                the transfer balance cap, whose earnings are taxed 15%.
+                <span className="font-semibold text-emerald-300">{fmtCurrency(Math.round(b.pensionSuper))}</span> of
+                your super is in the tax-free <span className="text-slate-300">pension pool</span>; the{" "}
+                <span className="font-semibold text-amber-300">{fmtCurrency(Math.round(b.accumSuper))}</span> above
+                the transfer balance cap stays in <span className="text-slate-300">accumulation</span>, its earnings
+                taxed 15%.
               </p>
             )}
 

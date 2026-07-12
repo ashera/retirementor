@@ -22,7 +22,13 @@ export interface SpendingBand {
   fill: string;
 }
 
-type ChartRow = Partial<YearRow> & { age: number; baselineTotal?: number; propertyNW?: number };
+type ChartRow = Partial<YearRow> & {
+  age: number;
+  baselineTotal?: number;
+  propertyNW?: number;
+  pensionSuper?: number; // tax-free pension pool (opening); pensionSuper + accumSuper = totalSuper
+  accumSuper?: number; // taxed accumulation pool (opening)
+};
 
 function AssetsTooltip({
   active,
@@ -57,11 +63,21 @@ function AssetsTooltip({
           Investment property {fmtCurrency(property)}
         </div>
       )}
-      {r.totalSuper !== undefined && (
-        <div className="tabular-nums text-emerald-400">
-          Super {fmtCurrency(r.totalSuper)}
-        </div>
-      )}
+      {r.totalSuper !== undefined &&
+        ((r.accumSuper ?? 0) > 1 ? (
+          <>
+            <div className="tabular-nums text-emerald-400">
+              Pension {fmtCurrency(r.pensionSuper ?? 0)}
+            </div>
+            <div className="tabular-nums text-yellow-500">
+              Accumulation {fmtCurrency(r.accumSuper ?? 0)}
+            </div>
+          </>
+        ) : (
+          <div className="tabular-nums text-emerald-400">
+            Super {fmtCurrency(r.totalSuper)}
+          </div>
+        ))}
       {r.outside !== undefined && (
         <div className="tabular-nums text-sky-400">
           Outside {fmtCurrency(r.outside)}
@@ -138,8 +154,19 @@ export default function RetirementChart({
   // Net-worth property band = held equity plus, in the sale year only, the sale
   // proceeds (which land in the OUTSIDE opening balance next year, not this one) —
   // so a sale reallocates cleanly with no one-year dip.
-  for (const r of cpiBasis(result.rows))
-    byAge.set(r.age, { ...r, propertyNW: Math.max(0, (r.propertyEquity ?? 0) + (r.breakdown?.propertyProceeds ?? 0)) });
+  for (const r of cpiBasis(result.rows)) {
+    // Split the super band into pension (tax-free) + accumulation (taxed). While
+    // accumulating it's all in accumulation; in retirement use the engine's opening
+    // split. cpiBasis has already scaled totalSuper, so accumulation-phase accum
+    // rides that scaled figure and the two still stack to the plotted super band.
+    const isAccum = r.phase === "accumulation";
+    byAge.set(r.age, {
+      ...r,
+      propertyNW: Math.max(0, (r.propertyEquity ?? 0) + (r.breakdown?.propertyProceeds ?? 0)),
+      pensionSuper: isAccum ? 0 : r.breakdown?.pensionSuper ?? 0,
+      accumSuper: isAccum ? r.totalSuper ?? 0 : r.breakdown?.accumSuper ?? 0,
+    });
+  }
   if (baseline) {
     // In net-worth mode the ghost line must be baseline NET WORTH (incl. home +
     // property), not just its liquid total, so the two trajectories are comparable.
@@ -151,6 +178,9 @@ export default function RetirementChart({
     }
   }
   const data = [...byAge.values()].sort((a, b) => a.age - b.age);
+  // Only split the super band when there's actually an accumulation balance (super
+  // over the Transfer Balance Cap); otherwise it's one clean super band as before.
+  const hasSplit = result.rows.some((r) => (r.breakdown?.accumSuper ?? 0) > 1);
 
   return (
     <ResponsiveContainer width="100%" height={height}>
@@ -190,6 +220,10 @@ export default function RetirementChart({
           <linearGradient id="outsideFill" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#38bdf8" stopOpacity={0.5} />
             <stop offset="100%" stopColor="#38bdf8" stopOpacity={0.05} />
+          </linearGradient>
+          <linearGradient id="accumFill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#eab308" stopOpacity={0.5} />
+            <stop offset="100%" stopColor="#eab308" stopOpacity={0.05} />
           </linearGradient>
           <linearGradient id="homeFill" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#64748b" stopOpacity={0.4} />
@@ -297,16 +331,42 @@ export default function RetirementChart({
             isAnimationActive={animate}
           />
         )}
-        <Area
-          type="monotone"
-          dataKey="totalSuper"
-          stackId="1"
-          stroke="#34d399"
-          strokeWidth={2}
-          fill="url(#superFill)"
-          name="Super"
-          isAnimationActive={animate}
-        />
+        {hasSplit && (
+          <Area
+            type="monotone"
+            dataKey="accumSuper"
+            stackId="1"
+            stroke="#eab308"
+            strokeWidth={2}
+            fill="url(#accumFill)"
+            name="Accumulation (taxed)"
+            isAnimationActive={animate}
+          />
+        )}
+        {hasSplit && (
+          <Area
+            type="monotone"
+            dataKey="pensionSuper"
+            stackId="1"
+            stroke="#34d399"
+            strokeWidth={2}
+            fill="url(#superFill)"
+            name="Pension (tax-free)"
+            isAnimationActive={animate}
+          />
+        )}
+        {!hasSplit && (
+          <Area
+            type="monotone"
+            dataKey="totalSuper"
+            stackId="1"
+            stroke="#34d399"
+            strokeWidth={2}
+            fill="url(#superFill)"
+            name="Super"
+            isAnimationActive={animate}
+          />
+        )}
         <Area
           type="monotone"
           dataKey="outside"

@@ -847,7 +847,14 @@ export default function PlannerApp({
             Balance over time (today&apos;s dollars)
           </h2>
           <div className="flex flex-wrap items-center gap-4">
-            <LegendDot color="#34d399" label="Super" />
+            {result.rows.some((r) => (r.breakdown?.accumSuper ?? 0) > 1) ? (
+              <>
+                <LegendDot color="#34d399" label="Super — pension" />
+                <LegendDot color="#eab308" label="Super — accumulation" />
+              </>
+            ) : (
+              <LegendDot color="#34d399" label="Super" />
+            )}
             <LegendDot color="#38bdf8" label="Outside super" />
             {tweaked && <LegendDot color="#94a3b8" label={baselineLabel} />}
             <ChrisToggle on={chrisToggle} onToggle={() => setChrisToggle((v) => !v)} />
@@ -1020,7 +1027,14 @@ export default function PlannerApp({
             <LegendDot color="#facc15" label="Take-home pay" />
             {plan.workIncome && <LegendDot color="#f472b6" label="Part-time work" />}
             <LegendDot color="#a78bfa" label="Age Pension" />
-            <LegendDot color="#34d399" label="Super" />
+            {result.rows.some((r) => (r.breakdown?.accumSuper ?? 0) > 1) ? (
+              <>
+                <LegendDot color="#34d399" label="Super — pension" />
+                <LegendDot color="#eab308" label="Super — accumulation" />
+              </>
+            ) : (
+              <LegendDot color="#34d399" label="Super" />
+            )}
             <LegendDot color="#38bdf8" label="Outside super" />
             {hasInvestmentProperty(plan) && <LegendDot color="#fb923c" label="Net rent" />}
             <ChrisToggle on={chrisToggle} onToggle={() => setChrisToggle((v) => !v)} />

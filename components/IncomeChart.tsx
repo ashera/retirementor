@@ -51,11 +51,21 @@ function IncomeTooltip({
           Net rent {fmtCurrency(rent)}
         </div>
       )}
-      {r.superDrawn > 0 && (
-        <div className="tabular-nums text-emerald-400">
-          From super {fmtCurrency(r.superDrawn)}
-        </div>
-      )}
+      {r.superDrawn > 0 &&
+        ((r.breakdown?.accumDrawn ?? 0) > 1 ? (
+          <>
+            <div className="tabular-nums text-emerald-400">
+              From pension {fmtCurrency((r.breakdown?.minDrawdown ?? 0) + (r.breakdown?.pensionExtraDrawn ?? 0))}
+            </div>
+            <div className="tabular-nums text-yellow-500">
+              From accumulation {fmtCurrency(r.breakdown?.accumDrawn ?? 0)}
+            </div>
+          </>
+        ) : (
+          <div className="tabular-nums text-emerald-400">
+            From super {fmtCurrency(r.superDrawn)}
+          </div>
+        ))}
       {r.outsideDrawn > 0 && (
         <div className="tabular-nums text-sky-400">
           From outside {fmtCurrency(r.outsideDrawn)}
@@ -86,6 +96,9 @@ export default function IncomeChart({
   // Show the full timeline (income is $0 through the accumulation years) so this
   // chart's x-axis lines up with the balance chart above it.
   const rows = result.rows;
+  // Split the "from super" band into pension vs accumulation drawdown when there's
+  // an accumulation balance (super over the Transfer Balance Cap); else one band.
+  const hasSplit = rows.some((r) => (r.breakdown?.accumSuper ?? 0) > 1);
   if (rows.length === 0) {
     return (
       <div className="flex h-[220px] items-center justify-center text-sm text-muted">
@@ -178,16 +191,42 @@ export default function IncomeChart({
           name="Age Pension"
           isAnimationActive={animate}
         />
-        <Area
-          type="stepAfter"
-          dataKey="superDrawn"
-          stackId="1"
-          stroke="#34d399"
-          fill="#34d399"
-          fillOpacity={0.35}
-          name="Super"
-          isAnimationActive={animate}
-        />
+        {!hasSplit && (
+          <Area
+            type="stepAfter"
+            dataKey="superDrawn"
+            stackId="1"
+            stroke="#34d399"
+            fill="#34d399"
+            fillOpacity={0.35}
+            name="Super"
+            isAnimationActive={animate}
+          />
+        )}
+        {hasSplit && (
+          <Area
+            type="stepAfter"
+            dataKey={(r: YearRow) => Math.max(0, (r.breakdown?.accumDrawn ?? 0))}
+            stackId="1"
+            stroke="#eab308"
+            fill="#eab308"
+            fillOpacity={0.35}
+            name="Super — accumulation"
+            isAnimationActive={animate}
+          />
+        )}
+        {hasSplit && (
+          <Area
+            type="stepAfter"
+            dataKey={(r: YearRow) => Math.max(0, (r.breakdown?.minDrawdown ?? 0) + (r.breakdown?.pensionExtraDrawn ?? 0))}
+            stackId="1"
+            stroke="#34d399"
+            fill="#34d399"
+            fillOpacity={0.35}
+            name="Super — pension"
+            isAnimationActive={animate}
+          />
+        )}
         <Area
           type="stepAfter"
           dataKey="outsideDrawn"

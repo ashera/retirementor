@@ -62,6 +62,10 @@ export default function IncomeYearModal({
   const pension = row.agePension;
   const fromSuper = row.superDrawn;
   const fromOutside = row.outsideDrawn;
+  // The drawdown order beyond the pension minimum (see the ordered list below).
+  const accumDrawn = row.breakdown.accumDrawn;
+  const pensionExtraDrawn = row.breakdown.pensionExtraDrawn;
+  const hasAccum = row.breakdown.accumSuper > 1; // two-pool split active (super over the cap)
   // Staggered-retirement gap year: a partner is still working, so their take-home
   // salary is household income too (on the retirement row as salaryIncome/takeHome).
   const partnerStillWorking = retired && row.salaryIncome > 1;
@@ -445,17 +449,40 @@ export default function IncomeYearModal({
                       </div>
                     </div>
                     <div className="border-t border-line pt-1.5 text-slate-300">
-                      Super&apos;s earnings are tax-free, so spending comes from outside-super
-                      savings first. Super pays its <strong className="text-white">minimum</strong>
-                      {fromOutside > 1
-                        ? `, and your outside savings cover the remaining ${cur(fromOutside)}`
-                        : ""}
-                      {superToppedUp
-                        ? `; with savings run down, super also draws a further ${cur(fromSuper - minDraw)} to meet the shortfall`
-                        : ""}{" "}
-                      →{" "}
-                      <strong className="text-accent">{cur(fromSuper)}</strong> from super
-                      {fromOutside > 1 ? ` and ${cur(fromOutside)} from savings` : ""}.
+                      <div className="mb-1.5 text-[11px] text-muted">
+                        {hasAccum
+                          ? "Then the shortfall is met in a tax-aware order — most-taxed money first, the tax-free pension preserved to last:"
+                          : "Then the shortfall is met in order — savings outside super first, so the tax-free pension keeps compounding:"}
+                      </div>
+                      {(() => {
+                        const steps = [
+                          { show: minDraw > 1, label: "Pension minimum (mandatory)", value: minDraw },
+                          { show: fromOutside > 1, label: "Outside super — taxed at your marginal rate", value: fromOutside },
+                          { show: accumDrawn > 1, label: "Accumulation super — earnings taxed 15%", value: accumDrawn },
+                          {
+                            show: pensionExtraDrawn > 1,
+                            label: hasAccum ? "Pension above the minimum — tax-free" : "Super above the minimum",
+                            value: pensionExtraDrawn,
+                          },
+                        ].filter((s) => s.show);
+                        return (
+                          <div className="space-y-1">
+                            {steps.map((s, i) => (
+                              <div key={i} className="flex items-baseline justify-between gap-3 text-[11px]">
+                                <span className="text-muted">
+                                  <span className="mr-1.5 font-mono text-slate-400">{i + 1}</span>
+                                  {s.label}
+                                </span>
+                                <span className="shrink-0 tabular-nums font-semibold text-slate-200">{cur(s.value)}</span>
+                              </div>
+                            ))}
+                            <div className="flex items-baseline justify-between gap-3 border-t border-line pt-1 text-[11px] font-semibold">
+                              <span className="text-slate-200">Total drawn from savings</span>
+                              <span className="tabular-nums text-accent">{cur(fromSuper + fromOutside)}</span>
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
                     {minReinvested && (
                       <p className="text-[11px] text-muted">

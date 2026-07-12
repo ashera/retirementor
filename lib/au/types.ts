@@ -295,9 +295,10 @@ export interface YearBreakdown {
   openingOutside: number;
   closingSuper: number;
   closingOutside: number;
-  // Split of the closing super between the tax-free account-based PENSION pool (up
+  // Split of the OPENING super between the tax-free account-based PENSION pool (up
   // to the Transfer Balance Cap) and the ACCUMULATION pool (the excess above the
-  // cap, or preserved bridge super — its earnings are taxed 15%). Sum = closingSuper.
+  // cap, or preserved bridge super — its earnings are taxed 15%). Sum = openingSuper,
+  // so the balance chart can stack them to the plotted super band.
   pensionSuper: number;
   accumSuper: number;
   // Accumulation (working-year) inflows
@@ -320,8 +321,13 @@ export interface YearBreakdown {
   agePension: number;
   pension: PensionBreakdown | null; // means-test working behind agePension (null before pension age)
   rentIncome: number; // net cash rent from an investment property
-  minDrawdown: number; // legislated minimum super drawdown this year (per-person, summed)
+  minDrawdown: number; // legislated minimum super drawdown this year (from the PENSION pool, per-person, summed)
   minDrawdownParts: MinDrawdownPart[]; // the per-person split behind minDrawdown
+  // The drawdown order for spending beyond the pension minimum: outside first (row
+  // .outsideDrawn), then accumulation super, then the tax-free pension above its
+  // minimum. superDrawn = minDrawdown + accumDrawn + pensionExtraDrawn.
+  accumDrawn: number; // accumulation super drawn above the minimum
+  pensionExtraDrawn: number; // tax-free pension drawn above the minimum (only once outside + accum are exhausted)
   // Retirement spending
   livingSpend: number;
   rentCost: number; // rent paid this year after selling up (0 otherwise)

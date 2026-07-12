@@ -94,19 +94,23 @@ export function simulate(
     accum[i] += amount - toPension;
   };
   // Draw `amount` from the accessible members' super, ACCUMULATION first (to
-  // preserve the tax-free pension pool), proportionally within each pool.
+  // preserve the tax-free pension pool), proportionally within each pool. Returns
+  // how much came from each pool, so the drawdown order can be shown.
   const drawSuper = (accessible: number[], amount: number) => {
     let remaining = amount;
-    for (const pool of [accum, pension]) {
+    const drawn = { accum: 0, pension: 0 };
+    for (const key of ["accum", "pension"] as const) {
       if (remaining <= EPS) break;
+      const pool = key === "accum" ? accum : pension;
       const total = accessible.reduce((s, i) => s + pool[i], 0);
       if (total <= EPS) continue;
       const take = Math.min(remaining, total);
       const r = take / total;
       accessible.forEach((i) => (pool[i] -= pool[i] * r));
+      drawn[key] = take;
       remaining -= take;
     }
-    return amount - remaining;
+    return drawn;
   };
   let outside = plan.outsideSuper;
 
@@ -329,7 +333,9 @@ export function simulate(
           closingSuper: totalSuper(),
           closingOutside: outside,
           pensionSuper: 0, // all super is in accumulation while still working
-          accumSuper: totalSuper(),
+          accumSuper: startSuper,
+          accumDrawn: 0,
+          pensionExtraDrawn: 0,
           contribGross,
           contribTax,
           contribNet,
@@ -418,6 +424,12 @@ export function simulate(
       accum[i] -= toPension;
       transferred[i] = true;
     });
+
+    // Opening split of this year's super (post-transfer). The pension pool sums
+    // across everyone; accum is whatever's left of the plotted opening balance, so
+    // the two always add to startSuper (what the balance chart plots).
+    const openPension = plan.people.reduce((s, _p, i) => s + pension[i], 0);
+    const openAccum = Math.max(0, startSuper - openPension);
 
     let accessibleSuper = accessibleIdx.reduce((s, i) => s + superOf(i), 0);
 
@@ -609,8 +621,10 @@ export function simulate(
     const needAfterMin = Math.max(0, privateNeed - minDraw);
     const outsideDrawn = Math.min(needAfterMin, outside);
     outside -= outsideDrawn;
-    const fromSuperExtra = drawSuper(accessibleIdx, needAfterMin - outsideDrawn);
-    const fromSuper = minDraw + fromSuperExtra;
+    const extra = drawSuper(accessibleIdx, needAfterMin - outsideDrawn);
+    const accumDrawn = extra.accum; // accumulation super drawn above the minimum
+    const pensionExtraDrawn = extra.pension; // tax-free pension drawn above the minimum
+    const fromSuper = minDraw + accumDrawn + pensionExtraDrawn;
     // A mandatory minimum drawn beyond the actual need is reinvested outside super.
     const surplus = Math.max(0, minDraw - privateNeed);
     outside += surplus;
@@ -647,9 +661,6 @@ export function simulate(
         accum[i] *= 1 + superAccumReturn;
       }
     });
-    // The split of super after this year's activity (sums to closingSuper).
-    const closingPension = plan.people.reduce((s, _p, i) => s + pension[i], 0);
-    const closingAccum = plan.people.reduce((s, _p, i) => s + accum[i], 0);
     const outsideGrowth = outside * realReturn;
     outside *= 1 + realReturn;
 
@@ -687,8 +698,10 @@ export function simulate(
         openingOutside: startOutside,
         closingSuper: totalSuper(),
         closingOutside: outside,
-        pensionSuper: closingPension,
-        accumSuper: closingAccum,
+        pensionSuper: openPension,
+        accumSuper: openAccum,
+        accumDrawn,
+        pensionExtraDrawn,
         contribGross: workContribGross,
         contribTax: workContribTax,
         contribNet: workContribNet,
