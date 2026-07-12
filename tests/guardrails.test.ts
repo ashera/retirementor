@@ -92,6 +92,36 @@ describe("Guyton-Klinger guardrails", () => {
     expect(tl.upperRail).toBeGreaterThan(tl.wr0);
   });
 
+  it("a depleting plan holds at the floor — a $0 portfolio never reads as a prosperity 'raise'", () => {
+    // Small portfolio, high spend → it fails. The bug was: once the portfolio hit
+    // $0 the rate computed as 0% (below the lower rail) and spending kept RAISING.
+    const failing: RetirementPlan = {
+      ...base,
+      people: [{ ...base.people[0], superBalance: 200_000 }],
+      outsideSuper: 100_000,
+      targetSpending: 60_000,
+      guardrails: {},
+    };
+    const res = simulate(failing, cfg);
+    expect(res.lastsToLifeExpectancy).toBe(false); // it genuinely runs short
+    const spends = res.rows.filter((r) => r.phase !== "accumulation").map((r) => r.breakdown.livingSpend);
+    expect(Math.max(...spends)).toBeLessThanOrEqual(60_000 + 1); // never raised above the start
+  });
+
+  it("the cut floor is never above the starting spend (all-essentials plans have no room to trim)", () => {
+    // A budget whose essentials exceed the spend used to push the floor ABOVE the
+    // start — nonsensical. It must cap at the start.
+    const allEssentials: RetirementPlan = {
+      ...base,
+      targetSpending: 60_000,
+      budget: { tenure: "own", lifestyle: "premium", applyPhases: false, categories: { housing: 30_000, food: 20_000, health: 15_000, leisure: 3_000 } },
+      guardrails: {},
+    };
+    const tl = guardrailsTimeline(allEssentials, cfg);
+    expect(tl.floor).toBeLessThanOrEqual(tl.start); // capped at the start
+    expect(tl.didCut).toBe(false); // nothing discretionary to trim
+  });
+
   it("offers a What-If lever that enables guardrails, once", () => {
     const card = buildStrategyCatalog(base).find((c) => c.id === "guardrails");
     expect(card).toBeTruthy();

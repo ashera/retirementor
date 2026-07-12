@@ -86,18 +86,21 @@ export function guardrailsOutlook(
 export interface GuardrailsTimelinePoint {
   age: number;
   spend: number; // living-spend that year (today's $)
-  rate: number; // net-of-pension withdrawal rate over the portfolio (fraction)
+  rate: number; // net-of-pension withdrawal rate over the portfolio (fraction; 0 once depleted)
   action: "start" | "cut" | "raise" | "hold";
+  funded: boolean; // was spending actually met this year (false once the portfolio is exhausted)
 }
 
 export interface GuardrailsTimeline {
   start: number; // initial spend
-  floor: number; // the cut floor (max of essentials, floorPct% of start)
+  floor: number; // the cut floor (max of essentials capped at start, floorPct% of start)
   wr0: number; // initial rate — the rail reference
   upperRail: number; // rate above which spending is cut
   lowerRail: number; // rate below which spending is raised
   pensionAge: number | null; // first age the Age Pension pays (the pivotal recovery)
   plateauSpend: number; // where spending settles by the end
+  failsAtAge: number | null; // first age spending can't be met (portfolio exhausted), else null
+  didCut: boolean; // did any cut trigger at all (false when spending is all-essentials)
   dipYears: number; // length of the illustrative downturn
   points: GuardrailsTimelinePoint[];
 }
@@ -120,7 +123,8 @@ export function guardrailsTimeline(
   const horizon = Math.max(0, Math.round(plan.lifeExpectancy - startOldest));
   const seq = Array.from({ length: horizon + 1 }, (_, t) => (t < dipYears ? dip : plan.investmentReturn));
 
-  const rows = simulate(plan, config, seq).rows.filter((r) => r.phase !== "accumulation");
+  const sim = simulate(plan, config, seq);
+  const rows = sim.rows.filter((r) => r.phase !== "accumulation");
   const points: GuardrailsTimelinePoint[] = [];
   let wr0 = 0;
   let prev = 0;
@@ -129,21 +133,27 @@ export function guardrailsTimeline(
     const spend = Math.round(r.breakdown.livingSpend);
     const pension = r.breakdown.agePension;
     const portfolio = r.totalSuper + r.outside;
-    const rate = portfolio > 0 ? Math.max(0, spend - pension) / portfolio : 0;
+    // A depleted portfolio has no meaningful rate; report 0 for the chart but flag
+    // it so callers can stop plotting the (otherwise exploding) rate there.
+    const rate = portfolio > 1 ? Math.max(0, spend - pension) / portfolio : 0;
     if (i === 0) wr0 = rate;
     if (pension > 1 && pensionAge == null) pensionAge = r.age;
     const action: GuardrailsTimelinePoint["action"] =
       i === 0 ? "start" : spend < prev - 1 ? "cut" : spend > prev + 1 ? "raise" : "hold";
     prev = spend;
-    points.push({ age: r.age, spend, rate, action });
+    points.push({ age: r.age, spend, rate, action, funded: r.funded });
   });
 
   const start = points.length ? points[0].spend : 0;
   const essential = budgetSplit(
     plan.budget?.categories ?? presetCategories(config, plan.household, plan.homeowner, "modest"),
   ).essential;
-  const floor = Math.max(Math.round(essential), Math.round(((plan.guardrails?.floorPct ?? 70) / 100) * start));
+  const floorPct = (plan.guardrails?.floorPct ?? 70) / 100;
+  // Never above the start spend (mirrors the engine): a plan spending all-essentials
+  // has no discretionary to trim, so its floor is simply the start.
+  const floor = Math.max(Math.min(Math.round(essential), start), Math.round(floorPct * start));
   const width = (plan.guardrails?.guardPct ?? 20) / 100;
+  const failsAtAge = points.find((p) => !p.funded)?.age ?? null;
 
   return {
     start,
@@ -153,6 +163,8 @@ export function guardrailsTimeline(
     lowerRail: wr0 * (1 - width),
     pensionAge,
     plateauSpend: points.length ? points[points.length - 1].spend : start,
+    failsAtAge,
+    didCut: points.some((p) => p.action === "cut"),
     dipYears,
     points,
   };

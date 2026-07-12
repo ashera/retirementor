@@ -532,7 +532,10 @@ export function simulate(
     if (guardrails) {
       if (guardSpend == null) {
         guardSpend = livingSpend;
-        guardFloor = Math.max(guardEssentials, guardFloorPct * livingSpend);
+        // The floor is the greater of essentials or floorPct% of the initial spend,
+        // but never above the spend itself — you can't "hold" more than you spend
+        // (a plan whose spend is already all-essentials just has no room to trim).
+        guardFloor = Math.max(Math.min(guardEssentials, livingSpend), guardFloorPct * livingSpend);
       }
       livingSpend = guardSpend;
     }
@@ -636,9 +639,12 @@ export function simulate(
     // upper rail cuts spending, below the lower rail raises it (floored, D3).
     if (guardrails && guardSpend != null) {
       const portfolio = startSuper + startOutside;
-      const rate = portfolio > EPS ? privateNeed / portfolio : 0;
+      // A depleted portfolio means the draw rate is effectively infinite (drawing
+      // from nothing) — that must read as ABOVE the upper rail, never as a "0%"
+      // that would wrongly trigger a prosperity raise on a failed plan.
+      const rate = portfolio > EPS ? privateNeed / portfolio : Infinity;
       if (guardWr0 == null) {
-        guardWr0 = rate;
+        guardWr0 = Number.isFinite(rate) ? rate : 0;
       } else if (rate > guardWr0 * (1 + guardWidth) && guardSpend > guardFloor + EPS) {
         guardSpend = Math.max(guardFloor, guardSpend * (1 - guardStep)); // pay cut
       } else if (rate < guardWr0 * (1 - guardWidth)) {
