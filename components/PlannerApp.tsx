@@ -32,6 +32,7 @@ import TrimSpendingModal from "@/components/TrimSpendingModal";
 import BoostSpendingModal from "@/components/BoostSpendingModal";
 import ProbabilityYearModal from "@/components/ProbabilityYearModal";
 import { retirementGoal } from "@/lib/au/goal";
+import { essentialsFloor } from "@/lib/au/lifestages";
 import { logout } from "@/app/actions/auth";
 import {
   deletePlan,
@@ -301,6 +302,11 @@ export default function PlannerApp({
   const prudentDelta = maxSpend != null ? maxSpend - gs.currentSpend : null;
   const overspending = prudentDelta != null && prudentDelta <= -1000;
   const spendHeadroom = prudentDelta != null && prudentDelta >= 1000;
+  // The essentials floor (needs — housing, food, health…). When the prudent max is
+  // below it, even cutting ALL discretionary can't reach the confidence bar, so a
+  // "trim spending" suggestion would be trimming into needs — not a real option.
+  const essentials = useMemo(() => essentialsFloor(plan, config).value, [plan, config]);
+  const cantTrim = overspending && maxSpend != null && maxSpend < essentials - 100;
   // Spend sits right at the prudent max — neither over nor under. Wait for the MC
   // max to settle so it doesn't flicker to/from the trim/boost states.
   const budgetBalanced = prudentDelta != null && !overspending && !spendHeadroom && !mcMaxPending;
@@ -1251,7 +1257,9 @@ export default function PlannerApp({
       <div id="what-will-it-take" className="mt-4 scroll-mt-6 rounded-2xl border border-line bg-panel p-6">
         <h2 className="font-semibold text-white">What will it take?</h2>
         <p className="mb-4 mt-1 text-sm text-slate-300">
-          {overspending
+          {cantTrim
+            ? `Trimming alone can't get ${fmtCurrency(goal.total)}/yr to ${Math.round(MC_CONFIDENCE_TARGET * 100)}% likely to last to age ${plan.lifeExpectancy} — even cutting all discretionary falls short of your essentials. Save more or retire later:`
+            : overspending
             ? `To keep ${fmtCurrency(goal.total)}/yr about ${Math.round(MC_CONFIDENCE_TARGET * 100)}% likely to last to age ${plan.lifeExpectancy}, ease any one of these:`
             : gs.lasts
               ? `Your plan funds ${fmtCurrency(goal.total)}/yr to age ${plan.lifeExpectancy} on the central projection — here's the headroom on each lever.`
@@ -1267,29 +1275,39 @@ export default function PlannerApp({
               <>
                 <Lever
                   label={
-                    budgetBalanced
-                      ? "Budget balanced"
-                      : spendDelta != null && spendDelta < 0
-                        ? "Trim spending to"
-                        : "Spend up to"
+                    cantTrim
+                      ? "Trim spending"
+                      : budgetBalanced
+                        ? "Budget balanced"
+                        : spendDelta != null && spendDelta < 0
+                          ? "Trim spending to"
+                          : "Spend up to"
                   }
-                  value={maxSpend != null ? `${fmtCurrency(maxSpend + goal.loanCost)}/yr` : "—"}
+                  value={
+                    cantTrim
+                      ? "not enough"
+                      : maxSpend != null
+                        ? `${fmtCurrency(maxSpend + goal.loanCost)}/yr`
+                        : "—"
+                  }
                   note={
-                    maxSpend != null
-                      ? `${goal.loanCost > 0 ? `${fmtCurrency(maxSpend)} living + ${fmtCurrency(goal.loanCost)} loan · ` : ""}${targetPct}% likely to last`
-                      : undefined
+                    cantTrim || maxSpend == null
+                      ? undefined
+                      : `${goal.loanCost > 0 ? `${fmtCurrency(maxSpend)} living + ${fmtCurrency(goal.loanCost)} loan · ` : ""}${targetPct}% likely to last`
                   }
                   delta={
-                    budgetBalanced
-                      ? "A great match for what your plan can afford"
-                      : spendDelta == null
-                        ? "even a low spend is risky"
-                        : spendDelta >= 0
-                          ? `${fmtCurrency(spendDelta)} of headroom`
-                          : `${fmtCurrency(-spendDelta)} less than now`
+                    cantTrim
+                      ? `Essentials alone (${fmtCurrency(essentials + goal.loanCost)}/yr) already miss ${targetPct}% — trimming can't fix it`
+                      : budgetBalanced
+                        ? "A great match for what your plan can afford"
+                        : spendDelta == null
+                          ? "even a low spend is risky"
+                          : spendDelta >= 0
+                            ? `${fmtCurrency(spendDelta)} of headroom`
+                            : `${fmtCurrency(-spendDelta)} less than now`
                   }
                   tone={
-                    budgetBalanced || (spendDelta != null && spendDelta >= 0)
+                    !cantTrim && (budgetBalanced || (spendDelta != null && spendDelta >= 0))
                       ? "text-emerald-400"
                       : "text-amber-400"
                   }
@@ -1338,7 +1356,7 @@ export default function PlannerApp({
           for market ups and downs); saving and retirement are on the central average-return projection. Each lever on
           its own — combine them, or check the likelihood above.
         </p>
-        {overspending && (
+        {overspending && !cantTrim && (
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
             <p className="text-sm text-slate-300">
               Want the app to do it for you? Trim discretionary spending — keeping
