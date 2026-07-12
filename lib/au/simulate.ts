@@ -23,6 +23,7 @@ import {
   startingSuperBalances,
 } from "./types";
 import { mortgageActiveAtAge, mortgageAnnualCost } from "./mortgage";
+import { budgetSplit, presetCategories } from "./budget";
 import { residentIncomeTax, seniorIncomeTax } from "./tax";
 import {
   capitalGainsTax,
@@ -153,6 +154,22 @@ export function simulate(
   let lumpSumTaken = false;
   // Optional recontribution: annual after-tax top-up of super from outside savings.
   const recontribute = plan.recontribute;
+  // Optional Guyton-Klinger guardrails: dynamic spending that flexes with the
+  // portfolio. Living-spend starts at the plan's target and is nudged each year —
+  // cut past the upper rail, raised past the lower — measured on the NET-OF-PENSION
+  // withdrawal rate (D1), floored at essentials or floorPct% of the initial spend (D3).
+  const guardrails = plan.guardrails;
+  const guardWidth = (guardrails?.guardPct ?? 20) / 100; // rail half-width vs initial rate
+  const guardStep = (guardrails?.adjustPct ?? 10) / 100; // cut / raise size
+  const guardFloorPct = (guardrails?.floorPct ?? 70) / 100;
+  // Essentials floor (needs) — the same budget-derived figure the What-If spend
+  // lever holds fixed; guardrail cuts never trim below it.
+  const guardEssentials = guardrails
+    ? budgetSplit(plan.budget?.categories ?? presetCategories(config, plan.household, plan.homeowner, "modest")).essential
+    : 0;
+  let guardSpend: number | null = null; // dynamic living-spend (today's $), set on the first retired year
+  let guardWr0: number | null = null; // initial net-of-pension withdrawal rate (the rail reference)
+  let guardFloor = 0; // max(essentials, floorPct% of the initial spend)
   // The (exempt) home value tracked for the net-worth view: the current value
   // until a downsize (→ the smaller home) or a sale (→ 0). Homeowners without a
   // stated value get the same default the downsize lever assumes. It appreciates
@@ -508,7 +525,17 @@ export function simulate(
     // Rent once sold up (today's-dollars flat, like living costs), itemised
     // separately so the ledger can show it as its own line.
     const rentExpense = sellRent != null && oldest >= sellRent.atAge ? Math.max(0, sellRent.rentPerYear) : 0;
-    const livingSpend = spendingForAge(plan, oldest);
+    let livingSpend = spendingForAge(plan, oldest);
+    // Guardrails own the spending schedule once retired: the first retired year
+    // seeds the dynamic spend (and the floor); later years use the carried value,
+    // updated at the end of each iteration from the realised withdrawal rate.
+    if (guardrails) {
+      if (guardSpend == null) {
+        guardSpend = livingSpend;
+        guardFloor = Math.max(guardEssentials, guardFloorPct * livingSpend);
+      }
+      livingSpend = guardSpend;
+    }
     const spending = livingSpend + rentExpense + mortgageCost;
 
     // Investment property: real capital growth, actual net rent (income test) and
@@ -602,6 +629,22 @@ export function simulate(
     const externalIncome = agePensionAmt + rentCash + netWork + workTakeHome;
     const privateNeed = Math.max(0, spending - externalIncome);
     if (externalIncome > spending) outside += externalIncome - spending;
+
+    // Guardrails: update next year's spend from THIS year's realised withdrawal
+    // rate — the net-of-pension draw over the whole investable portfolio (D1). The
+    // first retired year fixes the reference rate; thereafter, drifting above the
+    // upper rail cuts spending, below the lower rail raises it (floored, D3).
+    if (guardrails && guardSpend != null) {
+      const portfolio = startSuper + startOutside;
+      const rate = portfolio > EPS ? privateNeed / portfolio : 0;
+      if (guardWr0 == null) {
+        guardWr0 = rate;
+      } else if (rate > guardWr0 * (1 + guardWidth) && guardSpend > guardFloor + EPS) {
+        guardSpend = Math.max(guardFloor, guardSpend * (1 - guardStep)); // pay cut
+      } else if (rate < guardWr0 * (1 - guardWidth)) {
+        guardSpend *= 1 + guardStep; // raise
+      }
+    }
 
     // Super must pay at least its ATO minimum each year; beyond that we spend
     // OUTSIDE super FIRST. Super in pension phase earns tax-free, whereas money

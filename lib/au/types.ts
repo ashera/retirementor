@@ -151,6 +151,7 @@ export interface RetirementPlan {
   workIncome?: { perYear: number; untilAge: number }; // part-time work in early retirement (offsets drawdown; income-test assessable net of the Work Bonus)
   ttr?: { extraSacrifice: number }; // Transition to Retirement: extra pre-tax sacrifice/yr from preservation age → retirement, take-home held by a tax-free TTR pension
   keepSuperInAccumulation?: boolean; // don't convert super to an account-based pension at retirement — keep it in accumulation (15% earnings tax, but NO mandatory minimum drawdown, so nothing is force-drawn into taxable savings). Useful when outside-super covers spending.
+  guardrails?: { guardPct?: number; adjustPct?: number; floorPct?: number }; // Guyton-Klinger dynamic spending: flex living-spend with the portfolio. If the net-of-pension withdrawal RATE drifts guardPct% (default 20) above its initial level, cut spending adjustPct% (default 10); if it drifts guardPct% below, raise it — never below the greater of essentials or floorPct% (default 70) of the initial spend. Presence enables it.
   lumpSum?: { atAge: number; amount: number }; // one-off tax-free super withdrawal at an age (spent), capped at the accessible super balance then
   recontribute?: { perYear: number; fromAge: number; untilAge: number }; // recontribution: after-tax (non-concessional) top-up of super from outside savings, each year from fromAge to untilAge (a one-off when they're equal), age ≤75, within the NCC + total-super caps
   investmentProperties?: PropertyDetail[]; // income-producing properties (source of truth)

@@ -526,6 +526,20 @@ export function buildStrategyCatalog(
     });
   }
 
+  // --- Flexible spending: Guyton-Klinger guardrails ---
+  if (spend > 0 && !plan.guardrails) {
+    cards.push({
+      id: "guardrails",
+      group: "timing",
+      label: "Flexible spending (guardrails)",
+      blurb: "Let spending flex with your portfolio — ease off a little after market falls, treat yourself after strong years — instead of drawing a fixed amount forever.",
+      params: [],
+      note: () =>
+        "Guyton-Klinger guardrails: if your portfolio's withdrawal rate (after the Age Pension) drifts about 20% above where it started, spending is trimmed ~10%; if it drifts ~20% below, you get a ~10% raise — but never below your essentials. Being willing to ease off in downturns lets the same portfolio safely support a higher average spend than a rigid fixed withdrawal. Pair it with the spending lever to see how much more you could start on.",
+      apply: (p) => ({ ...p, guardrails: {} }),
+    });
+  }
+
   // --- Work ---
   if (oldest < 75) {
     cards.push({
