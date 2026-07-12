@@ -150,6 +150,7 @@ export interface RetirementPlan {
   home?: HomeDetail; // the principal home as an asset (exempt; net-worth context only)
   workIncome?: { perYear: number; untilAge: number }; // part-time work in early retirement (offsets drawdown; income-test assessable net of the Work Bonus)
   ttr?: { extraSacrifice: number }; // Transition to Retirement: extra pre-tax sacrifice/yr from preservation age → retirement, take-home held by a tax-free TTR pension
+  keepSuperInAccumulation?: boolean; // don't convert super to an account-based pension at retirement — keep it in accumulation (15% earnings tax, but NO mandatory minimum drawdown, so nothing is force-drawn into taxable savings). Useful when outside-super covers spending.
   lumpSum?: { atAge: number; amount: number }; // one-off tax-free super withdrawal at an age (spent), capped at the accessible super balance then
   recontribute?: { perYear: number; fromAge: number; untilAge: number }; // recontribution: after-tax (non-concessional) top-up of super from outside savings, each year from fromAge to untilAge (a one-off when they're equal), age ≤75, within the NCC + total-super caps
   investmentProperties?: PropertyDetail[]; // income-producing properties (source of truth)

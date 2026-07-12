@@ -722,6 +722,28 @@ export default function PlanWizard({
             </div>
           );
         })()}
+        <div className="space-y-3 rounded-xl border border-line bg-panel-2 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="text-xs font-semibold uppercase tracking-wide text-muted">
+              Super in retirement (advanced)
+            </div>
+            <Segmented
+              value={draft.keepSuperInAccumulation ? "accum" : "pension"}
+              onChange={(v) => patch({ keepSuperInAccumulation: v === "accum" })}
+              options={[
+                { value: "pension", label: "Pension" },
+                { value: "accum", label: "Accumulation" },
+              ]}
+            />
+          </div>
+          <p className="text-xs text-muted">
+            By default, super converts to a tax-free <strong className="text-slate-300">account-based pension</strong>{" "}
+            at retirement: earnings are tax-free, but you must draw a minimum each year (any part you don&apos;t need
+            is reinvested outside super). Choose <strong className="text-slate-300">Accumulation</strong> to leave it
+            in accumulation instead — no forced minimum drawdown, but earnings are taxed 15%. Handy to model when your
+            outside-super savings already cover your spending, though starting a pension is usually more tax-effective.
+          </p>
+        </div>
       </div>
     ),
   };

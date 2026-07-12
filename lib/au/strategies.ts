@@ -5,7 +5,7 @@
 // sell-&-rent and part-time work land in later phases.
 
 import type { RetirementPlan } from "./types";
-import { getInvestmentProperties } from "./types";
+import { getInvestmentProperties, startingSuperBalances } from "./types";
 import { fmtCurrency } from "./format";
 import { propertyValueAt, capitalGainsTax, netSaleProceeds } from "./property";
 import { budgetSplit, presetCategories } from "./budget";
@@ -474,6 +474,21 @@ export function buildStrategyCatalog(
         );
       },
       apply: (p, v) => ({ ...p, recontribute: { perYear: v.amount, fromAge: v.fromAge, untilAge: Math.max(v.fromAge, v.untilAge) } }),
+    });
+  }
+
+  // --- Keep super in accumulation (don't start an account-based pension) ---
+  const totalStartSuper = startingSuperBalances(plan).reduce((s, v) => s + v, 0);
+  if (totalStartSuper > 1_000 && !plan.keepSuperInAccumulation) {
+    cards.push({
+      id: "keep-accumulation",
+      group: "timing",
+      label: "Keep super in accumulation",
+      blurb: "Leave super in accumulation instead of starting an account-based pension at retirement — no mandatory minimum drawdown, but earnings are taxed 15% instead of tax-free.",
+      params: [],
+      note: () =>
+        "Super stays in accumulation phase: there's no forced minimum drawdown, so nothing is pushed out into taxable savings — but its earnings are taxed at 15% rather than being tax-free. For most people, starting a pension and reinvesting any minimum you don't need is more tax-effective; use this to model the alternative (e.g. if your outside-super savings already cover your spending).",
+      apply: (p) => ({ ...p, keepSuperInAccumulation: true }),
     });
   }
 

@@ -417,13 +417,19 @@ export function simulate(
     // a new tax-free pension pool. Fixed at transfer — the pension pool's growth
     // stays tax-free thereafter even if it grows past the cap. The excess (if any)
     // stays in accumulation and keeps being taxed at 15%.
-    accessibleIdx.forEach((i) => {
-      if (transferred[i]) return;
-      const toPension = Math.min(accum[i], config.transferBalanceCap);
-      pension[i] += toPension;
-      accum[i] -= toPension;
-      transferred[i] = true;
-    });
+    // OPT-OUT: keepSuperInAccumulation leaves everything in accumulation (no
+    // pension started) — earnings still taxed 15%, but no mandatory minimum
+    // drawdown forces money out into taxable savings. Super is then only drawn
+    // when outside-super is exhausted (drawSuper pulls from accumulation).
+    if (!plan.keepSuperInAccumulation) {
+      accessibleIdx.forEach((i) => {
+        if (transferred[i]) return;
+        const toPension = Math.min(accum[i], config.transferBalanceCap);
+        pension[i] += toPension;
+        accum[i] -= toPension;
+        transferred[i] = true;
+      });
+    }
 
     // Opening split of this year's super (post-transfer). The pension pool sums
     // across everyone; accum is whatever's left of the plotted opening balance, so
