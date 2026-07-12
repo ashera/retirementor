@@ -38,6 +38,8 @@ import {
   deletePlan,
   savePlan,
   saveDraft,
+  createShareLink,
+  revokeShareLink,
   type SavedPlan,
   type PlanDraft,
 } from "@/app/actions/plans";
@@ -83,6 +85,93 @@ function LegendDot({ color, label }: { color: string; label: string }) {
       />
       {label}
     </span>
+  );
+}
+
+/** Per-scenario share control: mints (or reuses) a public read-only link, copies
+ *  it to the clipboard, and lets the owner revoke it. Lives in the saved-scenarios
+ *  chip beside the Report/Delete actions. */
+function ShareControl({
+  id,
+  initialToken,
+  onNotice,
+}: {
+  id: string;
+  initialToken: string | null;
+  onNotice: (msg: string) => void;
+}) {
+  const [token, setToken] = useState<string | null>(initialToken);
+  const [busy, setBusy] = useState(false);
+
+  const linkFor = (t: string) =>
+    `${typeof window !== "undefined" ? window.location.origin : ""}/s/${t}`;
+
+  const copy = async (url: string) => {
+    try {
+      await navigator.clipboard.writeText(url);
+      onNotice("Share link copied — anyone with it can view this scenario (read-only).");
+    } catch {
+      onNotice(`Share link: ${url}`); // clipboard blocked — show it so they can copy manually
+    }
+  };
+
+  const share = async () => {
+    if (busy) return;
+    if (token) return void copy(linkFor(token));
+    setBusy(true);
+    try {
+      const res = await createShareLink(id);
+      if (res.token) {
+        setToken(res.token);
+        await copy(linkFor(res.token));
+      } else {
+        onNotice(res.error ?? "Couldn't create a share link.");
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const revoke = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await revokeShareLink(id);
+      setToken(null);
+      onNotice("Share link revoked — the public link no longer works.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return token ? (
+    <>
+      <button
+        onClick={share}
+        disabled={busy}
+        title="Copy the public read-only link"
+        className="rounded px-1 text-accent hover:text-accent-soft"
+      >
+        🔗 Copy link
+      </button>
+      <button
+        onClick={revoke}
+        disabled={busy}
+        title="Disable the public link"
+        className="rounded px-1 text-muted hover:text-red-400"
+      >
+        unshare
+      </button>
+    </>
+  ) : (
+    <button
+      onClick={share}
+      disabled={busy}
+      title="Create a public read-only link to send someone"
+      className="rounded px-1 text-muted hover:text-accent"
+    >
+      🔗 Share
+    </button>
   );
 }
 
@@ -138,13 +227,18 @@ export default function PlannerApp({
   draft = null,
   config,
   reviewDue = 0,
+  sharedPlan = null,
 }: {
   user: { email: string; isAdmin: boolean; name?: string | null; avatarUrl?: string | null } | null;
   savedPlans: SavedPlan[];
   draft?: PlanDraft | null;
   config: EngineConfig;
   reviewDue?: number;
+  // Public share-link view: preload this scenario, and treat the session as
+  // read-only — never read or write the viewer's own localStorage / cloud draft.
+  sharedPlan?: { plan: RetirementPlan; name: string } | null;
 }) {
+  const shared = !!sharedPlan;
   const router = useRouter();
   const [plan, setPlan] = useState<RetirementPlan>(DEFAULT_PLAN);
   // Baseline = the last committed plan (wizard / saved / load). Quick-adjust tweaks
@@ -175,6 +269,18 @@ export default function PlannerApp({
   const [nudgeDismissed, setNudgeDismissed] = useState(false);
 
   useEffect(() => {
+    // Public share-link view: load the shared scenario straight in and stop —
+    // never read or write this viewer's localStorage (it's someone else's plan).
+    if (sharedPlan) {
+      const working = { ...DEFAULT_PLAN, ...sharedPlan.plan };
+      setPlan(working);
+      setBaseline(working);
+      setBaselineName(sharedPlan.name);
+      setConfigured(true);
+      setReady(true);
+      track("Shared scenario viewed");
+      return;
+    }
     // Decide which working plan to restore. Priority: the newer of the local
     // working copy vs. the signed-in user's cloud draft (so work follows them
     // across devices / survives cleared storage); else the most recent saved
@@ -324,6 +430,7 @@ export default function PlannerApp({
   const baselineLabel = baselineName || "Before changes";
 
   const persistWorking = (next: RetirementPlan) => {
+    if (shared) return; // read-only share view — don't touch the viewer's storage
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
       localStorage.setItem(WORKING_TS_KEY, String(Date.now()));
@@ -339,6 +446,7 @@ export default function PlannerApp({
     setBaseline(next);
     setBaselineName(name);
     persistWorking(next);
+    if (shared) return; // read-only share view — don't touch the viewer's storage
     try {
       localStorage.setItem(BASELINE_KEY, JSON.stringify(next));
       if (name) localStorage.setItem(BASELINE_NAME_KEY, name);
@@ -615,9 +723,27 @@ export default function PlannerApp({
           })()}
       </header>
 
+      {/* Public share-link view: make it clear this is someone else's scenario,
+          it's read-only (tweaks explore but aren't saved), and offer a way in. */}
+      {shared && (
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-accent/30 bg-accent/5 px-5 py-3">
+          <p className="text-sm text-slate-200">
+            <span aria-hidden>🔗</span> You&apos;re viewing a{" "}
+            <strong className="text-white">shared scenario{sharedPlan ? ` — “${sharedPlan.name}”` : ""}</strong>.
+            Explore it freely; any changes you make here are just a preview and aren&apos;t saved.
+          </p>
+          <Link
+            href="/"
+            className="shrink-0 rounded-lg bg-accent px-3 py-1.5 text-sm font-semibold text-ink transition hover:bg-accent-soft"
+          >
+            Build your own →
+          </Link>
+        </div>
+      )}
+
       {/* Signed-out users: their work lives only on this device — nudge them to
           create an account so it's backed up and available anywhere. */}
-      {!user && configured && !nudgeDismissed && (
+      {!user && !shared && configured && !nudgeDismissed && (
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/5 px-5 py-3">
           <p className="text-sm text-amber-100">
             <span aria-hidden>💾</span> Your plan is saved on{" "}
@@ -690,6 +816,7 @@ export default function PlannerApp({
                 >
                   ↗ Report
                 </Link>
+                <ShareControl id={sp.id} initialToken={sp.share_token} onNotice={setNotice} />
                 <button
                   onClick={() => handleDelete(sp)}
                   aria-label={`Delete ${sp.name}`}

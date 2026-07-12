@@ -55,6 +55,10 @@ create table if not exists plans (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+-- Capability token for a public, read-only share link to this scenario (null =
+-- not shared). Anyone with the link can view; the owner revokes by nulling it.
+-- ALTER (not part of the create above) so existing databases pick it up too.
+alter table plans add column if not exists share_token text;
 
 -- One auto-saved working draft per user, so unsaved work survives across
 -- devices and cleared browser storage (upserted on the user_id primary key).

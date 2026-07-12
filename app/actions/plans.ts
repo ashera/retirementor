@@ -1,5 +1,6 @@
 "use server";
 
+import { randomBytes } from "crypto";
 import { revalidatePath } from "next/cache";
 import { query } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
@@ -10,6 +11,7 @@ export interface SavedPlan {
   name: string;
   data: RetirementPlan;
   updated_at: string;
+  share_token: string | null; // set → a public read-only link exists; null → not shared
 }
 
 export interface ActionResult {
@@ -21,10 +23,38 @@ export async function listPlans(): Promise<SavedPlan[]> {
   const user = await getCurrentUser();
   if (!user) return [];
   const r = await query<SavedPlan>(
-    "select id, name, data, updated_at from plans where user_id = $1 order by updated_at desc",
+    "select id, name, data, updated_at, share_token from plans where user_id = $1 order by updated_at desc",
     [user.id],
   );
   return r.rows;
+}
+
+/** Create (or return the existing) public read-only share link for a scenario.
+ *  The token is a capability: anyone with the link can view the scenario in a
+ *  logged-out, preloaded dashboard. Owner-scoped; idempotent (reuses the token). */
+export async function createShareLink(id: string): Promise<{ token?: string; error?: string }> {
+  const user = await getCurrentUser();
+  if (!user) return { error: "You need to be signed in." };
+  const existing = await query<{ share_token: string | null }>(
+    "select share_token from plans where id = $1 and user_id = $2",
+    [id, user.id],
+  );
+  if (existing.rows.length === 0) return { error: "Scenario not found." };
+  const current = existing.rows[0].share_token;
+  if (current) return { token: current }; // already shared — keep the same link
+  const token = randomBytes(24).toString("base64url"); // ~32 URL-safe chars, unguessable
+  await query("update plans set share_token = $1 where id = $2 and user_id = $3", [token, id, user.id]);
+  revalidatePath("/");
+  return { token };
+}
+
+/** Revoke the share link — the public URL stops working immediately. */
+export async function revokeShareLink(id: string): Promise<ActionResult> {
+  const user = await getCurrentUser();
+  if (!user) return { error: "You need to be signed in." };
+  await query("update plans set share_token = null where id = $1 and user_id = $2", [id, user.id]);
+  revalidatePath("/");
+  return { ok: true };
 }
 
 export interface PlanDraft {
