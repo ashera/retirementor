@@ -96,9 +96,10 @@ export default function IncomeChart({
   // Show the full timeline (income is $0 through the accumulation years) so this
   // chart's x-axis lines up with the balance chart above it.
   const rows = result.rows;
-  // Split the "from super" band into pension vs accumulation drawdown when there's
-  // an accumulation balance (super over the Transfer Balance Cap); else one band.
-  const hasSplit = rows.some((r) => (r.breakdown?.accumSuper ?? 0) > 1);
+  // Split the "from super" band into pension vs accumulation drawdown only when
+  // accumulation is actually DRAWN as income; an accumulation balance that's never
+  // tapped would otherwise show an empty band + legend entry.
+  const hasSplit = rows.some((r) => (r.breakdown?.accumDrawn ?? 0) > 1);
   if (rows.length === 0) {
     return (
       <div className="flex h-[220px] items-center justify-center text-sm text-muted">

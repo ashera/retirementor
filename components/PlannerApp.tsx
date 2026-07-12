@@ -1033,7 +1033,10 @@ export default function PlannerApp({
             <LegendDot color="#facc15" label="Take-home pay" />
             {plan.workIncome && <LegendDot color="#f472b6" label="Part-time work" />}
             <LegendDot color="#a78bfa" label="Age Pension" />
-            {result.rows.some((r) => (r.breakdown?.accumSuper ?? 0) > 1) ? (
+            {/* Split the super legend only when accumulation is actually DRAWN as
+                income — an accumulation balance that's never tapped adds a legend
+                entry with no matching band. */}
+            {result.rows.some((r) => (r.breakdown?.accumDrawn ?? 0) > 1) ? (
               <>
                 <LegendDot color="#34d399" label="Super — pension" />
                 <LegendDot color="#eab308" label="Super — accumulation" />
