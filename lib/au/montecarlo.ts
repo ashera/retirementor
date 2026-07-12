@@ -4,6 +4,7 @@
 // than the same run late) and report a success probability + a fan of outcomes.
 
 import { simulate } from "./simulate";
+import { householdRetirementOffset } from "./types";
 import type { EngineConfig } from "./config";
 import type { RetirementPlan } from "./types";
 
@@ -113,6 +114,24 @@ export function runMonteCarlo(
       solvent: vals.length ? vals.filter((v) => v > 1).length / vals.length : 1,
     };
   });
+
+  // RG 276 two-stage deflation: accumulation-year balances are in WAGE-deflated
+  // today's dollars, retirement onward in CPI-deflated dollars. The engine rebases
+  // the stock at the retirement boundary, which — plotted raw — makes the fan step
+  // up ~50% right at retirement. The balance chart already lifts the accumulation
+  // years onto the CPI basis for one smooth line (RetirementChart.cpiBasis); do the
+  // same here so the fan agrees. The rebase is a single deterministic factor per
+  // year, so scaling each percentile is exact and touches no success/solvency math.
+  const step = (1 + (plan.inflation + (config.livingStandardsGrowthPct ?? 0)) / 100) / (1 + plan.inflation / 100);
+  const accumYears = householdRetirementOffset(plan); // t < accumYears is still accumulation
+  if (Math.abs(step - 1) > 1e-9) {
+    for (let t = 1; t < Math.min(fan.length, accumYears); t++) {
+      const f = Math.pow(step, t);
+      fan[t].p10 *= f;
+      fan[t].p50 *= f;
+      fan[t].p90 *= f;
+    }
+  }
 
   const depSorted = depletionAges.slice().sort((a, b) => a - b);
 
