@@ -31,7 +31,7 @@ export default async function SharedScenarioPage({
       savedPlans={[]}
       draft={null}
       config={config}
-      sharedPlan={{ plan, name: saved.name, token }}
+      sharedPlan={{ plan, name: saved.name, basePath: `/s/${token}` }}
     />
   );
 }

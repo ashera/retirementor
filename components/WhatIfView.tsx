@@ -99,9 +99,10 @@ export default function WhatIfView({
   config: EngineConfig;
   savedPlans: SavedPlan[];
   signedIn: boolean;
-  // Public share-link view: start from this scenario, treat the session as
-  // read-only, and never read/write the viewer's own localStorage.
-  sharedPlan?: { plan: RetirementPlan; name: string; token: string } | null;
+  // Public read-only view (a share link or a curated /scenario/<slug> demo):
+  // start from this scenario and never read/write the viewer's own localStorage.
+  // `basePath` is this view's root (e.g. "/s/<token>" or "/scenario/<slug>").
+  sharedPlan?: { plan: RetirementPlan; name: string; basePath: string } | null;
 }) {
   const shared = !!sharedPlan;
   const [current, setCurrent] = useState<RetirementPlan | null>(null);
@@ -400,7 +401,7 @@ export default function WhatIfView({
     <div className="mx-auto max-w-4xl px-5 py-8">
       <div className="mb-6 flex items-center justify-between gap-3">
         <Link
-          href={shared ? `/s/${sharedPlan!.token}` : "/"}
+          href={shared ? sharedPlan!.basePath : "/"}
           className="text-sm font-medium text-muted hover:text-white"
         >
           ← Back to {shared ? "the shared scenario" : "planner"}

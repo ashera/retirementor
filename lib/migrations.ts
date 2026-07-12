@@ -5,6 +5,7 @@ import type { Client } from "pg";
 import { DEFAULT_CONFIG } from "./au/config";
 import { PARAM_DESCRIPTORS } from "./au/params";
 import { SOURCE_SEEDS } from "./au/sources";
+import { DEMO_SCENARIOS } from "./au/scenarios/demoScenarios";
 
 export const SCHEMA_SQL = `
 create table if not exists users (
@@ -65,6 +66,24 @@ alter table plans add column if not exists share_token text;
 create table if not exists plan_drafts (
   user_id uuid primary key references users(id) on delete cascade,
   data jsonb not null,
+  updated_at timestamptz not null default now()
+);
+
+-- Curated, code-seeded demo scenarios (e.g. reproductions of Reddit FIRE debates)
+-- shared publicly at /scenario/<slug>. Not owned by a user; authored in code and
+-- upserted by slug on deploy (see seedDemoScenarios). context/thread_url are
+-- admin-only notes (which discussion, the claim, our finding).
+create table if not exists demo_scenarios (
+  id uuid primary key default gen_random_uuid(),
+  slug text unique not null,
+  title text not null,
+  blurb text,
+  context text,
+  thread_url text,
+  data jsonb not null,
+  sort_order int not null default 0,
+  published boolean not null default true,
+  created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 
@@ -197,6 +216,7 @@ create table if not exists test_results (
 
 create index if not exists sessions_token_idx on sessions(token);
 create index if not exists plans_user_idx on plans(user_id);
+create index if not exists demo_scenarios_pub_idx on demo_scenarios(published, sort_order);
 create index if not exists ref_audit_version_idx on ref_data_audit(version_id, changed_at desc);
 create index if not exists test_results_run_idx on test_results(run_id, area);
 `;
@@ -446,4 +466,31 @@ export async function migrate(c: Client): Promise<void> {
   await seedRefData(c);
   await seedSources(c);
   await seedMarketingAssets(c);
+  await seedDemoScenarios(c);
+}
+
+/**
+ * Curated demo scenarios (Reddit reproductions etc.). Code is the source of
+ * truth: every scenario is upserted by its stable `slug`, so editing the array
+ * in code and deploying updates the live scenario in place. Removing one from
+ * the array leaves the DB row untouched (unpublish/delete via the backoffice).
+ */
+export async function seedDemoScenarios(c: Client): Promise<void> {
+  for (const s of DEMO_SCENARIOS) {
+    await c.query(
+      `insert into demo_scenarios (slug, title, blurb, context, thread_url, data, sort_order, published, updated_at)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, now())
+       on conflict (slug) do update set
+         title = excluded.title,
+         blurb = excluded.blurb,
+         context = excluded.context,
+         thread_url = excluded.thread_url,
+         data = excluded.data,
+         sort_order = excluded.sort_order,
+         published = excluded.published,
+         updated_at = now()`,
+      [s.slug, s.title, s.blurb ?? null, s.context ?? null, s.threadUrl ?? null, JSON.stringify(s.data), s.sortOrder ?? 0, s.published ?? true],
+    );
+  }
+  console.log(`  demo-scenarios: upserted ${DEMO_SCENARIOS.length} scenario(s).`);
 }

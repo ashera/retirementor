@@ -30,7 +30,7 @@ export default async function SharedWhatIfPage({
       config={config}
       savedPlans={[]}
       signedIn={false}
-      sharedPlan={{ plan, name: saved.name, token }}
+      sharedPlan={{ plan, name: saved.name, basePath: `/s/${token}` }}
     />
   );
 }

@@ -234,15 +234,16 @@ export default function PlannerApp({
   draft?: PlanDraft | null;
   config: EngineConfig;
   reviewDue?: number;
-  // Public share-link view: preload this scenario, and treat the session as
-  // read-only — never read or write the viewer's own localStorage / cloud draft.
-  // `token` lets in-app links (e.g. What-If) stay within the shared context.
-  sharedPlan?: { plan: RetirementPlan; name: string; token: string } | null;
+  // Public read-only view (a share link or a curated /scenario/<slug> demo):
+  // preload this scenario and never read or write the viewer's own localStorage /
+  // cloud draft. `basePath` is this view's root (e.g. "/s/<token>" or
+  // "/scenario/<slug>") so in-app links (What-If) stay within the shared context.
+  sharedPlan?: { plan: RetirementPlan; name: string; basePath: string } | null;
 }) {
   const shared = !!sharedPlan;
   // Keep What-If inside the shared context so it starts from THIS scenario, not
   // the viewer's own plan; signed-in/normal visitors go to the regular sandbox.
-  const whatIfHref = sharedPlan ? `/s/${sharedPlan.token}/what-if` : "/what-if";
+  const whatIfHref = sharedPlan ? `${sharedPlan.basePath}/what-if` : "/what-if";
   const router = useRouter();
   const [plan, setPlan] = useState<RetirementPlan>(DEFAULT_PLAN);
   // Baseline = the last committed plan (wizard / saved / load). Quick-adjust tweaks
