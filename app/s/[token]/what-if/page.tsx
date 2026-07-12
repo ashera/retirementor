@@ -1,15 +1,15 @@
 import { notFound } from "next/navigation";
-import PlannerApp from "@/components/PlannerApp";
+import WhatIfView from "@/components/WhatIfView";
 import { query } from "@/lib/db";
 import { getActiveConfig } from "@/lib/refdata";
 import { DEFAULT_PLAN, type RetirementPlan } from "@/lib/au/types";
 
-// A public, read-only share link. No login: the scenario is looked up by its
-// capability token and rendered into a logged-out dashboard preloaded with it.
-export const metadata = { title: "Shared retirement scenario", robots: { index: false, follow: false } };
+// Public What-If sandbox for a shared scenario. No login: the base plan is
+// looked up by the same capability token as the shared dashboard.
+export const metadata = { title: "What if… (shared scenario)", robots: { index: false, follow: false } };
 export const dynamic = "force-dynamic";
 
-export default async function SharedScenarioPage({
+export default async function SharedWhatIfPage({
   params,
 }: {
   params: Promise<{ token: string }>;
@@ -26,11 +26,10 @@ export default async function SharedScenarioPage({
   const config = await getActiveConfig();
 
   return (
-    <PlannerApp
-      user={null}
-      savedPlans={[]}
-      draft={null}
+    <WhatIfView
       config={config}
+      savedPlans={[]}
+      signedIn={false}
       sharedPlan={{ plan, name: saved.name, token }}
     />
   );

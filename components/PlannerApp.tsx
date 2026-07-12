@@ -236,9 +236,13 @@ export default function PlannerApp({
   reviewDue?: number;
   // Public share-link view: preload this scenario, and treat the session as
   // read-only — never read or write the viewer's own localStorage / cloud draft.
-  sharedPlan?: { plan: RetirementPlan; name: string } | null;
+  // `token` lets in-app links (e.g. What-If) stay within the shared context.
+  sharedPlan?: { plan: RetirementPlan; name: string; token: string } | null;
 }) {
   const shared = !!sharedPlan;
+  // Keep What-If inside the shared context so it starts from THIS scenario, not
+  // the viewer's own plan; signed-in/normal visitors go to the regular sandbox.
+  const whatIfHref = sharedPlan ? `/s/${sharedPlan.token}/what-if` : "/what-if";
   const router = useRouter();
   const [plan, setPlan] = useState<RetirementPlan>(DEFAULT_PLAN);
   // Baseline = the last committed plan (wizard / saved / load). Quick-adjust tweaks
@@ -951,7 +955,7 @@ export default function PlannerApp({
           exists, so make it a prominent, unmissable call-out here (shown to
           everyone with a plan, signed in or not). */}
       <Link
-        href="/what-if"
+        href={whatIfHref}
         onClick={() => track("What-if promo clicked")}
         className="group mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-accent/40 bg-accent/[0.07] px-5 py-4 transition hover:border-accent/70 hover:bg-accent/10"
       >

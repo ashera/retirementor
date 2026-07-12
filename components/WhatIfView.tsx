@@ -94,11 +94,16 @@ export default function WhatIfView({
   config,
   savedPlans,
   signedIn,
+  sharedPlan = null,
 }: {
   config: EngineConfig;
   savedPlans: SavedPlan[];
   signedIn: boolean;
+  // Public share-link view: start from this scenario, treat the session as
+  // read-only, and never read/write the viewer's own localStorage.
+  sharedPlan?: { plan: RetirementPlan; name: string; token: string } | null;
 }) {
+  const shared = !!sharedPlan;
   const [current, setCurrent] = useState<RetirementPlan | null>(null);
   const [baselineId, setBaselineId] = useState("current");
   const [active, setActive] = useState<Set<string>>(new Set());
@@ -116,6 +121,12 @@ export default function WhatIfView({
   const persistReady = useRef(false);
 
   useEffect(() => {
+    if (sharedPlan) {
+      // Public share view: start from the shared scenario with a clean board;
+      // never read the viewer's own stored plan or saved board state.
+      setCurrent({ ...DEFAULT_PLAN, ...sharedPlan.plan });
+      return;
+    }
     let cur: RetirementPlan = DEFAULT_PLAN;
     try {
       const raw = localStorage.getItem(PLAN_KEY);
@@ -150,6 +161,7 @@ export default function WhatIfView({
   // Persist the board selection (Part A). Skips the very first run so the empty
   // initial state doesn't overwrite what we're about to restore above.
   useEffect(() => {
+    if (shared) return; // read-only share view — don't touch the viewer's storage
     if (!persistReady.current) {
       persistReady.current = true;
       return;
@@ -387,7 +399,12 @@ export default function WhatIfView({
   return (
     <div className="mx-auto max-w-4xl px-5 py-8">
       <div className="mb-6 flex items-center justify-between gap-3">
-        <Link href="/" className="text-sm font-medium text-muted hover:text-white">← Back to planner</Link>
+        <Link
+          href={shared ? `/s/${sharedPlan!.token}` : "/"}
+          className="text-sm font-medium text-muted hover:text-white"
+        >
+          ← Back to {shared ? "the shared scenario" : "planner"}
+        </Link>
         {savedPlans.length > 0 && (
           <label className="flex items-center gap-2 text-sm text-muted">
             Baseline:
@@ -404,6 +421,22 @@ export default function WhatIfView({
           </label>
         )}
       </div>
+
+      {shared && (
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-accent/30 bg-accent/5 px-5 py-3">
+          <p className="text-sm text-slate-200">
+            <span aria-hidden>🔗</span> You&apos;re experimenting on a{" "}
+            <strong className="text-white">shared scenario — “{sharedPlan!.name}”</strong>. Nothing here is
+            saved — it&apos;s a sandbox on top of the shared plan.
+          </p>
+          <Link
+            href="/"
+            className="shrink-0 rounded-lg bg-accent px-3 py-1.5 text-sm font-semibold text-ink transition hover:bg-accent-soft"
+          >
+            Build your own →
+          </Link>
+        </div>
+      )}
 
       <header className="mb-6">
         <h1 className="text-3xl font-bold text-white">What if…</h1>
@@ -627,7 +660,20 @@ export default function WhatIfView({
         </div>
       )}
 
-      {/* Save */}
+      {/* Save (owner) — or, for a shared viewer, an invite to build their own. */}
+      {shared ? (
+        <div className="mt-8 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-accent/30 bg-accent/5 p-4">
+          <span className="text-sm text-slate-200">
+            Like where this is heading? Build your own plan to save scenarios and share them too.
+          </span>
+          <Link
+            href="/"
+            className="shrink-0 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-ink transition hover:bg-accent-soft"
+          >
+            Build your own →
+          </Link>
+        </div>
+      ) : (
       <div className="mt-8 rounded-2xl border border-line bg-panel p-4">
         <div className="flex flex-wrap items-center gap-3">
           <span className="text-sm font-medium text-slate-200">Like this combination?</span>
@@ -651,6 +697,7 @@ export default function WhatIfView({
         {!signedIn && <p className="mt-2 text-xs text-muted">Sign in to save scenarios to your account.</p>}
         {saveMsg && <p className="mt-2 text-xs text-accent">{saveMsg}</p>}
       </div>
+      )}
 
       <AssumptionsModal open={assumptionsOpen} onClose={() => setAssumptionsOpen(false)} config={config} plan={composed} />
       <StrategyAssumptionsModal
