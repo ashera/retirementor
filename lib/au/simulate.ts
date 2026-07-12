@@ -74,7 +74,40 @@ export function simulate(
   // single-return behaviour); its deterministic mean falls back likewise.
   const outsideSeq = outsideReturns ?? nominalReturns;
 
-  const balances = startingSuperBalances(plan);
+  // Super is tracked as two pools per person: a tax-free PENSION pool (account-
+  // based pension, with a forced minimum drawdown) and a taxed ACCUMULATION pool
+  // (15% on earnings, no minimum). Everyone starts fully in accumulation; at
+  // retirement a one-time TRANSFER moves up to the Transfer Balance Cap into the
+  // pension pool, whose growth then stays tax-free even if it later exceeds the cap.
+  const accum = startingSuperBalances(plan);
+  const pension = plan.people.map(() => 0);
+  const transferred = plan.people.map(() => false);
+  const superOf = (i: number) => accum[i] + pension[i];
+  const totalSuper = () => plan.people.reduce((s, _p, i) => s + superOf(i), 0);
+  // Add a contribution to super: into the pension pool up to Transfer Balance Cap
+  // room (only once a pension exists), the remainder into accumulation.
+  const addToSuper = (i: number, amount: number) => {
+    if (amount <= 0) return;
+    const room = transferred[i] ? Math.max(0, config.transferBalanceCap - pension[i]) : 0;
+    const toPension = Math.min(amount, room);
+    pension[i] += toPension;
+    accum[i] += amount - toPension;
+  };
+  // Draw `amount` from the accessible members' super, ACCUMULATION first (to
+  // preserve the tax-free pension pool), proportionally within each pool.
+  const drawSuper = (accessible: number[], amount: number) => {
+    let remaining = amount;
+    for (const pool of [accum, pension]) {
+      if (remaining <= EPS) break;
+      const total = accessible.reduce((s, i) => s + pool[i], 0);
+      if (total <= EPS) continue;
+      const take = Math.min(remaining, total);
+      const r = take / total;
+      accessible.forEach((i) => (pool[i] -= pool[i] * r));
+      remaining -= take;
+    }
+    return amount - remaining;
+  };
   let outside = plan.outsideSuper;
 
   const startOldest = Math.max(...plan.people.map((p) => p.currentAge));
@@ -201,7 +234,10 @@ export function simulate(
     // CPI-real balance the retiree actually holds. (No-op when wage == cpi.)
     if (t === earliestOffset && earliestOffset > 0) {
       const rebase = Math.pow((1 + wageInflation / 100) / (1 + cpi / 100), earliestOffset);
-      for (let i = 0; i < balances.length; i++) balances[i] *= rebase;
+      for (let i = 0; i < accum.length; i++) {
+        accum[i] *= rebase;
+        pension[i] *= rebase;
+      }
       outside *= rebase;
     }
 
@@ -220,7 +256,7 @@ export function simulate(
       const release = Math.max(0, homeVal - downsize.newValue - loanBal);
       const toSuper = Math.max(0, Math.min(downsize.toSuper, release));
       const toOutside = Math.max(0, release - toSuper);
-      if (balances.length) balances[0] += toSuper;
+      if (accum.length) addToSuper(0, toSuper);
       outside += toOutside;
       downsized = true;
       homeProceedsThisYear = release;
@@ -250,7 +286,7 @@ export function simulate(
 
     // Balances at the START of this year (on the birthday) — this is what each
     // data point plots, so the peak lands on the retirement age, not the year before.
-    const startSuper = sum(balances);
+    const startSuper = totalSuper();
     const startOutside = outside;
 
     if (accumPhase) {
@@ -264,8 +300,8 @@ export function simulate(
       let takeHome = 0; // net cash from salary after income tax and pre-tax sacrifice
       let ttrBenefit = 0; // net super gained from a Transition-to-Retirement swap this year
       plan.people.forEach((p, i) => {
-        const r = contribute(p, balances[i], 1, i === 0 && ages[i] >= preservationAge);
-        balances[i] = r.newBalance;
+        const r = contribute(p, accum[i], 1, i === 0 && ages[i] >= preservationAge);
+        accum[i] = r.newBalance;
         contribGross += r.contribGross;
         contribTax += r.contribTax;
         contribNet += r.contribNet;
@@ -290,7 +326,7 @@ export function simulate(
         row(oldest, startSuper, startOutside, 0, 0, 0, 0, "accumulation", true, 0, accumPropertyEquity, {
           openingSuper: startSuper,
           openingOutside: startOutside,
-          closingSuper: sum(balances),
+          closingSuper: totalSuper(),
           closingOutside: outside,
           contribGross,
           contribTax,
@@ -350,8 +386,8 @@ export function simulate(
     let workGrossSalary = 0; // gross → Age Pension income test
     plan.people.forEach((p, i) => {
       if (t >= retireOffsets[i]) return; // already retired — drawn down below
-      const r = contribute(p, balances[i], gapScale, i === 0 && ages[i] >= preservationAge);
-      balances[i] = r.newBalance;
+      const r = contribute(p, accum[i], gapScale, i === 0 && ages[i] >= preservationAge);
+      accum[i] = r.newBalance;
       workContribGross += r.contribGross;
       workContribTax += r.contribTax;
       workContribNet += r.contribNet;
@@ -367,7 +403,21 @@ export function simulate(
     const accessibleIdx = plan.people
       .map((_, i) => i)
       .filter((i) => t >= retireOffsets[i] && ages[i] >= preservationAge);
-    let accessibleSuper = accessibleIdx.reduce((s, i) => s + balances[i], 0);
+
+    // Transfer to pension phase: the first year a member is both retired and at
+    // preservation age, move up to the Transfer Balance Cap from accumulation into
+    // a new tax-free pension pool. Fixed at transfer — the pension pool's growth
+    // stays tax-free thereafter even if it grows past the cap. The excess (if any)
+    // stays in accumulation and keeps being taxed at 15%.
+    accessibleIdx.forEach((i) => {
+      if (transferred[i]) return;
+      const toPension = Math.min(accum[i], config.transferBalanceCap);
+      pension[i] += toPension;
+      accum[i] -= toPension;
+      transferred[i] = true;
+    });
+
+    let accessibleSuper = accessibleIdx.reduce((s, i) => s + superOf(i), 0);
 
     // Clear-at-retirement: once retired, pay the loan off from super as soon as
     // super is both accessible (preservation age, so tax-free) and enough to
@@ -381,10 +431,7 @@ export function simulate(
       !mortgageCleared &&
       accessibleSuper >= mortgage.balance
     ) {
-      const ratio = mortgage.balance / accessibleSuper;
-      accessibleIdx.forEach((i) => {
-        balances[i] -= balances[i] * ratio;
-      });
+      drawSuper(accessibleIdx, mortgage.balance);
       accessibleSuper -= mortgage.balance;
       mortgageCleared = true;
       mortgageClearedNow = mortgage.balance;
@@ -398,10 +445,7 @@ export function simulate(
     if (lumpSum && !lumpSumTaken && oldest >= lumpSum.atAge && accessibleSuper > EPS) {
       const take = Math.min(Math.max(0, lumpSum.amount), accessibleSuper);
       if (take > 0) {
-        const ratio = take / accessibleSuper;
-        accessibleIdx.forEach((i) => {
-          balances[i] -= balances[i] * ratio;
-        });
+        drawSuper(accessibleIdx, take);
         accessibleSuper -= take;
         lumpSumNow = take;
       }
@@ -422,13 +466,13 @@ export function simulate(
       ages[0] <= reconUntil &&
       ages[0] <= 75 &&
       outside > EPS &&
-      sum(balances) < config.transferBalanceCap
+      totalSuper() < config.transferBalanceCap
     ) {
-      const room = config.transferBalanceCap - sum(balances);
+      const room = config.transferBalanceCap - totalSuper();
       const take = Math.min(Math.max(0, recontribute.perYear), config.nonConcessionalCap, outside, room);
       if (take > 0) {
         outside -= take;
-        balances[0] += take;
+        addToSuper(0, take); // routes into the pension pool (tax-free) up to the cap
         if (ages[0] >= preservationAge) accessibleSuper += take; // joins the drawable/assessed pool
         recontributionNow = take;
       }
@@ -547,31 +591,26 @@ export function simulate(
     // spent either way), so there's no means-test cost to it. A member still
     // under preservation age has no accessible super, so the outside pool
     // naturally funds the early-retirement bridge.
+    // The legislated minimum applies only to the PENSION pool (accumulation has no
+    // forced drawdown), and it comes out first.
     const minDrawdownParts = accessibleIdx.map((i) => {
       const rate = minDrawdownRate(ages[i], config);
-      // The legislated minimum applies only to the pension-phase balance (up to the
-      // Transfer Balance Cap); any accumulation excess above the cap has no forced
-      // drawdown. Under the cap this is just the full balance (unchanged).
-      const pensionBalance = Math.min(balances[i], config.transferBalanceCap);
-      return { age: ages[i], balance: pensionBalance, rate, amount: pensionBalance * rate };
+      return { age: ages[i], balance: pension[i], rate, amount: pension[i] * rate };
     });
     const minDraw = minDrawdownParts.reduce((s, pt) => s + pt.amount, 0);
-    const minDrawCapped = Math.min(accessibleSuper, minDraw);
-    // Outside super covers whatever the need is after the mandatory super minimum.
-    const needAfterMin = Math.max(0, privateNeed - minDrawCapped);
+    accessibleIdx.forEach((i) => (pension[i] -= pension[i] * minDrawdownRate(ages[i], config)));
+
+    // Fund the remaining private need in a tax-aware order: OUTSIDE super (taxed at
+    // your marginal rate) first, then ACCUMULATION super (15% on earnings), then the
+    // tax-free PENSION pool above its minimum, preserved to last. `drawSuper` draws
+    // accumulation before pension, so it covers those two steps in order.
+    const needAfterMin = Math.max(0, privateNeed - minDraw);
     const outsideDrawn = Math.min(needAfterMin, outside);
-    // Only top up from super above the minimum once outside savings are exhausted.
-    const extraSuper = Math.min(needAfterMin - outsideDrawn, Math.max(0, accessibleSuper - minDrawCapped));
-    const fromSuper = minDrawCapped + extraSuper;
-    if (accessibleSuper > EPS && fromSuper > 0) {
-      const ratio = Math.min(1, fromSuper / accessibleSuper);
-      accessibleIdx.forEach((i) => {
-        balances[i] -= balances[i] * ratio;
-      });
-    }
     outside -= outsideDrawn;
+    const fromSuperExtra = drawSuper(accessibleIdx, needAfterMin - outsideDrawn);
+    const fromSuper = minDraw + fromSuperExtra;
     // A mandatory minimum drawn beyond the actual need is reinvested outside super.
-    const surplus = Math.max(0, fromSuper - privateNeed);
+    const surplus = Math.max(0, minDraw - privateNeed);
     outside += surplus;
 
     const funded = externalIncome + fromSuper + outsideDrawn + EPS >= spending;
@@ -584,23 +623,21 @@ export function simulate(
     let feesPaid = workFees;
     plan.people.forEach((_, i) => {
       if (t < retireOffsets[i]) return; // still working — handled by contribute()
-      const fee = Math.min(fixedAdmin, Math.max(0, balances[i]));
-      balances[i] -= fee;
+      // Fixed admin fee — deducted from accumulation first, then pension.
+      const fee = Math.min(fixedAdmin, Math.max(0, superOf(i)));
+      const feeFromAccum = Math.min(fee, accum[i]);
+      accum[i] -= feeFromAccum;
+      pension[i] -= fee - feeFromAccum;
       feesPaid += fee;
       if (ages[i] >= preservationAge) {
-        // Pension phase up to the Transfer Balance Cap earns tax-free; any excess
-        // must stay in accumulation, so its earnings are taxed at 15% (the
-        // superAccumReturn). Under the cap (accumPart = 0) this is exactly the old
-        // tax-free pension growth, so most retirees are unchanged.
-        const pensionPart = Math.min(balances[i], config.transferBalanceCap);
-        const accumPart = Math.max(0, balances[i] - config.transferBalanceCap);
-        const grown = pensionPart * (1 + superPensionReturn) + accumPart * (1 + superAccumReturn);
-        superGrowth += grown - balances[i];
-        balances[i] = grown;
+        // Pension pool earns tax-free; accumulation pool net of 15% earnings tax.
+        superGrowth += pension[i] * superPensionReturn + accum[i] * superAccumReturn;
+        pension[i] *= 1 + superPensionReturn;
+        accum[i] *= 1 + superAccumReturn;
       } else {
         // Retired but under preservation age — super stays preserved in accumulation.
-        superGrowth += balances[i] * superAccumReturn;
-        balances[i] *= 1 + superAccumReturn;
+        superGrowth += accum[i] * superAccumReturn;
+        accum[i] *= 1 + superAccumReturn;
       }
     });
     const outsideGrowth = outside * realReturn;
@@ -638,7 +675,7 @@ export function simulate(
       row(oldest, startSuper, startOutside, agePensionAmt, fromSuper, outsideDrawn, spending, phase, funded, rentCash, propertyEquity, {
         openingSuper: startSuper,
         openingOutside: startOutside,
-        closingSuper: sum(balances),
+        closingSuper: totalSuper(),
         closingOutside: outside,
         contribGross: workContribGross,
         contribTax: workContribTax,

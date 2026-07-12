@@ -46,6 +46,25 @@ describe("Transfer Balance Cap — super above the cap is taxed at 15%", () => {
     }
   });
 
+  it("is FIXED at transfer — the pension pool stays tax-free even as it grows past the cap", () => {
+    // Retire AT the cap with a low spend, so the balance grows well past it. The
+    // whole balance transfers to the pension pool at retirement, so all of its
+    // growth stays tax-free — identical to an uncapped run, year by year. (The old
+    // yearly-re-split approximation wrongly taxed the growth above the cap.)
+    const p = mk(cfg.transferBalanceCap, 40_000, 0);
+    const capped = simulate(p, cfg);
+    const uncapped = simulate(p, cfgNoCap);
+    for (let i = 0; i < capped.rows.length; i++) {
+      const a = capped.rows[i].totalSuper;
+      const b = uncapped.rows[i].totalSuper;
+      expect(Math.abs(a - b) / Math.max(1, b)).toBeLessThan(1e-9); // identical, bar float noise
+    }
+    // …and the pension pool really did grow past the cap (so the test bites — the
+    // old approximation would have started taxing it here).
+    const peakSuper = Math.max(...capped.rows.map((r) => r.totalSuper));
+    expect(peakSuper).toBeGreaterThan(cfg.transferBalanceCap * 1.2);
+  });
+
   it("above the cap, the 15% tax on the excess lowers total wealth (isolated: no outside)", () => {
     // No outside pool + a spend above the minimum ⇒ super draws the same amount
     // either way, so the ONLY difference is the tax on the accumulation excess.
