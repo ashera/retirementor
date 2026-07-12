@@ -9,7 +9,7 @@ import type { EngineConfig } from "./config";
 import type { RetirementPlan } from "./types";
 
 /** Deterministic PRNG so results are stable across renders (only change with the plan). */
-function mulberry32(seed: number): () => number {
+export function mulberry32(seed: number): () => number {
   let a = seed >>> 0;
   return () => {
     a = (a + 0x6d2b79f5) | 0;
@@ -20,7 +20,7 @@ function mulberry32(seed: number): () => number {
 }
 
 /** One standard-normal draw via Box–Muller. */
-function standardNormal(rand: () => number): number {
+export function standardNormal(rand: () => number): number {
   const u1 = Math.max(1e-9, rand());
   const u2 = rand();
   return Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);

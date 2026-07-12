@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { simulate } from "../lib/au/simulate";
 import { runMonteCarlo } from "../lib/au/montecarlo";
+import { guardrailsOutlook } from "../lib/au/guardrails";
 import { buildStrategyCatalog } from "../lib/au/strategies";
 import { DEFAULT_CONFIG as cfg } from "../lib/au/config";
 import { DEFAULT_PLAN, type RetirementPlan } from "../lib/au/types";
@@ -59,6 +60,24 @@ describe("Guyton-Klinger guardrails", () => {
     const a = JSON.stringify(simulate(base, cfg).rows);
     const b = JSON.stringify(simulate({ ...base, guardrails: undefined }, cfg).rows);
     expect(a).toBe(b);
+  });
+
+  it("outlook: reports a bounded worst-case cut and the central spend path", () => {
+    const o = guardrailsOutlook({ ...base, targetSpending: 62_000, guardrails: {} }, cfg, { iterations: 80 });
+    expect(o.startSpend).toBe(62_000);
+    expect(o.centralPath.length).toBeGreaterThan(10);
+    expect(o.centralPath[0].spend).toBe(62_000);
+    // Cuts can't breach the floor (70% of the start here), so worst-case ≤ 30%.
+    expect(o.worstCutPct).toBeGreaterThan(0); // an aggressive spend does trigger cuts
+    expect(o.worstCutPct).toBeLessThanOrEqual(0.301);
+    expect(o.worstCutSpend).toBeGreaterThanOrEqual(0.7 * 62_000 - 1);
+    expect(o.yearsBelowBad).toBeGreaterThan(0);
+  });
+
+  it("outlook: a comfortably-funded plan mostly raises, not cuts", () => {
+    const o = guardrailsOutlook({ ...base, targetSpending: 30_000, guardrails: {} }, cfg, { iterations: 80 });
+    expect(o.everRaises).toBe(true); // plenty of headroom → the central path lifts spending
+    expect(o.worstCutPct).toBeLessThan(0.2); // rarely, if ever, forced to cut deeply
   });
 
   it("offers a What-If lever that enables guardrails, once", () => {

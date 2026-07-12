@@ -7,6 +7,7 @@ import type { RetirementPlan, SimResult, WhatIfSaved } from "@/lib/au/types";
 import { DEFAULT_PLAN, getInvestmentProperties } from "@/lib/au/types";
 import { simulate } from "@/lib/au/simulate";
 import { runMonteCarlo, MC_CONFIDENCE_TARGET as SAFE_TARGET, MC_CONFIDENCE_MC as SAFE_MC } from "@/lib/au/montecarlo";
+import { guardrailsOutlook, type GuardrailsOutlook } from "@/lib/au/guardrails";
 import { fmtCurrency } from "@/lib/au/format";
 import { rowNetWorth } from "@/lib/au/networth";
 import { track } from "@/lib/analytics";
@@ -300,6 +301,25 @@ export default function WhatIfView({
     return () => clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [baseline, catalog, active, otherValsKey, config]);
+
+  // Guardrails outlook — the flexible-spending downside a fixed safe-spend can't
+  // show (worst-case cut depth + how long, and the central spend path). Only when
+  // the guardrails lever is on, and debounced off the interaction path (it's a
+  // small Monte Carlo over the spending path).
+  const [grOutlook, setGrOutlook] = useState<GuardrailsOutlook | null>(null);
+  const [grPending, setGrPending] = useState(false);
+  useEffect(() => {
+    if (!composed || !active.has("guardrails")) {
+      setGrOutlook(null);
+      return;
+    }
+    setGrPending(true);
+    const id = setTimeout(() => {
+      setGrOutlook(guardrailsOutlook(composed, config));
+      setGrPending(false);
+    }, 500);
+    return () => clearTimeout(id);
+  }, [composed, active, config]);
 
   // Per-lever "affordable income" — the change in the most you could sustainably
   // spend each YEAR that this strategy buys you (isolated from the baseline, like
@@ -635,6 +655,18 @@ export default function WhatIfView({
                     onToggle={() => toggle(card)}
                     onParam={(k, v) => setParam(card.id, k, v)}
                     onAssumptions={() => setAssumptionsCard(card)}
+                    guardrails={
+                      card.id === "guardrails" && grOutlook
+                        ? {
+                            outlook: grOutlook,
+                            pending: grPending,
+                            safeStart: safeSpend,
+                            safePending,
+                            currentStart: annualSpend(composed),
+                            targetPct: Math.round(SAFE_TARGET * 100),
+                          }
+                        : undefined
+                    }
                     sustainable={
                       card.id === "adjust-spending" && spendSustainable != null
                         ? {
@@ -919,6 +951,7 @@ function StrategyCardRow({
   onToggle,
   onParam,
   onAssumptions,
+  guardrails,
   sustainable,
 }: {
   card: StrategyCard;
@@ -932,6 +965,14 @@ function StrategyCardRow({
   onToggle: () => void;
   onParam: (key: string, v: number) => void;
   onAssumptions: () => void;
+  guardrails?: {
+    outlook: GuardrailsOutlook;
+    pending: boolean;
+    safeStart: number | null; // safe STARTING spend with guardrails (null while computing)
+    safePending: boolean;
+    currentStart: number; // the composed plan's current starting spend
+    targetPct: number;
+  };
   sustainable?: {
     essentials: number; // needs floor held fixed — the slider's lower bound
     stretch: number; // deterministic max (assumed return) — the slider ceiling
@@ -1024,6 +1065,63 @@ function StrategyCardRow({
                   {fmtCurrency(Math.max(0, values.spend - sustainable.essentials))}/yr
                 </span>
               </span>
+            </div>
+          )}
+          {guardrails && (
+            <div className="space-y-2 rounded-lg border border-accent/30 bg-accent/5 px-3 py-2 text-xs">
+              {/* Safe STARTING spend with guardrails (from the same solver the spend
+                  lever uses — it already reflects guardrails when this lever is on). */}
+              <div className="text-slate-300">
+                Guardrails let you start as high as{" "}
+                {guardrails.safeStart != null ? (
+                  <span className="font-semibold text-accent">{fmtCurrency(guardrails.safeStart)}/yr</span>
+                ) : (
+                  <span className="text-muted">…</span>
+                )}
+                <span className="text-muted">
+                  {" "}and still be ~{guardrails.targetPct}% likely to last
+                  {guardrails.safeStart != null && guardrails.safeStart > guardrails.currentStart + 1_000
+                    ? `, up from your ${fmtCurrency(guardrails.currentStart)}`
+                    : ""}
+                  {" "}— because bad years auto-trim (below).
+                </span>
+                {guardrails.safePending && (
+                  <span className="ml-1 inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-accent align-middle" />
+                )}
+                <span className="ml-1 text-[11px] text-muted">Set the start with the spending lever.</span>
+              </div>
+              {/* The honest counterweight: that "lasting" is achieved BY trimming. */}
+              <div className="border-t border-line pt-1.5">
+                {guardrails.pending ? (
+                  <span className="flex items-center gap-1.5 text-muted">
+                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent" />
+                    Sizing up the downside…
+                  </span>
+                ) : guardrails.outlook.worstCutPct < 0.01 ? (
+                  <span className="text-slate-300">
+                    Across the market runs we tested, spending only ever rose — no cuts were triggered.
+                  </span>
+                ) : (
+                  <span className="text-slate-300">
+                    That trimming is real: from your current start, a rough run cuts you to about{" "}
+                    <span className="font-semibold text-amber-300">{fmtCurrency(guardrails.outlook.worstCutSpend)}/yr</span>{" "}
+                    (−{Math.round(guardrails.outlook.worstCutPct * 100)}%)
+                    {guardrails.outlook.yearsBelowBad > 0 ? ` for ~${guardrails.outlook.yearsBelowBad} years` : ""}.
+                    {guardrails.outlook.everRaises && " Strong years raise you above your start."}
+                  </span>
+                )}
+              </div>
+              {guardrails.outlook.centralPath.length > 2 && (
+                <div className="flex items-center gap-2 pt-0.5">
+                  <span className="shrink-0 text-[10px] text-muted">Spend path</span>
+                  <Sparkline
+                    series={[guardrails.outlook.centralPath.map((p) => ({ age: p.age, v: p.spend }))]}
+                    colors={["#34d399"]}
+                    width={220}
+                    height={36}
+                  />
+                </div>
+              )}
             </div>
           )}
           {card.note && (
