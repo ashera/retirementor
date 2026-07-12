@@ -124,6 +124,28 @@ describe("Spending trim (prudent, mirror of boost)", () => {
     expect(simulate({ ...plan, ...trim.patch }, cfg).lastsToLifeExpectancy).toBe(true);
   });
 
+  it("cuts discretionary fully when 85% is out of reach AND the plan already lasts on average", () => {
+    // Lasts on the CENTRAL projection at full spend but only ~37% in Monte Carlo,
+    // and even essentials-only can't clear 85%. The old fallback ("largest d that
+    // lasts on central") returned d=1 → trimmed NOTHING ("keep 100%, cut $0"). It
+    // must instead cut discretionary fully so the trim still improves the odds.
+    const plan: RetirementPlan = {
+      ...DEFAULT_PLAN, household: "single",
+      people: [{ ...DEFAULT_PLAN.people[0], currentAge: 60, superBalance: 600_000, salary: 0, voluntaryConcessional: 0 }],
+      superMode: "individual", homeowner: true, outsideSuper: 72_000, annualOutsideSavings: 0,
+      retirementAge: 60, spendingMode: "flat", targetSpending: 52_000,
+      investmentReturn: 7, returnVolatility: 20, inflation: 2.5, lifeExpectancy: 90,
+    };
+    expect(simulate(plan, cfg).lastsToLifeExpectancy).toBe(true); // lasts on central at full spend
+    const trim = trimSpending(plan, cfg);
+    expect(trim.applicable).toBe(true);
+    expect(trim.successBefore).toBeLessThan(0.85);
+    expect(trim.feasible).toBe(true);
+    expect(trim.reachesTarget).toBe(false);
+    expect(trim.discretionaryKeptPct).toBe(0); // cut all discretionary — the most trimming can do
+    expect(trim.successAfter).toBeGreaterThan(trim.successBefore + 0.1); // and it meaningfully lifts the odds
+  });
+
   it("is not offered when the plan is already prudent (boost's territory)", () => {
     const trim = trimSpending({ ...rich, targetSpending: 45_000 }, cfg);
     expect(trim.applicable).toBe(false);

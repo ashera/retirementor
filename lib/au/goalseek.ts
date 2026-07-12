@@ -331,7 +331,14 @@ export function trimSpending(
       solved = toTarget;
       reachesTarget = true;
     } else {
-      solved = solveThreshold((dd) => lasts(sc.planAt(dd), config), 0, 1, false, 0.004);
+      // The 85% bar is out of reach. Fall back to the largest trim that still makes
+      // the plan last on the central projection — a meaningful milestone for a plan
+      // that otherwise depletes on average. BUT if the plan already lasts on average
+      // at full spend (so that milestone would be "cut nothing"), or can't last even
+      // at the essentials floor, trim discretionary all the way instead: it's the
+      // most trimming can do for the odds, and "keep 100%, cut $0" reads as broken.
+      const lastsMilestone = solveThreshold((dd) => lasts(sc.planAt(dd), config), 0, 1, false, 0.004);
+      solved = lastsMilestone != null && lastsMilestone < 0.999 ? lastsMilestone : 0;
     }
   }
   const feasible = solved != null;
