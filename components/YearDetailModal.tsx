@@ -5,7 +5,7 @@ import { mortgageAnnualCost } from "@/lib/au/mortgage";
 import { rowWithdrawalRate, withdrawalBand } from "@/lib/au/withdrawal";
 import { yearFlow } from "@/lib/au/yearFlow";
 import { rowNetWorth } from "@/lib/au/networth";
-import type { RetirementPlan, YearRow } from "@/lib/au/types";
+import { personRetirementOffset, type RetirementPlan, type YearRow } from "@/lib/au/types";
 
 const WR_TONE: Record<"accent" | "amber" | "red", string> = {
   accent: "text-emerald-400",
@@ -145,6 +145,23 @@ export default function YearDetailModal({
   // still working — their salary sits on the retirement row (salaryIncome/takeHome),
   // and their super keeps growing from contributions.
   const partnerStillWorking = !isWorking && b.salaryIncome > 1;
+  // Name the ages behind a staggered "gap" year, so it's clear WHY someone's still
+  // working: the chart plots the OLDER partner's age, so at (say) "Age 60" the
+  // younger partner may only be 57 — below their own retirement age. Each person's
+  // age this row = their current age + years elapsed (row.age − the oldest's age).
+  const stillWorkingSubtitle = (() => {
+    if (!partnerStillWorking) return null;
+    const startOldest = Math.max(...plan.people.map((p) => p.currentAge));
+    const t = row.age - startOldest;
+    const ages = plan.people.map((p) => p.currentAge + t);
+    const offsets = plan.people.map((_, i) => personRetirementOffset(plan, i));
+    const workingAges = ages.filter((_, i) => t < offsets[i]);
+    const retiredAges = ages.filter((_, i) => t >= offsets[i]);
+    if (workingAges.length === 1 && retiredAges.length === 1) {
+      return `one retired at ${retiredAges[0]}, the other still working at ${workingAges[0]}`;
+    }
+    return "one partner still working, one retired";
+  })();
   const spending = b.livingSpend + b.rentCost + b.mortgageCost;
   // This year's super withdrawal rate (share of the balance drawn).
   const wr = !isWorking && row.superDrawn > 0 && row.totalSuper > 0 ? rowWithdrawalRate(row) : null;
@@ -201,7 +218,7 @@ export default function YearDetailModal({
             <h2 className="mt-0.5 text-lg font-bold text-white">
               Age {row.age}{" "}
               <span className="text-sm font-medium text-muted">
-                · {partnerStillWorking ? "one partner still working, one retired" : PHASE_LABEL[row.phase]}
+                · {stillWorkingSubtitle ?? PHASE_LABEL[row.phase]}
               </span>
             </h2>
           </div>
