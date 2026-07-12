@@ -130,14 +130,18 @@ export function guardrailsTimeline(
   let prev = 0;
   let pensionAge: number | null = null;
   rows.forEach((r, i) => {
-    const spend = Math.round(r.breakdown.livingSpend);
-    const pension = r.breakdown.agePension;
+    const b = r.breakdown;
+    const spend = Math.round(b.livingSpend); // the flexed living spend (what the chart's spend line shows)
     const portfolio = r.totalSuper + r.outside;
+    // Match the ENGINE's guardrail rate: the FULL call on the portfolio — living
+    // spend PLUS the home loan and any post-sale rent — net of ALL income (Age
+    // Pension, investment rent, part-time work, a still-working partner's pay).
+    const netDraw = Math.max(0, b.livingSpend + b.mortgageCost + b.rentCost - (b.agePension + b.rentIncome + r.workIncome + r.takeHome));
     // A depleted portfolio has no meaningful rate; report 0 for the chart but flag
-    // it so callers can stop plotting the (otherwise exploding) rate there.
-    const rate = portfolio > 1 ? Math.max(0, spend - pension) / portfolio : 0;
+    // it (via `funded`) so callers can stop plotting the (otherwise exploding) rate.
+    const rate = portfolio > 1 ? netDraw / portfolio : 0;
     if (i === 0) wr0 = rate;
-    if (pension > 1 && pensionAge == null) pensionAge = r.age;
+    if (b.agePension > 1 && pensionAge == null) pensionAge = r.age;
     const action: GuardrailsTimelinePoint["action"] =
       i === 0 ? "start" : spend < prev - 1 ? "cut" : spend > prev + 1 ? "raise" : "hold";
     prev = spend;

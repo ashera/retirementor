@@ -122,6 +122,22 @@ describe("Guyton-Klinger guardrails", () => {
     expect(tl.didCut).toBe(false); // nothing discretionary to trim
   });
 
+  it("the timeline rate includes the PPOR home loan (matches the engine's draw)", () => {
+    const noLoan = guardrailsTimeline({ ...base, targetSpending: 55_000, guardrails: {} }, cfg);
+    const withLoan = guardrailsTimeline(
+      {
+        ...base,
+        targetSpending: 55_000,
+        guardrails: {},
+        mortgage: { type: "principal_interest", balance: 300_000, interestRate: 6, annualRepayment: 24_000, payoffAge: 75, strategy: "carry" },
+      },
+      cfg,
+    );
+    // The loan is part of the portfolio draw, so it lifts the initial withdrawal
+    // rate (and thus the rails) — it isn't ignored.
+    expect(withLoan.wr0).toBeGreaterThan(noLoan.wr0 + 0.005);
+  });
+
   it("offers a What-If lever that enables guardrails, once", () => {
     const card = buildStrategyCatalog(base).find((c) => c.id === "guardrails");
     expect(card).toBeTruthy();
