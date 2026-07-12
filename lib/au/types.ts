@@ -295,6 +295,11 @@ export interface YearBreakdown {
   openingOutside: number;
   closingSuper: number;
   closingOutside: number;
+  // Split of the closing super between the tax-free account-based PENSION pool (up
+  // to the Transfer Balance Cap) and the ACCUMULATION pool (the excess above the
+  // cap, or preserved bridge super — its earnings are taxed 15%). Sum = closingSuper.
+  pensionSuper: number;
+  accumSuper: number;
   // Accumulation (working-year) inflows
   contribGross: number; // gross concessional (SG + salary sacrifice)
   contribTax: number; // 15% contributions tax withheld

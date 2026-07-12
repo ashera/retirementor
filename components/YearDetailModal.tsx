@@ -275,6 +275,17 @@ export default function YearDetailModal({
               </span>
             </div>
 
+            {b.accumSuper > 1 && (
+              <p className="mt-2 border-t border-line pt-2 text-[11px] leading-snug text-muted">
+                Your super is split:{" "}
+                <span className="font-semibold text-emerald-300">{fmtCurrency(Math.round(b.pensionSuper))}</span> in
+                the tax-free <span className="text-slate-300">pension pool</span> and{" "}
+                <span className="font-semibold text-amber-300">{fmtCurrency(Math.round(b.accumSuper))}</span> in{" "}
+                <span className="text-slate-300">accumulation</span> — the amount that couldn&apos;t fit under
+                the transfer balance cap, whose earnings are taxed 15%.
+              </p>
+            )}
+
             {isNetWorth ? (
               <p className="mt-2 border-t border-line pt-2 text-[11px] leading-snug text-muted">
                 Net worth is your <span className="text-slate-300">savings</span> (super + outside) plus

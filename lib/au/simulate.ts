@@ -328,6 +328,8 @@ export function simulate(
           openingOutside: startOutside,
           closingSuper: totalSuper(),
           closingOutside: outside,
+          pensionSuper: 0, // all super is in accumulation while still working
+          accumSuper: totalSuper(),
           contribGross,
           contribTax,
           contribNet,
@@ -621,6 +623,7 @@ export function simulate(
     // so they carry their accumulation figures and are skipped here.
     let superGrowth = workSuperGrowth;
     let feesPaid = workFees;
+    let retAccumTax = 0; // 15% earnings tax on the accumulation pool in retirement
     plan.people.forEach((_, i) => {
       if (t < retireOffsets[i]) return; // still working — handled by contribute()
       // Fixed admin fee — deducted from accumulation first, then pension.
@@ -629,6 +632,10 @@ export function simulate(
       accum[i] -= feeFromAccum;
       pension[i] -= fee - feeFromAccum;
       feesPaid += fee;
+      // The accumulation pool is taxed 15% on earnings whether it's the excess over
+      // the Transfer Balance Cap (retired, over preservation) or preserved bridge
+      // super. That tax is the gap between the tax-free and taxed return.
+      retAccumTax += accum[i] * (superPensionReturn - superAccumReturn);
       if (ages[i] >= preservationAge) {
         // Pension pool earns tax-free; accumulation pool net of 15% earnings tax.
         superGrowth += pension[i] * superPensionReturn + accum[i] * superAccumReturn;
@@ -640,6 +647,9 @@ export function simulate(
         accum[i] *= 1 + superAccumReturn;
       }
     });
+    // The split of super after this year's activity (sums to closingSuper).
+    const closingPension = plan.people.reduce((s, _p, i) => s + pension[i], 0);
+    const closingAccum = plan.people.reduce((s, _p, i) => s + accum[i], 0);
     const outsideGrowth = outside * realReturn;
     outside *= 1 + realReturn;
 
@@ -677,6 +687,8 @@ export function simulate(
         openingOutside: startOutside,
         closingSuper: totalSuper(),
         closingOutside: outside,
+        pensionSuper: closingPension,
+        accumSuper: closingAccum,
         contribGross: workContribGross,
         contribTax: workContribTax,
         contribNet: workContribNet,
@@ -688,7 +700,7 @@ export function simulate(
         superGrowth,
         outsideGrowth,
         fees: feesPaid,
-        earningsTax: Math.max(0, workEarningsTax),
+        earningsTax: Math.max(0, workEarningsTax + retAccumTax),
         outsideTax,
         agePension: agePensionAmt,
         pension: pensionBreakdown,
