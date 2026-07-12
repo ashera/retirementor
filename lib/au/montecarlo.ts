@@ -38,7 +38,12 @@ export interface FanPoint {
 // Carlo success rate still clears this bar — shared so every "how much can I
 // safely spend?" answer (What-If safe spend, Help-me-spend-more) uses one target.
 export const MC_CONFIDENCE_TARGET = 0.85;
-export const MC_CONFIDENCE_MC = { iterations: 300, seed: 12345 } as const;
+// Use the SAME seed as runMonteCarlo's default (0x9e3779b9) so the goal-seek /
+// trim / boost numbers line up with the dashboard "How likely" card for the same
+// plan — a different seed made them disagree by several points on the same plan.
+// Fewer iterations (300 vs the dashboard's 1000) keeps the many binary-search
+// evaluations fast; that only leaves ~1pp of sampling noise between the two.
+export const MC_CONFIDENCE_MC = { iterations: 300, seed: 0x9e3779b9 } as const;
 
 export interface MonteCarloResult {
   iterations: number;

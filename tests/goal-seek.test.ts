@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { whatWillItTake, trimSpending, boostSpending } from "../lib/au/goalseek";
+import { runMonteCarlo } from "../lib/au/montecarlo";
 import { simulate } from "../lib/au/simulate";
 import { lifestageBreakdown } from "../lib/au/lifestages";
 import { DEFAULT_CONFIG as cfg } from "../lib/au/config";
@@ -122,6 +123,16 @@ describe("Spending trim (prudent, mirror of boost)", () => {
     expect(trim.successAfter).toBeGreaterThan(trim.successBefore); // it improves the odds
     expect(trim.discretionaryKeptPct).toBeGreaterThan(0); // keeps some (lasts, not essentials-only)
     expect(simulate({ ...plan, ...trim.patch }, cfg).lastsToLifeExpectancy).toBe(true);
+  });
+
+  it("the shown before/after likelihoods match the dashboard 'How likely' run exactly", () => {
+    // The modal's %s must equal what the dashboard shows for the same plan — the
+    // dashboard uses runMonteCarlo's default run, so the goal-seek reports on that.
+    // (A different seed once made them disagree by several points.)
+    const plan: RetirementPlan = { ...rich, targetSpending: 90_000 };
+    const trim = trimSpending(plan, cfg);
+    expect(trim.successBefore).toBe(runMonteCarlo(plan, cfg).successRate);
+    expect(trim.successAfter).toBe(runMonteCarlo({ ...plan, ...trim.patch }, cfg).successRate);
   });
 
   it("cuts discretionary fully when 85% is out of reach AND the plan already lasts on average", () => {

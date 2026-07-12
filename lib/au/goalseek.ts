@@ -315,12 +315,19 @@ export function trimSpending(
   const sc = discretionaryScaler(plan, config);
   const { bd, essentials } = sc;
 
+  // The binary search runs on the fast preset (`mc`, 300 iters) for speed; the two
+  // percentages SHOWN to the user (before/after) are then computed with the same
+  // default run as the dashboard "How likely" card, so the modal's numbers line up
+  // exactly with the dashboard for the same plan (a cheap 2 extra runs).
   const mcSuccess = (p: RetirementPlan) => runMonteCarlo(p, config, mc).successRate;
+  const mcShown = (p: RetirementPlan) => runMonteCarlo(p, config).successRate;
   const prudent = (p: RetirementPlan) => mcSuccess(p) >= target;
   const hasDiscretionary = (bd.rows[0]?.discretionary ?? 0) > 1;
 
-  const successBefore = mcSuccess(plan);
-  const applicable = successBefore < target; // under the bar → a trim can help
+  const successBefore = mcShown(plan);
+  // Whether a trim is relevant is decided on the fast preset — the SAME measure the
+  // dashboard's "trim spending" prompt uses — so the prompt and this modal agree.
+  const applicable = mcSuccess(plan) < target; // under the bar → a trim can help
 
   let solved: number | null = null;
   let reachesTarget = false;
@@ -344,7 +351,7 @@ export function trimSpending(
   const feasible = solved != null;
   const dd = solved ?? 0;
   const patch = sc.patchAt(dd);
-  const successAfter = mcSuccess(feasible ? { ...plan, ...patch } : sc.planAt(0));
+  const successAfter = mcShown(feasible ? { ...plan, ...patch } : sc.planAt(0));
 
   const afterLiving = livingReader(patch);
   const stages: SpendStageView[] = bd.rows.map((r) => {
@@ -414,6 +421,8 @@ export function boostSpending(plan: RetirementPlan, config: EngineConfig): Spend
   // rate still clears the shared confidence bar (85%) — so we account for market
   // ups and downs, not just the average-return projection.
   const mcSuccess = (p: RetirementPlan) => runMonteCarlo(p, config, MC_CONFIDENCE_MC).successRate;
+  // The shown "after" %: same run as the dashboard "How likely" card (see trimSpending).
+  const mcShown = (p: RetirementPlan) => runMonteCarlo(p, config).successRate;
   const prudent = (p: RetirementPlan) => mcSuccess(p) >= MC_CONFIDENCE_TARGET;
 
   const applicable = prudent(plan); // already comfortably safe → room to spend more
@@ -426,7 +435,7 @@ export function boostSpending(plan: RetirementPlan, config: EngineConfig): Spend
   const d = solved ?? 1;
   const patch = canGrow ? sc.patchAt(d) : {};
   const after = canGrow ? simulate({ ...plan, ...patch }, config) : null;
-  const successAfter = mcSuccess(canGrow ? { ...plan, ...patch } : plan);
+  const successAfter = mcShown(canGrow ? { ...plan, ...patch } : plan);
 
   const afterLiving = livingReader(patch);
   const stages: SpendStageView[] = bd.rows.map((r) => {
