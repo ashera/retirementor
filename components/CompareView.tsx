@@ -97,7 +97,7 @@ export default function CompareView({ config, savedPlans }: { config: EngineConf
     { label: "Super at retirement", cell: (c) => fmtCurrency(c.result.superAtRetirement), best: "max", metric: (c) => c.result.superAtRetirement },
     { label: "Money lasts", cell: (c) => (c.result.lastsToLifeExpectancy ? `to ${c.plan.lifeExpectancy}+` : `to ${c.result.depletedAge}`), best: "max", metric: lastsVal },
     { label: "Likely to last", cell: (c) => `${Math.round(c.mc.successRate * 100)}%`, best: "max", metric: (c) => c.mc.successRate },
-    { label: "Withdrawal rate (yr 1)", cell: (c) => (c.wr ? `${(c.wr.rate * 100).toFixed(1)}%` : "—"), best: "min", metric: (c) => c.wr?.rate ?? Infinity },
+    { label: "Withdrawal rate (yr 1)", cell: (c) => (c.wr ? `${(c.wr.portfolioRate * 100).toFixed(1)}%` : "—"), best: "min", metric: (c) => c.wr?.portfolioRate ?? Infinity },
     { label: "Age Pension from", cell: (c) => (c.result.firstAgePensionAge === null ? "—" : `age ${c.result.firstAgePensionAge}`) },
   ];
 
