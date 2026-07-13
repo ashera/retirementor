@@ -1,0 +1,28 @@
+// Registry of public "case study" content pages (the /case-studies library). Each
+// is a curated, code-authored article; the metadata here powers the library index,
+// the footer/sitemap, and per-page SEO. The article body lives in its own route
+// under app/case-studies/<slug>/ so it can compute live figures from the engine.
+
+export interface CaseStudyMeta {
+  slug: string;
+  title: string;
+  dek: string; // one-line summary — library card + meta description
+  date: string; // ISO published date (absolute)
+  readMinutes: number;
+  published: boolean;
+}
+
+export const CASE_STUDIES: CaseStudyMeta[] = [
+  {
+    slug: "does-the-age-pension-matter",
+    title: "Does the Age Pension actually matter?",
+    dek: "Four retirement plans, each modelled with and without the Age Pension. Its importance turns out to depend almost entirely on your wealth and how much you spend.",
+    date: "2026-07-13",
+    readMinutes: 4,
+    published: true,
+  },
+];
+
+export const publishedCaseStudies = () => CASE_STUDIES.filter((c) => c.published);
+export const caseStudyBySlug = (slug: string) =>
+  CASE_STUDIES.find((c) => c.slug === slug && c.published);
