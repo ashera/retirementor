@@ -165,8 +165,8 @@ export default function GuardrailsTimelineModal({
               <strong className={toneClass(fixedSuccess)}>{fixedSuccess}%</strong> of the time.
             </p>
             <div className="rounded-xl border border-line bg-panel-2 p-3">
-              <ResponsiveContainer width="100%" height={140}>
-                <BarChart data={returnsData} margin={{ top: 6, right: 8, left: 0, bottom: 0 }}>
+              <ResponsiveContainer width="100%" height={152}>
+                <BarChart data={returnsData} margin={{ top: 20, right: 8, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#232c40" vertical={false} />
                   <XAxis dataKey="age" stroke="#8b97ad" fontSize={10} tickLine={false} axisLine={{ stroke: "#232c40" }} />
                   <YAxis stroke="#8b97ad" fontSize={10} tickLine={false} axisLine={false} width={34} tickFormatter={(v) => `${v}%`} />
