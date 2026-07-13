@@ -1168,7 +1168,7 @@ function StrategyCardRow({
                     onClick={onTimeline}
                     className="shrink-0 rounded-md border border-accent/40 bg-accent/10 px-2.5 py-1 text-[11px] font-semibold text-accent transition hover:bg-accent/20"
                   >
-                    Why? See the timeline →
+                    See how guardrails work →
                   </button>
                 )}
               </div>

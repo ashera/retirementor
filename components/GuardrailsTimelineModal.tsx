@@ -16,6 +16,12 @@ import type { EngineConfig } from "@/lib/au/config";
 import type { RetirementPlan } from "@/lib/au/types";
 import { fmtCurrency, fmtCompact } from "@/lib/au/format";
 import { guardrailsTimeline, type GuardrailsTimelinePoint } from "@/lib/au/guardrails";
+import { runMonteCarlo, MC_CONFIDENCE_MC } from "@/lib/au/montecarlo";
+import { essentialsFloor } from "@/lib/au/strategies";
+import { retirementGoal } from "@/lib/au/goal";
+import SpendingBreakdown from "@/components/SpendingBreakdown";
+
+const toneClass = (pct: number) => (pct >= 85 ? "text-accent" : pct >= 60 ? "text-amber-400" : "text-red-400");
 
 function SpendTooltip({ active, payload }: { active?: boolean; payload?: { payload: GuardrailsTimelinePoint }[] }) {
   if (!active || !payload?.length) return null;
@@ -26,6 +32,21 @@ function SpendTooltip({ active, payload }: { active?: boolean; payload?: { paylo
       <div className="font-semibold text-white">Age {p.age}</div>
       <div className="tabular-nums text-slate-200">{fmtCurrency(p.spend)}/yr</div>
       <div className="tabular-nums text-muted">rate {(p.rate * 100).toFixed(1)}% · {tag}</div>
+    </div>
+  );
+}
+
+/** One numbered step in the story. */
+function Step({ n, title, children }: { n: number; title: string; children: React.ReactNode }) {
+  return (
+    <div className="flex gap-3">
+      <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent/15 text-xs font-bold text-accent">
+        {n}
+      </span>
+      <div className="min-w-0 flex-1 space-y-2">
+        <h3 className="text-sm font-semibold text-white">{title}</h3>
+        <div className="space-y-2 text-sm leading-relaxed text-slate-300">{children}</div>
+      </div>
     </div>
   );
 }
@@ -41,23 +62,47 @@ export default function GuardrailsTimelineModal({
   plan: RetirementPlan;
   config: EngineConfig;
 }) {
-  const [view, setView] = useState<"spend" | "rate">("spend");
-  const tl = useMemo(() => (open ? guardrailsTimeline(plan, config) : null), [open, plan, config]);
-  if (!open || !tl) return null;
+  const [showRate, setShowRate] = useState(false);
 
-  const raiseAge = tl.points.find((p) => p.action === "raise")?.age ?? null;
-  // Which story is this plan telling? Cuts-then-recover, a comfortable plan that
-  // only raises, an all-essentials plan with nothing to trim, or one that runs short.
-  const fails = tl.failsAtAge != null;
-  const allEssentials = tl.floor >= tl.start * 0.9; // little discretionary to trim
-  const raised = tl.plateauSpend > tl.start + 1 && !fails;
-  const plateauBelow = tl.plateauSpend < tl.start - 1;
+  const d = useMemo(() => {
+    if (!open) return null;
+    const flexPlan = { ...plan, guardrails: plan.guardrails ?? {} };
+    const fixedPlan = { ...plan, guardrails: undefined };
+    const flexTl = guardrailsTimeline(flexPlan, config);
+    const fixedTl = guardrailsTimeline(fixedPlan, config);
+    const fixedSuccess = Math.round(runMonteCarlo(fixedPlan, config, MC_CONFIDENCE_MC).successRate * 100);
+    const flexSuccess = Math.round(runMonteCarlo(flexPlan, config, MC_CONFIDENCE_MC).successRate * 100);
+    const goal = retirementGoal(flexPlan);
+    const essential = Math.min(essentialsFloor(flexPlan, config), goal.living);
+    const discretionary = Math.max(0, goal.living - essential);
+    const minSpend = flexTl.points.length ? Math.min(...flexTl.points.map((p) => p.spend)) : flexTl.start;
+    return {
+      tl: flexTl,
+      fixedTl,
+      fixedSuccess,
+      flexSuccess,
+      goal,
+      essential,
+      discretionary,
+      loan: goal.loanCost,
+      minSpend,
+      estimated: !flexPlan.budget,
+    };
+  }, [open, plan, config]);
 
-  // Plot up to the point the plan runs short (a held-flat, unfunded tail would
-  // mislead), and cap the runaway rate so the rails stay legible.
-  const plotEnd = fails ? tl.failsAtAge! : Infinity;
+  if (!open || !d) return null;
+  const { tl, fixedTl, fixedSuccess, flexSuccess, goal, essential, discretionary, loan, minSpend, estimated } = d;
+
+  const flexFails = tl.failsAtAge != null;
+  const fixedFails = fixedTl.failsAtAge != null;
+  const allEssentials = tl.floor >= tl.start * 0.9;
+  const raised = tl.plateauSpend > tl.start + 1 && !flexFails;
+  const cutPct = tl.start > 0 ? Math.round((1 - minSpend / tl.start) * 100) : 0;
+
+  // Chart data for step 3.
+  const plotEnd = flexFails ? tl.failsAtAge! : Infinity;
   const rateCap = Math.max(0.25, tl.upperRail * 3);
-  const dipStart = tl.points.length ? tl.points[0].age : 0; // downturn window (retirement start)
+  const dipStart = tl.points.length ? tl.points[0].age : 0;
   const dipEnd = dipStart + tl.dipYears;
   const spendData = tl.points.filter((p) => p.age <= plotEnd);
   const rateData = tl.points
@@ -72,7 +117,7 @@ export default function GuardrailsTimelineModal({
           <div className="flex min-w-0 items-center gap-2">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/whatif-icon.png" alt="" aria-hidden className="h-7 w-7 shrink-0" style={{ mixBlendMode: "lighten" }} />
-            <h2 className="truncate text-base font-bold text-white">Guardrails: the raise &amp; cut timeline</h2>
+            <h2 className="truncate text-base font-bold text-white">How guardrails work for your plan</h2>
           </div>
           <button
             type="button"
@@ -84,171 +129,163 @@ export default function GuardrailsTimelineModal({
           </button>
         </div>
 
-        <div className="space-y-4 overflow-y-auto px-5 py-4">
-          <p className="text-sm text-slate-300">
-            An illustration: you retire straight into a {tl.dipYears}-year market downturn (the hardest test), then
-            returns run at your assumed average. Here&apos;s how guardrails flex your spending through it — and what
-            that means for your plan.
+        <div className="space-y-5 overflow-y-auto px-5 py-4">
+          <p className="text-sm text-muted">
+            Guardrails let your spending flex with the markets. Here&apos;s what that means for your plan, in four
+            steps — stress-tested by retiring straight into a {tl.dipYears}-year downturn.
           </p>
 
-          {/* View toggle */}
-          <div className="flex gap-1 rounded-lg border border-line bg-panel-2 p-1 text-xs">
-            {([
-              ["spend", "Spending"],
-              ["rate", "Withdrawal rate vs rails"],
-            ] as const).map(([v, label]) => (
-              <button
-                key={v}
-                onClick={() => setView(v)}
-                className={`rounded-md px-2.5 py-1 font-medium transition ${
-                  view === v ? "bg-accent text-ink" : "text-muted hover:text-white"
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-
-          <div className="rounded-xl border border-line bg-panel-2 p-3">
-            <ResponsiveContainer width="100%" height={240}>
-              {view === "spend" ? (
-                <LineChart data={spendData} margin={{ top: 8, right: 12, left: 4, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#232c40" vertical={false} />
-                  <ReferenceArea x1={dipStart} x2={dipEnd} fill="#f87171" fillOpacity={0.09} />
-                  <XAxis dataKey="age" type="number" domain={["dataMin", "dataMax"]} stroke="#8b97ad" fontSize={11} tickLine={false} axisLine={{ stroke: "#232c40" }} />
-                  <YAxis stroke="#8b97ad" fontSize={11} tickLine={false} axisLine={false} width={48} tickFormatter={fmtCompact} />
-                  <Tooltip content={<SpendTooltip />} />
-                  <ReferenceLine y={tl.start} stroke="#94a3b8" strokeDasharray="5 4" label={{ value: `Started ${fmtCompact(tl.start)}`, position: "insideTopLeft", fill: "#94a3b8", fontSize: 10 }} />
-                  {tl.floor < tl.start * 0.98 && (
-                    <ReferenceLine y={tl.floor} stroke="#f59e0b" strokeDasharray="5 4" label={{ value: `Floor ${fmtCompact(tl.floor)}`, position: "insideBottomLeft", fill: "#f59e0b", fontSize: 10 }} />
-                  )}
-                  {tl.pensionAge != null && (
-                    <ReferenceLine x={tl.pensionAge} stroke="#a78bfa" strokeDasharray="4 3" label={{ value: "Age Pension", position: "top", fill: "#a78bfa", fontSize: 10 }} />
-                  )}
-                  {fails && (
-                    <ReferenceLine x={tl.failsAtAge!} stroke="#f87171" strokeDasharray="2 3" label={{ value: "Runs short", position: "top", fill: "#f87171", fontSize: 10 }} />
-                  )}
-                  <Line type="stepAfter" dataKey="spend" stroke="#34d399" strokeWidth={2} dot={false} isAnimationActive={false} />
-                </LineChart>
+          {/* ① The risk */}
+          <Step n={1} title="The risk in your plan">
+            <p>
+              {fixedFails ? (
+                <>
+                  Retire into a bad run of markets and a fixed <strong className="text-white">{fmtCurrency(goal.total)}/yr</strong>{" "}
+                  can run you short — in this stress test it runs out around <strong className="text-white">age {fixedTl.failsAtAge}</strong>.
+                </>
               ) : (
-                <LineChart data={rateData} margin={{ top: 8, right: 12, left: 4, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#232c40" vertical={false} />
-                  <ReferenceArea x1={dipStart} x2={dipEnd} fill="#f87171" fillOpacity={0.09} />
-                  <XAxis dataKey="age" type="number" domain={["dataMin", "dataMax"]} stroke="#8b97ad" fontSize={11} tickLine={false} axisLine={{ stroke: "#232c40" }} />
-                  <YAxis stroke="#8b97ad" fontSize={11} tickLine={false} axisLine={false} width={40} tickFormatter={(v) => `${v}%`} />
-                  <Tooltip
-                    formatter={(v: number) => [`${v}%`, "Withdrawal rate"]}
-                    labelFormatter={(l) => `Age ${l}`}
-                    contentStyle={{ background: "#0f1520", border: "1px solid #232c40", borderRadius: 8, fontSize: 12 }}
-                  />
-                  <ReferenceLine y={+(tl.upperRail * 100).toFixed(2)} stroke="#f87171" strokeDasharray="5 4" label={{ value: "Cut above", position: "insideTopRight", fill: "#f87171", fontSize: 10 }} />
-                  <ReferenceLine y={+(tl.lowerRail * 100).toFixed(2)} stroke="#34d399" strokeDasharray="5 4" label={{ value: "Raise below", position: "insideBottomRight", fill: "#34d399", fontSize: 10 }} />
-                  {tl.pensionAge != null && (
-                    <ReferenceLine x={tl.pensionAge} stroke="#a78bfa" strokeDasharray="4 3" label={{ value: "Age Pension", position: "top", fill: "#a78bfa", fontSize: 10 }} />
-                  )}
-                  {fails && (
-                    <ReferenceLine x={tl.failsAtAge!} stroke="#f87171" strokeDasharray="2 3" label={{ value: "Runs short", position: "top", fill: "#f87171", fontSize: 10 }} />
-                  )}
-                  <Line type="monotone" dataKey="ratePct" stroke="#38bdf8" strokeWidth={2} dot={false} isAnimationActive={false} />
-                </LineChart>
-              )}
-            </ResponsiveContainer>
-            <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted">
-              <span className="flex items-center gap-1.5">
-                <span className="inline-block h-2.5 w-3.5 rounded-sm bg-[#f87171]/25" />
-                Returns in this run: <strong className="text-slate-300">{tl.dip}%/yr</strong> for the first {tl.dipYears} years
-                of retirement (a GFC-scale crash), then <strong className="text-slate-300">{tl.meanReturn}%/yr</strong> — your assumed return.
-              </span>
+                <>
+                  Even in a bad run, a fixed <strong className="text-white">{fmtCurrency(goal.total)}/yr</strong> holds up here — but a
+                  rough start in your first years is the main danger.
+                </>
+              )}{" "}
+              Across all market scenarios, a fixed spend lasts{" "}
+              <strong className={toneClass(fixedSuccess)}>{fixedSuccess}%</strong> of the time.
             </p>
-          </div>
+          </Step>
 
-          {/* Adaptive explanation — the story depends on what actually happened. */}
-          {fails ? (
-            <div className="space-y-3 text-sm text-slate-300">
-              <h3 className="font-semibold text-white">Why guardrails can&apos;t rescue this plan</h3>
+          {/* ② The lever */}
+          <Step n={2} title="The lever you already have">
+            <p>
               {allEssentials ? (
-                <p>
-                  Your spending is almost entirely <strong className="text-white">essentials</strong> ({fmtCurrency(tl.floor)}
-                  ), so there&apos;s little discretionary to trim. When the downturn hits, your withdrawal rate climbs past
-                  the upper rail ({(tl.upperRail * 100).toFixed(1)}%) and just keeps rising — with no lever to pull, the
-                  portfolio runs short around <strong className="text-white">age {tl.failsAtAge}</strong>. That runaway
-                  rate <em>is</em> the warning sign you spotted: it means the cuts have nowhere left to go.
-                </p>
+                <>
+                  Almost all of your spending is <strong className="text-white">essentials</strong> — there&apos;s very little
+                  discretionary to ease off, which limits what guardrails can do.
+                </>
               ) : (
-                <p>
-                  Guardrails cut spending all the way to its {fmtCurrency(tl.floor)} floor, but even that isn&apos;t
-                  enough — the portfolio still runs short around <strong className="text-white">age {tl.failsAtAge}</strong>.
-                  Once spending is at the floor, the rate climbing past the upper rail has no more room to work.
-                </p>
+                <>
+                  You don&apos;t have to spend the same no matter what. <strong className="text-white">{fmtCurrency(discretionary)}/yr</strong>{" "}
+                  of your spend is <strong className="text-white">discretionary</strong> — the part you can dial down. Essentials
+                  {loan > 0 ? " and your home loan" : ""} stay fixed.
+                </>
               )}
-              <p className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-100/90">
-                Guardrails adapt <em>spending</em>; they can&apos;t fund a plan that&apos;s structurally short. To fix
-                this you&apos;d lower your spending, retire later, or save more — flexibility alone won&apos;t close the
-                gap. (This is a deliberately harsh test: retiring straight into a {tl.dipYears}-year downturn.)
-              </p>
-            </div>
-          ) : raised ? (
-            <div className="space-y-3 text-sm text-slate-300">
-              <h3 className="font-semibold text-white">Here, flexibility is upside</h3>
-              <p>
-                Even riding out the early downturn, your portfolio comfortably outpaces your spending — so the withdrawal
-                rate keeps drifting below the lower rail ({(tl.lowerRail * 100).toFixed(1)}%) and guardrails hand you
-                <strong className="text-white"> raises</strong>, lifting spending to about {fmtCurrency(tl.plateauSpend)}
-                by the end. The cuts during the dip are small and temporary; the story here is spending <em>more</em>,
-                safely, not belt-tightening.
-              </p>
-              <p className="rounded-lg border border-line bg-ink/40 px-3 py-2 text-xs text-muted">
-                Guardrails cut when the rate runs above the upper rail and raise when it falls below the lower one. A
-                well-funded plan spends most of its time under the lower rail — which is why yours trends up.
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-3 text-sm text-slate-300">
-              <h3 className="font-semibold text-white">
-                {plateauBelow ? "Why it takes so long to recover" : "How the guardrails flex"}
-              </h3>
-              <ol className="space-y-2">
-                <li className="flex gap-2">
-                  <span className="mt-0.5 shrink-0 rounded bg-red-500/15 px-1.5 text-[11px] font-semibold text-red-400">1</span>
-                  <span>
-                    <strong className="text-white">Cuts cascade first.</strong> As the downturn drops your portfolio, your
-                    withdrawal rate climbs past the upper rail ({(tl.upperRail * 100).toFixed(1)}%), so spending steps down
-                    ~10% a year — toward your {fmtCurrency(tl.floor)} floor. Each cut helps, but the shrinking balance
-                    keeps the rate high.
-                  </span>
-                </li>
-                {tl.pensionAge != null && (
-                  <li className="flex gap-2">
-                    <span className="mt-0.5 shrink-0 rounded bg-violet-500/15 px-1.5 text-[11px] font-semibold text-violet-400">2</span>
-                    <span>
-                      <strong className="text-white">The Age Pension does the real recovery, at {tl.pensionAge}.</strong>{" "}
-                      It covers a big slice of your spending, so the draw <em>on your portfolio</em> — the rate the rails
-                      watch — drops below the lower rail ({(tl.lowerRail * 100).toFixed(1)}%)
-                      {raiseAge != null ? `, earning a raise at ${raiseAge}` : ""}. Not the market — the pension.
-                    </span>
-                  </li>
+            </p>
+            <SpendingBreakdown essential={essential} discretionary={discretionary} loan={loan} estimated={estimated} />
+          </Step>
+
+          {/* ③ How it trims */}
+          <Step n={3} title="How guardrails pull the lever">
+            <p>
+              {flexFails ? (
+                allEssentials ? (
+                  <>
+                    With so little discretionary to trim, guardrails can only ease spending slightly — and in this bad run it
+                    still runs short around <strong className="text-white">age {tl.failsAtAge}</strong>.
+                  </>
+                ) : (
+                  <>
+                    Guardrails trim the discretionary part down to your <strong className="text-white">{fmtCurrency(tl.floor)}</strong>{" "}
+                    floor, but even that isn&apos;t enough here — it still runs short around{" "}
+                    <strong className="text-white">age {tl.failsAtAge}</strong>.
+                  </>
+                )
+              ) : raised ? (
+                <>
+                  Your savings comfortably outpace your spending, so guardrails mostly hand you <strong className="text-white">raises</strong> —
+                  spending climbs to about <strong className="text-white">{fmtCurrency(tl.plateauSpend)}</strong> by the end.
+                </>
+              ) : (
+                <>
+                  After the downturn, guardrails trim the discretionary part ~10% a year — to about{" "}
+                  <strong className="text-amber-300">{fmtCurrency(minSpend)}</strong> (−{cutPct}%) in this run — then ease it
+                  back as the Age Pension arrives{tl.pensionAge != null ? ` at ${tl.pensionAge}` : ""}. Essentials never get cut.
+                </>
+              )}
+            </p>
+
+            <div className="rounded-xl border border-line bg-panel-2 p-3">
+              <ResponsiveContainer width="100%" height={210}>
+                {showRate ? (
+                  <LineChart data={rateData} margin={{ top: 8, right: 12, left: 4, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#232c40" vertical={false} />
+                    <ReferenceArea x1={dipStart} x2={dipEnd} fill="#f87171" fillOpacity={0.09} />
+                    <XAxis dataKey="age" type="number" domain={["dataMin", "dataMax"]} stroke="#8b97ad" fontSize={11} tickLine={false} axisLine={{ stroke: "#232c40" }} />
+                    <YAxis stroke="#8b97ad" fontSize={11} tickLine={false} axisLine={false} width={40} tickFormatter={(v) => `${v}%`} />
+                    <Tooltip formatter={(v: number) => [`${v}%`, "Withdrawal rate"]} labelFormatter={(l) => `Age ${l}`} contentStyle={{ background: "#0f1520", border: "1px solid #232c40", borderRadius: 8, fontSize: 12 }} />
+                    <ReferenceLine y={+(tl.upperRail * 100).toFixed(2)} stroke="#f87171" strokeDasharray="5 4" label={{ value: "Cut above", position: "insideTopRight", fill: "#f87171", fontSize: 10 }} />
+                    <ReferenceLine y={+(tl.lowerRail * 100).toFixed(2)} stroke="#34d399" strokeDasharray="5 4" label={{ value: "Raise below", position: "insideBottomRight", fill: "#34d399", fontSize: 10 }} />
+                    {tl.pensionAge != null && <ReferenceLine x={tl.pensionAge} stroke="#a78bfa" strokeDasharray="4 3" label={{ value: "Age Pension", position: "top", fill: "#a78bfa", fontSize: 10 }} />}
+                    {flexFails && <ReferenceLine x={tl.failsAtAge!} stroke="#f87171" strokeDasharray="2 3" label={{ value: "Runs short", position: "top", fill: "#f87171", fontSize: 10 }} />}
+                    <Line type="monotone" dataKey="ratePct" stroke="#38bdf8" strokeWidth={2} dot={false} isAnimationActive={false} />
+                  </LineChart>
+                ) : (
+                  <LineChart data={spendData} margin={{ top: 8, right: 12, left: 4, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#232c40" vertical={false} />
+                    <ReferenceArea x1={dipStart} x2={dipEnd} fill="#f87171" fillOpacity={0.09} />
+                    <XAxis dataKey="age" type="number" domain={["dataMin", "dataMax"]} stroke="#8b97ad" fontSize={11} tickLine={false} axisLine={{ stroke: "#232c40" }} />
+                    <YAxis stroke="#8b97ad" fontSize={11} tickLine={false} axisLine={false} width={48} tickFormatter={fmtCompact} />
+                    <Tooltip content={<SpendTooltip />} />
+                    <ReferenceLine y={tl.start} stroke="#94a3b8" strokeDasharray="5 4" label={{ value: `Started ${fmtCompact(tl.start)}`, position: "insideTopLeft", fill: "#94a3b8", fontSize: 10 }} />
+                    {tl.floor < tl.start * 0.98 && <ReferenceLine y={tl.floor} stroke="#f59e0b" strokeDasharray="5 4" label={{ value: `Floor ${fmtCompact(tl.floor)}`, position: "insideBottomLeft", fill: "#f59e0b", fontSize: 10 }} />}
+                    {tl.pensionAge != null && <ReferenceLine x={tl.pensionAge} stroke="#a78bfa" strokeDasharray="4 3" label={{ value: "Age Pension", position: "top", fill: "#a78bfa", fontSize: 10 }} />}
+                    {flexFails && <ReferenceLine x={tl.failsAtAge!} stroke="#f87171" strokeDasharray="2 3" label={{ value: "Runs short", position: "top", fill: "#f87171", fontSize: 10 }} />}
+                    <Line type="stepAfter" dataKey="spend" stroke="#34d399" strokeWidth={2} dot={false} isAnimationActive={false} />
+                  </LineChart>
                 )}
-                {plateauBelow && (
-                  <li className="flex gap-2">
-                    <span className="mt-0.5 shrink-0 rounded bg-slate-500/20 px-1.5 text-[11px] font-semibold text-slate-300">
-                      {tl.pensionAge != null ? 3 : 2}
-                    </span>
-                    <span>
-                      <strong className="text-white">Then it plateaus — below where you started</strong> (around{" "}
-                      {fmtCurrency(tl.plateauSpend)}). The early crash <em>permanently</em> shrank your portfolio, so the
-                      rate never drifts low enough again to climb all the way back. That&apos;s sequence-of-returns risk:
-                      guardrails keep you safe by adapting, but a bad start means spending less for good — not a temporary dip.
-                    </span>
-                  </li>
-                )}
-              </ol>
-              <p className="rounded-lg border border-line bg-ink/40 px-3 py-2 text-xs text-muted">
-                The rails are set from your <em>initial</em> rate on your <em>initial</em> balance. Once a crash resets
-                your wealth lower, spending safely at the reduced level is exactly right — a full recovery would mean
-                overspending a portfolio that never recovered. Guardrails are working; the loss is real.
-              </p>
+              </ResponsiveContainer>
+              <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[11px] text-muted">
+                <span className="flex items-center gap-1.5">
+                  <span className="inline-block h-2.5 w-3.5 rounded-sm bg-[#f87171]/25" />
+                  {tl.dip}%/yr for the first {tl.dipYears} years, then {tl.meanReturn}%/yr (your assumed return).
+                </span>
+                <button type="button" onClick={() => setShowRate((v) => !v)} className="font-medium text-accent hover:underline">
+                  {showRate ? "← Back to spending" : "Show the rate mechanism →"}
+                </button>
+              </div>
             </div>
-          )}
+          </Step>
+
+          {/* ④ The result */}
+          <Step n={4} title="The result">
+            <p>
+              {flexFails ? (
+                <>
+                  Even with that flexibility, this plan still runs short. Flexibility narrows the gap —{" "}
+                  <strong className="text-white">{fixedSuccess}% → {flexSuccess}%</strong> likely to last — but can&apos;t close
+                  it: you&apos;d need to spend less, retire later, or save more.
+                </>
+              ) : raised ? (
+                <>
+                  You&apos;re comfortably funded — flexibility is <strong className="text-white">upside</strong> here, not a
+                  rescue. You stay <strong className={toneClass(flexSuccess)}>{flexSuccess}%</strong> likely to last while
+                  spending more in the good years.
+                </>
+              ) : (
+                <>
+                  That flexibility turns a coin-flip into near-certain:{" "}
+                  <strong className="text-white">{fixedSuccess}% → {flexSuccess}%</strong> likely to last. The cost is the
+                  belt-tightening in step 3 — real, but the Age Pension does much of the recovery.
+                </>
+              )}
+            </p>
+            <div className="space-y-2 rounded-lg border border-line bg-ink/40 px-3 py-2.5">
+              {[
+                { label: "Fixed spending", pct: fixedSuccess, color: "#f59e0b" },
+                { label: "With guardrails", pct: flexSuccess, color: "#34d399" },
+              ].map((b) => (
+                <div key={b.label} className="space-y-1">
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-muted">{b.label}</span>
+                    <span className={`font-semibold tabular-nums ${toneClass(b.pct)}`}>{b.pct}%</span>
+                  </div>
+                  <div className="h-2 w-full overflow-hidden rounded-full bg-panel">
+                    <div className="h-full rounded-full" style={{ width: `${b.pct}%`, backgroundColor: b.color }} />
+                  </div>
+                </div>
+              ))}
+              <p className="text-[10px] text-muted">Chance your money lasts to age {plan.lifeExpectancy}, across many market scenarios.</p>
+            </div>
+          </Step>
         </div>
       </div>
     </div>
