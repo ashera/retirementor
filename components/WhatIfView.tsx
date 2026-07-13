@@ -1045,10 +1045,15 @@ function StrategyCardRow({
   const gCurrent = guardrails ? guardrails.currentStart + gLoan : 0;
   const gWorst = guardrails ? guardrails.outlook.worstCutSpend + gLoan : 0;
   const gCutPct = gCurrent > 0 ? Math.round((1 - gWorst / gCurrent) * 100) : 0;
-  // Genuine headroom to spend more = the plan raises even on steady returns (it's
-  // underspending). Only then is "start higher" real upside rather than more
-  // austerity — for a stretched plan we suppress that invite.
-  const gHeadroom = !!guardrails?.outlook.everRaises;
+  // Does the plan ever hand out raises (drives the cost-line framing: two-sided
+  // "good years raise, bad years trim" vs a one-sided "trims and holds").
+  const gRaises = !!guardrails?.outlook.everRaises;
+  // GENUINE headroom to spend more — only then is "start higher" real upside, not
+  // more austerity. Requires being comfortably safe EVEN WITHOUT guardrails (a
+  // clear margin above the bar), not just an optimistic steady-return path: an
+  // 87%-fixed plan that raises on average but crashes in a downturn isn't "funded".
+  const gHeadroom =
+    guardrails?.fixedPct != null && guardrails.fixedPct >= guardrails.targetPct + 5 && gRaises;
   return (
     <div className={`rounded-2xl border p-4 transition ${on ? "border-accent/40 bg-accent/5" : "border-line bg-panel"}`}>
       <div className="flex items-center gap-3">
@@ -1163,11 +1168,11 @@ function StrategyCardRow({
                   </span>
                 ) : guardrails.outlook.worstCutPct < 0.01 ? (
                   <>Across the runs we tested, spending only ever rose — no cuts were triggered.</>
-                ) : gHeadroom ? (
+                ) : gRaises ? (
                   <>
-                    The flex is mostly <span className="font-semibold text-accent">upside</span>: good years raise you
-                    above your start, and at worst a rough run trims to about{" "}
-                    <span className="font-semibold text-amber-300">{fmtCurrency(gWorst)}/yr</span> (−{gCutPct}%).
+                    Good years raise you above your start; the trade-off is a rough run trims to about{" "}
+                    <span className="font-semibold text-amber-300">{fmtCurrency(gWorst)}/yr</span> (−{gCutPct}%)
+                    {guardrails.outlook.yearsBelowBad > 0 ? ` for ~${guardrails.outlook.yearsBelowBad} years` : ""}.
                   </>
                 ) : (
                   <>
