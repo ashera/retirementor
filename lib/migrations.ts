@@ -415,6 +415,38 @@ ${home}
 TIP: post with OC/Tool flair, reply to every comment for the first few hours, and don't cross-post the same link to other subs the same day.`,
     },
     {
+      kind: "outreach",
+      title: "Reddit/social post — 'Does the Age Pension actually matter?' (4 scenarios)",
+      audience: "consumers",
+      pinned: true,
+      body: `TITLE: Does the Age Pension actually matter for your retirement? I modelled 4 cases — it depends entirely on how wealthy you are
+
+BODY:
+There's a recurring stoush in retirement/FIRE threads: is the Age Pension a genuine pillar of your plan, or a rounding error you should ignore? People talk straight past each other. So I modelled four cases the same way and the answer is clear — it depends almost entirely on your wealth and spending.
+
+Each is run on current AU rules (means-tested Age Pension — income & assets tests, deeming — plus super preservation rules, tax and fees), in today's dollars, funding to age 90. "Lasts" = the share of market scenarios (Monte Carlo, block-resampling real 1928–2025 return sequences) where the money reaches 90. Here's each plan WITH the pension vs with it switched off:
+
+Ordinary retirees — the pension is the backbone:
+• Single, retire 55, $750k, $42k/yr → 87% ... ~12% without the pension (+75pp)
+• Couple, retire 55, $1.1M, $60k/yr → 92% ... ~16% without (+76pp)
+
+High-net-worth early retirees — the pension barely moves:
+• Single, retire 45, $1M, $40k/yr → 86% ... 49% without (+37pp — still decisive at a low spend)
+• Single, retire 45, $2M, $80k/yr → 60% ... 54% without (+6pp — a late-life backstop only)
+
+The pattern: for a normal retiree the means-tested pension does most of the heavy lifting — ignore it and you'll wildly over-save or scare yourself out of retiring. For a high-spend millionaire it's tapered away and barely registers. The "pension doesn't matter" camp and the "pension is everything" camp are both right — about different people. What actually decides it is your assets and how much you spend.
+
+Click any of these and change the numbers yourself (no signup):
+• Retire 55, single: ${home}/scenario/retire-55-single
+• Retire 55, couple: ${home}/scenario/retire-55-couple
+• Retire 45, $40k (pension decisive): ${home}/scenario/fire-at-45
+• Retire 45, $80k (pension marginal): ${home}/scenario/fire-at-45-high-spend
+
+I built this (RetireWiz, free) because most calculators ignore the pension entirely, which quietly breaks the answer for the people it matters most to. General information, not advice — just the maths. Keen for feedback on where the modelling could be sharper.
+
+TIP: r/fiaustralia (OC/Tool flair) or r/AusFinance-adjacent are the fit — DISCLOSE you built it, lead with the insight not the links, and reply to every comment for the first few hours. Also works as a LinkedIn post: keep the four bullets, drop the etiquette line, put the scenario links in the first comment if reach dips.`,
+    },
+    {
       kind: "snippet",
       title: "Reddit comment — 'how much super / will it last' answer",
       audience: "consumers",
