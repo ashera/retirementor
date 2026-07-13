@@ -265,20 +265,20 @@ export default function GuardrailsTimelineModal({
             <div className="rounded-xl border border-line bg-panel-2 p-3">
               <ResponsiveContainer width="100%" height={210}>
                 {showRate ? (
-                  <LineChart data={rateData} margin={{ top: 8, right: 12, left: 4, bottom: 0 }}>
+                  <LineChart data={rateData} margin={{ top: 20, right: 12, left: 4, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#232c40" vertical={false} />
                     <ReferenceArea x1={dipStart} x2={dipEnd} fill="#f87171" fillOpacity={0.09} />
                     <XAxis dataKey="age" type="number" domain={["dataMin", "dataMax"]} stroke="#8b97ad" fontSize={11} tickLine={false} axisLine={{ stroke: "#232c40" }} />
                     <YAxis stroke="#8b97ad" fontSize={11} tickLine={false} axisLine={false} width={40} tickFormatter={(v) => `${v}%`} />
                     <Tooltip formatter={(v: number) => [`${v}%`, "Withdrawal rate"]} labelFormatter={(l) => `Age ${l}`} contentStyle={{ background: "#0f1520", border: "1px solid #232c40", borderRadius: 8, fontSize: 12 }} />
                     <ReferenceLine y={+(tl.upperRail * 100).toFixed(2)} stroke="#f87171" strokeDasharray="5 4" label={{ value: "Cut above", position: "insideTopRight", fill: "#f87171", fontSize: 10 }} />
-                    <ReferenceLine y={+(tl.lowerRail * 100).toFixed(2)} stroke="#34d399" strokeDasharray="5 4" label={{ value: "Raise below", position: "insideBottomRight", fill: "#34d399", fontSize: 10 }} />
+                    <ReferenceLine y={+(tl.lowerRail * 100).toFixed(2)} stroke="#34d399" strokeDasharray="5 4" label={{ value: "Raise below", position: "insideBottomLeft", fill: "#34d399", fontSize: 10 }} />
                     {tl.pensionAge != null && <ReferenceLine x={tl.pensionAge} stroke="#a78bfa" strokeDasharray="4 3" label={{ value: "Age Pension", position: "top", fill: "#a78bfa", fontSize: 10 }} />}
                     {flexFails && <ReferenceLine x={tl.failsAtAge!} stroke="#f87171" strokeDasharray="2 3" label={{ value: "Runs short", position: "top", fill: "#f87171", fontSize: 10 }} />}
                     <Line type="monotone" dataKey="ratePct" stroke="#38bdf8" strokeWidth={2} dot={false} isAnimationActive={false} />
                   </LineChart>
                 ) : (
-                  <LineChart data={spendData} margin={{ top: 8, right: 12, left: 4, bottom: 0 }}>
+                  <LineChart data={spendData} margin={{ top: 20, right: 12, left: 4, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#232c40" vertical={false} />
                     <ReferenceArea x1={dipStart} x2={dipEnd} fill="#f87171" fillOpacity={0.09} />
                     <XAxis dataKey="age" type="number" domain={["dataMin", "dataMax"]} stroke="#8b97ad" fontSize={11} tickLine={false} axisLine={{ stroke: "#232c40" }} />

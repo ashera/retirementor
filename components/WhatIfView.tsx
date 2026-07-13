@@ -1043,11 +1043,40 @@ function StrategyCardRow({
   const gLoan = guardrails?.loan ?? 0;
   const gSafeStart = guardrails?.safeStart != null ? guardrails.safeStart + gLoan : null;
   const gCurrent = guardrails ? guardrails.currentStart + gLoan : 0;
-  const gWorst = guardrails ? guardrails.outlook.worstCutSpend + gLoan : 0;
-  const gCutPct = gCurrent > 0 ? Math.round((1 - gWorst / gCurrent) * 100) : 0;
+  // The trade-off line is derived from the SAME illustrative "rough run" the
+  // sparkline draws (outlook.downturnPath), so the words and the chart can't
+  // disagree — a run that visibly climbs back must not read "holds there". (The p90
+  // Monte Carlo worstCut/yearsBelow are a rougher, separate statistic; mixing them
+  // into this line was the inconsistency a user hit on fire-at-45.)
+  const gPath = guardrails?.outlook.downturnPath ?? [];
+  const gPathStart = (gPath[0]?.spend ?? guardrails?.currentStart ?? 0) + gLoan;
+  const gPathTrough = (gPath.length ? Math.min(...gPath.map((p) => p.spend)) : 0) + gLoan;
+  const gPathEnd = (gPath[gPath.length - 1]?.spend ?? 0) + gLoan;
+  const gPathYrsBelow = gPath.filter((p) => p.spend < (gPath[0]?.spend ?? 0) - 1).length;
+  const gPathRecovers = gPathEnd > gPathTrough * 1.03;
+  const gPathBackToStart = gPathStart > 0 && gPathEnd >= gPathStart * 0.98;
+  const gPathCutPct = gPathStart > 0 ? Math.round((1 - gPathTrough / gPathStart) * 100) : 0;
   // Does the plan ever hand out raises (drives the cost-line framing: two-sided
   // "good years raise, bad years trim" vs a one-sided "trims and holds").
   const gRaises = !!guardrails?.outlook.everRaises;
+  // The shared "here's the cost in a rough run" clause, consistent with the sparkline.
+  const gTradeoff = (
+    <>
+      trims you {gPathRecovers ? "as low as" : "to about"}{" "}
+      <span className="font-semibold text-amber-300">{fmtCurrency(gPathTrough)}/yr</span> (−{gPathCutPct}%)
+      {gPathYrsBelow > 0 ? ` for ~${gPathYrsBelow} years` : ""}
+      {gPathRecovers ? (
+        gPathBackToStart ? (
+          <>, then climbs back to around your {fmtCurrency(gPathStart)}/yr start as the Age Pension arrives.</>
+        ) : (
+          <>, then recovers partway as the Age Pension arrives — still short of your {fmtCurrency(gPathStart)}/yr start.</>
+        )
+      ) : (
+        <>, and holds there.</>
+      )}
+      {gLoan > 0 ? " Your home loan is never trimmed." : ""}
+    </>
+  );
   // GENUINE headroom to spend more — only then is "start higher" real upside, not
   // more austerity. Requires being comfortably safe EVEN WITHOUT guardrails (a
   // clear margin above the bar), not just an optimistic steady-return path: an
@@ -1191,18 +1220,9 @@ function StrategyCardRow({
                 ) : guardrails.outlook.worstCutPct < 0.01 ? (
                   <>Across the runs we tested, spending only ever rose — no cuts were triggered.</>
                 ) : gRaises ? (
-                  <>
-                    Good years raise you above your start; the trade-off is a rough run trims to about{" "}
-                    <span className="font-semibold text-amber-300">{fmtCurrency(gWorst)}/yr</span> (−{gCutPct}%)
-                    {guardrails.outlook.yearsBelowBad > 0 ? ` for ~${guardrails.outlook.yearsBelowBad} years` : ""}.
-                  </>
+                  <>Good years raise you above your start; a rough run then {gTradeoff}</>
                 ) : (
-                  <>
-                    The trade-off: a rough run trims you to about{" "}
-                    <span className="font-semibold text-amber-300">{fmtCurrency(gWorst)}/yr</span> (−{gCutPct}%)
-                    {guardrails.outlook.yearsBelowBad > 0 ? ` for ~${guardrails.outlook.yearsBelowBad} years` : ""}, and
-                    holds there.{gLoan > 0 ? " Your home loan is never trimmed." : ""}
-                  </>
+                  <>The trade-off: a rough run {gTradeoff}</>
                 )}
               </div>
               {/* Only genuinely well-funded plans get the "start higher" invite — for
