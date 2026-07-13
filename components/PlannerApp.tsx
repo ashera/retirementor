@@ -88,6 +88,51 @@ function LegendDot({ color, label }: { color: string; label: string }) {
   );
 }
 
+/** The spending-mix breakdown shown in the "Your spending" stat card: a stacked
+ *  bar + legend splitting the total into Essentials (fixed floor), Discretionary
+ *  (the part that flexes) and any Home loan (fixed). Ties directly to what
+ *  guardrails can and can't move. */
+function SpendingBreakdown({
+  essential,
+  discretionary,
+  loan,
+  estimated,
+}: {
+  essential: number;
+  discretionary: number;
+  loan: number;
+  estimated: boolean;
+}) {
+  const total = essential + discretionary + loan;
+  const pct = (x: number) => (total > 0 ? (x / total) * 100 : 0);
+  const rows: { color: string; label: string; value: number; note?: string }[] = [
+    { color: "#94a3b8", label: "Essentials", value: essential, note: estimated ? "est." : undefined },
+    { color: "#34d399", label: "Discretionary", value: discretionary, note: "flexes" },
+    ...(loan > 0 ? [{ color: "#f59e0b", label: "Home loan", value: loan }] : []),
+  ];
+  return (
+    <div className="mt-1.5 space-y-1.5">
+      <div className="flex h-2 w-full overflow-hidden rounded-full bg-panel">
+        {rows.map((r) => (
+          <div key={r.label} title={`${r.label} ${fmtCurrency(r.value)}`} style={{ width: `${pct(r.value)}%`, backgroundColor: r.color }} />
+        ))}
+      </div>
+      <div className="space-y-0.5">
+        {rows.map((r) => (
+          <div key={r.label} className="flex items-center justify-between gap-2 text-[11px]">
+            <span className="flex items-center gap-1.5 text-muted">
+              <span className="inline-block h-2 w-2 rounded-sm" style={{ backgroundColor: r.color }} />
+              {r.label}
+              {r.note && <span className="text-[9px] uppercase tracking-wide text-muted/70">{r.note}</span>}
+            </span>
+            <span className="tabular-nums text-slate-300">{fmtCurrency(r.value)}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /** Per-scenario share control: mints (or reuses) a public read-only link, copies
  *  it to the clipboard, and lets the owner revoke it. Lives in the saved-scenarios
  *  chip beside the Report/Delete actions. */
@@ -416,7 +461,8 @@ export default function PlannerApp({
   // The essentials floor (needs — housing, food, health…). When the prudent max is
   // below it, even cutting ALL discretionary can't reach the confidence bar, so a
   // "trim spending" suggestion would be trimming into needs — not a real option.
-  const essentials = useMemo(() => essentialsFloor(plan, config).value, [plan, config]);
+  const essInfo = useMemo(() => essentialsFloor(plan, config), [plan, config]);
+  const essentials = essInfo.value;
   const cantTrim = overspending && maxSpend != null && maxSpend < essentials - 100;
   // Spend sits right at the prudent max — neither over nor under. Wait for the MC
   // max to settle so it doesn't flicker to/from the trim/boost states.
@@ -874,7 +920,7 @@ export default function PlannerApp({
       {configured ? (
         <>
       {/* Stat cards */}
-      <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <StatCard
           label="Super at retirement"
           value={fmtCurrency(result.superAtRetirement)}
@@ -895,6 +941,19 @@ export default function PlannerApp({
               ✎ Refine scenario
               <span aria-hidden>→</span>
             </button>
+          }
+        />
+        <StatCard
+          label="Your spending"
+          value={fmtCurrency(goal.total)}
+          unit="/yr"
+          sub={
+            <SpendingBreakdown
+              essential={Math.min(essentials, goal.living)}
+              discretionary={Math.max(0, goal.living - Math.min(essentials, goal.living))}
+              loan={goal.loanCost}
+              estimated={essInfo.estimated}
+            />
           }
         />
         <StatCard

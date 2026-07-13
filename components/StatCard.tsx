@@ -12,7 +12,7 @@ interface StatCardProps {
   label: string;
   value: string;
   unit?: string; // small muted suffix after the value (e.g. "/yr")
-  sub?: string;
+  sub?: ReactNode; // string, or richer content (e.g. a mini breakdown)
   subTone?: "muted" | "amber"; // colour of the sub-text (default muted)
   highlight?: boolean;
   tag?: string; // small pill next to the value (e.g. the spending stage)
