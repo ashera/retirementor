@@ -82,23 +82,32 @@ describe("Differential — one-lever deltas match an independent delta", () => {
     expect(near(engine, -netWork, 2), `drawdown Δ${engine.toFixed(0)} vs −netWork ${(-netWork).toFixed(0)}`).toBe(true);
   });
 
-  it("outside-super earnings: ordinary tax before Age Pension age, SAPTO from 67", () => {
-    // Early retiree living off sizeable savings — the case flagged as showing
-    // 'no tax' despite investment income.
+  it("outside-super tax: only the dividend yield + discounted realised gains, ordinary tax pre-67", () => {
+    // Early retiree living off a sizeable outside-super pool. The realistic model
+    // taxes the DIVIDEND YIELD each year (deferring unrealised capital growth, and
+    // discounting the gain that IS realised by 50%) — not the whole return as
+    // income (which badly over-taxed an equity portfolio).
+    const outside = 1_500_000, spend = 60_000;
     const plan = base({
-      people: [P({ currentAge: 58, salary: 0 })],
-      retirementAge: 58, outsideSuper: 800_000, targetSpending: 40_000,
+      people: [P({ currentAge: 58, salary: 0, superBalance: 300_000 })],
+      retirementAge: 58, outsideSuper: outside, targetSpending: spend,
     });
     const rows = simulate(plan, cfg).rows;
-    for (const age of [63, 70]) {
-      const row = rows.find((r) => r.age === age)!;
-      const grownOutside = row.breakdown.closingOutside + row.breakdown.outsideTax; // pre-tax base
-      const senior = age >= cfg.agePensionAge;
-      const expected = ref.outsideEarningsTax(grownOutside, 6, 0, 1, "single", senior);
-      expect(near(row.breakdown.outsideTax, expected, 2), `age ${age}: engine ${row.breakdown.outsideTax.toFixed(0)} vs ref ${expected.toFixed(0)}`).toBe(true);
-    }
-    // The fix: pre-67 it's genuinely taxed (was $0 when SAPTO wrongly applied).
-    expect(rows.find((r) => r.age === 63)!.breakdown.outsideTax).toBeGreaterThan(500);
+
+    // First retirement year: basis is fresh, so the drawdown realises NO gain and
+    // the whole outside tax is the dividend yield on the post-drawdown balance,
+    // taxed at the ordinary (pre-67, no SAPTO) resident scale — an exact closed form.
+    const first = rows.find((r) => r.age === 58)!;
+    const income = (outside - spend) * (cfg.outsideTax.incomeYieldPct / 100); // draw is outside-first
+    const expected = ref.residentIncomeTax(income);
+    expect(near(first.breakdown.outsideTax, expected, 2), `age 58: engine ${first.breakdown.outsideTax.toFixed(0)} vs ref ${expected.toFixed(0)}`).toBe(true);
+
+    // Genuinely taxed pre-67 (the SAPTO-fix invariant) — income alone clears LITO.
+    expect(first.breakdown.outsideTax).toBeGreaterThan(1_000);
+    // ...but FAR less than the old model, which taxed the full ~6% return as income
+    // (≈ residentIncomeTax on 6% of the balance, an order of magnitude more).
+    const oldModel = ref.residentIncomeTax((outside - spend) * 0.06);
+    expect(first.breakdown.outsideTax).toBeLessThan(oldModel * 0.6);
   });
 
   it("downsizer split: $ moved to super reallocates from savings 1:1, release unchanged", () => {

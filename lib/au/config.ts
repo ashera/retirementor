@@ -93,6 +93,24 @@ export interface EngineConfig {
   // Super fees & premiums (Moneysmart-style), deducted per account each year
   fees: SuperFees;
 
+  // Outside-super (personal/brokerage) taxation. An equity return is split into an
+  // income yield (dividends/distributions — taxed each year at marginal rates) and
+  // capital growth (UNREALISED — taxed only when units are sold to fund spending,
+  // with the 50% CGT discount for assets held >12 months). Deferring the growth and
+  // discounting the realised gain is far more accurate than taxing the whole return
+  // as ordinary income every year (which badly over-taxes an equity portfolio).
+  outsideTax: {
+    incomeYieldPct: number; // dividend/distribution yield as % of value (real terms)
+    cgtDiscountPct: number; // capital-gains discount on realised gains (e.g. 50)
+  };
+
+  // Monte Carlo return model (lib/au/historicalReturns.ts). "gaussian" draws each
+  // year independently from mean/vol; "bootstrap" resamples contiguous blocks of
+  // real historical returns (preserving mean-reversion / volatility clustering).
+  // Admin-configurable; runMonteCarlo reads these unless a call overrides them.
+  returnModel: "gaussian" | "bootstrap";
+  bootstrapBlockYears: number;
+
   // Minimum account-based pension drawdown, by age band
   minDrawdownBands: MinDrawdownBand[];
 
@@ -155,6 +173,14 @@ export const DEFAULT_CONFIG: EngineConfig = {
     fixedAdminAnnual: 74,
     insuranceAnnual: 0,
   },
+
+  outsideTax: {
+    incomeYieldPct: 2.5, // ~broad-market dividend yield (global/AU blend, real)
+    cgtDiscountPct: 50, // ATO 50% discount for assets held > 12 months
+  },
+
+  returnModel: "gaussian",
+  bootstrapBlockYears: 10,
 
   minDrawdownBands: [
     { minAge: 0, rate: 0.04 },

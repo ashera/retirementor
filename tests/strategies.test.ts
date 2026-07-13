@@ -241,9 +241,11 @@ describe("What-If strategies", () => {
     const b = base({
       people: [{ currentAge: 66, superBalance: 400_000, salary: 0, voluntaryConcessional: 0, voluntaryNonConcessional: 0 }],
       retirementAge: 66, outsideSuper: 200_000, targetSpending: 70_000, lifeExpectancy: 92,
-      home: { value: 1_400_000, growthReal: 0 },
+      home: { value: 2_800_000, growthReal: 0 },
     });
     const card = cardById(b, "downsize");
+    // A big equity release leaves a large taxable outside pool: its dividend yield
+    // plus the gains realised on drawdown clear even the senior (SAPTO) offset.
     const run = (toSuper: number) => simulate(card.apply(b, resolveValues(card, { age: 67, newValue: 800_000, toSuper })), cfg).rows;
     const toSavings = run(0);
     const toSuper = run(300_000);

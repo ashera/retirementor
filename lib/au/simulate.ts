@@ -114,6 +114,16 @@ export function simulate(
     return drawn;
   };
   let outside = plan.outsideSuper;
+  // Deferred-CGT bookkeeping for the outside-super pool: the running UNREALISED
+  // capital gain (value − cost base). Capital growth accrues here untaxed; a
+  // withdrawal (or transfer out) realises a proportional slice, taxed with the CGT
+  // discount. Contributions/inflows add at cost, so they dilute the gain fraction
+  // automatically — no need to touch every `outside +=` site. Basis is reset to the
+  // pool's value at the retirement boundary (pre-retirement growth is left untaxed,
+  // matching the accumulation-phase treatment below), so it starts at 0.
+  let unrealizedGain = 0;
+  const outsideIncomeYield = (config.outsideTax?.incomeYieldPct ?? 0) / 100;
+  const cgtDiscount = 1 - (config.outsideTax?.cgtDiscountPct ?? 0) / 100;
 
   const startOldest = Math.max(...plan.people.map((p) => p.currentAge));
   const horizon = Math.max(0, Math.round(plan.lifeExpectancy - startOldest));
@@ -394,6 +404,17 @@ export function simulate(
       totalAtRetirement = startSuper + startOutside;
     }
 
+    // Capital gains realised this year by selling outside-super units (to fund
+    // spending, or to transfer into super) — taxed, with the discount, at year end.
+    let realizedGain = 0;
+    const realizeOutside = (amount: number) => {
+      if (amount <= 0 || outside <= EPS) return;
+      const gainFrac = Math.max(0, unrealizedGain) / outside;
+      const g = amount * gainFrac;
+      realizedGain += g;
+      unrealizedGain -= g;
+    };
+
     // A still-working partner (staggered retirement): keep accumulating their
     // super and bank their salary. Their take-home offsets the household's
     // drawdown; their gross salary is assessable for the Age Pension income test.
@@ -508,6 +529,7 @@ export function simulate(
       const room = config.transferBalanceCap - totalSuper();
       const take = Math.min(Math.max(0, recontribute.perYear), config.nonConcessionalCap, outside, room);
       if (take > 0) {
+        realizeOutside(take); // moving units into super realises their gain
         outside -= take;
         addToSuper(0, take); // routes into the pension pool (tax-free) up to the cap
         if (ages[0] >= preservationAge) accessibleSuper += take; // joins the drawable/assessed pool
@@ -675,6 +697,7 @@ export function simulate(
     // accumulation before pension, so it covers those two steps in order.
     const needAfterMin = Math.max(0, privateNeed - minDraw);
     const outsideDrawn = Math.min(needAfterMin, outside);
+    realizeOutside(outsideDrawn); // selling units to fund spending realises their gain
     outside -= outsideDrawn;
     const extra = drawSuper(accessibleIdx, needAfterMin - outsideDrawn);
     const accumDrawn = extra.accum; // accumulation super drawn above the minimum
@@ -717,23 +740,31 @@ export function simulate(
       }
     });
     const outsideGrowth = outside * realReturn;
+    // Split the year's return into an income yield (dividends — realised, taxed now)
+    // and capital growth (unrealised — deferred until units are sold). The whole
+    // return still compounds into the balance; only the tax treatment differs.
+    const outsideIncome = Math.max(0, outside * outsideIncomeYield);
+    unrealizedGain += outsideGrowth - outsideIncome; // capital growth accrues untaxed
     outside *= 1 + realReturn;
 
-    // Super's real edge: pension-phase super earnings are tax-free, but earnings
-    // on money held OUTSIDE super are taxable. In retirement we tax the (nominal)
-    // outside-super earnings at each person's marginal rate, stacked on top of any
-    // part-time work income so the tax-free threshold + SAPTO aren't double-used.
-    // Before Age Pension age it's the ordinary scale (no SAPTO), so an early
-    // retiree living off sizeable savings does pay some tax; from pension age SAPTO
-    // shields modest amounts. (Accumulation-phase outside earnings are left untaxed.)
+    // Super's real edge: pension-phase super earnings are tax-free, but money held
+    // OUTSIDE super is taxable. In retirement we tax, at each person's marginal rate
+    // (stacked on any part-time work income so the tax-free threshold + SAPTO aren't
+    // double-used), the year's assessable outside income = the dividend yield PLUS
+    // the discounted capital gain realised by this year's withdrawals. Deferring the
+    // unrealised growth and applying the 50% CGT discount is what an ETF/share
+    // investor actually experiences — taxing the full return as income every year
+    // (the old model) massively over-taxed an equity portfolio. Before Age Pension
+    // age it's the ordinary scale (no SAPTO); from pension age SAPTO shields modest
+    // amounts. (Accumulation-phase outside earnings are left untaxed.)
     let outsideTax = 0;
     if (!accumPhase) {
-      const outsideEarnings = Math.max(0, outside * (outsideNom / 100)); // nominal, today's $
-      if (outsideEarnings > 0) {
+      const assessable = outsideIncome + cgtDiscount * realizedGain; // today's $
+      if (assessable > 0) {
         const workPer = grossWork / workers;
-        const earnPer = outsideEarnings / workers; // household earnings split per person
+        const assessPer = assessable / workers; // household assessable split per person
         outsideTax = ages.reduce(
-          (s, a) => s + Math.max(0, taxAtAge(workPer + earnPer, a) - taxAtAge(workPer, a)),
+          (s, a) => s + Math.max(0, taxAtAge(workPer + assessPer, a) - taxAtAge(workPer, a)),
           0,
         );
         outside = Math.max(0, outside - outsideTax);

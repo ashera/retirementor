@@ -57,13 +57,15 @@ describe("Separate super vs outside-super returns", () => {
   });
 
   it("taxes the outside pool's OWN earnings in retirement, not the super return", () => {
-    // Big outside pool, retired, past preservation age → outside earnings are taxed.
-    const p = (r: number) => plan({ outsideReturn: r, retirementAge: 60, targetSpending: 40_000 });
+    // Large outside pool (so the dividend yield clears LITO), retired, pre-67 window.
+    // A higher return grows the pool and its unrealised gains faster → more dividend
+    // income AND more discounted gain realised on drawdown → more outside-super tax.
+    const p = (r: number) => plan({ outsideSuper: 1_500_000, outsideReturn: r, retirementAge: 60, targetSpending: 60_000 });
     const taxAt = (r: number) => {
       const rows = simulate(p(r), cfg).rows.filter((x) => x.phase !== "accumulation" && x.age >= 61 && x.age < 67);
       return rows.reduce((s, x) => s + x.breakdown.outsideTax, 0);
     };
-    // A higher outside return produces higher outside earnings → more tax.
+    expect(taxAt(3)).toBeGreaterThan(0); // genuinely taxed at this scale
     expect(taxAt(8)).toBeGreaterThan(taxAt(3));
   });
 

@@ -76,7 +76,9 @@ export function runMonteCarlo(
   // Return model: "gaussian" draws each year independently (default); "bootstrap"
   // resamples contiguous blocks of real historical returns, preserving the
   // mean-reversion/clustering that makes long-horizon Gaussian draws too pessimistic.
-  const bootstrap = opts?.model === "bootstrap";
+  const model = opts?.model ?? config.returnModel ?? "gaussian";
+  const bootstrap = model === "bootstrap";
+  const blockYears = opts?.blockYears ?? config.bootstrapBlockYears ?? 10;
   const mean = plan.investmentReturn;
   const sd = Math.max(0, plan.returnVolatility);
   // Outside-super money may carry its own return/volatility (e.g. cash). Each pool
@@ -105,7 +107,7 @@ export function runMonteCarlo(
     if (bootstrap) {
       // All-equity historical path shared by both pools (a cash/bond sleeve would
       // need its own series — a later addition).
-      const real = bootstrapRealPath(rand, horizon, opts?.blockYears);
+      const real = bootstrapRealPath(rand, horizon, blockYears);
       for (let t = 0; t <= horizon; t++) {
         const nom = ((1 + real[t]) * cpiFactor - 1) * 100;
         returns[t] = nom;
