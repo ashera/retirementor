@@ -101,6 +101,12 @@ export default function GuardrailsTimelineModal({
   const allEssentials = tl.floor >= tl.start * 0.9;
   const raised = tl.plateauSpend > tl.start + 1 && !flexFails;
   const cutPct = tl.start > 0 ? Math.round((1 - minSpend / tl.start) * 100) : 0;
+  // Does spending actually rebound after the cuts, or hold at the floor? A raise
+  // only fires if the (post-pension) draw rate falls back below the lower rail —
+  // which happens for modest spends the pension can meaningfully offset, but not
+  // for high spends where the pension is a small slice. Drives the step 3/4 story.
+  const recovers = tl.points.some((p) => p.action === "raise");
+  const coinFlip = fixedSuccess <= 60 && flexSuccess >= 88;
 
   // Chart data for step 3.
   const plotEnd = flexFails ? tl.failsAtAge! : Infinity;
@@ -233,11 +239,19 @@ export default function GuardrailsTimelineModal({
                   Your savings comfortably outpace your spending, so guardrails mostly hand you <strong className="text-white">raises</strong> —
                   spending climbs to about <strong className="text-white">{fmtCurrency(tl.plateauSpend)}</strong> by the end.
                 </>
-              ) : (
+              ) : recovers ? (
                 <>
                   After the downturn, guardrails trim the discretionary part ~10% a year — to about{" "}
                   <strong className="text-amber-300">{fmtCurrency(minSpend)}</strong> (−{cutPct}%) in this run — then ease it
                   back as the Age Pension arrives{tl.pensionAge != null ? ` at ${tl.pensionAge}` : ""}. Essentials never get cut.
+                </>
+              ) : (
+                <>
+                  After the downturn, guardrails trim the discretionary part ~10% a year — down to your{" "}
+                  <strong className="text-amber-300">{fmtCurrency(tl.floor)}</strong> floor (−{cutPct}%) — and{" "}
+                  <strong className="text-white">hold there for the rest of retirement</strong>. At this spending level the
+                  Age Pension is too small a slice to lift the draw back below the rail, so there&apos;s no raise back — you
+                  can see the withdrawal rate keep climbing in the rate view. Essentials never get cut.
                 </>
               )}
             </p>
@@ -301,9 +315,13 @@ export default function GuardrailsTimelineModal({
                 </>
               ) : (
                 <>
-                  That flexibility turns a coin-flip into near-certain:{" "}
-                  <strong className="text-white">{fixedSuccess}% → {flexSuccess}%</strong> likely to last. The cost is the
-                  belt-tightening in step 3 — real, but the Age Pension does much of the recovery.
+                  {coinFlip ? "That flexibility turns a coin-flip into near-certain: " : "That flexibility lifts your odds: "}
+                  <strong className="text-white">{fixedSuccess}% → {flexSuccess}%</strong> likely to last.{" "}
+                  {recovers ? (
+                    <>The cost — the belt-tightening in step 3 — is real but eases: the Age Pension does much of the recovery.</>
+                  ) : (
+                    <>The cost sticks, though: spending holds at the trimmed level for the rest of retirement — that permanent trim is exactly what keeps the plan from running short.</>
+                  )}
                 </>
               )}
             </p>
