@@ -2,6 +2,9 @@
 
 import { useMemo, useState } from "react";
 import {
+  Bar,
+  BarChart,
+  Cell,
   Line,
   LineChart,
   CartesianGrid,
@@ -109,6 +112,15 @@ export default function GuardrailsTimelineModal({
     .filter((p) => p.age <= plotEnd && p.funded)
     .map((p) => ({ ...p, ratePct: +(Math.min(p.rate, rateCap) * 100).toFixed(2) }));
 
+  // Step ①: the return sequence being tested — a few normal years, the downturn at
+  // retirement, then a few more normal years. Green above the line, red below.
+  const retireAge = dipStart;
+  const returnsData: { age: number; ret: number }[] = [];
+  for (let age = retireAge - 3; age < retireAge + tl.dipYears + 5; age++) {
+    const inDip = age >= retireAge && age < retireAge + tl.dipYears;
+    returnsData.push({ age, ret: inDip ? tl.dip : tl.meanReturn });
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
@@ -152,6 +164,32 @@ export default function GuardrailsTimelineModal({
               Across all market scenarios, a fixed spend lasts{" "}
               <strong className={toneClass(fixedSuccess)}>{fixedSuccess}%</strong> of the time.
             </p>
+            <div className="rounded-xl border border-line bg-panel-2 p-3">
+              <ResponsiveContainer width="100%" height={140}>
+                <BarChart data={returnsData} margin={{ top: 6, right: 8, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#232c40" vertical={false} />
+                  <XAxis dataKey="age" stroke="#8b97ad" fontSize={10} tickLine={false} axisLine={{ stroke: "#232c40" }} />
+                  <YAxis stroke="#8b97ad" fontSize={10} tickLine={false} axisLine={false} width={34} tickFormatter={(v) => `${v}%`} />
+                  <Tooltip
+                    cursor={{ fill: "#ffffff10" }}
+                    formatter={(v: number) => [`${v}%`, "Return"]}
+                    labelFormatter={(l) => `Age ${l}`}
+                    contentStyle={{ background: "#0f1520", border: "1px solid #232c40", borderRadius: 8, fontSize: 12 }}
+                  />
+                  <ReferenceLine y={0} stroke="#475569" />
+                  <ReferenceLine x={retireAge} stroke="#a78bfa" strokeDasharray="3 3" label={{ value: "Retire", position: "top", fill: "#a78bfa", fontSize: 9 }} />
+                  <Bar dataKey="ret" radius={[2, 2, 0, 0]} isAnimationActive={false}>
+                    {returnsData.map((r) => (
+                      <Cell key={r.age} fill={r.ret < 0 ? "#f87171" : "#34d399"} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+              <p className="mt-1 text-[10px] text-muted">
+                The market path we&apos;re testing: {Math.abs(tl.dip)}% falls for {tl.dipYears} years right as you retire,
+                then {tl.meanReturn}%/yr. It&apos;s the <em>timing</em> — a crash before your savings have grown — that does the damage.
+              </p>
+            </div>
           </Step>
 
           {/* ② The lever */}
