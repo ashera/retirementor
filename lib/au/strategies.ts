@@ -535,7 +535,7 @@ export function buildStrategyCatalog(
       blurb: "Let spending flex with your portfolio — ease off a little after market falls, treat yourself after strong years — instead of drawing a fixed amount forever.",
       params: [],
       note: () =>
-        "Guyton-Klinger guardrails: if your portfolio's withdrawal rate (after the Age Pension) drifts about 20% above where it started, spending is trimmed ~10%; if it drifts ~20% below, you get a ~10% raise — but never below your essentials. Being willing to ease off in downturns lets the same portfolio safely support a higher average spend than a rigid fixed withdrawal. Pair it with the spending lever to see how much more you could start on.",
+        "Guyton-Klinger guardrails: if your portfolio's withdrawal rate (after the Age Pension) drifts about 20% above where it started, spending is trimmed ~10%; if it drifts ~20% below, you get a ~10% raise — but never below your essentials. Instead of a fixed amount forever, your spending flexes with the markets — more in good years, less in bad — so you're much less likely to run out.",
       apply: (p) => ({ ...p, guardrails: {} }),
     });
   }

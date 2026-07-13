@@ -320,15 +320,23 @@ export default function WhatIfView({
   // the guardrails lever is on, and debounced off the interaction path (it's a
   // small Monte Carlo over the spending path).
   const [grOutlook, setGrOutlook] = useState<GuardrailsOutlook | null>(null);
+  const [grUplift, setGrUplift] = useState<{ fixed: number; flex: number } | null>(null);
   const [grPending, setGrPending] = useState(false);
   useEffect(() => {
     if (!composed || !active.has("guardrails")) {
       setGrOutlook(null);
+      setGrUplift(null);
       return;
     }
     setGrPending(true);
     const id = setTimeout(() => {
       setGrOutlook(guardrailsOutlook(composed, config));
+      // The honest headline for guardrails: the likelihood uplift at the CURRENT
+      // spend (same plan, guardrails off vs on) — not the misleading "safe start"
+      // ceiling, which is inflated because "lasting" is achieved by trimming.
+      const fixed = runMonteCarlo({ ...composed, guardrails: undefined }, config, SAFE_MC).successRate;
+      const flex = runMonteCarlo(composed, config, SAFE_MC).successRate;
+      setGrUplift({ fixed, flex });
       setGrPending(false);
     }, 500);
     return () => clearTimeout(id);
@@ -698,6 +706,8 @@ export default function WhatIfView({
                             safePending,
                             currentStart: annualSpend(composed),
                             loan: spendMix?.loan ?? 0,
+                            fixedPct: grUplift ? Math.round(grUplift.fixed * 100) : null,
+                            flexPct: grUplift ? Math.round(grUplift.flex * 100) : null,
                             targetPct: Math.round(SAFE_TARGET * 100),
                           }
                         : undefined
@@ -1010,6 +1020,8 @@ function StrategyCardRow({
     safePending: boolean;
     currentStart: number; // the composed plan's current starting LIVING spend
     loan: number; // annual home-loan cost — fixed (never trimmed), added to show TOTAL spend
+    fixedPct: number | null; // likelihood to last at the current spend WITHOUT guardrails
+    flexPct: number | null; // likelihood to last at the current spend WITH guardrails
     targetPct: number;
   };
   sustainable?: {
@@ -1033,6 +1045,10 @@ function StrategyCardRow({
   const gCurrent = guardrails ? guardrails.currentStart + gLoan : 0;
   const gWorst = guardrails ? guardrails.outlook.worstCutSpend + gLoan : 0;
   const gCutPct = gCurrent > 0 ? Math.round((1 - gWorst / gCurrent) * 100) : 0;
+  // Genuine headroom to spend more = the plan raises even on steady returns (it's
+  // underspending). Only then is "start higher" real upside rather than more
+  // austerity — for a stretched plan we suppress that invite.
+  const gHeadroom = !!guardrails?.outlook.everRaises;
   return (
     <div className={`rounded-2xl border p-4 transition ${on ? "border-accent/40 bg-accent/5" : "border-line bg-panel"}`}>
       <div className="flex items-center gap-3">
@@ -1116,47 +1132,64 @@ function StrategyCardRow({
           )}
           {guardrails && (
             <div className="space-y-2 rounded-lg border border-accent/30 bg-accent/5 px-3 py-2 text-xs">
-              {/* Safe STARTING spend with guardrails (from the same solver the spend
-                  lever uses — it already reflects guardrails when this lever is on). */}
+              {/* Honest headline: the likelihood uplift at the CURRENT spend — not
+                  the "safe start" ceiling, which is inflated because guardrails
+                  achieve "lasting" by trimming. */}
               <div className="text-slate-300">
-                Guardrails let you start as high as{" "}
-                {gSafeStart != null ? (
-                  <span className="font-semibold text-accent">{fmtCurrency(gSafeStart)}/yr</span>
+                At your <span className="font-semibold text-slate-200">{fmtCurrency(gCurrent)}/yr</span>, guardrails{" "}
+                {guardrails.fixedPct == null || guardrails.flexPct == null ? (
+                  <>
+                    improve your odds of lasting
+                    <span className="ml-1 inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-accent align-middle" />
+                  </>
+                ) : guardrails.flexPct > guardrails.fixedPct + 1 ? (
+                  <>
+                    lift your odds from <span className="font-semibold text-amber-300">{guardrails.fixedPct}%</span> to{" "}
+                    <span className="font-semibold text-accent">{guardrails.flexPct}%</span> likely to last — by easing spending in the bad years.
+                  </>
                 ) : (
-                  <span className="text-muted">…</span>
+                  <>
+                    keep you ~<span className="font-semibold text-accent">{guardrails.flexPct}%</span> likely to last, and let your
+                    spending flex up in the good years.
+                  </>
                 )}
-                <span className="text-muted">
-                  {" "}and still be ~{guardrails.targetPct}% likely to last
-                  {gSafeStart != null && gSafeStart > gCurrent + 1_000 ? `, up from your ${fmtCurrency(gCurrent)}` : ""}
-                  {" "}— because bad years auto-trim (below).
-                </span>
-                {guardrails.safePending && (
-                  <span className="ml-1 inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-accent align-middle" />
-                )}
-                <span className="ml-1 text-[11px] text-muted">Set the start with the spending lever.</span>
               </div>
-              {/* The honest counterweight: that "lasting" is achieved BY trimming. */}
-              <div className="border-t border-line pt-1.5">
+              {/* The cost — or, for a well-funded plan, the upside. */}
+              <div className="border-t border-line pt-1.5 text-slate-300">
                 {guardrails.pending ? (
                   <span className="flex items-center gap-1.5 text-muted">
                     <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent" />
-                    Sizing up the downside…
+                    Sizing up the trade-off…
                   </span>
                 ) : guardrails.outlook.worstCutPct < 0.01 ? (
-                  <span className="text-slate-300">
-                    Across the market runs we tested, spending only ever rose — no cuts were triggered.
-                  </span>
+                  <>Across the runs we tested, spending only ever rose — no cuts were triggered.</>
+                ) : gHeadroom ? (
+                  <>
+                    The flex is mostly <span className="font-semibold text-accent">upside</span>: good years raise you
+                    above your start, and at worst a rough run trims to about{" "}
+                    <span className="font-semibold text-amber-300">{fmtCurrency(gWorst)}/yr</span> (−{gCutPct}%).
+                  </>
                 ) : (
-                  <span className="text-slate-300">
-                    That trimming is real: from your current start, a rough run cuts you to about{" "}
-                    <span className="font-semibold text-amber-300">{fmtCurrency(gWorst)}/yr</span>{" "}
-                    (−{gCutPct}%)
-                    {guardrails.outlook.yearsBelowBad > 0 ? ` for ~${guardrails.outlook.yearsBelowBad} years` : ""}.
-                    {gLoan > 0 ? " Your home loan is never trimmed." : ""}
-                    {guardrails.outlook.everRaises && " Strong years raise you above your start."}
-                  </span>
+                  <>
+                    The trade-off: a rough run trims you to about{" "}
+                    <span className="font-semibold text-amber-300">{fmtCurrency(gWorst)}/yr</span> (−{gCutPct}%)
+                    {guardrails.outlook.yearsBelowBad > 0 ? ` for ~${guardrails.outlook.yearsBelowBad} years` : ""}, and
+                    holds there.{gLoan > 0 ? " Your home loan is never trimmed." : ""}
+                  </>
                 )}
               </div>
+              {/* Only genuinely well-funded plans get the "start higher" invite — for
+                  a stretched plan a higher start is just more austerity, not upside. */}
+              {gHeadroom && gSafeStart != null && gSafeStart > gCurrent + 1_000 && (
+                <div className="border-t border-line pt-1.5 text-slate-300">
+                  You&apos;re comfortably funded — you could start as high as{" "}
+                  <span className="font-semibold text-accent">{fmtCurrency(gSafeStart)}/yr</span> and stay ~
+                  {guardrails.targetPct}% likely, mostly enjoying raises. Set it with the spending lever.
+                  {guardrails.safePending && (
+                    <span className="ml-1 inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-accent align-middle" />
+                  )}
+                </div>
+              )}
               <div className="flex items-center justify-between gap-2 pt-0.5">
                 {guardrails.outlook.centralPath.length > 2 ? (
                   <div className="flex items-center gap-2">
