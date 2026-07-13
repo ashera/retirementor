@@ -66,11 +66,12 @@ export default function ReturnModelView({
       <header className="mb-6">
         <h1 className="text-xl font-semibold text-white">Monte Carlo return model</h1>
         <p className="mt-1 max-w-2xl text-sm text-muted">
-          How the likelihood engine draws future returns. <strong className="text-slate-200">Gaussian</strong> draws
+          How the likelihood engine <em>sequences</em> future returns. <strong className="text-slate-200">Gaussian</strong> draws
           each year independently from the plan&apos;s mean &amp; volatility. <strong className="text-slate-200">Historical
-          bootstrap</strong> resamples contiguous blocks of real market history, preserving the mean-reversion and
-          volatility-clustering that independent draws destroy over a long retirement. This setting applies to every
-          user&apos;s projection.
+          bootstrap</strong> uses the same mean &amp; volatility but takes its year-to-year sequence from real market
+          history (block-resampled), restoring the mean-reversion and volatility-clustering that independent draws
+          destroy over a long retirement. <strong className="text-slate-200">Only the sequencing differs</strong> — the
+          likelihood stays consistent with the plan&apos;s own return assumptions. Applies to every user&apos;s projection.
         </p>
       </header>
 
@@ -162,6 +163,9 @@ export default function ReturnModelView({
             S&amp;P 500 annual total return deflated by US CPI (Damodaran, NYU Stern · usinflationcalculator.com),
             {" "}{stats.startYear}–{stats.endYear}. US is a proxy: the longest clean series, and AU/global equities are
             highly correlated. Swap an AU series into <code className="text-slate-300">lib/au/historicalReturns.ts</code> to change it.
+            {" "}<strong className="text-slate-300">The model uses only the SHAPE of this series</strong> — standardised to
+            zero-mean, unit-variance and re-expressed at each plan&apos;s own return &amp; volatility — so history&apos;s
+            {" "}~{pct(stats.geoMean)} / ~{pct(stats.vol)} levels are <em>not</em> imposed on anyone&apos;s plan.
           </p>
         </div>
       </section>
@@ -201,9 +205,9 @@ export default function ReturnModelView({
           </table>
         </div>
         <p className="mt-2 text-xs text-muted">
-          The bootstrap carries both a higher mean and higher volatility than the Gaussian default, so which looks safer
-          depends on the spend/horizon: volatility dominates deep in the tail (aggressive spend), the higher mean in the
-          mid range.
+          Both models use the plan&apos;s own mean &amp; volatility, so they land close. The bootstrap tends to run a
+          touch higher because real markets mean-revert over a long horizon — independent Gaussian draws manufacture
+          ruinous streaks history never actually produced.
         </p>
       </section>
     </main>

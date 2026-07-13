@@ -4,7 +4,7 @@
 // than the same run late) and report a success probability + a fan of outcomes.
 
 import { simulate } from "./simulate";
-import { bootstrapRealPath } from "./historicalReturns";
+import { bootstrapShockPath } from "./historicalReturns";
 import { householdRetirementOffset } from "./types";
 import type { EngineConfig } from "./config";
 import type { RetirementPlan } from "./types";
@@ -97,28 +97,19 @@ export function runMonteCarlo(
   const depletionAges: number[] = [];
   let successes = 0;
 
-  // Bootstrap supplies REAL returns; re-inflate by the plan's CPI so simulate's own
-  // deflation recovers them (and pension/wage indexing stay on the plan's inflation).
-  const cpiFactor = 1 + plan.inflation / 100;
-
   for (let iter = 0; iter < iterations; iter++) {
     const returns = new Array(horizon + 1);
     const outsideReturns = splitPools ? new Array(horizon + 1) : undefined;
-    if (bootstrap) {
-      // All-equity historical path shared by both pools (a cash/bond sleeve would
-      // need its own series — a later addition).
-      const real = bootstrapRealPath(rand, horizon, blockYears);
-      for (let t = 0; t <= horizon; t++) {
-        const nom = ((1 + real[t]) * cpiFactor - 1) * 100;
-        returns[t] = nom;
-        if (outsideReturns) outsideReturns[t] = nom;
-      }
-    } else {
-      for (let t = 0; t <= horizon; t++) {
-        const z = standardNormal(rand);
-        returns[t] = mean + sd * z;
-        if (outsideReturns) outsideReturns[t] = outsideMean + outsideSd * z;
-      }
+    // The two models differ ONLY in where the annual shock `z` comes from: the
+    // bootstrap draws a block-resampled path of real historical shocks (preserving
+    // mean-reversion / clustering), the Gaussian draws independent normals. Both are
+    // then expressed at the plan's own mean & volatility, and the same shock drives
+    // both pools (perfect correlation, scaled by each pool's vol).
+    const shocks = bootstrap ? bootstrapShockPath(rand, horizon, blockYears) : null;
+    for (let t = 0; t <= horizon; t++) {
+      const z = shocks ? shocks[t] : standardNormal(rand);
+      returns[t] = mean + sd * z;
+      if (outsideReturns) outsideReturns[t] = outsideMean + outsideSd * z;
     }
 
     const r = simulate(plan, config, returns, outsideReturns);

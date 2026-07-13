@@ -5,6 +5,16 @@
 // produced, which understates long-horizon safe spending. Resampling real history
 // in contiguous blocks preserves those dynamics.
 //
+// IMPORTANT — we resample the SHAPE of history, not its level. Raw historical
+// returns carry their own mean (~11% nominal) and volatility (~20%); using them
+// directly would silently override the plan's own return/volatility assumptions
+// (and impose a US market's level on an AU tool). Instead we STANDARDISE the series
+// to zero-mean, unit-variance "shocks" (HISTORICAL_SHOCKS), block-resample those,
+// and let the Monte Carlo apply them as `planMean + planVol · shock` — identical to
+// the Gaussian path except the shocks come from real history (with its
+// mean-reversion / clustering) rather than from independent normal draws. So the
+// bootstrap changes only the SEQUENCING, never the assumed mean or volatility.
+//
 // Sources (accessed Jul 2026):
 //  - S&P 500 annual TOTAL returns (price + dividends), 1928-2025: Aswath Damodaran,
 //    NYU Stern — pages.stern.nyu.edu/~adamodar/New_Home_Page/datafile/histretSP.html
@@ -54,6 +64,17 @@ export const HISTORICAL_REAL_EQUITY: readonly number[] = SP500_NOMINAL_TR.map(
   (nom, i) => (1 + nom) / (1 + US_CPI_PCT[i] / 100) - 1,
 );
 
+// Standardised historical shocks: zero mean, unit variance. These carry the SHAPE
+// of history (order, mean-reversion, fat tails) with its level stripped out, so the
+// Monte Carlo can re-express them at the plan's own mean & volatility. (Standardising
+// the real series is equivalent to standardising the nominal one — the CPI transform
+// is affine, so it cancels — hence no inflation dependence here.)
+const _mean = HISTORICAL_REAL_EQUITY.reduce((a, b) => a + b, 0) / HISTORICAL_REAL_EQUITY.length;
+const _sd = Math.sqrt(
+  HISTORICAL_REAL_EQUITY.reduce((a, b) => a + (b - _mean) ** 2, 0) / HISTORICAL_REAL_EQUITY.length,
+);
+export const HISTORICAL_SHOCKS: readonly number[] = HISTORICAL_REAL_EQUITY.map((r) => (r - _mean) / _sd);
+
 /** The real-return series as {year, real} points (real is a fraction). */
 export function historicalSeries(): { year: number; real: number }[] {
   return HISTORICAL_REAL_EQUITY.map((real, i) => ({ year: HIST_START_YEAR + i, real }));
@@ -92,14 +113,17 @@ export function historicalStats(): HistoricalStats {
 }
 
 /**
- * Circular block bootstrap: stitch contiguous blocks of the historical real-return
- * series into a synthetic (horizon+1)-year path. Contiguous blocks preserve the
- * short-run structure (mean-reversion, volatility clustering) that IID / Gaussian
- * draws destroy; wrapping around the end ("circular") avoids under-weighting the
- * latest years. `rand` is the caller's PRNG so results stay deterministic per seed.
+ * Circular block bootstrap over the standardised historical SHOCKS: stitch
+ * contiguous blocks into a synthetic (horizon+1)-year path of zero-mean, unit-
+ * variance shocks. Contiguous blocks preserve the short-run structure (mean-
+ * reversion, volatility clustering) that IID / Gaussian draws destroy; wrapping
+ * around the end ("circular") avoids under-weighting the latest years. `rand` is
+ * the caller's PRNG so results stay deterministic per seed. The caller turns each
+ * shock into a return via `planMean + planVol · shock`, so the plan's own mean and
+ * volatility are preserved — only the sequencing comes from history.
  */
-export function bootstrapRealPath(rand: () => number, horizon: number, blockYears = 10): number[] {
-  const s = HISTORICAL_REAL_EQUITY;
+export function bootstrapShockPath(rand: () => number, horizon: number, blockYears = 10): number[] {
+  const s = HISTORICAL_SHOCKS;
   const n = s.length;
   const len = Math.max(1, Math.round(blockYears));
   const out: number[] = [];

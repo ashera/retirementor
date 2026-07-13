@@ -179,7 +179,7 @@ export const DEFAULT_CONFIG: EngineConfig = {
     cgtDiscountPct: 50, // ATO 50% discount for assets held > 12 months
   },
 
-  returnModel: "gaussian",
+  returnModel: "bootstrap",
   bootstrapBlockYears: 10,
 
   minDrawdownBands: [
