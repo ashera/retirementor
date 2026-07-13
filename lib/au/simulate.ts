@@ -24,7 +24,7 @@ import {
 } from "./types";
 import { mortgageActiveAtAge, mortgageAnnualCost } from "./mortgage";
 import { budgetSplit, presetCategories } from "./budget";
-import { residentIncomeTax, seniorIncomeTax } from "./tax";
+import { residentIncomeTax, seniorIncomeTax, medicareLevy } from "./tax";
 import {
   capitalGainsTax,
   netEquity,
@@ -171,7 +171,7 @@ export function simulate(
   const guardrails = plan.guardrails;
   const guardWidth = (guardrails?.guardPct ?? 20) / 100; // rail half-width vs initial rate
   const guardStep = (guardrails?.adjustPct ?? 10) / 100; // cut / raise size
-  const guardFloorPct = (guardrails?.floorPct ?? 70) / 100;
+  const guardFloorPct = Math.min(1, (guardrails?.floorPct ?? 70) / 100); // a floor > 100% of start makes no sense — clamp so it never exceeds the start spend
   // Essentials floor (needs) — the same budget-derived figure the What-If spend
   // lever holds fixed; guardrail cuts never trim below it.
   const guardEssentials = guardrails
@@ -224,7 +224,9 @@ export function simulate(
       const concessional = Math.min(salary * config.sgRate + p.voluntaryConcessional * scale, cap);
       const sacrificed = Math.max(0, concessional - salary * config.sgRate);
       const taxable = Math.max(0, salary - sacrificed);
-      const takeHome = taxable - residentIncomeTax(taxable);
+      // Take-home is real cash the household spends/banks, so it must include the 2%
+      // Medicare levy (unlike residentIncomeTax, which omits it for the CGT use).
+      const takeHome = taxable - residentIncomeTax(taxable) - medicareLevy(taxable);
       let ttrBenefit = 0;
       if (ttrEligible && plan.ttr && plan.ttr.extraSacrifice > 0) {
         const ttrSacrificed = Math.min(plan.ttr.extraSacrifice * scale, Math.max(0, cap - concessional));
@@ -233,7 +235,10 @@ export function simulate(
           ttrBenefit = taxSaved - ttrSacrificed * config.contributionsTax;
         }
       }
-      const ncc = Math.min(p.voluntaryNonConcessional * scale, nccCap);
+      // Non-concessional cap falls to $0 once the person's total super balance is at
+      // or above the threshold (~$2.1M). During accumulation `opening` is the whole
+      // super balance, so it's the right gauge for a working-age contributor.
+      const ncc = opening >= config.totalSuperBalanceNccThreshold * scale ? 0 : Math.min(p.voluntaryNonConcessional * scale, nccCap);
       const div293Income = taxable + concessional; // taxable income + low-tax contributions (sacrifice already removed from taxable)
       const taxed293 = Math.min(concessional, Math.max(0, div293Income - div293Threshold));
       const extra293 = taxed293 * config.div293ExtraTaxRate;
@@ -292,7 +297,10 @@ export function simulate(
     let homeToSuperThisYear = 0;
     if (downsize && !downsized && oldest >= downsize.atAge) {
       const release = Math.max(0, homeVal - downsize.newValue - loanBal);
-      const toSuper = Math.max(0, Math.min(downsize.toSuper, release));
+      // The downsizer contribution is capped at $300k PER PERSON by law, regardless
+      // of how much equity is freed or requested (the UI slider caps too, but the
+      // engine is the source of truth for saved/seeded plans).
+      const toSuper = Math.max(0, Math.min(downsize.toSuper, release, 300_000 * plan.people.length));
       const toOutside = Math.max(0, release - toSuper);
       if (accum.length) addToSuper(0, toSuper);
       outside += toOutside;
@@ -416,7 +424,7 @@ export function simulate(
     let realizedGain = 0;
     const realizeOutside = (amount: number) => {
       if (amount <= 0 || outside <= EPS) return;
-      const gainFrac = Math.max(0, unrealizedGain) / outside;
+      const gainFrac = Math.min(1, Math.max(0, unrealizedGain) / outside); // never realise more gain than the amount sold
       const g = amount * gainFrac;
       realizedGain += g;
       unrealizedGain -= g;

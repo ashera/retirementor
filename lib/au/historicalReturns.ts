@@ -66,9 +66,11 @@ export const HISTORICAL_REAL_EQUITY: readonly number[] = SP500_NOMINAL_TR.map(
 
 // Standardised historical shocks: zero mean, unit variance. These carry the SHAPE
 // of history (order, mean-reversion, fat tails) with its level stripped out, so the
-// Monte Carlo can re-express them at the plan's own mean & volatility. (Standardising
-// the real series is equivalent to standardising the nominal one — the CPI transform
-// is affine, so it cancels — hence no inflation dependence here.)
+// Monte Carlo can re-express them at the plan's own mean & volatility. We standardise
+// the REAL series deliberately: the shocks are applied to a nominal mean and then
+// deflated by a CONSTANT plan-inflation, so the resulting real path inherits the
+// real-return shape. (This is NOT the same as standardising the nominal series — the
+// year-varying CPI means the two shock sequences differ.)
 const _mean = HISTORICAL_REAL_EQUITY.reduce((a, b) => a + b, 0) / HISTORICAL_REAL_EQUITY.length;
 const _sd = Math.sqrt(
   HISTORICAL_REAL_EQUITY.reduce((a, b) => a + (b - _mean) ** 2, 0) / HISTORICAL_REAL_EQUITY.length,
@@ -125,7 +127,9 @@ export function historicalStats(): HistoricalStats {
 export function bootstrapShockPath(rand: () => number, horizon: number, blockYears = 10): number[] {
   const s = HISTORICAL_SHOCKS;
   const n = s.length;
-  const len = Math.max(1, Math.round(blockYears));
+  // Guard against a non-finite blockYears: Math.max(1, Math.round(NaN)) is NaN, and
+  // `k < NaN` is always false → the block never fills → the while-loop spins forever.
+  const len = Number.isFinite(blockYears) ? Math.max(1, Math.round(blockYears)) : 10;
   const out: number[] = [];
   while (out.length <= horizon) {
     const start = Math.floor(rand() * n);

@@ -166,7 +166,7 @@ export function guardrailsTimeline(
   const essential = budgetSplit(
     plan.budget?.categories ?? presetCategories(config, plan.household, plan.homeowner, "modest"),
   ).essential;
-  const floorPct = (plan.guardrails?.floorPct ?? 70) / 100;
+  const floorPct = Math.min(1, (plan.guardrails?.floorPct ?? 70) / 100); // clamp: floor never above the start spend
   // Never above the start spend (mirrors the engine): a plan spending all-essentials
   // has no discretionary to trim, so its floor is simply the start.
   const floor = Math.max(Math.min(Math.round(essential), start), Math.round(floorPct * start));

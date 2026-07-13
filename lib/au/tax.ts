@@ -8,13 +8,15 @@ interface Bracket {
   rate: number; // marginal rate within it
 }
 
-// FY2026-27 resident scale.
+// FY2026-27 resident scale. The $18,201–$45,000 bracket is 15% from 1 July 2026
+// (the legislated cost-of-living tax cut; drops again to 14% from 1 July 2027).
+// `base` = cumulative tax at the bottom of each bracket, e.g. 45k → 26,800·0.15.
 const BRACKETS: Bracket[] = [
   { upTo: 18_200, base: 0, rate: 0 },
-  { upTo: 45_000, base: 0, rate: 0.16 },
-  { upTo: 135_000, base: 4_288, rate: 0.3 },
-  { upTo: 190_000, base: 31_288, rate: 0.37 },
-  { upTo: Infinity, base: 51_638, rate: 0.45 },
+  { upTo: 45_000, base: 0, rate: 0.15 },
+  { upTo: 135_000, base: 4_020, rate: 0.3 },
+  { upTo: 190_000, base: 31_020, rate: 0.37 },
+  { upTo: Infinity, base: 51_370, rate: 0.45 },
 ];
 
 /** Resident income tax on a taxable amount, BEFORE offsets (today's dollars).
@@ -44,6 +46,19 @@ export function lito(taxable: number): number {
  *  wages and other assessable income for a working-age person. */
 export function residentIncomeTax(taxable: number): number {
   return Math.max(0, incomeTax(taxable) - lito(taxable));
+}
+
+// Medicare levy low-income threshold (single, ATO — indexed yearly).
+const MEDICARE_LOW_INCOME_THRESHOLD = 27_222;
+
+/** The 2% Medicare levy on a working-age person's taxable income: nil below the
+ *  low-income threshold, shaded in at 10c per $ over it, then a flat 2%. Kept
+ *  SEPARATE from residentIncomeTax (which is also used for CGT, where we deliberately
+ *  exclude the levy) — this is added only to a wage-earner's take-home. */
+export function medicareLevy(taxable: number): number {
+  const t = Math.max(0, taxable);
+  if (t <= MEDICARE_LOW_INCOME_THRESHOLD) return 0;
+  return Math.min(0.02 * t, 0.1 * (t - MEDICARE_LOW_INCOME_THRESHOLD));
 }
 
 // Max SAPTO (Seniors & Pensioners Tax Offset), per person. The offset makes

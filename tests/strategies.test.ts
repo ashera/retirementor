@@ -4,7 +4,7 @@ import { DEFAULT_CONFIG as cfg } from "../lib/au/config";
 import { DEFAULT_PLAN, getInvestmentProperties, type PropertyDetail, type RetirementPlan } from "../lib/au/types";
 import { buildStrategyCatalog, applyStrategies, resolveValues, maxSustainableSpend, maxSpendForConfidence, essentialsFloor, withSpend } from "../lib/au/strategies";
 import { runMonteCarlo } from "../lib/au/montecarlo";
-import { incomeTax } from "../lib/au/tax";
+import { incomeTax, medicareLevy } from "../lib/au/tax";
 import { rowNetWorth } from "../lib/au/networth";
 import { seniorEmploymentTax } from "../lib/au/tax";
 
@@ -75,12 +75,12 @@ describe("What-If strategies", () => {
   it("take-home reflects income tax, and salary-sacrificing lowers it by the after-tax cost", () => {
     const b = base(); // single, salary $100k, working from age 50
     const row = simulate(b, cfg).rows.find((r) => r.age === 50)!;
-    // No sacrifice: take-home = salary less resident income tax.
-    expect(row.takeHome).toBeCloseTo(100_000 - incomeTax(100_000), 0);
+    // No sacrifice: take-home = salary less resident income tax AND the 2% Medicare levy.
+    expect(row.takeHome).toBeCloseTo(100_000 - incomeTax(100_000) - medicareLevy(100_000), 0);
     // Salary-sacrifice $15k (pre-tax) → taxable falls to $85k, so does take-home.
     const sac = applyOne(b, "salary-sacrifice", { extra: 15_000 });
     const rowS = simulate(sac, cfg).rows.find((r) => r.age === 50)!;
-    expect(rowS.takeHome).toBeCloseTo(85_000 - incomeTax(85_000), 0);
+    expect(rowS.takeHome).toBeCloseTo(85_000 - incomeTax(85_000) - medicareLevy(85_000), 0);
     expect(rowS.takeHome).toBeLessThan(row.takeHome);
   });
 

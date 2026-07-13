@@ -190,13 +190,14 @@ export function mortgageRealCost(m: MortgageDetail, inflationPct: number, years:
 }
 
 // ── Resident income tax (FY2026-27), used for the CGT above ──────────────────
+// $18,201–$45,000 bracket is 15% from 1 July 2026 (legislated cost-of-living cut).
 export function incomeTax(taxable: number): number {
   const t = Math.max(0, taxable);
   if (t <= 18_200) return 0;
-  if (t <= 45_000) return (t - 18_200) * 0.16;
-  if (t <= 135_000) return 4_288 + (t - 45_000) * 0.3;
-  if (t <= 190_000) return 31_288 + (t - 135_000) * 0.37;
-  return 51_638 + (t - 190_000) * 0.45;
+  if (t <= 45_000) return (t - 18_200) * 0.15;
+  if (t <= 135_000) return 4_020 + (t - 45_000) * 0.3;
+  if (t <= 190_000) return 31_020 + (t - 135_000) * 0.37;
+  return 51_370 + (t - 190_000) * 0.45;
 }
 
 // ── Low Income Tax Offset (LITO) ─────────────────────────────────────────────

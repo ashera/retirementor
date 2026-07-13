@@ -1,6 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { simulate } from "../lib/au/simulate";
 import { DEFAULT_CONFIG } from "../lib/au/config";
+import { incomeTax, medicareLevy } from "../lib/au/tax";
+import { guardrailsTimeline } from "../lib/au/guardrails";
+import { bootstrapShockPath } from "../lib/au/historicalReturns";
 import { DEFAULT_PLAN, type RetirementPlan, type Person } from "../lib/au/types";
 
 // Regression tests for the adversarial engine review (Tier 1 + verified Tier 2).
@@ -83,5 +86,48 @@ describe("Review fix #5 — Division 293 base excludes the salary-sacrifice", ()
     const contribNet = rowAt(plan, 50).breakdown.contribNet;
     const concessional = Math.min(220_000 * cfg.sgRate + 10_000, cfg.concessionalCap);
     expect(contribNet).toBeCloseTo(concessional * (1 - cfg.contributionsTax), 0); // no Div 293 deducted
+  });
+});
+
+describe("Review Tier-3 fixes", () => {
+  it("#1 FY2026-27 resident scale uses the 15% bracket (not 16%)", () => {
+    expect(incomeTax(45_000)).toBeCloseTo(4_020, 0); // 26,800 × 15%
+    expect(incomeTax(100_000)).toBeCloseTo(20_520, 0); // 4,020 + 55,000 × 30%
+  });
+
+  it("#2 Medicare levy: nil under the threshold, shaded in, then flat 2%", () => {
+    expect(medicareLevy(20_000)).toBe(0);
+    expect(medicareLevy(30_000)).toBeCloseTo(0.1 * (30_000 - 27_222), 0); // shade-in
+    expect(medicareLevy(100_000)).toBeCloseTo(2_000, 0); // flat 2%
+    // and the engine's take-home now includes it
+    const p = base({ people: [P({ currentAge: 50, superBalance: 300_000, salary: 100_000 })], retirementAge: 67 });
+    expect(rowAt(p, 50).takeHome).toBeCloseTo(100_000 - incomeTax(100_000) - 2_000, 0);
+  });
+
+  it("#11 non-concessional cap falls to $0 once total super ≥ the threshold", () => {
+    const over = base({ people: [P({ currentAge: 50, superBalance: 2_200_000, salary: 50_000, voluntaryNonConcessional: 100_000 })], retirementAge: 67 });
+    const under = base({ people: [P({ currentAge: 50, superBalance: 1_000_000, salary: 50_000, voluntaryNonConcessional: 100_000 })], retirementAge: 67 });
+    // Over the threshold: no NCC added; under: the full $100k goes in.
+    expect(rowAt(under, 50).breakdown.contribNet - rowAt(over, 50).breakdown.contribNet).toBeCloseTo(100_000, -1);
+  });
+
+  it("#10 downsizer contribution is capped at $300k per person", () => {
+    const plan = base({
+      people: [P({ currentAge: 60, superBalance: 400_000 })], retirementAge: 65,
+      home: { value: 1_500_000, growthReal: 0, downsize: { atAge: 70, newValue: 600_000, toSuper: 500_000 } },
+    });
+    const row = simulate(plan, cfg).rows.find((r) => r.breakdown.homeProceedsToSuper > 0)!;
+    expect(row.breakdown.homeProceedsToSuper).toBeCloseTo(300_000, 0); // requested $500k → capped at $300k (single)
+  });
+
+  it("#8 a floorPct over 100% is clamped — the floor never exceeds the start spend", () => {
+    const tl = guardrailsTimeline({ ...base({ people: [P({ currentAge: 60, superBalance: 900_000 })], retirementAge: 60, outsideSuper: 0, targetSpending: 55_000 }), guardrails: { floorPct: 120 } }, cfg);
+    expect(tl.floor).toBeLessThanOrEqual(tl.start);
+  });
+
+  it("#6 bootstrap sampler survives a non-finite blockYears (no infinite loop)", () => {
+    const path = bootstrapShockPath(() => 0.5, 20, Number.NaN);
+    expect(path).toHaveLength(21);
+    expect(path.every((v) => Number.isFinite(v))).toBe(true);
   });
 });
