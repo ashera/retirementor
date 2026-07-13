@@ -100,7 +100,13 @@ export default function GuardrailsTimelineModal({
   const fixedFails = fixedTl.failsAtAge != null;
   const allEssentials = tl.floor >= tl.start * 0.9;
   const raised = tl.plateauSpend > tl.start + 1 && !flexFails;
-  const cutPct = tl.start > 0 ? Math.round((1 - minSpend / tl.start) * 100) : 0;
+  // The timeline works in LIVING spend (what flexes); add the fixed home loan so
+  // the story shows TOTAL spend, consistent with the spending bar (step 2). The
+  // loan is never trimmed, so the total cut % is smaller than the living cut %.
+  const startTotal = tl.start + loan;
+  const floorTotal = tl.floor + loan;
+  const minTotal = minSpend + loan;
+  const cutPct = startTotal > 0 ? Math.round((1 - minTotal / startTotal) * 100) : 0;
   // Does spending actually rebound after the cuts, or hold at the floor? A raise
   // only fires if the (post-pension) draw rate falls back below the lower rail —
   // which happens for modest spends the pension can meaningfully offset, but not
@@ -113,7 +119,7 @@ export default function GuardrailsTimelineModal({
   const rateCap = Math.max(0.25, tl.upperRail * 3);
   const dipStart = tl.points.length ? tl.points[0].age : 0;
   const dipEnd = dipStart + tl.dipYears;
-  const spendData = tl.points.filter((p) => p.age <= plotEnd);
+  const spendData = tl.points.filter((p) => p.age <= plotEnd).map((p) => ({ ...p, spend: p.spend + loan }));
   const rateData = tl.points
     .filter((p) => p.age <= plotEnd && p.funded)
     .map((p) => ({ ...p, ratePct: +(Math.min(p.rate, rateCap) * 100).toFixed(2) }));
@@ -241,17 +247,17 @@ export default function GuardrailsTimelineModal({
                 </>
               ) : recovers ? (
                 <>
-                  After the downturn, guardrails trim the discretionary part ~10% a year — to about{" "}
-                  <strong className="text-amber-300">{fmtCurrency(minSpend)}</strong> (−{cutPct}%) in this run — then ease it
-                  back as the Age Pension arrives{tl.pensionAge != null ? ` at ${tl.pensionAge}` : ""}. Essentials never get cut.
+                  After the downturn, guardrails trim the discretionary part ~10% a year — total spend to about{" "}
+                  <strong className="text-amber-300">{fmtCurrency(minTotal)}</strong> (−{cutPct}%) in this run — then ease it
+                  back as the Age Pension arrives{tl.pensionAge != null ? ` at ${tl.pensionAge}` : ""}. Essentials{loan > 0 ? " and your home loan" : ""} never get cut.
                 </>
               ) : (
                 <>
-                  After the downturn, guardrails trim the discretionary part ~10% a year — down to your{" "}
-                  <strong className="text-amber-300">{fmtCurrency(tl.floor)}</strong> floor (−{cutPct}%) — and{" "}
+                  After the downturn, guardrails trim the discretionary part ~10% a year — total spend down to about{" "}
+                  <strong className="text-amber-300">{fmtCurrency(floorTotal)}</strong> (−{cutPct}%) — and{" "}
                   <strong className="text-white">hold there for the rest of retirement</strong>. At this spending level the
                   Age Pension is too small a slice to lift the draw back below the rail, so there&apos;s no raise back — you
-                  can see the withdrawal rate keep climbing in the rate view. Essentials never get cut.
+                  can see the withdrawal rate keep climbing in the rate view. Essentials{loan > 0 ? " and your home loan" : ""} never get cut.
                 </>
               )}
             </p>
@@ -278,8 +284,8 @@ export default function GuardrailsTimelineModal({
                     <XAxis dataKey="age" type="number" domain={["dataMin", "dataMax"]} stroke="#8b97ad" fontSize={11} tickLine={false} axisLine={{ stroke: "#232c40" }} />
                     <YAxis stroke="#8b97ad" fontSize={11} tickLine={false} axisLine={false} width={48} tickFormatter={fmtCompact} />
                     <Tooltip content={<SpendTooltip />} />
-                    <ReferenceLine y={tl.start} stroke="#94a3b8" strokeDasharray="5 4" label={{ value: `Started ${fmtCompact(tl.start)}`, position: "insideTopLeft", fill: "#94a3b8", fontSize: 10 }} />
-                    {tl.floor < tl.start * 0.98 && <ReferenceLine y={tl.floor} stroke="#f59e0b" strokeDasharray="5 4" label={{ value: `Floor ${fmtCompact(tl.floor)}`, position: "insideBottomLeft", fill: "#f59e0b", fontSize: 10 }} />}
+                    <ReferenceLine y={startTotal} stroke="#94a3b8" strokeDasharray="5 4" label={{ value: `Started ${fmtCompact(startTotal)}`, position: "insideTopLeft", fill: "#94a3b8", fontSize: 10 }} />
+                    {tl.floor < tl.start * 0.98 && <ReferenceLine y={floorTotal} stroke="#f59e0b" strokeDasharray="5 4" label={{ value: `Floor ${fmtCompact(floorTotal)}`, position: "insideBottomLeft", fill: "#f59e0b", fontSize: 10 }} />}
                     {tl.pensionAge != null && <ReferenceLine x={tl.pensionAge} stroke="#a78bfa" strokeDasharray="4 3" label={{ value: "Age Pension", position: "top", fill: "#a78bfa", fontSize: 10 }} />}
                     {flexFails && <ReferenceLine x={tl.failsAtAge!} stroke="#f87171" strokeDasharray="2 3" label={{ value: "Runs short", position: "top", fill: "#f87171", fontSize: 10 }} />}
                     <Line type="stepAfter" dataKey="spend" stroke="#34d399" strokeWidth={2} dot={false} isAnimationActive={false} />

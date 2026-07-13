@@ -697,6 +697,7 @@ export default function WhatIfView({
                             safeStart: safeSpend,
                             safePending,
                             currentStart: annualSpend(composed),
+                            loan: spendMix?.loan ?? 0,
                             targetPct: Math.round(SAFE_TARGET * 100),
                           }
                         : undefined
@@ -1005,9 +1006,10 @@ function StrategyCardRow({
   guardrails?: {
     outlook: GuardrailsOutlook;
     pending: boolean;
-    safeStart: number | null; // safe STARTING spend with guardrails (null while computing)
+    safeStart: number | null; // safe STARTING spend with guardrails, LIVING (null while computing)
     safePending: boolean;
-    currentStart: number; // the composed plan's current starting spend
+    currentStart: number; // the composed plan's current starting LIVING spend
+    loan: number; // annual home-loan cost — fixed (never trimmed), added to show TOTAL spend
     targetPct: number;
   };
   sustainable?: {
@@ -1023,6 +1025,14 @@ function StrategyCardRow({
     onSetSafe: () => void;
   };
 }) {
+  // Guardrails figures are computed on LIVING spend (what flexes); add the fixed
+  // home loan so the card shows TOTAL spend, consistent with the "Your spending"
+  // bar (the loan is never trimmed — it behaves like an essential).
+  const gLoan = guardrails?.loan ?? 0;
+  const gSafeStart = guardrails?.safeStart != null ? guardrails.safeStart + gLoan : null;
+  const gCurrent = guardrails ? guardrails.currentStart + gLoan : 0;
+  const gWorst = guardrails ? guardrails.outlook.worstCutSpend + gLoan : 0;
+  const gCutPct = gCurrent > 0 ? Math.round((1 - gWorst / gCurrent) * 100) : 0;
   return (
     <div className={`rounded-2xl border p-4 transition ${on ? "border-accent/40 bg-accent/5" : "border-line bg-panel"}`}>
       <div className="flex items-center gap-3">
@@ -1110,16 +1120,14 @@ function StrategyCardRow({
                   lever uses — it already reflects guardrails when this lever is on). */}
               <div className="text-slate-300">
                 Guardrails let you start as high as{" "}
-                {guardrails.safeStart != null ? (
-                  <span className="font-semibold text-accent">{fmtCurrency(guardrails.safeStart)}/yr</span>
+                {gSafeStart != null ? (
+                  <span className="font-semibold text-accent">{fmtCurrency(gSafeStart)}/yr</span>
                 ) : (
                   <span className="text-muted">…</span>
                 )}
                 <span className="text-muted">
                   {" "}and still be ~{guardrails.targetPct}% likely to last
-                  {guardrails.safeStart != null && guardrails.safeStart > guardrails.currentStart + 1_000
-                    ? `, up from your ${fmtCurrency(guardrails.currentStart)}`
-                    : ""}
+                  {gSafeStart != null && gSafeStart > gCurrent + 1_000 ? `, up from your ${fmtCurrency(gCurrent)}` : ""}
                   {" "}— because bad years auto-trim (below).
                 </span>
                 {guardrails.safePending && (
@@ -1141,9 +1149,10 @@ function StrategyCardRow({
                 ) : (
                   <span className="text-slate-300">
                     That trimming is real: from your current start, a rough run cuts you to about{" "}
-                    <span className="font-semibold text-amber-300">{fmtCurrency(guardrails.outlook.worstCutSpend)}/yr</span>{" "}
-                    (−{Math.round(guardrails.outlook.worstCutPct * 100)}%)
+                    <span className="font-semibold text-amber-300">{fmtCurrency(gWorst)}/yr</span>{" "}
+                    (−{gCutPct}%)
                     {guardrails.outlook.yearsBelowBad > 0 ? ` for ~${guardrails.outlook.yearsBelowBad} years` : ""}.
+                    {gLoan > 0 ? " Your home loan is never trimmed." : ""}
                     {guardrails.outlook.everRaises && " Strong years raise you above your start."}
                   </span>
                 )}
