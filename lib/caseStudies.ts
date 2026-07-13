@@ -14,6 +14,14 @@ export interface CaseStudyMeta {
 
 export const CASE_STUDIES: CaseStudyMeta[] = [
   {
+    slug: "will-the-cgt-changes-hurt-your-retirement",
+    title: "Will the 2027 CGT changes hurt your retirement?",
+    dek: "From 1 July 2027 the 50% capital gains tax discount is abolished. We modelled it: for whether your money lasts, the effect is minimal — though a large estate does take a real trim.",
+    date: "2026-07-13",
+    readMinutes: 5,
+    published: true,
+  },
+  {
     slug: "does-the-age-pension-matter",
     title: "Does the Age Pension actually matter?",
     dek: "Four retirement plans, each modelled with and without the Age Pension. Its importance turns out to depend almost entirely on your wealth and how much you spend.",

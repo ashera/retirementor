@@ -101,6 +101,14 @@ export default function AssumptionsModal({
             <Row label="Dividend/distribution yield (taxed each year)" value={`${pct(config.outsideTax.incomeYieldPct)} of the balance`} />
             <Row label="Capital growth" value="deferred — taxed only when sold to fund spending" />
             <Row label="Capital gains tax" value={`${pct(config.outsideTax.cgtDiscountPct, 0)} discount (held > 12 months), at your marginal rate`} />
+            <p className="mt-1.5 text-[11px] leading-snug text-muted">
+              Uses current law — the 50% CGT discount, in force until 30 June 2027. From 1 July 2027 the discount
+              is replaced by cost-base indexation and a 30% minimum tax on gains; for a retiree drawing down, the
+              effect on whether the money lasts is minimal —{" "}
+              <a href="/case-studies/will-the-cgt-changes-hurt-your-retirement" className="text-accent hover:underline">
+                see the case study
+              </a>.
+            </p>
           </Section>
 
           <Section title={`Age Pension (${hh})`}>
