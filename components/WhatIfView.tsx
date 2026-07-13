@@ -1069,13 +1069,35 @@ function StrategyCardRow({
         <button type="button" onClick={onToggle} className="min-w-0 flex-1 text-left">
           <div className="text-sm font-semibold text-white">{card.label}</div>
         </button>
-        <DeltaChip years={delta.years} moneyLeft={delta.moneyLeft} netWorth={delta.netWorth} incomeDelta={incomeDelta} incomePending={incomePending} life={life} />
+        {guardrails ? (
+          // Guardrails isn't a wealth-mover — it's a spending rule / stress test, so
+          // money-lasts / income / net-worth deltas misframe it. Tag it as such.
+          <span className="shrink-0 rounded-full bg-panel-2 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted">
+            Stress test
+          </span>
+        ) : (
+          <DeltaChip years={delta.years} moneyLeft={delta.moneyLeft} netWorth={delta.netWorth} incomeDelta={incomeDelta} incomePending={incomePending} life={life} />
+        )}
       </div>
 
       {on && (
         <div className="mt-3 space-y-3 border-t border-line pt-3">
           {card.blurb && <p className="text-xs text-muted">{card.blurb}</p>}
-          <ImpactBreakdown delta={delta} incomeDelta={incomeDelta} life={life} />
+          {guardrails ? (
+            // Repurposed "impact" slot: frame guardrails as a policy / stress test,
+            // since it doesn't move wealth or longevity the way other levers do.
+            <div className="rounded-lg border border-line bg-panel px-3 py-2 text-xs">
+              <div className="mb-1 text-[10px] uppercase tracking-wide text-muted">A spending rule — not a wealth boost</div>
+              <p className="text-slate-300">
+                Unlike the other levers, guardrails don&apos;t grow your money or make it last longer on their own —
+                they&apos;re a rule for <em>how you spend</em>: ease off in bad years, treat yourself in good ones, so a
+                rough market can&apos;t sink the plan. The panel below stress-tests it — your odds of lasting, and what
+                the flexing costs.
+              </p>
+            </div>
+          ) : (
+            <ImpactBreakdown delta={delta} incomeDelta={incomeDelta} life={life} />
+          )}
           {card.params.map((pm) => {
             // A param can cap itself against the card's other live values (e.g.
             // the downsizer contribution can't exceed the equity actually freed).
