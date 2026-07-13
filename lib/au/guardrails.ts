@@ -5,7 +5,7 @@
 // for a sparkline. Only meaningful when plan.guardrails is set.
 
 import { simulate } from "./simulate";
-import { mulberry32, standardNormal } from "./montecarlo";
+import { mulberry32, returnParams, sampleReturnPath } from "./montecarlo";
 import { budgetSplit, presetCategories } from "./budget";
 import { householdRetirementOffset } from "./types";
 import type { EngineConfig } from "./config";
@@ -44,24 +44,17 @@ export function guardrailsOutlook(
 
   const iterations = opts?.iterations ?? 150;
   const rand = mulberry32(opts?.seed ?? 0x9e3779b9);
-  const mean = plan.investmentReturn;
-  const sd = Math.max(0, plan.returnVolatility);
-  const outsideMean = plan.outsideReturn ?? plan.investmentReturn;
-  const outsideSd = Math.max(0, plan.outsideVolatility ?? plan.returnVolatility);
-  const splitPools = outsideMean !== mean || outsideSd !== sd;
+  // Sample returns the SAME way as the headline Monte Carlo (reads config.returnModel
+  // — bootstrap by default), so the guardrails outlook is consistent with the success
+  // rate shown beside it rather than silently running its own Gaussian.
+  const params = returnParams(plan, config);
   const startOldest = Math.max(...plan.people.map((p) => p.currentAge));
   const horizon = Math.max(0, Math.round(plan.lifeExpectancy - startOldest));
 
   const minSpends: number[] = [];
   const yearsBelow: number[] = [];
   for (let iter = 0; iter < iterations; iter++) {
-    const returns = new Array(horizon + 1);
-    const outsideReturns = splitPools ? new Array(horizon + 1) : undefined;
-    for (let t = 0; t <= horizon; t++) {
-      const z = standardNormal(rand);
-      returns[t] = mean + sd * z;
-      if (outsideReturns) outsideReturns[t] = outsideMean + outsideSd * z;
-    }
+    const { returns, outsideReturns } = sampleReturnPath(rand, horizon, params);
     const spends = retirementSpends(plan, config, returns, outsideReturns);
     if (!spends.length) continue;
     minSpends.push(Math.min(...spends));

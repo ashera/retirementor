@@ -27,6 +27,57 @@ export function standardNormal(rand: () => number): number {
   return Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
 }
 
+export interface ReturnParams {
+  mean: number; // super-pool mean nominal return (%)
+  sd: number; // super-pool volatility (%)
+  outsideMean: number; // outside-pool mean (may differ, e.g. cash)
+  outsideSd: number;
+  splitPools: boolean; // outside carries its own return/vol
+  model: "gaussian" | "bootstrap";
+  blockYears: number;
+}
+
+/** Resolve the return-sampling parameters from a plan + config (the return model
+ *  defaults from config.returnModel; opts can override). Shared so every Monte
+ *  Carlo — the headline success rate AND the guardrails outlook — samples returns
+ *  the SAME way, rather than each hand-rolling its own (previously divergent) loop. */
+export function returnParams(
+  plan: RetirementPlan,
+  config: EngineConfig,
+  opts?: { model?: "gaussian" | "bootstrap"; blockYears?: number },
+): ReturnParams {
+  const mean = plan.investmentReturn;
+  const sd = Math.max(0, plan.returnVolatility);
+  const outsideMean = plan.outsideReturn ?? plan.investmentReturn;
+  const outsideSd = Math.max(0, plan.outsideVolatility ?? plan.returnVolatility);
+  return {
+    mean, sd, outsideMean, outsideSd,
+    splitPools: outsideMean !== mean || outsideSd !== sd,
+    model: opts?.model ?? config.returnModel ?? "gaussian",
+    blockYears: opts?.blockYears ?? config.bootstrapBlockYears ?? 10,
+  };
+}
+
+/** One sampled return path (both pools share the annual shock, scaled by each pool's
+ *  vol). Gaussian draws independent normals; bootstrap block-resamples real
+ *  historical shocks (mean-reversion / clustering), both expressed at the plan's own
+ *  mean & vol. Advances `rand`, so calling once per iteration preserves determinism. */
+export function sampleReturnPath(
+  rand: () => number,
+  horizon: number,
+  p: ReturnParams,
+): { returns: number[]; outsideReturns?: number[] } {
+  const returns = new Array(horizon + 1);
+  const outsideReturns = p.splitPools ? new Array(horizon + 1) : undefined;
+  const shocks = p.model === "bootstrap" ? bootstrapShockPath(rand, horizon, p.blockYears) : null;
+  for (let t = 0; t <= horizon; t++) {
+    const z = shocks ? shocks[t] : standardNormal(rand);
+    returns[t] = p.mean + p.sd * z;
+    if (outsideReturns) outsideReturns[t] = p.outsideMean + p.outsideSd * z;
+  }
+  return { returns, outsideReturns };
+}
+
 export interface FanPoint {
   age: number;
   p10: number; // pessimistic total balance
@@ -73,21 +124,7 @@ export function runMonteCarlo(
 ): MonteCarloResult {
   const iterations = opts?.iterations ?? 1000;
   const rand = mulberry32(opts?.seed ?? 0x9e3779b9);
-  // Return model: "gaussian" draws each year independently (default); "bootstrap"
-  // resamples contiguous blocks of real historical returns, preserving the
-  // mean-reversion/clustering that makes long-horizon Gaussian draws too pessimistic.
-  const model = opts?.model ?? config.returnModel ?? "gaussian";
-  const bootstrap = model === "bootstrap";
-  const blockYears = opts?.blockYears ?? config.bootstrapBlockYears ?? 10;
-  const mean = plan.investmentReturn;
-  const sd = Math.max(0, plan.returnVolatility);
-  // Outside-super money may carry its own return/volatility (e.g. cash). Each pool
-  // shares the SAME market shock z each year (perfect correlation — super and
-  // outside investments move together) but scales it by its own volatility, so a
-  // low-return, low-vol outside pool stays stable like cash. Both default to super.
-  const outsideMean = plan.outsideReturn ?? plan.investmentReturn;
-  const outsideSd = Math.max(0, plan.outsideVolatility ?? plan.returnVolatility);
-  const splitPools = outsideMean !== mean || outsideSd !== sd;
+  const params = returnParams(plan, config, opts);
 
   const startOldest = Math.max(...plan.people.map((p) => p.currentAge));
   const horizon = Math.max(0, Math.round(plan.lifeExpectancy - startOldest));
@@ -98,20 +135,7 @@ export function runMonteCarlo(
   let successes = 0;
 
   for (let iter = 0; iter < iterations; iter++) {
-    const returns = new Array(horizon + 1);
-    const outsideReturns = splitPools ? new Array(horizon + 1) : undefined;
-    // The two models differ ONLY in where the annual shock `z` comes from: the
-    // bootstrap draws a block-resampled path of real historical shocks (preserving
-    // mean-reversion / clustering), the Gaussian draws independent normals. Both are
-    // then expressed at the plan's own mean & volatility, and the same shock drives
-    // both pools (perfect correlation, scaled by each pool's vol).
-    const shocks = bootstrap ? bootstrapShockPath(rand, horizon, blockYears) : null;
-    for (let t = 0; t <= horizon; t++) {
-      const z = shocks ? shocks[t] : standardNormal(rand);
-      returns[t] = mean + sd * z;
-      if (outsideReturns) outsideReturns[t] = outsideMean + outsideSd * z;
-    }
-
+    const { returns, outsideReturns } = sampleReturnPath(rand, horizon, params);
     const r = simulate(plan, config, returns, outsideReturns);
     if (r.lastsToLifeExpectancy) successes++;
     else if (r.depletedAge !== null) depletionAges.push(r.depletedAge);
