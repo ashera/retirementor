@@ -187,7 +187,8 @@ export default function GuardrailsTimelineModal({
               </ResponsiveContainer>
               <p className="mt-1 text-[10px] text-muted">
                 The market path we&apos;re testing: {Math.abs(tl.dip)}% falls for {tl.dipYears} years right as you retire,
-                then {tl.meanReturn}%/yr. It&apos;s the <em>timing</em> — a crash before your savings have grown — that does the damage.
+                then {tl.meanReturn}%/yr. It&apos;s the <em>timing</em> — a crash just as you start drawing on your savings,
+                when your withdrawals stop them recovering — that does the damage.
               </p>
             </div>
           </Step>
