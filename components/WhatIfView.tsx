@@ -31,6 +31,8 @@ import IncomeYearModal from "@/components/IncomeYearModal";
 import AssumptionsModal from "@/components/AssumptionsModal";
 import StrategyAssumptionsModal from "@/components/StrategyAssumptionsModal";
 import GuardrailsTimelineModal from "@/components/GuardrailsTimelineModal";
+import SpendingBreakdown from "@/components/SpendingBreakdown";
+import { retirementGoal } from "@/lib/au/goal";
 import Field from "@/components/Field";
 
 const PLAN_KEY = "au-retirement-plan";
@@ -285,6 +287,15 @@ export default function WhatIfView({
   // plan's budget, or an ASFA 'modest' fallback). The spend slider can't go below it.
   const essentials = useMemo(() => (baseline ? essentialsFloor(baseline, config) : 0), [baseline, config]);
 
+  // Spending mix of the COMPOSED plan (reflects the active levers) — essentials
+  // (fixed), discretionary (what flexes under guardrails) and any home loan (fixed).
+  const spendMix = useMemo(() => {
+    if (!composed) return null;
+    const goal = retirementGoal(composed);
+    const ess = Math.min(essentialsFloor(composed, config), goal.living);
+    return { total: goal.total, essential: ess, discretionary: Math.max(0, goal.living - ess), loan: goal.loanCost, estimated: !composed.budget };
+  }, [composed, config]);
+
   // Prudent "safe spend" = highest spend with ≥ SAFE_TARGET Monte Carlo success.
   // Heavy (bisected MC), so debounced off the interaction path with a pending
   // pulse — same pattern as the composed MC above.
@@ -509,6 +520,26 @@ export default function WhatIfView({
           pending={changed && mcPending}
         />
       </div>
+
+      {/* Spending mix — what a flexible-spending strategy can (discretionary) and
+          can't (essentials, home loan) move. */}
+      {spendMix && (
+        <div className="mb-6 rounded-2xl border border-line bg-panel p-4">
+          <div className="flex items-baseline justify-between gap-2">
+            <span className="text-[11px] font-medium uppercase tracking-wide text-muted">Your spending</span>
+            <span className="text-lg font-bold tabular-nums text-white">
+              {fmtCurrency(spendMix.total)}
+              <span className="ml-0.5 text-xs font-medium text-muted">/yr</span>
+            </span>
+          </div>
+          <SpendingBreakdown
+            essential={spendMix.essential}
+            discretionary={spendMix.discretionary}
+            loan={spendMix.loan}
+            estimated={spendMix.estimated}
+          />
+        </div>
+      )}
 
       {/* Net worth trajectory */}
       <div className="mb-6 rounded-2xl border border-line bg-panel p-4">
