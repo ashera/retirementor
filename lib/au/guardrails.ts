@@ -17,7 +17,8 @@ export interface GuardrailsOutlook {
   worstCutSpend: number; // the trimmed living-spend in that run (today's $)
   yearsBelowBad: number; // in a rough run, how many retirement years are spent below the start
   everRaises: boolean; // does the central path give a raise above the start spend?
-  centralPath: { age: number; spend: number }[]; // deterministic living-spend path (for the sparkline)
+  centralPath: { age: number; spend: number }[]; // deterministic (steady-return) living-spend path
+  downturnPath: { age: number; spend: number }[]; // the "retire into a downturn" living-spend path (matches the modal), truncated at any run-short
 }
 
 function percentile(sortedAsc: number[], p: number): number {
@@ -72,6 +73,13 @@ export function guardrailsOutlook(
   const p10Min = percentile(minSpends, 10); // a rough (bottom-decile) run's deepest spend
   const worstCutPct = startSpend > 0 ? Math.max(0, 1 - p10Min / startSpend) : 0;
 
+  // The illustrative "retire into a downturn" spend path (same as the modal), for
+  // the card's mini-preview — truncated where the plan runs short.
+  const dtl = guardrailsTimeline(plan, config);
+  const downturnPath = dtl.points
+    .filter((p) => dtl.failsAtAge == null || p.age <= dtl.failsAtAge)
+    .map((p) => ({ age: p.age, spend: p.spend }));
+
   return {
     startSpend,
     worstCutPct,
@@ -79,6 +87,7 @@ export function guardrailsOutlook(
     yearsBelowBad: percentile(yearsBelow, 90), // pairs with the rough-run cut depth
     everRaises,
     centralPath,
+    downturnPath,
   };
 }
 
