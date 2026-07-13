@@ -5,6 +5,7 @@ import {
   Line,
   LineChart,
   CartesianGrid,
+  ReferenceArea,
   ReferenceLine,
   ResponsiveContainer,
   Tooltip,
@@ -56,6 +57,8 @@ export default function GuardrailsTimelineModal({
   // mislead), and cap the runaway rate so the rails stay legible.
   const plotEnd = fails ? tl.failsAtAge! : Infinity;
   const rateCap = Math.max(0.25, tl.upperRail * 3);
+  const dipStart = tl.points.length ? tl.points[0].age : 0; // downturn window (retirement start)
+  const dipEnd = dipStart + tl.dipYears;
   const spendData = tl.points.filter((p) => p.age <= plotEnd);
   const rateData = tl.points
     .filter((p) => p.age <= plotEnd && p.funded)
@@ -111,6 +114,7 @@ export default function GuardrailsTimelineModal({
               {view === "spend" ? (
                 <LineChart data={spendData} margin={{ top: 8, right: 12, left: 4, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#232c40" vertical={false} />
+                  <ReferenceArea x1={dipStart} x2={dipEnd} fill="#f87171" fillOpacity={0.09} />
                   <XAxis dataKey="age" type="number" domain={["dataMin", "dataMax"]} stroke="#8b97ad" fontSize={11} tickLine={false} axisLine={{ stroke: "#232c40" }} />
                   <YAxis stroke="#8b97ad" fontSize={11} tickLine={false} axisLine={false} width={48} tickFormatter={fmtCompact} />
                   <Tooltip content={<SpendTooltip />} />
@@ -129,6 +133,7 @@ export default function GuardrailsTimelineModal({
               ) : (
                 <LineChart data={rateData} margin={{ top: 8, right: 12, left: 4, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#232c40" vertical={false} />
+                  <ReferenceArea x1={dipStart} x2={dipEnd} fill="#f87171" fillOpacity={0.09} />
                   <XAxis dataKey="age" type="number" domain={["dataMin", "dataMax"]} stroke="#8b97ad" fontSize={11} tickLine={false} axisLine={{ stroke: "#232c40" }} />
                   <YAxis stroke="#8b97ad" fontSize={11} tickLine={false} axisLine={false} width={40} tickFormatter={(v) => `${v}%`} />
                   <Tooltip
@@ -148,6 +153,13 @@ export default function GuardrailsTimelineModal({
                 </LineChart>
               )}
             </ResponsiveContainer>
+            <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted">
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block h-2.5 w-3.5 rounded-sm bg-[#f87171]/25" />
+                Returns in this run: <strong className="text-slate-300">{tl.dip}%/yr</strong> for the first {tl.dipYears} years
+                of retirement (a GFC-scale crash), then <strong className="text-slate-300">{tl.meanReturn}%/yr</strong> — your assumed return.
+              </span>
+            </p>
           </div>
 
           {/* Adaptive explanation — the story depends on what actually happened. */}

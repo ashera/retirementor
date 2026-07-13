@@ -7,6 +7,7 @@
 import { simulate } from "./simulate";
 import { mulberry32, standardNormal } from "./montecarlo";
 import { budgetSplit, presetCategories } from "./budget";
+import { householdRetirementOffset } from "./types";
 import type { EngineConfig } from "./config";
 import type { RetirementPlan } from "./types";
 
@@ -102,6 +103,8 @@ export interface GuardrailsTimeline {
   failsAtAge: number | null; // first age spending can't be met (portfolio exhausted), else null
   didCut: boolean; // did any cut trigger at all (false when spending is all-essentials)
   dipYears: number; // length of the illustrative downturn
+  dip: number; // annual return (%) through the downturn
+  meanReturn: number; // annual return (%) once returns normalise (the plan's assumption)
   points: GuardrailsTimelinePoint[];
 }
 
@@ -121,7 +124,13 @@ export function guardrailsTimeline(
   const dipYears = opts?.dipYears ?? 3;
   const startOldest = Math.max(...plan.people.map((p) => p.currentAge));
   const horizon = Math.max(0, Math.round(plan.lifeExpectancy - startOldest));
-  const seq = Array.from({ length: horizon + 1 }, (_, t) => (t < dipYears ? dip : plan.investmentReturn));
+  // Anchor the downturn to RETIREMENT (not the sim start) — the story is "retire
+  // straight into a crash", so it must bite the first years of drawdown even when
+  // the plan still has accumulation years to run.
+  const retireOffset = householdRetirementOffset(plan);
+  const seq = Array.from({ length: horizon + 1 }, (_, t) =>
+    t >= retireOffset && t < retireOffset + dipYears ? dip : plan.investmentReturn,
+  );
 
   const sim = simulate(plan, config, seq);
   const rows = sim.rows.filter((r) => r.phase !== "accumulation");
@@ -170,6 +179,8 @@ export function guardrailsTimeline(
     failsAtAge,
     didCut: points.some((p) => p.action === "cut"),
     dipYears,
+    dip,
+    meanReturn: plan.investmentReturn,
     points,
   };
 }

@@ -138,6 +138,26 @@ describe("Guyton-Klinger guardrails", () => {
     expect(withLoan.wr0).toBeGreaterThan(noLoan.wr0 + 0.005);
   });
 
+  it("anchors the illustrative downturn at retirement (bites even with accumulation years left)", () => {
+    const preRetire: RetirementPlan = {
+      ...base,
+      people: [{ ...base.people[0], currentAge: 55, superBalance: 500_000, salary: 90_000 }],
+      retirementAge: 65,
+      annualOutsideSavings: 10_000,
+      targetSpending: 55_000,
+      guardrails: {},
+    };
+    const tl = guardrailsTimeline(preRetire, cfg);
+    expect(tl.dip).toBeLessThan(0);
+    expect(tl.meanReturn).toBe(preRetire.investmentReturn);
+    // The crash must land in the FIRST retirement years, so a cut appears soon
+    // after retirement — not "never" (which is what happened when it was anchored
+    // to the sim start and fell entirely inside the accumulation years).
+    const firstCut = tl.points.find((p) => p.action === "cut");
+    expect(firstCut).toBeTruthy();
+    expect(firstCut!.age).toBeLessThanOrEqual(tl.points[0].age + 6);
+  });
+
   it("offers a What-If lever that enables guardrails, once", () => {
     const card = buildStrategyCatalog(base).find((c) => c.id === "guardrails");
     expect(card).toBeTruthy();
