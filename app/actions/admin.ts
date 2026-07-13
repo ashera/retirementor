@@ -66,6 +66,41 @@ export async function updateParam(
   return { ok: true };
 }
 
+/** Set the Monte Carlo return model (gaussian vs historical block-bootstrap) and
+ *  block length on the active config version. Enum + integer, so it doesn't fit the
+ *  numeric PARAM_DESCRIPTORS editor — it's driven from the Returns admin tab. */
+export async function setReturnModel(
+  model: "gaussian" | "bootstrap",
+  blockYears: number,
+): Promise<AdminResult> {
+  const admin = await getAdmin();
+  if (!admin) return { error: "Not authorised." };
+  if (model !== "gaussian" && model !== "bootstrap") return { error: "Unknown model." };
+  const block = Math.round(blockYears);
+  if (!Number.isFinite(block) || block < 1 || block > 40) return { error: "Block length must be 1–40 years." };
+
+  const active = await query<{ id: string; financial_year: string; data: EngineConfig }>(
+    "select id, financial_year, data from ref_data_versions where is_active limit 1",
+  );
+  const version = active.rows[0];
+  if (!version) return { error: "No active version." };
+
+  const prev = `${version.data.returnModel ?? "gaussian"}/${version.data.bootstrapBlockYears ?? 10}`;
+  let data = setByPath<EngineConfig>(version.data, "returnModel", model);
+  data = setByPath<EngineConfig>(data, "bootstrapBlockYears", block);
+  await query("update ref_data_versions set data = $1, updated_at = now() where id = $2", [
+    JSON.stringify(data),
+    version.id,
+  ]);
+  await query(
+    `insert into ref_data_audit (version_id, financial_year, param_key, action, old_value, new_value, changed_by, changed_by_email)
+     values ($1,$2,'return_model','edit',$3,$4,$5,$6)`,
+    [version.id, version.financial_year, prev, `${model}/${block}`, admin.id, admin.email],
+  );
+  revalidate();
+  return { ok: true };
+}
+
 /** Mark a parameter as verified now, by the current admin. */
 export async function verifyParam(
   versionId: string,

@@ -32,8 +32,8 @@ describe("Reference data", () => {
 
   it("defines its parameters, each mapped to a seeded source", () => {
     const keys = new Set(SOURCE_SEEDS.map((s) => s.key));
-    // 41 core params + the ASFA budget breakdown (4 figures per category).
-    const expected = 41 + cfg.asfa.breakdown.categories.length * 4;
+    // 43 core params + the ASFA budget breakdown (4 figures per category).
+    const expected = 43 + cfg.asfa.breakdown.categories.length * 4;
     expect(PARAM_DESCRIPTORS).toHaveLength(expected);
     for (const d of PARAM_DESCRIPTORS) expect(keys.has(d.sourceKey)).toBe(true);
   });

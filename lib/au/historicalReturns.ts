@@ -54,6 +54,43 @@ export const HISTORICAL_REAL_EQUITY: readonly number[] = SP500_NOMINAL_TR.map(
   (nom, i) => (1 + nom) / (1 + US_CPI_PCT[i] / 100) - 1,
 );
 
+/** The real-return series as {year, real} points (real is a fraction). */
+export function historicalSeries(): { year: number; real: number }[] {
+  return HISTORICAL_REAL_EQUITY.map((real, i) => ({ year: HIST_START_YEAR + i, real }));
+}
+
+export interface HistoricalStats {
+  n: number;
+  startYear: number;
+  endYear: number;
+  arithMean: number; // arithmetic mean real return (fraction)
+  geoMean: number; // geometric (compound) mean real return (fraction)
+  vol: number; // standard deviation of real returns (fraction)
+  best: { year: number; real: number };
+  worst: { year: number; real: number };
+  negativeYears: number; // count of down years
+}
+
+/** Summary statistics of the real historical equity series (for the admin view). */
+export function historicalStats(): HistoricalStats {
+  const s = HISTORICAL_REAL_EQUITY;
+  const n = s.length;
+  const arithMean = s.reduce((a, b) => a + b, 0) / n;
+  const vol = Math.sqrt(s.reduce((a, b) => a + (b - arithMean) ** 2, 0) / n);
+  const geoMean = Math.pow(s.reduce((a, b) => a * (1 + b), 1), 1 / n) - 1;
+  let best = { year: HIST_START_YEAR, real: s[0] };
+  let worst = { year: HIST_START_YEAR, real: s[0] };
+  s.forEach((real, i) => {
+    if (real > best.real) best = { year: HIST_START_YEAR + i, real };
+    if (real < worst.real) worst = { year: HIST_START_YEAR + i, real };
+  });
+  return {
+    n, startYear: HIST_START_YEAR, endYear: HIST_START_YEAR + n - 1,
+    arithMean, geoMean, vol, best, worst,
+    negativeYears: s.filter((r) => r < 0).length,
+  };
+}
+
 /**
  * Circular block bootstrap: stitch contiguous blocks of the historical real-return
  * series into a synthetic (horizon+1)-year path. Contiguous blocks preserve the

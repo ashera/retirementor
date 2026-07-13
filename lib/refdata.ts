@@ -50,6 +50,19 @@ function withDefaults(data: EngineConfig): EngineConfig {
       div293ExtraTaxRate: DEFAULT_CONFIG.div293ExtraTaxRate,
     };
   }
+  // Outside-super deferred-CGT taxation, added after the initial seed. Critical to
+  // backfill: without it the engine would tax outside gains with NO discount.
+  if (out.outsideTax == null) {
+    out = { ...out, outsideTax: DEFAULT_CONFIG.outsideTax };
+  }
+  // Monte Carlo return model, added after the initial seed.
+  if (out.returnModel == null) {
+    out = {
+      ...out,
+      returnModel: DEFAULT_CONFIG.returnModel,
+      bootstrapBlockYears: DEFAULT_CONFIG.bootstrapBlockYears,
+    };
+  }
   return out;
 }
 

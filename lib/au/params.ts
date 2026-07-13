@@ -58,6 +58,10 @@ export const PARAM_DESCRIPTORS: ParamDescriptor[] = [
   { key: "div293_threshold", label: "Division 293 threshold", category: "Superannuation", path: "div293Threshold", unit: "aud", sourceKey: "ato-rates" },
   { key: "div293_extra_rate", label: "Division 293 extra tax", category: "Superannuation", path: "div293ExtraTaxRate", unit: "percent", sourceKey: "ato-rates" },
 
+  // Outside-super (personal/brokerage) taxation — see EngineConfig.outsideTax
+  { key: "outside_income_yield", label: "Dividend/distribution yield (taxed yearly)", category: "Outside super", path: "outsideTax.incomeYieldPct", unit: "percentPoint", sourceKey: "ms-tax" },
+  { key: "outside_cgt_discount", label: "Capital gains discount (held > 12 months)", category: "Outside super", path: "outsideTax.cgtDiscountPct", unit: "percentPoint", sourceKey: "ato-rates" },
+
   // Ages
   { key: "preservation_age", label: "Preservation age", category: "Ages", path: "preservationAge", unit: "age", sourceKey: "ms-preserve" },
   { key: "age_pension_age", label: "Age Pension age", category: "Ages", path: "agePensionAge", unit: "age", sourceKey: "sa-rates" },
@@ -132,8 +136,9 @@ export function getByPath(obj: unknown, path: string): number {
   return typeof cur === "number" ? cur : NaN;
 }
 
-/** Immutably set a numeric value at a dot/index path, returning a new object. */
-export function setByPath<T>(obj: T, path: string, value: number): T {
+/** Immutably set a value at a dot/index path, returning a new object. Values are
+ *  usually numeric, but a few config leaves (e.g. returnModel) are strings. */
+export function setByPath<T>(obj: T, path: string, value: number | string): T {
   const segs = path.split(".");
   const clone: Json = Array.isArray(obj)
     ? [...(obj as unknown[])]
