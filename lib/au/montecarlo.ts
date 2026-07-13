@@ -4,6 +4,7 @@
 // than the same run late) and report a success probability + a fan of outcomes.
 
 import { simulate } from "./simulate";
+import { bootstrapRealPath } from "./historicalReturns";
 import { householdRetirementOffset } from "./types";
 import type { EngineConfig } from "./config";
 import type { RetirementPlan } from "./types";
@@ -68,10 +69,14 @@ function percentile(sortedAsc: number[], p: number): number {
 export function runMonteCarlo(
   plan: RetirementPlan,
   config: EngineConfig,
-  opts?: { iterations?: number; seed?: number },
+  opts?: { iterations?: number; seed?: number; model?: "gaussian" | "bootstrap"; blockYears?: number },
 ): MonteCarloResult {
   const iterations = opts?.iterations ?? 1000;
   const rand = mulberry32(opts?.seed ?? 0x9e3779b9);
+  // Return model: "gaussian" draws each year independently (default); "bootstrap"
+  // resamples contiguous blocks of real historical returns, preserving the
+  // mean-reversion/clustering that makes long-horizon Gaussian draws too pessimistic.
+  const bootstrap = opts?.model === "bootstrap";
   const mean = plan.investmentReturn;
   const sd = Math.max(0, plan.returnVolatility);
   // Outside-super money may carry its own return/volatility (e.g. cash). Each pool
@@ -90,13 +95,28 @@ export function runMonteCarlo(
   const depletionAges: number[] = [];
   let successes = 0;
 
+  // Bootstrap supplies REAL returns; re-inflate by the plan's CPI so simulate's own
+  // deflation recovers them (and pension/wage indexing stay on the plan's inflation).
+  const cpiFactor = 1 + plan.inflation / 100;
+
   for (let iter = 0; iter < iterations; iter++) {
     const returns = new Array(horizon + 1);
     const outsideReturns = splitPools ? new Array(horizon + 1) : undefined;
-    for (let t = 0; t <= horizon; t++) {
-      const z = standardNormal(rand);
-      returns[t] = mean + sd * z;
-      if (outsideReturns) outsideReturns[t] = outsideMean + outsideSd * z;
+    if (bootstrap) {
+      // All-equity historical path shared by both pools (a cash/bond sleeve would
+      // need its own series — a later addition).
+      const real = bootstrapRealPath(rand, horizon, opts?.blockYears);
+      for (let t = 0; t <= horizon; t++) {
+        const nom = ((1 + real[t]) * cpiFactor - 1) * 100;
+        returns[t] = nom;
+        if (outsideReturns) outsideReturns[t] = nom;
+      }
+    } else {
+      for (let t = 0; t <= horizon; t++) {
+        const z = standardNormal(rand);
+        returns[t] = mean + sd * z;
+        if (outsideReturns) outsideReturns[t] = outsideMean + outsideSd * z;
+      }
     }
 
     const r = simulate(plan, config, returns, outsideReturns);
