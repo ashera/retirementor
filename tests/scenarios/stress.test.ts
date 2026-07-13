@@ -269,8 +269,12 @@ describe(`Stress matrix — ${PLANS.length} plans, universal invariants`, () => 
           { household: plan.household, homeowner: plan.homeowner, assessableAssets: assess, financialAssets: financial, otherIncome: Math.max(0, row.rentIncome) },
           cfg,
         );
-        if (!near(row.agePension, p.annual, 1)) {
-          fails.push(`${name} @${row.age}: pension ${row.agePension.toFixed(0)} vs ref ${p.annual.toFixed(0)} (assess ${assess.toFixed(0)})`);
+        // When only ONE member of a couple has reached Age Pension age, they're paid
+        // the member-of-a-couple rate (half the means-tested couple amount).
+        const expected =
+          plan.household === "couple" && youngestAge < cfg.agePensionAge ? p.annual / 2 : p.annual;
+        if (!near(row.agePension, expected, 1)) {
+          fails.push(`${name} @${row.age}: pension ${row.agePension.toFixed(0)} vs ref ${expected.toFixed(0)} (assess ${assess.toFixed(0)})`);
           break;
         }
       }

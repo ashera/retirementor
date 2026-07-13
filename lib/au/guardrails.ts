@@ -151,7 +151,10 @@ export function guardrailsTimeline(
     // A depleted portfolio has no meaningful rate; report 0 for the chart but flag
     // it (via `funded`) so callers can stop plotting the (otherwise exploding) rate.
     const rate = portfolio > 1 ? netDraw / portfolio : 0;
-    if (i === 0) wr0 = rate;
+    // Anchor the rails on the first year the portfolio actually funds spending (not
+    // an income-covered year, which reads as a meaningless 0% and would peg the
+    // rails at 0) — mirrors the engine's deferred anchor.
+    if (wr0 === 0 && netDraw > 1 && portfolio > 1) wr0 = rate;
     if (b.agePension > 1 && pensionAge == null) pensionAge = r.age;
     const action: GuardrailsTimelinePoint["action"] =
       i === 0 ? "start" : spend < prev - 1 ? "cut" : spend > prev + 1 ? "raise" : "hold";

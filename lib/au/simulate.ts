@@ -234,7 +234,7 @@ export function simulate(
         }
       }
       const ncc = Math.min(p.voluntaryNonConcessional * scale, nccCap);
-      const div293Income = salary + concessional;
+      const div293Income = taxable + concessional; // taxable income + low-tax contributions (sacrifice already removed from taxable)
       const taxed293 = Math.min(concessional, Math.max(0, div293Income - div293Threshold));
       const extra293 = taxed293 * config.div293ExtraTaxRate;
       const added = concessional * (1 - config.contributionsTax) - extra293 + ncc;
@@ -280,7 +280,14 @@ export function simulate(
     // later downsize frees more and net worth carries across the event. The
     // downsizer portion lands in the primary's super (assessable once accessible),
     // the rest in outside savings (deemed). The home itself stays exempt.
-    const loanBal = mortgage?.balance ?? 0;
+    // Only net an outstanding loan off the equity release if it's actually still
+    // owed: a mortgage already discharged (paid off at its payoff age, or cleared
+    // earlier from super) must NOT be subtracted, or downsizing/selling after payoff
+    // would silently destroy that much freed equity. (An active interest-only loan
+    // keeps its balance; a P&I loan's balance isn't amortised here — a smaller,
+    // conservative under-statement — but a GONE loan must count as $0.)
+    const loanBal =
+      mortgage && !mortgageCleared && mortgageActiveAtAge(mortgage, oldest) ? mortgage.balance : 0;
     let homeProceedsThisYear = 0;
     let homeToSuperThisYear = 0;
     if (downsize && !downsized && oldest >= downsize.atAge) {
@@ -617,7 +624,8 @@ export function simulate(
     // counted as actual income — so these two are no longer the same figure.
     let agePensionAmt = 0;
     let pensionBreakdown: YearBreakdown["pension"] = null;
-    if (oldest >= pensionAge) {
+    const pensionEligible = ages.filter((a) => a >= pensionAge).length;
+    if (pensionEligible > 0) {
       const financialAssets = outside + accessibleSuper;
       const ap = agePension(
         {
@@ -629,7 +637,12 @@ export function simulate(
         },
         config,
       );
-      agePensionAmt = ap.annual;
+      // When only ONE member of a couple has reached Age Pension age, the household
+      // is paid the member-of-a-couple rate (half the means-tested couple amount) —
+      // the means test still uses combined assets/income, but the under-age partner
+      // gets nothing until they too qualify. Paying the full couple rate here
+      // overstated income by ~half for every age-gap couple through the gap.
+      agePensionAmt = plan.household === "couple" && pensionEligible < 2 ? ap.annual / 2 : ap.annual;
       pensionBreakdown = {
         outsideAssets: outside,
         accessibleSuper,
@@ -659,17 +672,22 @@ export function simulate(
     // rate — the net-of-pension draw over the whole investable portfolio (D1). The
     // first retired year fixes the reference rate; thereafter, drifting above the
     // upper rail cuts spending, below the lower rail raises it (floored, D3).
-    if (guardrails && guardSpend != null) {
+    // Only anchor/adjust the rails when the PORTFOLIO is actually funding spending.
+    // A year fully covered by income (a still-working partner, part-time work, or the
+    // Age Pension) has privateNeed 0 and no meaningful withdrawal rate — anchoring
+    // there would peg the rails at ~0 and ratchet spending to the floor forever, and
+    // a spurious "rate below the lower rail" would trigger an unwarranted raise. So
+    // skip income-covered years; the anchor waits for the first real draw.
+    if (guardrails && guardSpend != null && privateNeed > EPS) {
       const portfolio = startSuper + startOutside;
       // A depleted portfolio means the draw rate is effectively infinite (drawing
-      // from nothing) — that must read as ABOVE the upper rail, never as a "0%"
-      // that would wrongly trigger a prosperity raise on a failed plan.
+      // from nothing) — that must read as ABOVE the upper rail, never a "0%".
       const rate = portfolio > EPS ? privateNeed / portfolio : Infinity;
       if (guardWr0 == null) {
         guardWr0 = Number.isFinite(rate) ? rate : 0;
       } else if (rate > guardWr0 * (1 + guardWidth) && guardSpend > guardFloor + EPS) {
         guardSpend = Math.max(guardFloor, guardSpend * (1 - guardStep)); // pay cut
-      } else if (rate < guardWr0 * (1 - guardWidth)) {
+      } else if (Number.isFinite(rate) && rate < guardWr0 * (1 - guardWidth)) {
         guardSpend *= 1 + guardStep; // raise
       }
     }
@@ -761,12 +779,15 @@ export function simulate(
     if (!accumPhase) {
       const assessable = outsideIncome + cgtDiscount * realizedGain; // today's $
       if (assessable > 0) {
-        const workPer = grossWork / workers;
         const assessPer = assessable / workers; // household assessable split per person
-        outsideTax = ages.reduce(
-          (s, a) => s + Math.max(0, taxAtAge(workPer + assessPer, a) - taxAtAge(workPer, a)),
-          0,
-        );
+        // Stack each person's share on THEIR OWN work income — a still-working
+        // partner's salary (staggered retirement) plus their share of any part-time
+        // work — so an outside gain isn't taxed from the $0 threshold when it
+        // actually sits on top of a high salary.
+        outsideTax = plan.people.reduce((s, p, i) => {
+          const workPer = (t < retireOffsets[i] ? p.salary * gapScale : 0) + grossWork / workers;
+          return s + Math.max(0, taxAtAge(workPer + assessPer, ages[i]) - taxAtAge(workPer, ages[i]));
+        }, 0);
         outside = Math.max(0, outside - outsideTax);
       }
     }
