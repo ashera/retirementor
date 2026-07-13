@@ -1135,7 +1135,7 @@ export default function PlannerApp({
                     max={12}
                     step={0.1}
                     suffix="%"
-                    hint="Money outside super — no super fee; earnings taxed at your marginal rate in retirement."
+                    hint="Money outside super — no super fee. Dividends are taxed each year at your marginal rate; capital growth is taxed only when sold (with the 50% CGT discount)."
                   />
                 </div>
                 <button

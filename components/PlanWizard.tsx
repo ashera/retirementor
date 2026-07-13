@@ -707,7 +707,7 @@ export default function PlanWizard({
                 max={12}
                 step={0.1}
                 suffix="%"
-                hint="Nominal return on money outside super. No super fee applies; its earnings are taxed at your marginal rate in retirement."
+                hint="Nominal return on money outside super. No super fee applies. Dividends are taxed each year at your marginal rate; capital growth is deferred and taxed only when sold (with the 50% CGT discount)."
               />
               <Field
                 label="Outside-super volatility"

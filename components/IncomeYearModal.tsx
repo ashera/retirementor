@@ -457,7 +457,7 @@ export default function IncomeYearModal({
                       {(() => {
                         const steps = [
                           { show: minDraw > 1, label: "Pension minimum (mandatory)", value: minDraw },
-                          { show: fromOutside > 1, label: "Outside super — taxed at your marginal rate", value: fromOutside },
+                          { show: fromOutside > 1, label: "Outside super — dividends taxed yearly, gains on sale (50% discount)", value: fromOutside },
                           { show: accumDrawn > 1, label: "Accumulation super — earnings taxed 15%", value: accumDrawn },
                           {
                             show: pensionExtraDrawn > 1,

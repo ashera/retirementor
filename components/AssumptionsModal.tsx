@@ -97,6 +97,12 @@ export default function AssumptionsModal({
             <Row label="Preservation age (can access super)" value={`${config.preservationAge}`} />
           </Section>
 
+          <Section title="Outside super (personal investments)">
+            <Row label="Dividend/distribution yield (taxed each year)" value={`${pct(config.outsideTax.incomeYieldPct)} of the balance`} />
+            <Row label="Capital growth" value="deferred — taxed only when sold to fund spending" />
+            <Row label="Capital gains tax" value={`${pct(config.outsideTax.cgtDiscountPct, 0)} discount (held > 12 months), at your marginal rate`} />
+          </Section>
+
           <Section title={`Age Pension (${hh})`}>
             <Row label="Age Pension age" value={`${config.agePensionAge}`} />
             <Row label="Maximum rate" value={`${fmtCurrency(Math.round(ap.maxAnnual))}/yr`} />
