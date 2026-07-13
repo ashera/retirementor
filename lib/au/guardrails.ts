@@ -193,3 +193,34 @@ export function guardrailsTimeline(
     points,
   };
 }
+
+// --- Which story the explainer should tell (shared, testable) ------------------
+
+export type GuardrailsStory = "fails" | "raised" | "recovers" | "holds";
+
+/** How many retirement years the illustrative rough run spends BELOW the starting
+ *  spend — the honest measure of how hard guardrails bite in that run. */
+export function yearsBelowStart(tl: GuardrailsTimeline): number {
+  return tl.points.filter((p) => p.spend < tl.start - 1).length;
+}
+
+/**
+ * The narrative the guardrails modal/card should tell for a timeline:
+ *  - "fails"    — even trimmed to the floor, the plan runs short.
+ *  - "raised"   — comfortably funded: mostly upside, spending stays at/above start.
+ *  - "recovers" — trimmed in a rough run, then eases back (Age Pension-driven).
+ *  - "holds"    — trimmed and stuck at the floor for the rest of retirement.
+ *
+ * "raised" REQUIRES the run to stay at/above the start for most of retirement — not
+ * merely to end above it. A plan cut to the floor for decades that only claws back
+ * past the start at the very end is a rescue, not upside (the fire-at-45 case that
+ * used to read, wrongly, as "comfortably funded").
+ */
+export function guardrailsStoryMode(tl: GuardrailsTimeline): GuardrailsStory {
+  if (tl.failsAtAge != null) return "fails";
+  const below = yearsBelowStart(tl);
+  const mostlyAboveStart = tl.points.length === 0 || below <= tl.points.length * 0.2;
+  if (tl.plateauSpend > tl.start + 1 && mostlyAboveStart) return "raised";
+  if (tl.points.some((p) => p.action === "raise")) return "recovers";
+  return "holds";
+}

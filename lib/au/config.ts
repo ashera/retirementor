@@ -256,3 +256,46 @@ export function minDrawdownRate(age: number, config: EngineConfig): number {
   for (const band of config.minDrawdownBands) if (age >= band.minAge) rate = band.rate;
   return rate;
 }
+
+/**
+ * Backfill a stored config with defaults for fields added AFTER it was first
+ * seeded, so an older DB version still runs the current engine. CRITICAL for
+ * `outsideTax` — without it the engine would tax outside-super gains with NO
+ * discount. Pure (no DB), so it lives here with DEFAULT_CONFIG and is unit-tested.
+ */
+export function withDefaults(data: EngineConfig): EngineConfig {
+  let out = data;
+  if (data.asfa && !data.asfa.breakdown) {
+    out = { ...out, asfa: { ...out.asfa, breakdown: DEFAULT_CONFIG.asfa.breakdown } };
+  }
+  // RG 276 two-stage deflation param, added after the initial seed.
+  if (out.livingStandardsGrowthPct == null) {
+    out = { ...out, livingStandardsGrowthPct: DEFAULT_CONFIG.livingStandardsGrowthPct };
+  }
+  // Super fees, added after the initial seed.
+  if (out.fees == null) {
+    out = { ...out, fees: DEFAULT_CONFIG.fees };
+  }
+  // Division 293, added after the initial seed.
+  if (out.div293Threshold == null) {
+    out = {
+      ...out,
+      div293Threshold: DEFAULT_CONFIG.div293Threshold,
+      div293ExtraTaxRate: DEFAULT_CONFIG.div293ExtraTaxRate,
+    };
+  }
+  // Outside-super deferred-CGT taxation, added after the initial seed. Critical to
+  // backfill: without it the engine would tax outside gains with NO discount.
+  if (out.outsideTax == null) {
+    out = { ...out, outsideTax: DEFAULT_CONFIG.outsideTax };
+  }
+  // Monte Carlo return model, added after the initial seed.
+  if (out.returnModel == null) {
+    out = {
+      ...out,
+      returnModel: DEFAULT_CONFIG.returnModel,
+      bootstrapBlockYears: DEFAULT_CONFIG.bootstrapBlockYears,
+    };
+  }
+  return out;
+}

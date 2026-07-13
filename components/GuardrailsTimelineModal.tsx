@@ -18,7 +18,7 @@ import {
 import type { EngineConfig } from "@/lib/au/config";
 import type { RetirementPlan } from "@/lib/au/types";
 import { fmtCurrency, fmtCompact } from "@/lib/au/format";
-import { guardrailsTimeline, type GuardrailsTimelinePoint } from "@/lib/au/guardrails";
+import { guardrailsTimeline, guardrailsStoryMode, yearsBelowStart, type GuardrailsTimelinePoint } from "@/lib/au/guardrails";
 import { runMonteCarlo, MC_CONFIDENCE_MC } from "@/lib/au/montecarlo";
 import { essentialsFloor } from "@/lib/au/strategies";
 import { retirementGoal } from "@/lib/au/goal";
@@ -99,14 +99,14 @@ export default function GuardrailsTimelineModal({
   const flexFails = tl.failsAtAge != null;
   const fixedFails = fixedTl.failsAtAge != null;
   const allEssentials = tl.floor >= tl.start * 0.9;
-  // How much of this rough run is spent BELOW the starting spend. "Comfortably
-  // funded / mostly raises" (the upside story) only holds if the run stays at or
-  // above start for most of retirement — NOT merely if it ends above start. A plan
-  // cut to the floor for 24 years that only claws back past start at the very end
-  // is a rescue, not upside, even though its plateau exceeds the start.
-  const yearsBelowStart = tl.points.filter((p) => p.spend < tl.start - 1).length;
-  const mostlyAboveStart = tl.points.length === 0 || yearsBelowStart <= tl.points.length * 0.2;
-  const raised = tl.plateauSpend > tl.start + 1 && mostlyAboveStart && !flexFails;
+  // Which narrative to tell — a pure, shared, unit-tested decision (guardrails.ts).
+  // "raised" (comfortably-funded upside) requires staying at/above start for most of
+  // retirement, not merely ending above it; "recovers" = trim then ease back;
+  // "holds" = trim and stay there. yrsBelow measures how long the rough run bites.
+  const story = guardrailsStoryMode(tl);
+  const raised = story === "raised";
+  const recovers = story === "recovers";
+  const yrsBelow = yearsBelowStart(tl);
   // The timeline works in LIVING spend (what flexes); add the fixed home loan so
   // the story shows TOTAL spend, consistent with the spending bar (step 2). The
   // loan is never trimmed, so the total cut % is smaller than the living cut %.
@@ -114,11 +114,6 @@ export default function GuardrailsTimelineModal({
   const floorTotal = tl.floor + loan;
   const minTotal = minSpend + loan;
   const cutPct = startTotal > 0 ? Math.round((1 - minTotal / startTotal) * 100) : 0;
-  // Does spending actually rebound after the cuts, or hold at the floor? A raise
-  // only fires if the (post-pension) draw rate falls back below the lower rail —
-  // which happens for modest spends the pension can meaningfully offset, but not
-  // for high spends where the pension is a small slice. Drives the step 3/4 story.
-  const recovers = tl.points.some((p) => p.action === "raise");
   const coinFlip = fixedSuccess <= 60 && flexSuccess >= 88;
 
   // Chart data for step 3.
@@ -257,7 +252,7 @@ export default function GuardrailsTimelineModal({
                   After a bad start, guardrails trim total spend to about{" "}
                   <strong className="text-amber-300">{fmtCurrency(minTotal)}</strong> (−{cutPct}%), and it stays below your{" "}
                   <strong className="text-white">{fmtCurrency(startTotal)}</strong> start for about{" "}
-                  <strong className="text-white">{yearsBelowStart} years</strong> — then, once the Age Pension arrives
+                  <strong className="text-white">{yrsBelow} years</strong> — then, once the Age Pension arrives
                   {tl.pensionAge != null ? ` at ${tl.pensionAge}` : ""}, spending eases back up, reaching about{" "}
                   <strong className="text-white">{fmtCurrency(tl.plateauSpend + loan)}</strong> by the end. Essentials{loan > 0 ? " and your home loan" : ""} never get cut.
                 </>

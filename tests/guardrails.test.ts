@@ -1,8 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { simulate } from "../lib/au/simulate";
 import { runMonteCarlo } from "../lib/au/montecarlo";
-import { guardrailsOutlook, guardrailsTimeline } from "../lib/au/guardrails";
+import { guardrailsOutlook, guardrailsTimeline, guardrailsStoryMode, yearsBelowStart } from "../lib/au/guardrails";
 import { buildStrategyCatalog } from "../lib/au/strategies";
+import { DEMO_SCENARIOS } from "../lib/au/scenarios/demoScenarios";
 import { DEFAULT_CONFIG as cfg } from "../lib/au/config";
 import { DEFAULT_PLAN, type RetirementPlan } from "../lib/au/types";
 
@@ -164,5 +165,48 @@ describe("Guyton-Klinger guardrails", () => {
     expect(card!.apply(base, {}).guardrails).toBeTruthy();
     // Not offered again once the baseline already uses guardrails.
     expect(buildStrategyCatalog({ ...base, guardrails: {} }).some((c) => c.id === "guardrails")).toBe(false);
+  });
+});
+
+// The explainer's narrative decision (which drove real user-reported bugs) is now a
+// pure function so it can be pinned. The key regression: a run cut to the floor for
+// ~24 years that only claws back above the start at the very END must read as
+// "recovers", NOT "raised" (comfortably-funded upside).
+describe("guardrails story mode", () => {
+  const demoPlan = (slug: string): RetirementPlan => {
+    const s = DEMO_SCENARIOS.find((x) => x.slug === slug)!;
+    return { ...DEFAULT_PLAN, ...s.data, guardrails: {} };
+  };
+
+  it("fire-at-45: ends ABOVE start after a long cut → 'recovers', not 'raised'", () => {
+    const tl = guardrailsTimeline(demoPlan("fire-at-45"), cfg);
+    expect(tl.plateauSpend).toBeGreaterThan(tl.start); // the trap: it DOES end higher…
+    expect(yearsBelowStart(tl)).toBeGreaterThan(tl.points.length * 0.2); // …but was below start most of retirement
+    expect(guardrailsStoryMode(tl)).toBe("recovers");
+  });
+
+  it("high-spend $80k: deep cut with no rebound → 'holds'", () => {
+    const tl = guardrailsTimeline(demoPlan("fire-at-45-high-spend"), cfg);
+    expect(tl.points.some((p) => p.action === "raise")).toBe(false);
+    expect(guardrailsStoryMode(tl)).toBe("holds");
+  });
+
+  it("a plan that runs short even when trimmed → 'fails'", () => {
+    const doomed: RetirementPlan = {
+      ...base,
+      people: [{ ...DEFAULT_PLAN.people[0], currentAge: 45, superBalance: 100_000, salary: 0 }],
+      retirementAge: 45, outsideSuper: 150_000, targetSpending: 55_000, guardrails: {},
+    };
+    const tl = guardrailsTimeline(doomed, cfg);
+    expect(tl.failsAtAge).not.toBeNull();
+    expect(guardrailsStoryMode(tl)).toBe("fails");
+  });
+
+  it("only reports 'raised' when the run stays at/above start for most of retirement", () => {
+    // Constructed guard: plateau just above start but many years below → not raised.
+    const tl = guardrailsTimeline({ ...base, targetSpending: 62_000, guardrails: {} }, cfg);
+    if (yearsBelowStart(tl) > tl.points.length * 0.2) {
+      expect(guardrailsStoryMode(tl)).not.toBe("raised");
+    }
   });
 });

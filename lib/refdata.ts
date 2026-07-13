@@ -1,6 +1,6 @@
 import "server-only";
 import { query } from "./db";
-import { DEFAULT_CONFIG, type EngineConfig } from "./au/config";
+import { DEFAULT_CONFIG, withDefaults, type EngineConfig } from "./au/config";
 import { configToRows } from "./au/params";
 import { computeStaleness } from "./au/staleness";
 
@@ -23,49 +23,8 @@ export interface RefVersion {
   updated_at: string;
 }
 
-/** The EngineConfig the running planner uses — the active DB version, or code defaults. */
-/**
- * Backfill config fields added to the code after a DB version was seeded, so an
- * older active version keeps working (and the admin shows the new params). Only
- * fills what's missing — never overrides stored values.
- */
-function withDefaults(data: EngineConfig): EngineConfig {
-  let out = data;
-  if (data.asfa && !data.asfa.breakdown) {
-    out = { ...out, asfa: { ...out.asfa, breakdown: DEFAULT_CONFIG.asfa.breakdown } };
-  }
-  // RG 276 two-stage deflation param, added after the initial seed.
-  if (out.livingStandardsGrowthPct == null) {
-    out = { ...out, livingStandardsGrowthPct: DEFAULT_CONFIG.livingStandardsGrowthPct };
-  }
-  // Super fees, added after the initial seed.
-  if (out.fees == null) {
-    out = { ...out, fees: DEFAULT_CONFIG.fees };
-  }
-  // Division 293, added after the initial seed.
-  if (out.div293Threshold == null) {
-    out = {
-      ...out,
-      div293Threshold: DEFAULT_CONFIG.div293Threshold,
-      div293ExtraTaxRate: DEFAULT_CONFIG.div293ExtraTaxRate,
-    };
-  }
-  // Outside-super deferred-CGT taxation, added after the initial seed. Critical to
-  // backfill: without it the engine would tax outside gains with NO discount.
-  if (out.outsideTax == null) {
-    out = { ...out, outsideTax: DEFAULT_CONFIG.outsideTax };
-  }
-  // Monte Carlo return model, added after the initial seed.
-  if (out.returnModel == null) {
-    out = {
-      ...out,
-      returnModel: DEFAULT_CONFIG.returnModel,
-      bootstrapBlockYears: DEFAULT_CONFIG.bootstrapBlockYears,
-    };
-  }
-  return out;
-}
-
+/** The EngineConfig the running planner uses — the active DB version (backfilled
+ *  with defaults via withDefaults), or code defaults if the DB is unavailable. */
 export async function getActiveConfig(): Promise<EngineConfig> {
   try {
     const r = await query<{ data: EngineConfig }>(
