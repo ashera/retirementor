@@ -921,11 +921,79 @@ function preservationPia(config: EngineConfig): PersonaReport {
   });
 }
 
+// ── FIRE Fern ────────────────────────────────────────────────────────────────
+// Retires at 52 living off a large OUTSIDE-super portfolio — the FIRE archetype the
+// demo scenarios + case study are built around. Exercises the deferred-CGT model:
+// the pool's 2.5% dividend yield is taxed each year and drawdowns realise a
+// 50%-discounted capital gain (resident scale through the pre-Age-Pension bridge).
+// Every other persona has a small outside pool that pays ~$0, so this is the only
+// scenario that meaningfully verifies the retirement-phase outside-super tax.
+function fireFern(config: EngineConfig): PersonaReport {
+  const person: Person = { currentAge: 52, superBalance: 400_000, salary: 0, voluntaryConcessional: 0, voluntaryNonConcessional: 0 };
+  const plan: RetirementPlan = {
+    ...DEFAULT_PLAN, household: "single", people: [person], superMode: "individual",
+    homeowner: true, outsideSuper: 1_500_000, annualOutsideSavings: 0,
+    retirementAge: 52, spendingMode: "flat", targetSpending: 70_000,
+    investmentReturn: 6, inflation: 0, lifeExpectancy: 90,
+  };
+  const r = simulate(plan, config);
+  const yld = config.outsideTax.incomeYieldPct, disc = config.outsideTax.cgtDiscountPct;
+  const outsideAt = (age: number) => r.rows.find((x) => x.age === age)!.outside;
+  const refAt = (age: number) => ref.outsideBridgeWithCgt(1_500_000, 70_000, 6, yld, disc, age - 52);
+  const bridgeSuperDraw = Math.max(0, ...r.rows.filter((x) => x.phase === "bridge").map((x) => x.superDrawn));
+  const taxAt55 = r.rows.find((x) => x.age === 55)!.breakdown.outsideTax;
+
+  return finish({
+    key: "fire-fern",
+    name: "FIRE Fern",
+    blurb: "Retires at 52 living off a $1.5M share portfolio — dividends taxed yearly, gains on sale (50% CGT discount).",
+    covers: ["Single", "Early retirement", "Large outside super", "Deferred CGT", "Homeowner"],
+    assumptions: [
+      "Today's dollars (inflation 0%).",
+      "Retires at 52 — the bridge to preservation age (60) runs entirely off the outside-super portfolio; super is locked.",
+      "Outside-super earnings: 2.5% dividend yield taxed each year; capital growth deferred and taxed on drawdown with the 50% CGT discount (ordinary resident scale, pre-Age-Pension).",
+      `Reference data: FY${config.financialYear} config seed.`,
+    ],
+    inputs: [
+      { label: "Household", value: "Single" }, { label: "Age now → retire", value: "52 → 52 (early)" },
+      { label: "Super today", value: `${m(400_000)}` }, { label: "Outside super", value: `${m(1_500_000)} (all equity)` },
+      { label: "Home", value: "Owner" }, { label: "Return / inflation", value: "6% / 0%" },
+      { label: "Spending", value: `${m(70_000)}/yr` },
+    ],
+    checkpoints: [
+      moneyCheck(
+        "Outside pool after 3 bridge years", "Age 55",
+        "Independent deferred-CGT recurrence — dividends taxed yearly, discounted gains realised on drawdown",
+        `${m(1_500_000)} opening, ${m(70_000)}/yr drawn, 6% real, ${yld}% yield, ${disc}% CGT discount, over 3 years → ${m(Math.round(refAt(55)))}.`,
+        Math.round(refAt(55)), Math.round(outsideAt(55)), 2,
+      ),
+      moneyCheck(
+        "Outside pool after 6 bridge years", "Age 58",
+        "Independent deferred-CGT recurrence — same rule, 6 years",
+        `Same portfolio drawn to age 58 → ${m(Math.round(refAt(58)))}.`,
+        Math.round(refAt(58)), Math.round(outsideAt(58)), 2,
+      ),
+      moneyCheck(
+        "Dividends + realised gains are genuinely taxed", "Age 55",
+        "A $1.5M portfolio's yield clears the tax-free threshold, unlike the small pools other personas hold",
+        `The engine charged ${m(Math.round(taxAt55))} of outside-super tax at 55 — it must exceed $500 (the deferred-CGT model still bites at this scale).`,
+        1, taxAt55 > 500 ? 1 : 0,
+      ),
+      moneyCheck(
+        "Super preserved through the bridge", "Ages 52–59",
+        "Drawdown is outside-first and super is locked until 60 — the engine must draw $0 from super",
+        `The most drawn from super across the bridge was ${m(Math.round(bridgeSuperDraw))} — it must be $0.`,
+        0, Math.round(bridgeSuperDraw),
+      ),
+    ],
+  });
+}
+
 export const PERSONAS: ((config: EngineConfig) => PersonaReport)[] = [
   soloSandra, coupledCraigKim, bridgingBen, landlordLena, interestOnlyIan,
   sellingSam, smsfSamSue, cappedCarl, fullPensionFiona, clearingClare,
   downsizingDot, sellUpRita, workingWendy, ttrTom,
-  div293Dan, cutoutCora, preservationPia,
+  div293Dan, cutoutCora, preservationPia, fireFern,
 ];
 
 export function evaluatePersonas(config: EngineConfig): PersonaReport[] {

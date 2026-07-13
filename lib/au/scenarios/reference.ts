@@ -81,6 +81,37 @@ export function outsideBalanceAt(
   return futureValue(opening, savings, realRate(nominalReturnPct, inflationPct), years, 0.5);
 }
 
+/**
+ * Independent recurrence for the OUTSIDE-super pool through the early-retirement
+ * bridge (pre-preservation-age): each year the whole spend is drawn from outside
+ * (super is locked, no Age Pension yet), realising a proportional, 50%-discounted
+ * capital gain; the dividend yield is taxed as income; capital growth is deferred.
+ * Mirrors the engine's deferred-CGT model (lib/au/simulate.ts) at the ordinary
+ * resident scale. Real terms (inflation 0), so `realReturnPct` is applied directly.
+ */
+export function outsideBridgeWithCgt(
+  opening: number, spendPerYear: number, realReturnPct: number,
+  incomeYieldPct: number, cgtDiscountPct: number, years: number,
+): number {
+  const r = realReturnPct / 100;
+  const yld = incomeYieldPct / 100;
+  const keep = 1 - cgtDiscountPct / 100; // taxable fraction of a realised gain
+  let value = opening;
+  let unrealizedGain = 0; // basis resets to value at the retirement boundary → 0
+  for (let i = 0; i < years; i++) {
+    const draw = Math.min(spendPerYear, value); // outside funds the whole spend
+    const gainFrac = value > 0 ? Math.max(0, unrealizedGain) / value : 0;
+    const realized = draw * gainFrac;
+    unrealizedGain -= realized;
+    value -= draw;
+    const income = value * yld;
+    unrealizedGain += value * r - income; // capital growth deferred
+    value *= 1 + r;
+    value -= residentIncomeTax(income + keep * realized); // pre-Age-Pension scale, no work
+  }
+  return value;
+}
+
 /** Income deemed on financial assets — two-tier, per Services Australia. */
 export function deemedIncome(financial: number, household: Household, config: EngineConfig): number {
   const t =
