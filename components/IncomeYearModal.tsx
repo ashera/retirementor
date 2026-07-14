@@ -238,6 +238,26 @@ export default function IncomeYearModal({
                 </p>
               </section>
 
+              {(rent > 0 || rentShortfall > 0) && (
+                <section>
+                  <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted">
+                    Investment property income
+                  </h3>
+                  <div className="rounded-xl border border-line bg-panel px-4 py-1">
+                    {rent > 0 && (
+                      <Row color="#fb923c" label="Net rent" sub="Rent after costs and loan interest — income on top of your salary this year." value={rent} />
+                    )}
+                    {rentShortfall > 0 && (
+                      <Row color="#fb923c" label="Rental shortfall" sub="Your geared property's loan interest and costs exceed its rent — a cash cost this year, funded from your pay (negatively geared)." value={-rentShortfall} />
+                    )}
+                  </div>
+                  <p className="mt-1 text-[11px] leading-snug text-muted">
+                    Shown as disposable income alongside your take-home. The tool doesn&apos;t assume it&apos;s saved —
+                    set your annual savings to reflect what you put away.
+                  </p>
+                </section>
+              )}
+
               {(row.breakdown.contribGross > 0 || afterTaxContrib > 0 || row.breakdown.ttrBenefit !== 0 || row.breakdown.savings > 0) && (
                 <section>
                   <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted">
