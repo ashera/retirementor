@@ -779,7 +779,7 @@ export default function PlannerApp({
             Saved scenarios
           </span>
             {savedPlans.length === 0 && (
-              <span className="text-sm text-muted">None yet — save one →</span>
+              <span className="text-sm text-muted">None yet — save the plan you&apos;re viewing below ↓</span>
             )}
             {selectedPlan && (
               <div className="flex flex-wrap items-center gap-2">
@@ -831,24 +831,39 @@ export default function PlannerApp({
                 </button>
               </div>
             )}
-            {configured && (
-              <div className="ml-auto flex items-center gap-2">
-                <input
-                  value={saveName}
-                  onChange={(e) => setSaveName(e.target.value)}
-                  placeholder="Name this scenario"
-                  className="w-40 rounded-lg border border-line bg-panel-2 px-3 py-1.5 text-sm text-white outline-none focus:border-accent"
-                />
-                <button
-                  onClick={handleSave}
-                  disabled={pending}
-                  className="rounded-lg bg-accent px-3 py-1.5 text-sm font-semibold text-ink transition hover:bg-accent-soft disabled:opacity-60"
-                >
-                  Save current
-                </button>
-              </div>
-            )}
         </div>
+
+        {/* Save the plan currently on the dashboard as a new named scenario — its
+            own clearly-labelled block so it isn't confused with loading a saved one. */}
+        {configured && (
+          <div className="mt-3 border-t border-line pt-3">
+            <label htmlFor="save-scenario-name" className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted">
+              Save the plan you&apos;re viewing
+            </label>
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                id="save-scenario-name"
+                value={saveName}
+                onChange={(e) => setSaveName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !pending) handleSave();
+                }}
+                placeholder="Name it — e.g. “Retire at 60”"
+                className="w-full max-w-xs rounded-lg border border-line bg-panel-2 px-3 py-1.5 text-sm text-white outline-none focus:border-accent"
+              />
+              <button
+                onClick={handleSave}
+                disabled={pending}
+                className="rounded-lg bg-accent px-3 py-1.5 text-sm font-semibold text-ink transition hover:bg-accent-soft disabled:opacity-60"
+              >
+                + Save as new scenario
+              </button>
+              <span className="text-xs text-muted">
+                Keeps a copy you can reload, share or run a report on later.
+              </span>
+            </div>
+          </div>
+        )}
         <div className="mt-3 flex flex-wrap gap-2 border-t border-line pt-3">
           <Link
             href="/compare"
