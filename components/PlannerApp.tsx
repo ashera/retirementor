@@ -10,6 +10,7 @@ import IncomeYearModal from "@/components/IncomeYearModal";
 import IncomeChart from "@/components/IncomeChart";
 import FanChart from "@/components/FanChart";
 import MonteCarloMark from "@/components/MonteCarloMark";
+import ReturnSeriesModal from "@/components/ReturnSeriesModal";
 import PlanWizard from "@/components/PlanWizard";
 import BudgetBuilder from "@/components/BudgetBuilder";
 import Field from "@/components/Field";
@@ -248,6 +249,7 @@ export default function PlannerApp({
   const [selectedAge, setSelectedAge] = useState<number | null>(null);
   const [incomeAge, setIncomeAge] = useState<number | null>(null);
   const [fanAge, setFanAge] = useState<number | null>(null);
+  const [showReturnSeries, setShowReturnSeries] = useState(false);
   const [saveName, setSaveName] = useState("");
   // Which saved scenario the dropdown has selected (the Run report / Share / View
   // buttons act on it). Falls back to the first saved plan when unset or stale.
@@ -1224,6 +1226,12 @@ export default function PlannerApp({
               How likely is this plan to work?
               <LikelihoodExplainer plan={plan} mc={mc} />
             </h2>
+            <button
+              onClick={() => setShowReturnSeries(true)}
+              className="mt-1.5 text-xs font-medium text-accent underline-offset-2 hover:underline"
+            >
+              ↗ See the return sequences behind this
+            </button>
           </div>
           <div className="flex gap-4">
             <LegendDot color="#34d399" label="Median" />
@@ -1233,6 +1241,12 @@ export default function PlannerApp({
             </span>
           </div>
         </div>
+        <ReturnSeriesModal
+          open={showReturnSeries}
+          onClose={() => setShowReturnSeries(false)}
+          plan={plan}
+          config={config}
+        />
 
         {(() => {
           const s = mc.successRate;
