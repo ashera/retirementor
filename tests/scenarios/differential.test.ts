@@ -49,8 +49,12 @@ describe("Differential — one-lever deltas match an independent delta", () => {
 
   it("extra outside savings: extra outside balance = FV of the extra savings", () => {
     const engine = rowAt(base({ annualOutsideSavings: 13_000 }), 67).outside - rowAt(base(), 67).outside;
+    // The extra savings also grow a bigger taxable dividend each working year, so
+    // the delta is less than a pure FV — the recurrence captures that.
+    const yld = cfg.outsideTax.incomeYieldPct;
     const refDelta =
-      ref.outsideBalanceAt(150_000, 13_000, 6, 0, 10) - ref.outsideBalanceAt(150_000, 5_000, 6, 0, 10);
+      ref.outsideAccumWithTax(150_000, 13_000, 6, 0, yld, 10, [90_000]) -
+      ref.outsideAccumWithTax(150_000, 5_000, 6, 0, yld, 10, [90_000]);
     expect(near(engine, refDelta, 2), `engine Δ${engine.toFixed(0)} vs ref Δ${refDelta.toFixed(0)}`).toBe(true);
   });
 

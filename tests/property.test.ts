@@ -139,6 +139,46 @@ describe("Rent income tax & negative gearing", () => {
     expect(row.rentIncome).toBeGreaterThan(0);
     expect(row.breakdown.rentTax).toBeCloseTo(0, 0);
   });
+
+  it("reinvests positive after-tax net rent into savings during the working years", () => {
+    // Same working plan with vs without a cash-flow-positive property: the property
+    // version ends the year with MORE outside savings (the after-tax rent is saved).
+    const working = { currentAge: 58, superBalance: 300_000, salary: 95_000, voluntaryConcessional: 0, voluntaryNonConcessional: 0 };
+    const p = base({ people: [working], retirementAge: 67, outsideSuper: 200_000, annualOutsideSavings: 0 });
+    const withProp = rowAt(simulate({ ...p, investmentProperty: prop() }, cfg), 58);
+    const without = rowAt(simulate(p, cfg), 58);
+    expect(withProp.breakdown.rentSaved).toBeGreaterThan(0);
+    // Extra closing outside ≈ the reinvested after-tax rent.
+    expect(withProp.breakdown.closingOutside - without.breakdown.closingOutside).toBeCloseTo(withProp.breakdown.rentSaved!, 0);
+    // A geared loss is NOT reinvested (disposable drain), so rentSaved is 0.
+    const geared = rowAt(simulate({ ...p, investmentProperty: prop({ loanBalance: 500_000 }) }, cfg), 58);
+    expect(geared.rentIncome).toBeLessThan(0);
+    expect(geared.breakdown.rentSaved).toBe(0);
+  });
+});
+
+describe("Outside-super earnings tax (working years)", () => {
+  const worker = (over = {}) => ({
+    ...DEFAULT_PLAN, household: "single" as const,
+    people: [{ currentAge: 55, superBalance: 300_000, salary: 95_000, voluntaryConcessional: 0, voluntaryNonConcessional: 0 }],
+    homeowner: true, outsideSuper: 400_000, annualOutsideSavings: 0,
+    retirementAge: 67, spendingMode: "flat" as const, targetSpending: 60_000,
+    investmentReturn: 7, inflation: 2.5, lifeExpectancy: 90, ...over,
+  });
+
+  it("taxes the dividend yield on outside savings while working, stacked on salary", () => {
+    const row = rowAt(simulate(worker() as RetirementPlan, cfg), 56);
+    expect(row.phase).toBe("accumulation");
+    // ~2.5% of a ~$400k balance is assessable; at a 30%+ marginal rate that's a
+    // few thousand dollars, well below the whole yield.
+    expect(row.breakdown.outsideTax).toBeGreaterThan(1_000);
+    expect(row.breakdown.outsideTax).toBeLessThan(row.breakdown.outsideGrowth);
+  });
+
+  it("no salary and a tiny balance → the yield is under the threshold, no tax", () => {
+    const row = rowAt(simulate(worker({ people: [{ currentAge: 55, superBalance: 300_000, salary: 0, voluntaryConcessional: 0, voluntaryNonConcessional: 0 }], outsideSuper: 50_000 }) as RetirementPlan, cfg), 56);
+    expect(row.breakdown.outsideTax).toBeCloseTo(0, 0);
+  });
 });
 
 describe("Multiple investment properties", () => {

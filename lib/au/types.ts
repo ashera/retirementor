@@ -318,7 +318,8 @@ export interface YearBreakdown {
   outsideGrowth: number;
   fees: number; // fixed admin + insurance $ deducted from super this year
   earningsTax: number; // approx 15% super earnings tax (accumulation only)
-  outsideTax: number; // income tax on outside-super earnings in retirement (super pension earnings are tax-free)
+  outsideTax: number; // income tax on outside-super earnings — the dividend/distribution yield each year (both phases) plus realised gains on sale (retirement); super pension earnings are tax-free
+  rentSaved?: number; // accumulation only: positive after-tax net rent reinvested into the outside pool (a geared loss isn't — it's a disposable drain)
   // Retirement income
   agePension: number;
   pension: PensionBreakdown | null; // means-test working behind agePension (null before pension age)

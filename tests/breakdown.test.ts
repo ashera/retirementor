@@ -44,7 +44,9 @@ describe("Year breakdown ledger", () => {
     expect(accum.length).toBeGreaterThan(0);
     for (const { breakdown: b } of accum) {
       expect(near(b.openingSuper + b.contribNet + b.ttrBenefit - b.fees + b.superGrowth, b.closingSuper)).toBe(true);
-      expect(near(b.openingOutside + b.savings + b.outsideGrowth, b.closingOutside)).toBe(true);
+      // Working-years outside pool also loses the dividend tax and gains any
+      // positive after-tax net rent reinvested.
+      expect(near(b.openingOutside + b.savings + b.outsideGrowth - b.outsideTax + (b.rentSaved ?? 0), b.closingOutside)).toBe(true);
     }
   });
 

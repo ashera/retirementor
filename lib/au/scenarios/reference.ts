@@ -82,6 +82,54 @@ export function outsideBalanceAt(
 }
 
 /**
+ * Outside-super pool through the ACCUMULATION (working) years, matching the
+ * engine's working-phase treatment: each year the pool grows (add-then-grow,
+ * mid-year savings), THEN the dividend/distribution yield is taxed at the
+ * owners' marginal rate stacked on their taxable salary (capital growth is
+ * deferred — only the yield is taxed while working), and any POSITIVE after-tax
+ * net rent is reinvested into the pool. Independent year-by-year recurrence
+ * (the per-year dividend tax depends on the growing balance, so there's no
+ * closed form) — still re-derived from published rules, not the engine's loop.
+ * `taxableSalaries` are the per-owner salaries (after any salary sacrifice) the
+ * dividend tax and rent stack on; `netRentAt(year)` is the household net rent in
+ * that working year (optional; negative = geared, not reinvested).
+ */
+export function outsideAccumWithTax(
+  opening: number,
+  savings: number,
+  nominalReturnPct: number,
+  inflationPct: number,
+  incomeYieldPct: number,
+  years: number,
+  taxableSalaries: number[] = [],
+  netRentAt?: (year: number) => number,
+): number {
+  const r = realRate(nominalReturnPct, inflationPct);
+  const yld = incomeYieldPct / 100;
+  const half = Math.pow(1 + r, 0.5);
+  const people = Math.max(1, taxableSalaries.length);
+  let value = opening;
+  for (let i = 0; i < years; i++) {
+    const start = value;
+    value = start * (1 + r) + savings * half;
+    // Dividend/distribution income tax — marginal, stacked on salary, split per owner.
+    const divPer = (start * yld) / people;
+    if (divPer > 0 && taxableSalaries.length > 0) {
+      value -= taxableSalaries.reduce((s, sal) => s + Math.max(0, residentIncomeTax(sal + divPer) - residentIncomeTax(sal)), 0);
+    }
+    // Positive net rent reinvested (after its own marginal income tax); a geared
+    // loss is a disposable drain, not drawn from the pool.
+    if (netRentAt) {
+      const rent = netRentAt(i);
+      const rentPer = rent / people;
+      const rentTax = rent === 0 ? 0 : taxableSalaries.reduce((s, sal) => s + (residentIncomeTax(sal + rentPer) - residentIncomeTax(sal)), 0);
+      value += Math.max(0, rent - rentTax);
+    }
+  }
+  return value;
+}
+
+/**
  * Independent recurrence for the OUTSIDE-super pool through the early-retirement
  * bridge (pre-preservation-age): each year the whole spend is drawn from outside
  * (super is locked, no Age Pension yet), realising a proportional, 50%-discounted

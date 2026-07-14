@@ -290,8 +290,9 @@ export default function IncomeYearModal({
                     )}
                   </div>
                   <p className="mt-1 text-[11px] leading-snug text-muted">
-                    Shown as disposable income alongside your take-home. The tool doesn&apos;t assume it&apos;s saved —
-                    set your annual savings to reflect what you put away.
+                    Positive net rent, after its income tax, is reinvested into your savings — a
+                    cash-flow-positive property builds wealth over your working years. A geared
+                    shortfall is a cash cost funded from your take-home pay.
                   </p>
                 </section>
               )}

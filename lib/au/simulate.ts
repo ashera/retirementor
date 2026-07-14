@@ -365,6 +365,19 @@ export function simulate(
       outside = startOutside * (1 + realReturn) + savings * outsideHalf;
       const outsideGrowth = outside - startOutside - savings;
 
+      // Tax the dividend/distribution yield on money held OUTSIDE super during the
+      // working years too — assessable at each owner's marginal rate on top of their
+      // salary (mirrors the retirement treatment; capital growth stays deferred and
+      // the CGT basis still resets at the retirement boundary, so only the yield is
+      // taxed here — no units are sold while working). Split equally across owners.
+      const outsideIncomeAccum = Math.max(0, startOutside * outsideIncomeYield);
+      const outsidePerAccum = outsideIncomeAccum / Math.max(1, plan.people.length);
+      const accumOutsideTax =
+        outsideIncomeAccum === 0
+          ? 0
+          : taxables.reduce((s, tx) => s + Math.max(0, residentIncomeTax(tx + outsidePerAccum) - residentIncomeTax(tx)), 0);
+      outside -= accumOutsideTax;
+
       // Held investment-property equity (value − loan) for the net-worth view.
       // Nothing sells while working, so every property still counts. The engine
       // otherwise only needs this in retirement (the means test), but the net-worth
@@ -380,6 +393,12 @@ export function simulate(
       // negative gearing (the working-years benefit). NEGATIVE rentTax = a tax saving.
       const accumRentPer = accumRentCash / Math.max(1, plan.people.length);
       const accumRentTax = accumRentCash === 0 ? 0 : taxables.reduce((s, tx) => s + (residentIncomeTax(tx + accumRentPer) - residentIncomeTax(tx)), 0);
+      // Positive net rent (after its income tax) is reinvested into the outside pool,
+      // so a cash-flow-positive property visibly builds wealth over the working years.
+      // A geared loss is NOT drawn from the pool here — it's a disposable cash drain
+      // funded from salary (its negative-gearing tax saving is already in accumRentTax).
+      const rentSaved = Math.max(0, accumRentCash - accumRentTax);
+      outside += rentSaved;
 
       rows.push(
         row(oldest, startSuper, startOutside, 0, 0, 0, 0, "accumulation", true, accumRentCash, accumPropertyEquity, {
@@ -403,11 +422,12 @@ export function simulate(
           outsideGrowth,
           fees: feesPaid,
           earningsTax: Math.max(0, earningsTax),
-          outsideTax: 0,
+          outsideTax: accumOutsideTax,
           agePension: 0,
           pension: null,
           rentIncome: accumRentCash,
           rentTax: accumRentTax,
+          rentSaved,
           minDrawdown: 0,
           minDrawdownParts: [],
           livingSpend: 0,
@@ -812,7 +832,8 @@ export function simulate(
     // investor actually experiences — taxing the full return as income every year
     // (the old model) massively over-taxed an equity portfolio. Before Age Pension
     // age it's the ordinary scale (no SAPTO); from pension age SAPTO shields modest
-    // amounts. (Accumulation-phase outside earnings are left untaxed.)
+    // amounts. (During accumulation the dividend yield is taxed too — stacked on
+    // salary at the ordinary scale — but no gains are realised, so it's yield-only.)
     let outsideTax = 0;
     if (!accumPhase) {
       const assessable = outsideIncome + cgtDiscount * realizedGain; // today's $

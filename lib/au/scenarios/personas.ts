@@ -120,12 +120,20 @@ function superCheckpoint(
 function outsideCheckpoint(
   opening: number, savings: number, nomReturn: number, infl: number, years: number,
   actual: number, config: EngineConfig,
+  // Per-owner taxable salary (after sacrifice) the yearly dividend tax stacks on,
+  // and optional household net rent per working year (positive → reinvested).
+  taxableSalaries: number[] = [], netRentAt?: (year: number) => number,
 ): CheckpointResult {
-  const exp = ref.outsideBalanceAt(opening, savings, nomReturn, infl, years);
+  const yld = config.outsideTax?.incomeYieldPct ?? 0;
+  const exp = ref.outsideAccumWithTax(opening, savings, nomReturn, infl, yld, years, taxableSalaries, netRentAt);
+  const taxNote = taxableSalaries.length > 0 && yld > 0
+    ? ` less ${yld}% dividend yield taxed at the owners' marginal rate each year`
+    : "";
+  const rentNote = netRentAt ? ", plus positive after-tax net rent reinvested" : "";
   return moneyCheck(
     "Outside super at retirement", `Age ${config.agePensionAge}`,
-    "Closed-form FV (no earnings tax) — independent",
-    `${m(opening)} opening + ${m(savings)}/yr, growth ${nomReturn}% real, over ${years} years → ${m(exp)}.`,
+    "Independent add-then-grow recurrence — dividends taxed yearly, capital growth deferred",
+    `${m(opening)} opening + ${m(savings)}/yr, growth ${nomReturn}% real${taxNote}${rentNote}, over ${years} years → ${m(exp)}.`,
     Math.round(exp), Math.round(actual),
   );
 }
@@ -193,7 +201,7 @@ function soloSandra(config: EngineConfig): PersonaReport {
     ],
     checkpoints: [
       superCheckpoint([{ name: "Sandra", person }], 6, 0, years, row.totalSuper, config),
-      outsideCheckpoint(50_000, 5_000, 6, 0, years, row.outside, config),
+      outsideCheckpoint(50_000, 5_000, 6, 0, years, row.outside, config, [90_000]),
       pensionCheckpoint("single", true, row.totalSuper, row.outside, 0, 0, row.agePension, config),
     ],
   });
@@ -236,7 +244,7 @@ function coupledCraigKim(config: EngineConfig): PersonaReport {
     ],
     checkpoints: [
       superCheckpoint([{ name: "Craig", person: craig }, { name: "Kim", person: kim }], 6, 0, years, row.totalSuper, config),
-      outsideCheckpoint(60_000, 4_000, 6, 0, years, row.outside, config),
+      outsideCheckpoint(60_000, 4_000, 6, 0, years, row.outside, config, [80_000, 60_000]),
       pensionCheckpoint("couple", false, row.totalSuper, row.outside, 0, 0, row.agePension, config),
     ],
   });
@@ -275,7 +283,7 @@ function bridgingBen(config: EngineConfig): PersonaReport {
     ],
     checkpoints: [
       superCheckpoint([{ name: "Ben", person }], 6, 0, years, row.totalSuper, config),
-      outsideCheckpoint(300_000, 10_000, 6, 0, years, row.outside, config),
+      outsideCheckpoint(300_000, 10_000, 6, 0, years, row.outside, config, [100_000]),
       moneyCheck(
         "Super preserved through the bridge", "Ages 55–59",
         "Super is locked until preservation age (60) — the engine must draw $0",
@@ -318,7 +326,7 @@ function landlordLena(config: EngineConfig): PersonaReport {
     ],
     checkpoints: [
       superCheckpoint([{ name: "Lena", person }], 6, 0, years, row.totalSuper, config),
-      outsideCheckpoint(60_000, 4_000, 6, 0, years, row.outside, config),
+      outsideCheckpoint(60_000, 4_000, 6, 0, years, row.outside, config, [90_000], (y) => ref.propertyNetRent(prop, y)),
       ...propertyCheckpoints(prop, years, row, config),
       pensionCheckpoint("single", true, row.totalSuper, row.outside, ref.propertyNetEquity(prop, years), Math.max(0, ref.propertyNetRent(prop, years)), row.agePension, config),
     ],
@@ -359,7 +367,7 @@ function interestOnlyIan(config: EngineConfig): PersonaReport {
     ],
     checkpoints: [
       superCheckpoint([{ name: "Ian", person }], 6, 0, years, row.totalSuper, config),
-      outsideCheckpoint(80_000, 5_000, 6, 0, years, row.outside, config),
+      outsideCheckpoint(80_000, 5_000, 6, 0, years, row.outside, config, [95_000]),
       pensionCheckpoint("single", true, row.totalSuper, row.outside, 0, 0, row.agePension, config),
       moneyCheck(
         "Home-loan interest (first year)", "Age 67",
@@ -461,7 +469,7 @@ function smsfSamSue(config: EngineConfig): PersonaReport {
         { name: "Sam (55% of pool)", person: { ...sam, superBalance: opening[0] } },
         { name: "Sue (45% of pool)", person: { ...sue, superBalance: opening[1] } },
       ], 6, 0, years, row.totalSuper, config),
-      outsideCheckpoint(70_000, 5_000, 6, 0, years, row.outside, config),
+      outsideCheckpoint(70_000, 5_000, 6, 0, years, row.outside, config, [85_000, 65_000]),
       pensionCheckpoint("couple", true, row.totalSuper, row.outside, 0, 0, row.agePension, config),
     ],
   });
@@ -498,7 +506,7 @@ function cappedCarl(config: EngineConfig): PersonaReport {
     ],
     checkpoints: [
       superCheckpoint([{ name: "Carl", person }], 6, 0, years, row.totalSuper, config),
-      outsideCheckpoint(150_000, 20_000, 6, 0, years, row.outside, config),
+      outsideCheckpoint(150_000, 20_000, 6, 0, years, row.outside, config, [300_000]),
       pensionCheckpoint("single", true, row.totalSuper, row.outside, 0, 0, row.agePension, config),
     ],
   });
@@ -534,7 +542,7 @@ function fullPensionFiona(config: EngineConfig): PersonaReport {
     ],
     checkpoints: [
       superCheckpoint([{ name: "Fiona", person }], 6, 0, years, row.totalSuper, config),
-      outsideCheckpoint(20_000, 0, 6, 0, years, row.outside, config),
+      outsideCheckpoint(20_000, 0, 6, 0, years, row.outside, config, [40_000]),
       pensionCheckpoint("single", false, row.totalSuper, row.outside, 0, 0, row.agePension, config),
     ],
   });
@@ -572,7 +580,7 @@ function clearingClare(config: EngineConfig): PersonaReport {
     ],
     checkpoints: [
       superCheckpoint([{ name: "Clare", person }], 6, 0, years, row.totalSuper, config),
-      outsideCheckpoint(100_000, 5_000, 6, 0, years, row.outside, config),
+      outsideCheckpoint(100_000, 5_000, 6, 0, years, row.outside, config, [90_000]),
       pensionCheckpoint("single", true, row.totalSuper - mtg.balance, row.outside, 0, 0, row.agePension, config),
     ],
   });
@@ -618,7 +626,7 @@ function downsizingDot(config: EngineConfig): PersonaReport {
     ],
     checkpoints: [
       superCheckpoint([{ name: "Dot", person }], 6, 0, retYears, retRow.totalSuper, config),
-      outsideCheckpoint(250_000, 0, 6, 0, retYears, retRow.outside, config),
+      outsideCheckpoint(250_000, 0, 6, 0, retYears, retRow.outside, config, [70_000]),
       moneyCheck(
         "Equity freed by downsizing", `Age ${dsRow.age}`,
         "Independent: grown home value − new home − loan",
@@ -674,7 +682,7 @@ function sellUpRita(config: EngineConfig): PersonaReport {
     ],
     checkpoints: [
       superCheckpoint([{ name: "Rita", person }], 6, 0, retYears, retRow.totalSuper, config),
-      outsideCheckpoint(120_000, 0, 6, 0, retYears, retRow.outside, config),
+      outsideCheckpoint(120_000, 0, 6, 0, retYears, retRow.outside, config, [80_000]),
       moneyCheck(
         "Equity freed by selling up", `Age ${saleRow.age}`,
         "Independent: grown home value − loan (all to savings)",
@@ -720,7 +728,7 @@ function workingWendy(config: EngineConfig): PersonaReport {
     ],
     checkpoints: [
       superCheckpoint([{ name: "Wendy", person }], 6, 0, years, row.totalSuper, config),
-      outsideCheckpoint(60_000, 0, 6, 0, years, row.outside, config),
+      outsideCheckpoint(60_000, 0, 6, 0, years, row.outside, config, [70_000]),
       moneyCheck(
         "Part-time income, net of tax", "Age 67",
         "Independent: gross $30k less senior (SAPTO) income tax",
@@ -793,7 +801,7 @@ function ttrTom(config: EngineConfig): PersonaReport {
         `Add-then-grow with net contribution ${m(netContrib)} + TTR ${m(ttr)} over ${years} yrs → ${m(expSuper)}.`,
         Math.round(expSuper), Math.round(retRow.totalSuper), 2,
       ),
-      outsideCheckpoint(100_000, 0, 6, 0, years, retRow.outside, config),
+      outsideCheckpoint(100_000, 0, 6, 0, years, retRow.outside, config, [150_000]),
     ],
   });
 }
@@ -833,7 +841,7 @@ function div293Dan(config: EngineConfig): PersonaReport {
     ],
     checkpoints: [
       superCheckpoint([{ name: "Dan", person }], 6, 0, years, row.totalSuper, config),
-      outsideCheckpoint(150_000, 0, 6, 0, years, row.outside, config),
+      outsideCheckpoint(150_000, 0, 6, 0, years, row.outside, config, [235_000]),
       pensionCheckpoint("single", true, row.totalSuper, row.outside, 0, 0, row.agePension, config),
     ],
   });
@@ -872,7 +880,7 @@ function cutoutCora(config: EngineConfig): PersonaReport {
     ],
     checkpoints: [
       superCheckpoint([{ name: "Cora", person }], 6, 0, years, row.totalSuper, config),
-      outsideCheckpoint(180_000, 3_000, 6, 0, years, row.outside, config),
+      outsideCheckpoint(180_000, 3_000, 6, 0, years, row.outside, config, [75_000]),
       pensionCheckpoint("single", true, row.totalSuper, row.outside, 0, 0, row.agePension, config),
     ],
   });
@@ -910,7 +918,7 @@ function preservationPia(config: EngineConfig): PersonaReport {
     ],
     checkpoints: [
       superCheckpoint([{ name: "Pia", person }], 6, 0, years, row.totalSuper, config),
-      outsideCheckpoint(120_000, 0, 6, 0, years, row.outside, config),
+      outsideCheckpoint(120_000, 0, 6, 0, years, row.outside, config, [90_000]),
       moneyCheck(
         "Min super drawdown at 60", "Age 60",
         "Independent: outside savings fund the spend first, so super draws only the ATO minimum (4% under 65)",

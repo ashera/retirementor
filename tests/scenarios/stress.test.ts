@@ -125,7 +125,7 @@ describe(`Stress matrix — ${PLANS.length} plans, universal invariants`, () => 
         if (!near(row.total, row.totalSuper + row.outside)) fails.push(`${name} @${row.age}: total≠super+outside`);
         if (row.phase === "accumulation") {
           if (!near(b.openingSuper + b.contribNet + b.ttrBenefit - b.fees + b.superGrowth, b.closingSuper)) fails.push(`${name} @${row.age}: accum super`);
-          if (!near(b.openingOutside + b.savings + b.outsideGrowth, b.closingOutside)) fails.push(`${name} @${row.age}: accum outside`);
+          if (!near(b.openingOutside + b.savings + b.outsideGrowth - b.outsideTax + (b.rentSaved ?? 0), b.closingOutside)) fails.push(`${name} @${row.age}: accum outside`);
         } else {
           if (!near(b.openingSuper - b.mortgageCleared - row.superDrawn - b.fees + b.superGrowth, b.closingSuper)) fails.push(`${name} @${row.age}: ret super`);
         }
@@ -202,7 +202,20 @@ describe(`Stress matrix — ${PLANS.length} plans, universal invariants`, () => 
         const c = ref.netAnnualContribution(p.salary, cfg.sgRate, p.voluntaryConcessional, cfg.concessionalCap, cfg.contributionsTax, p.voluntaryNonConcessional, cfg.nonConcessionalCap, cfg.div293Threshold, cfg.div293ExtraTaxRate);
         expSuper += ref.superBalanceAt(opening[i], c, plan.investmentReturn, wageInfl, cfg.superEarningsTaxAccumulation, n, cfg.fees.adminInvestmentPct, cfg.fees.fixedAdminAnnual + cfg.fees.insuranceAnnual);
       });
-      const expOutside = ref.outsideBalanceAt(plan.outsideSuper, plan.annualOutsideSavings, plan.investmentReturn, wageInfl, n);
+      // Working-years outside pool: each year loses the dividend tax (stacked on
+      // each owner's taxable salary) and reinvests positive after-tax net rent —
+      // re-derived independently, then rebased by the same wedge.
+      const taxableSalary = (p: Person) => {
+        const conc = Math.min(p.salary * cfg.sgRate + p.voluntaryConcessional, cfg.concessionalCap);
+        const sacrificed = Math.max(0, conc - p.salary * cfg.sgRate);
+        return Math.max(0, p.salary - sacrificed);
+      };
+      const prop = plan.investmentProperty;
+      const netRentAt = prop ? (y: number) => ref.propertyNetRent(prop, y) : undefined;
+      const expOutside = ref.outsideAccumWithTax(
+        plan.outsideSuper, plan.annualOutsideSavings, plan.investmentReturn, wageInfl,
+        cfg.outsideTax.incomeYieldPct, n, plan.people.map(taxableSalary), netRentAt,
+      );
       if (!near(r.superAtRetirement, expSuper * wedge, 1)) fails.push(`${name}: super ${r.superAtRetirement.toFixed(0)} vs ref ${(expSuper * wedge).toFixed(0)}`);
       const retRow = r.rows.find((x) => x.age === Math.max(...plan.people.map((p) => p.currentAge)) + n)!;
       if (retRow && !near(retRow.outside, expOutside * wedge, 1)) fails.push(`${name}: outside ${retRow.outside.toFixed(0)} vs ref ${(expOutside * wedge).toFixed(0)}`);
