@@ -175,24 +175,6 @@ function ShareControl({
   );
 }
 
-// "Chris's Toggle" — when on, disables the floating hover info box on the charts.
-function ChrisToggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={on}
-      onClick={onToggle}
-      className="flex items-center gap-2 text-xs text-muted transition hover:text-white"
-    >
-      <span className={`relative h-4 w-7 shrink-0 rounded-full transition ${on ? "bg-accent" : "bg-line"}`}>
-        <span className={`absolute top-0.5 h-3 w-3 rounded-full bg-white transition-all ${on ? "left-[14px]" : "left-0.5"}`} />
-      </span>
-      Chris&apos;s Toggle
-    </button>
-  );
-}
-
 function Lever({
   label,
   value,
@@ -265,8 +247,6 @@ export default function PlannerApp({
   const [boostOpen, setBoostOpen] = useState(false);
   const [selectedAge, setSelectedAge] = useState<number | null>(null);
   const [incomeAge, setIncomeAge] = useState<number | null>(null);
-  // "Chris's Toggle" — when on, hides the floating hover info box on the charts.
-  const [chrisToggle, setChrisToggle] = useState(false);
   const [fanAge, setFanAge] = useState<number | null>(null);
   const [saveName, setSaveName] = useState("");
   const [pending, startTransition] = useTransition();
@@ -995,7 +975,6 @@ export default function PlannerApp({
             )}
             <LegendDot color="#38bdf8" label="Outside super" />
             {tweaked && <LegendDot color="#94a3b8" label={baselineLabel} />}
-            <ChrisToggle on={chrisToggle} onToggle={() => setChrisToggle((v) => !v)} />
           </div>
         </div>
         <RetirementChart
@@ -1003,7 +982,6 @@ export default function PlannerApp({
           bands={stageBands}
           baseline={baselineResult}
           baselineLabel={baselineLabel}
-          showTooltip={!chrisToggle}
           onSelectYear={(age) => {
             track("Year breakdown opened", { chart: "balance" });
             setSelectedAge(age);
@@ -1178,13 +1156,11 @@ export default function PlannerApp({
             )}
             <LegendDot color="#38bdf8" label="Outside super" />
             {hasInvestmentProperty(plan) && <LegendDot color="#fb923c" label="Net rent" />}
-            <ChrisToggle on={chrisToggle} onToggle={() => setChrisToggle((v) => !v)} />
           </div>
         </div>
         <IncomeChart
           result={result}
           minDrawdownBands={config.minDrawdownBands}
-          showTooltip={!chrisToggle}
           onSelectYear={(age) => {
             track("Year breakdown opened", { chart: "income" });
             setIncomeAge(age);
