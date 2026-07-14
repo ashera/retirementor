@@ -420,6 +420,15 @@ export default function IncomeYearModal({
                     </div>
                   )}
                 </div>
+                {rent > 0 && Math.abs(rentTax) < 0.5 && (
+                  <p className="mt-1 text-[11px] leading-snug text-muted">
+                    Your net rent is taxable income, but at this income level{" "}
+                    {row.age >= config.agePensionAge
+                      ? "the Seniors and Pensioners Tax Offset (SAPTO)"
+                      : "the tax-free threshold and low-income offset"}{" "}
+                    covers it — no tax is payable on it this year. (Your super pension is tax-free from 60.)
+                  </p>
+                )}
               </section>
 
               {pb && (
