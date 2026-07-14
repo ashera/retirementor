@@ -99,6 +99,15 @@ export default function IncomeYearModal({
       net: prop.strategy === "sell" && row.age >= prop.sellAtAge ? 0 : netRentCash(prop, propertyValueAt(prop, yearsElapsed)),
     }))
     .filter((x) => Math.abs(x.net) > 0.5);
+  // Number of income rows the retirement view shows — the reconciling "Total income"
+  // footer is only worth showing when there's more than one (so it doesn't just
+  // echo a single row).
+  const retirementSourceCount =
+    (partnerStillWorking ? 1 : 0) +
+    (pension > 0 ? 1 : 0) +
+    (propertyCount > 1 || rent > 0 || rentShortfall > 0 ? 1 : 0) +
+    (spendableSuper > 0 ? 1 : 0) +
+    (fromOutside > 0 ? 1 : 0);
 
   // Working-year waterfall: how gross salary is reduced to take-home. Salary
   // sacrifice (concessional above compulsory SG) is pre-tax; income tax follows;
@@ -353,11 +362,23 @@ export default function IncomeYearModal({
                     <Row color="#a78bfa" label="Age Pension" sub={pensionReason} value={pension} />
                   )}
                   {propertyCount > 1 ? (
-                    rentByProperty.map((rp) => (
-                      <Row key={rp.name} color="#fb923c" label={rp.name}
-                        sub={rp.net < 0 ? "Geared — loan interest and costs exceed its rent (funded from the drawdown below)." : "Net rent after costs and loan interest."}
-                        value={rp.net} />
-                    ))
+                    <div className="border-b border-line py-2 last:border-0">
+                      <div className="flex items-baseline justify-between gap-4">
+                        <span className="text-sm text-slate-200">
+                          <span className="mr-2 inline-block h-2.5 w-2.5 rounded-sm align-middle" style={{ background: "#fb923c" }} />
+                          Investment property (net)
+                        </span>
+                        <span className="shrink-0 text-sm font-semibold tabular-nums text-white">{cur(rentRaw)}</span>
+                      </div>
+                      <div className="mt-1 space-y-0.5 pl-[18px] text-[11px] text-muted">
+                        {rentByProperty.map((rp) => (
+                          <div key={rp.name} className="flex justify-between gap-4">
+                            <span>{rp.name}{rp.net < 0 ? " — geared, a net cost" : ""}</span>
+                            <span className="tabular-nums text-slate-300">{cur(rp.net)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   ) : (
                     <>
                       {rent > 0 && (
@@ -373,6 +394,12 @@ export default function IncomeYearModal({
                   )}
                   {fromOutside > 0 && (
                     <Row color="#38bdf8" label="From outside super" sub="Drawn from your savings outside super to cover the rest." value={fromOutside} />
+                  )}
+                  {retirementSourceCount > 1 && (
+                    <div className="flex items-baseline justify-between gap-4 border-t border-line pt-2">
+                      <span className="text-sm font-semibold text-slate-200">Total income</span>
+                      <span className="shrink-0 text-sm font-bold tabular-nums text-white">{cur(total)}</span>
+                    </div>
                   )}
                 </div>
               </section>
