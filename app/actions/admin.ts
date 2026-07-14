@@ -19,6 +19,22 @@ export interface AdminResult {
 
 const DESCRIPTOR_BY_KEY = new Map(PARAM_DESCRIPTORS.map((d) => [d.key, d]));
 
+/** Fetch one saved plan's data by id (admin only) — lets an admin load any user's
+ *  scenario into their own dashboard for support/inspection. */
+export async function adminGetPlanData(
+  planId: string,
+): Promise<{ ok?: boolean; name?: string; data?: unknown; error?: string }> {
+  const admin = await getAdmin();
+  if (!admin) return { error: "Not authorised." };
+  const r = await query<{ name: string; data: unknown }>(
+    "select name, data from plans where id = $1",
+    [planId],
+  );
+  const row = r.rows[0];
+  if (!row) return { error: "Plan not found." };
+  return { ok: true, name: row.name, data: row.data };
+}
+
 function revalidate() {
   revalidatePath("/admin");
   revalidatePath("/admin/review");

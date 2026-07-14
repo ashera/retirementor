@@ -5,6 +5,7 @@ import { getUserDetail } from "@/lib/adminUsers";
 import { fmtDate, fmtDateTime } from "@/lib/au/format";
 import AdminTabs from "@/components/AdminTabs";
 import UserActions from "@/components/UserActions";
+import UserPlansList from "@/components/UserPlansList";
 
 export const metadata = { title: "Backoffice — User", robots: { index: false } };
 export const dynamic = "force-dynamic";
@@ -76,18 +77,7 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
         <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted">
           Saved scenarios ({u.plans.length})
         </h2>
-        {u.plans.length === 0 ? (
-          <p className="text-sm text-muted">No saved scenarios.</p>
-        ) : (
-          <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-panel">
-            {u.plans.map((p) => (
-              <li key={p.id} className="flex items-center justify-between gap-4 px-4 py-3 text-sm">
-                <span className="font-medium text-slate-100">{p.name}</span>
-                <span className="shrink-0 text-xs text-muted">updated {fmtDate(p.updated_at)}</span>
-              </li>
-            ))}
-          </ul>
-        )}
+        <UserPlansList plans={u.plans} />
       </section>
     </main>
   );
