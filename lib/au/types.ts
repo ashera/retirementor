@@ -322,7 +322,8 @@ export interface YearBreakdown {
   // Retirement income
   agePension: number;
   pension: PensionBreakdown | null; // means-test working behind agePension (null before pension age)
-  rentIncome: number; // net cash rent from an investment property
+  rentIncome: number; // net cash rent from an investment property (gross of income tax; can be negative)
+  rentTax: number; // income tax on the net rent (marginal, stacked on work/salary); NEGATIVE = a negative-gearing tax benefit
   minDrawdown: number; // legislated minimum super drawdown this year (from the PENSION pool, per-person, summed)
   minDrawdownParts: MinDrawdownPart[]; // the per-person split behind minDrawdown
   // The drawdown order for spending beyond the pension minimum: outside first (row

@@ -106,6 +106,41 @@ describe("Investment property", () => {
   });
 });
 
+describe("Rent income tax & negative gearing", () => {
+  it("taxes positive net rent stacked on a working owner's salary (accumulation)", () => {
+    // A cash-positive property, owner still working on $95k → the net rent is
+    // taxed at the marginal rate on top of salary, so rentTax > 0.
+    const r = simulate(base({
+      people: [{ currentAge: 58, superBalance: 300_000, salary: 95_000, voluntaryConcessional: 0, voluntaryNonConcessional: 0 }],
+      retirementAge: 67, investmentProperty: prop(),
+    }), cfg);
+    const row = rowAt(r, 58);
+    expect(row.phase).toBe("accumulation");
+    expect(row.rentIncome).toBeGreaterThan(0);
+    expect(row.breakdown.rentTax).toBeGreaterThan(0);
+    expect(row.breakdown.rentTax).toBeLessThan(row.rentIncome); // marginal, not 100%
+  });
+
+  it("a geared loss is a NEGATIVE rentTax — a negative-gearing tax benefit", () => {
+    // Loss −$18k against a $95k salary → the loss cuts tax, so rentTax < 0.
+    const r = simulate(base({
+      people: [{ currentAge: 58, superBalance: 300_000, salary: 95_000, voluntaryConcessional: 0, voluntaryNonConcessional: 0 }],
+      retirementAge: 67, investmentProperty: prop({ loanBalance: 500_000 }),
+    }), cfg);
+    const row = rowAt(r, 58);
+    expect(row.rentIncome).toBeLessThan(0); // geared loss
+    expect(row.breakdown.rentTax).toBeLessThan(0); // a tax saving
+  });
+
+  it("retired with only net rent below the tax-free threshold pays ~no rent tax", () => {
+    // Sole retiree, no salary, modest net rent → SAPTO/threshold means no tax.
+    const r = simulate(base({ people: super0, investmentProperty: prop() }), cfg);
+    const row = rowAt(r, 67);
+    expect(row.rentIncome).toBeGreaterThan(0);
+    expect(row.breakdown.rentTax).toBeCloseTo(0, 0);
+  });
+});
+
 describe("Multiple investment properties", () => {
   it("sums net rent and net equity across held properties", () => {
     const one = rowAt(simulate(base({ people: super0, investmentProperties: [prop()] }), cfg), 67);

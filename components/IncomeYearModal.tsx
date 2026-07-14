@@ -60,6 +60,8 @@ export default function IncomeYearModal({
 }) {
   const retired = row.phase !== "accumulation";
   const rentRaw = row.rentIncome ?? 0; // NEGATIVE for a geared property (a cash drain)
+  const rentTax = row.breakdown.rentTax ?? 0; // income tax on the net rent; NEGATIVE = a negative-gearing benefit
+  const afterTaxRent = rentRaw - rentTax; // what actually funds spending, after the ATO takes its cut (or gives it back)
   const rent = Math.max(0, rentRaw); // positive net rent — also what the pension income test assesses (a loss isn't assessable)
   const rentShortfall = Math.max(0, -rentRaw);
   const pension = row.agePension;
@@ -78,10 +80,10 @@ export default function IncomeYearModal({
   // a still-working partner's salary). The ATO minimum can force super out beyond
   // that — the surplus is reinvested, not spent, so it isn't spendable income
   // this year. Count only the super that actually funds spending.
-  const need = Math.max(0, spend - pension - rentRaw - salaryTakeHome);
+  const need = Math.max(0, spend - pension - afterTaxRent - salaryTakeHome);
   const superReinvested = Math.max(0, fromSuper - need);
   const spendableSuper = fromSuper - superReinvested;
-  const total = pension + rentRaw + spendableSuper + fromOutside + salaryTakeHome;
+  const total = pension + afterTaxRent + spendableSuper + fromOutside + salaryTakeHome;
   const shortfall = Math.max(0, spend - total);
 
   // Per-person salary split for a couple's working years (salary is constant in
@@ -151,7 +153,7 @@ export default function IncomeYearModal({
 
   // Why is the super draw this amount? Uses the engine's actual minimum (summed
   // per person — a couple with an age gap has different rates each).
-  const privateNeed = Math.max(0, spend - pension - rentRaw - salaryTakeHome);
+  const privateNeed = Math.max(0, spend - pension - afterTaxRent - salaryTakeHome);
   const minRate = minDrawdownRate(row.age, config);
   const minDraw = row.breakdown.minDrawdown;
   const parts = row.breakdown.minDrawdownParts;
@@ -278,6 +280,14 @@ export default function IncomeYearModal({
                         )}
                       </>
                     )}
+                    {Math.abs(rentTax) > 0.5 && (
+                      <Row color="#f97316"
+                        label={rentTax > 0 ? "Rental income tax" : "Negative-gearing tax benefit"}
+                        sub={rentTax > 0
+                          ? "Income tax on your net rent, stacked on your salary at your marginal rate."
+                          : "Your rental loss is deducted against your salary, cutting your income tax this year (negative gearing)."}
+                        value={-rentTax} />
+                    )}
                   </div>
                   <p className="mt-1 text-[11px] leading-snug text-muted">
                     Shown as disposable income alongside your take-home. The tool doesn&apos;t assume it&apos;s saved —
@@ -389,6 +399,14 @@ export default function IncomeYearModal({
                       )}
                     </>
                   )}
+                  {Math.abs(rentTax) > 0.5 && (
+                    <Row color="#f97316"
+                      label={rentTax > 0 ? "Rental income tax" : "Negative-gearing tax benefit"}
+                      sub={rentTax > 0
+                        ? "Income tax on your net rent at your marginal rate (a still-working partner's salary stacks on top)."
+                        : "Your rental loss is deducted against other taxable income, cutting your tax this year (negative gearing)."}
+                      value={-rentTax} />
+                  )}
                   {spendableSuper > 0 && (
                     <Row color="#34d399" label="From your super" sub="Drawn tax-free (accessible from 60) — see the working below." value={spendableSuper} />
                   )}
@@ -493,7 +511,8 @@ export default function IncomeYearModal({
                   <div className="space-y-1.5 rounded-xl border border-line bg-panel px-3 py-3 text-xs">
                     <DLine label="Your spending goal" value={spend} />
                     <DLine label="− Age Pension" value={pension} />
-                    {rent > 0 && <DLine label="− Net rent" value={rent} />}
+                    {afterTaxRent > 0.5 && <DLine label="− Net rent (after tax)" value={afterTaxRent} />}
+                    {afterTaxRent < -0.5 && <DLine label="+ Rental shortfall (after tax)" value={-afterTaxRent} />}
                     {salaryTakeHome > 1 && <DLine label="− A partner's salary (take-home)" value={salaryTakeHome} />}
                     <div className="border-t border-line pt-1.5">
                       <DLine label="= Shortfall to fund from savings" value={privateNeed} strong />

@@ -255,6 +255,7 @@ export function simulate(
         earningsTax: opening * (superPensionReturn - superAccumReturn),
         superGrowth: newBalance - opening - net,
         takeHome,
+        taxable, // taxable salary (after sacrifice) — the base a rental loss/gain stacks on
         ttrBenefit,
       };
     };
@@ -345,6 +346,7 @@ export function simulate(
       let feesPaid = 0;
       let takeHome = 0; // net cash from salary after income tax and pre-tax sacrifice
       let ttrBenefit = 0; // net super gained from a Transition-to-Retirement swap this year
+      const taxables: number[] = []; // per-person taxable salary — base for the rental tax/deduction
       plan.people.forEach((p, i) => {
         const r = contribute(p, accum[i], 1, i === 0 && ages[i] >= preservationAge);
         accum[i] = r.newBalance;
@@ -356,6 +358,7 @@ export function simulate(
         earningsTax += r.earningsTax;
         takeHome += r.takeHome;
         ttrBenefit += r.ttrBenefit;
+        taxables.push(r.taxable);
       });
       const savings = plan.annualOutsideSavings;
       const outsideHalf = Math.pow(1 + realReturn, 0.5);
@@ -372,6 +375,11 @@ export function simulate(
       // income chart alongside take-home pay. Like salary take-home it's disposable
       // income, not auto-saved, so it doesn't itself move the balance.
       const accumRentCash = properties.reduce((s, prop) => s + netRentCash(prop, propertyValueAt(prop, t)), 0);
+      // Income tax on that rent, marginal, stacked on each owner's taxable salary and
+      // split equally across the household. A rental LOSS reduces income tax — this is
+      // negative gearing (the working-years benefit). NEGATIVE rentTax = a tax saving.
+      const accumRentPer = accumRentCash / Math.max(1, plan.people.length);
+      const accumRentTax = accumRentCash === 0 ? 0 : taxables.reduce((s, tx) => s + (residentIncomeTax(tx + accumRentPer) - residentIncomeTax(tx)), 0);
 
       rows.push(
         row(oldest, startSuper, startOutside, 0, 0, 0, 0, "accumulation", true, accumRentCash, accumPropertyEquity, {
@@ -399,6 +407,7 @@ export function simulate(
           agePension: 0,
           pension: null,
           rentIncome: accumRentCash,
+          rentTax: accumRentTax,
           minDrawdown: 0,
           minDrawdownParts: [],
           livingSpend: 0,
@@ -674,10 +683,26 @@ export function simulate(
       }
     }
 
+    // Income tax on the net rental income, at each owner's marginal rate stacked on
+    // their WORK income (a still-working partner's salary + part-time work), split
+    // equally across the household. A rental LOSS stacks as a negative → it reduces
+    // tax (negative gearing), bounded by the tax on that work income (a loss with no
+    // taxable income to offset yields no benefit — carry-forward isn't modelled).
+    // Simplification: stacked on work/salary only, not outside-super earnings.
+    let rentTax = 0;
+    if (rentCash !== 0) {
+      const rentPer = rentCash / workers;
+      rentTax = ages.reduce((s, a, i) => {
+        const workPer = (t < retireOffsets[i] ? plan.people[i].salary * gapScale : 0) + grossWork / workers;
+        return s + (taxAtAge(workPer + rentPer, a) - taxAtAge(workPer, a));
+      }, 0);
+    }
+    const afterTaxRent = rentCash - rentTax;
+
     // External income offsets the spending the household must fund from
     // super/outside; any surplus (income beyond spending — e.g. a working
     // partner's salary covering the retiree's needs) is saved to outside super.
-    const externalIncome = agePensionAmt + rentCash + netWork + workTakeHome;
+    const externalIncome = agePensionAmt + afterTaxRent + netWork + workTakeHome;
     const privateNeed = Math.max(0, spending - externalIncome);
     if (externalIncome > spending) outside += externalIncome - spending;
 
@@ -838,6 +863,7 @@ export function simulate(
         agePension: agePensionAmt,
         pension: pensionBreakdown,
         rentIncome: rentCash,
+        rentTax,
         minDrawdown: minDraw,
         minDrawdownParts,
         livingSpend,
