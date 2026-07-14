@@ -50,6 +50,14 @@ describe("Investment property", () => {
     expect(row.propertyEquity).toBe(300_000);
   });
 
+  it("a negatively-geared property yields NEGATIVE net rent (raw, not clamped)", () => {
+    // The income chart + year modal rely on rentIncome being the RAW net figure so
+    // they can net a geared property's cash drain out of total income.
+    const r = simulate(base({ investmentProperty: prop({ loanBalance: 500_000 }) }), cfg);
+    // Gross 20k × 0.75 = 15k, less 30k interest (500k × 6%) → −15k net rent.
+    expect(rowAt(r, 67).rentIncome).toBeCloseTo(-15_000, 0);
+  });
+
   it("assesses rent as ACTUAL, not deemed (vs the same value held as cash)", () => {
     // Same ~320k assessable either way (below the assets cut-off, so the income
     // test binds). As a property its actual rent (~$3k) is far below what deeming

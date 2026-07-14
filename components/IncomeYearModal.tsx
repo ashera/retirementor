@@ -58,7 +58,9 @@ export default function IncomeYearModal({
   canNext: boolean;
 }) {
   const retired = row.phase !== "accumulation";
-  const rent = Math.max(0, row.rentIncome ?? 0);
+  const rentRaw = row.rentIncome ?? 0; // NEGATIVE for a geared property (a cash drain)
+  const rent = Math.max(0, rentRaw); // positive net rent — also what the pension income test assesses (a loss isn't assessable)
+  const rentShortfall = Math.max(0, -rentRaw);
   const pension = row.agePension;
   const fromSuper = row.superDrawn;
   const fromOutside = row.outsideDrawn;
@@ -75,10 +77,10 @@ export default function IncomeYearModal({
   // a still-working partner's salary). The ATO minimum can force super out beyond
   // that — the surplus is reinvested, not spent, so it isn't spendable income
   // this year. Count only the super that actually funds spending.
-  const need = Math.max(0, spend - pension - rent - salaryTakeHome);
+  const need = Math.max(0, spend - pension - rentRaw - salaryTakeHome);
   const superReinvested = Math.max(0, fromSuper - need);
   const spendableSuper = fromSuper - superReinvested;
-  const total = pension + rent + spendableSuper + fromOutside + salaryTakeHome;
+  const total = pension + rentRaw + spendableSuper + fromOutside + salaryTakeHome;
   const shortfall = Math.max(0, spend - total);
 
   // Per-person salary split for a couple's working years (salary is constant in
@@ -131,7 +133,7 @@ export default function IncomeYearModal({
 
   // Why is the super draw this amount? Uses the engine's actual minimum (summed
   // per person — a couple with an age gap has different rates each).
-  const privateNeed = Math.max(0, spend - pension - rent - salaryTakeHome);
+  const privateNeed = Math.max(0, spend - pension - rentRaw - salaryTakeHome);
   const minRate = minDrawdownRate(row.age, config);
   const minDraw = row.breakdown.minDrawdown;
   const parts = row.breakdown.minDrawdownParts;
@@ -313,6 +315,9 @@ export default function IncomeYearModal({
                   )}
                   {rent > 0 && (
                     <Row color="#fb923c" label="Net rent" sub="Actual rent from your investment property, after costs and loan interest." value={rent} />
+                  )}
+                  {rentShortfall > 0 && (
+                    <Row color="#fb923c" label="Rental shortfall" sub="Your geared property's loan interest and costs exceed its rent — the difference is funded from the drawdown below." value={-rentShortfall} />
                   )}
                   {spendableSuper > 0 && (
                     <Row color="#34d399" label="From your super" sub="Drawn tax-free (accessible from 60) — see the working below." value={spendableSuper} />

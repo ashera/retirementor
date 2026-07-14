@@ -22,11 +22,16 @@ function IncomeTooltip({
 }) {
   if (!active || !payload?.length) return null;
   const r = payload[0].payload;
-  const rent = Math.max(0, r.rentIncome ?? 0);
+  const rentRaw = r.rentIncome ?? 0; // net rent — NEGATIVE for a geared property (a cash drain)
+  const rent = Math.max(0, rentRaw);
+  const shortfall = Math.max(0, -rentRaw);
   const salary = Math.max(0, r.salaryIncome ?? 0);
   const takeHome = Math.max(0, r.takeHome ?? 0);
   const work = Math.max(0, r.workIncome ?? 0);
-  const total = takeHome + work + r.agePension + r.superDrawn + r.outsideDrawn + rent;
+  // Net the raw rent so a geared property's shortfall isn't double-counted: the
+  // extra drawdown that covers it is already in super/outside, so the household's
+  // real income is that drawdown LESS the shortfall (i.e. it equals spending).
+  const total = takeHome + work + r.agePension + r.superDrawn + r.outsideDrawn + rentRaw;
   return (
     <div className="rounded-lg border border-line bg-panel px-3 py-2 text-sm shadow-xl">
       <div className="font-semibold text-white">Age {r.age}</div>
@@ -49,6 +54,12 @@ function IncomeTooltip({
       {rent > 0 && (
         <div className="tabular-nums text-orange-400">
           Net rent {fmtCurrency(rent)}
+        </div>
+      )}
+      {shortfall > 0 && (
+        <div className="tabular-nums text-orange-400">
+          Rental shortfall −{fmtCurrency(shortfall)}
+          <span className="text-muted"> (funded from drawdown)</span>
         </div>
       )}
       {r.superDrawn > 0 &&
