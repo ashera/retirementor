@@ -145,12 +145,12 @@ function ShareControl({
   };
 
   return token ? (
-    <>
+    <div className="inline-flex items-center overflow-hidden rounded-lg border border-line bg-panel-2 text-sm">
       <button
         onClick={share}
         disabled={busy}
         title="Copy the public read-only link"
-        className="rounded px-1 text-accent hover:text-accent-soft"
+        className="px-3 py-1.5 font-medium text-accent transition hover:bg-accent/10 disabled:opacity-60"
       >
         🔗 Copy link
       </button>
@@ -158,17 +158,17 @@ function ShareControl({
         onClick={revoke}
         disabled={busy}
         title="Disable the public link"
-        className="rounded px-1 text-muted hover:text-red-400"
+        className="border-l border-line px-2 py-1.5 text-muted transition hover:text-red-400 disabled:opacity-60"
       >
         unshare
       </button>
-    </>
+    </div>
   ) : (
     <button
       onClick={share}
       disabled={busy}
       title="Create a public read-only link to send someone"
-      className="rounded px-1 text-muted hover:text-accent"
+      className="rounded-lg border border-line bg-panel-2 px-3 py-1.5 text-sm font-medium text-slate-200 transition hover:border-accent/50 hover:text-white disabled:opacity-60"
     >
       🔗 Share
     </button>
@@ -249,6 +249,9 @@ export default function PlannerApp({
   const [incomeAge, setIncomeAge] = useState<number | null>(null);
   const [fanAge, setFanAge] = useState<number | null>(null);
   const [saveName, setSaveName] = useState("");
+  // Which saved scenario the dropdown has selected (the Run report / Share / View
+  // buttons act on it). Falls back to the first saved plan when unset or stale.
+  const [selectedPlanId, setSelectedPlanId] = useState<string>("");
   const [pending, startTransition] = useTransition();
   const [notice, setNotice] = useState<string | null>(null);
   const [nudgeDismissed, setNudgeDismissed] = useState(false);
@@ -540,6 +543,11 @@ export default function PlannerApp({
     });
   };
 
+  // The scenario the dropdown is pointing at — the Run report / Share / View /
+  // Delete buttons all act on this. Fall back to the first saved plan so a stale
+  // or empty selection still resolves to something valid.
+  const selectedPlan = savedPlans.find((sp) => sp.id === selectedPlanId) ?? savedPlans[0] ?? null;
+
   const isCouple = plan.household === "couple";
   const comfortable = isCouple
     ? config.asfa.comfortable.couple
@@ -773,45 +781,56 @@ export default function PlannerApp({
             {savedPlans.length === 0 && (
               <span className="text-sm text-muted">None yet — save one →</span>
             )}
-            {savedPlans.map((sp) => (
-              <span
-                key={sp.id}
-                className="flex items-center gap-1.5 rounded-lg border border-line bg-panel-2 py-1 pl-3 pr-1 text-sm"
-              >
-                <button
-                  onClick={() => handleLoad(sp)}
-                  className="font-medium text-slate-200 hover:text-accent"
+            {selectedPlan && (
+              <div className="flex flex-wrap items-center gap-2">
+                <select
+                  value={selectedPlan.id}
+                  onChange={(e) => setSelectedPlanId(e.target.value)}
+                  aria-label="Choose a saved scenario"
+                  className="min-w-[11rem] max-w-[16rem] rounded-lg border border-line bg-panel-2 px-3 py-1.5 text-sm text-white outline-none focus:border-accent"
                 >
-                  {sp.name}
+                  {savedPlans.map((sp) => (
+                    <option key={sp.id} value={sp.id}>
+                      {sp.name}
+                      {sp.data.whatIf ? " · What-if" : ""}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  onClick={() => handleLoad(selectedPlan)}
+                  title={`Load ${selectedPlan.name} into your dashboard`}
+                  className="rounded-lg border border-accent/40 bg-accent/10 px-3 py-1.5 text-sm font-semibold text-accent transition hover:bg-accent/20"
+                >
+                  View
                 </button>
-                {sp.data.whatIf && (
+                <Link
+                  href={`/report/${selectedPlan.id}`}
+                  target="_blank"
+                  title={`Open a printable PDF report for ${selectedPlan.name}`}
+                  className="rounded-lg border border-line bg-panel-2 px-3 py-1.5 text-sm font-medium text-slate-200 transition hover:border-accent/50 hover:text-white"
+                >
+                  ↗ Run report
+                </Link>
+                <ShareControl key={selectedPlan.id} id={selectedPlan.id} initialToken={selectedPlan.share_token} onNotice={setNotice} />
+                {selectedPlan.data.whatIf && (
                   <Link
-                    href={`/what-if?edit=${sp.id}`}
-                    title={`Reopen ${sp.name}'s strategies in What-if`}
-                    className="rounded px-1 text-muted hover:text-accent"
+                    href={`/what-if?edit=${selectedPlan.id}`}
+                    title={`Reopen ${selectedPlan.name}'s strategies in What-if`}
+                    className="rounded-lg border border-line bg-panel-2 px-3 py-1.5 text-sm font-medium text-slate-200 transition hover:border-accent/50 hover:text-white"
                   >
                     ✎ What-if
                   </Link>
                 )}
-                <Link
-                  href={`/report/${sp.id}`}
-                  target="_blank"
-                  title={`Open a printable PDF report for ${sp.name}`}
-                  className="rounded px-1 text-muted hover:text-accent"
-                >
-                  ↗ Report
-                </Link>
-                <ShareControl id={sp.id} initialToken={sp.share_token} onNotice={setNotice} />
                 <button
-                  onClick={() => handleDelete(sp)}
-                  aria-label={`Delete ${sp.name}`}
+                  onClick={() => handleDelete(selectedPlan)}
+                  aria-label={`Delete ${selectedPlan.name}`}
                   disabled={pending}
-                  className="rounded px-1 text-muted hover:text-red-400"
+                  className="rounded-lg border border-line bg-panel-2 px-3 py-1.5 text-sm font-medium text-muted transition hover:border-red-400/50 hover:text-red-400 disabled:opacity-60"
                 >
-                  ✕
+                  ✕ Delete
                 </button>
-              </span>
-            ))}
+              </div>
+            )}
             {configured && (
               <div className="ml-auto flex items-center gap-2">
                 <input
