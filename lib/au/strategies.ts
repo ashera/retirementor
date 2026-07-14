@@ -5,7 +5,7 @@
 // sell-&-rent and part-time work land in later phases.
 
 import type { RetirementPlan } from "./types";
-import { getInvestmentProperties, startingSuperBalances } from "./types";
+import { getCareerBreaks, getInvestmentProperties, personRetirementOffset, startingSuperBalances } from "./types";
 import { fmtCurrency } from "./format";
 import { propertyValueAt, capitalGainsTax, netSaleProceeds } from "./property";
 import { budgetSplit, presetCategories } from "./budget";
@@ -572,19 +572,25 @@ export function buildStrategyCatalog(
     });
   }
 
-  // Gap years — person 0 takes a career break during their working years: no pay
-  // or contributions, living off savings. The cost is the missed super
-  // contributions and their compounding (plus the savings drawn to live).
-  if (plan.people[0]?.salary > 0 && plan.people[0].currentAge < plan.retirementAge) {
-    const p0 = plan.people[0];
-    const startMin = p0.currentAge;
-    const startMax = Math.max(startMin, plan.retirementAge - 1);
-    const maxYears = Math.min(10, Math.max(1, plan.retirementAge - startMin - 1));
+  // Gap years — a career break during the working years: no pay or contributions,
+  // living off savings. The cost is the missed super contributions and their
+  // compounding (plus the savings drawn to live). For a couple, one card per
+  // partner so you can model either — or, toggling both, each taking time off.
+  const addGapYearsCard = (i: number) => {
+    const pi = plan.people[i];
+    if (!pi || pi.salary <= 0) return;
+    const retireAge = pi.currentAge + personRetirementOffset(plan, i);
+    if (pi.currentAge >= retireAge) return; // no working window left
+    const startMin = pi.currentAge;
+    const startMax = Math.max(startMin, retireAge - 1);
+    const maxYears = Math.min(10, Math.max(1, retireAge - startMin - 1));
+    const Subject = i === 0 ? "You" : "Your partner";
+    const other = i === 0 ? "your partner" : "you";
     cards.push({
-      id: "gap-years",
+      id: i === 0 ? "gap-years" : `gap-years-${i}`,
       group: "work",
-      label: "Take gap years off work",
-      blurb: "Model a career break — a stretch of years with no pay and no super contributions, living off your savings. See what it costs your retirement, then pair it with 'Retire later' to make the time up.",
+      label: isCouple ? `Take gap years off work — ${Subject}` : "Take gap years off work",
+      blurb: `Model a career break${isCouple ? ` for ${i === 0 ? "you" : "your partner"}` : ""} — a stretch of years with no pay and no super contributions, living off your savings. See what it costs your retirement, then pair it with 'Retire later' to make the time up.`,
       params: [
         { key: "startAge", label: "Start at age", min: startMin, max: startMax, step: 1, default: Math.min(startMax, startMin + 5), suffix: "yrs" },
         { key: "years", label: "Years off", min: 1, max: maxYears, step: 1, default: Math.min(2, maxYears), suffix: "yrs" },
@@ -593,20 +599,29 @@ export function buildStrategyCatalog(
       note: (v) => {
         const start = Math.round(v.startAge);
         const yrs = Math.round(v.years);
-        const effYears = Math.max(0, Math.min(start + yrs, plan.retirementAge) - start);
-        const runsPast = start + yrs > plan.retirementAge;
+        const effYears = Math.max(0, Math.min(start + yrs, retireAge) - start);
+        const runsPast = start + yrs > retireAge;
         return (
-          `You take ${yrs} year${yrs === 1 ? "" : "s"} off from age ${start} to ${start + yrs}` +
-          `${isCouple ? " (your partner keeps working)" : ""}: no salary and no super contributions in those years, and you ` +
-          `draw ${fmtCurrency(v.spendFromSavings)}/yr from your savings to live${isCouple ? "" : " (and stop adding to savings)"}. ` +
-          `Your super keeps earning on what's already there, but misses ${effYears} year${effYears === 1 ? "" : "s"} of ` +
+          `${isCouple ? `${Subject} take${i === 0 ? "" : "s"}` : "You take"} ${yrs} year${yrs === 1 ? "" : "s"} off from age ${start} to ${start + yrs}` +
+          `${isCouple ? ` (${other} keep${i === 0 ? "s" : ""} working)` : ""}: no salary and no super contributions in those years, and ` +
+          `${fmtCurrency(v.spendFromSavings)}/yr is drawn from savings to live${isCouple ? "" : " (and you stop adding to savings)"}. ` +
+          `Super keeps earning on what's already there, but misses ${effYears} year${effYears === 1 ? "" : "s"} of ` +
           `contributions and their compounding — usually the biggest cost.` +
-          `${runsPast ? ` (Capped at your retirement age of ${plan.retirementAge}.)` : ""} Pair with 'Retire later' to make the years up.`
+          `${runsPast ? ` (Capped at the age-${retireAge} retirement.)` : ""} Pair with 'Retire later' to make the years up.`
         );
       },
-      apply: (p, v) => ({ ...p, careerBreak: { atAge: v.startAge, years: v.years, spendFromSavings: v.spendFromSavings } }),
+      apply: (p, v) => ({
+        ...p,
+        careerBreak: undefined, // superseded by the array form
+        careerBreaks: [
+          ...getCareerBreaks(p).filter((b) => b.who !== i),
+          { atAge: v.startAge, years: v.years, spendFromSavings: v.spendFromSavings, who: i },
+        ],
+      }),
     });
-  }
+  };
+  addGapYearsCard(0);
+  if (isCouple) addGapYearsCard(1);
 
   if (working && plan.people[0]?.salary > 0) {
     cards.push({

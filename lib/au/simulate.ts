@@ -14,6 +14,7 @@
 import { minDrawdownRate, type EngineConfig } from "./config";
 import { agePension, deemedIncome } from "./agePension";
 import {
+  getCareerBreaks,
   getInvestmentProperties,
   hasStaggeredRetirement,
   householdRetirementOffset,
@@ -150,6 +151,8 @@ export function simulate(
   // event has released its net proceeds into the outside-super pool.
   const properties = getInvestmentProperties(plan);
   const sold = properties.map(() => false);
+  // Career breaks ("gap years"), possibly one per partner (see getCareerBreaks).
+  const careerBreaks = getCareerBreaks(plan);
 
   // Optional home downsize: a one-off equity release at an age (home stays
   // exempt). `downsized` guards it to a single event.
@@ -338,13 +341,13 @@ export function simulate(
 
     if (accumPhase) {
       // --- Accumulation: add contributions (net of 15%), then grow. ---
-      // A career break ("gap years") for person 0: across the chosen window they
-      // earn nothing, so they make no super contributions and — if single — stop
-      // adding to savings, and they draw living costs from savings (below). Super
-      // keeps earning on the existing balance; the missed contributions and their
-      // compounding are the real cost.
-      const cb = plan.careerBreak;
-      const p0OnBreak = !!cb && ages[0] >= cb.atAge && ages[0] < cb.atAge + cb.years;
+      // Career breaks ("gap years"): a member on a break this year earns nothing —
+      // no super contributions — and the household draws that break's living cost
+      // from savings (below). Savings additions pause only when EVERY member is on
+      // a break (nobody's earning). Super keeps earning on the existing balance; the
+      // missed contributions and their compounding are the real cost.
+      const onBreak = (i: number) => careerBreaks.some((b) => b.who === i && ages[i] >= b.atAge && ages[i] < b.atAge + b.years);
+      const anyoneWorking = plan.people.some((_, i) => !onBreak(i));
       let contribGross = 0;
       let contribTax = 0;
       let contribNet = 0;
@@ -355,9 +358,9 @@ export function simulate(
       let ttrBenefit = 0; // net super gained from a Transition-to-Retirement swap this year
       const taxables: number[] = []; // per-person taxable salary — base for the rental tax/deduction
       plan.people.forEach((p, i) => {
-        const onBreak = i === 0 && p0OnBreak;
-        const person = onBreak ? { ...p, salary: 0, voluntaryConcessional: 0 } : p;
-        const r = contribute(person, accum[i], 1, i === 0 && ages[i] >= preservationAge && !onBreak);
+        const brk = onBreak(i);
+        const person = brk ? { ...p, salary: 0, voluntaryConcessional: 0 } : p;
+        const r = contribute(person, accum[i], 1, i === 0 && ages[i] >= preservationAge && !brk);
         accum[i] = r.newBalance;
         contribGross += r.contribGross;
         contribTax += r.contribTax;
@@ -369,10 +372,10 @@ export function simulate(
         ttrBenefit += r.ttrBenefit;
         taxables.push(r.taxable);
       });
-      // A single person on a break has no income to save from; a couple's partner
-      // keeps working, so household savings continue (a documented simplification —
-      // person 0's own share isn't separated out).
-      const savings = p0OnBreak && plan.people.length === 1 ? 0 : plan.annualOutsideSavings;
+      // Savings additions pause only when no one's earning (a single on a break, or
+      // a couple both on a break at once); if one partner keeps working, household
+      // savings continue (a documented simplification — their share isn't separated).
+      const savings = anyoneWorking ? plan.annualOutsideSavings : 0;
       const outsideHalf = Math.pow(1 + realReturn, 0.5);
       outside = startOutside * (1 + realReturn) + savings * outsideHalf;
       const outsideGrowth = outside - startOutside - savings;
@@ -411,9 +414,14 @@ export function simulate(
       // funded from salary (its negative-gearing tax saving is already in accumRentTax).
       const rentSaved = Math.max(0, accumRentCash - accumRentTax);
       outside += rentSaved;
-      // Living costs funded from savings during a career break, floored at what the
-      // outside pool actually holds (super is preserved, so it can't fund a break).
-      const careerBreakDraw = p0OnBreak ? Math.min(cb!.spendFromSavings, Math.max(0, outside)) : 0;
+      // Living costs funded from savings during a career break (summed if both
+      // partners are off at once), floored at what the outside pool actually holds
+      // (super is preserved, so it can't fund a break).
+      const breakSpend = careerBreaks.reduce(
+        (s, b) => s + (ages[b.who] >= b.atAge && ages[b.who] < b.atAge + b.years ? b.spendFromSavings : 0),
+        0,
+      );
+      const careerBreakDraw = Math.min(breakSpend, Math.max(0, outside));
       outside -= careerBreakDraw;
 
       rows.push(
@@ -430,7 +438,7 @@ export function simulate(
           contribTax,
           contribNet,
           savings,
-          salaryIncome: plan.people.reduce((s, p, i) => s + (i === 0 && p0OnBreak ? 0 : p.salary), 0),
+          salaryIncome: plan.people.reduce((s, p, i) => s + (onBreak(i) ? 0 : p.salary), 0),
           takeHome,
           ttrBenefit,
           workIncome: 0,

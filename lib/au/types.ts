@@ -119,6 +119,15 @@ export interface PropertyDetail {
 // preservation-age access and means-test treatment apply).
 export type SuperMode = "individual" | "joint";
 
+// A career break ("gap years"): person `who` takes `years` off from their age
+// `atAge`, drawing `spendFromSavings`/yr from outside savings to live.
+export interface CareerBreak {
+  atAge: number;
+  years: number;
+  spendFromSavings: number;
+  who: number; // person index (0 = "you")
+}
+
 export interface RetirementPlan {
   household: Household;
   people: Person[]; // 1 entry for single, 2 for couple
@@ -154,7 +163,8 @@ export interface RetirementPlan {
   guardrails?: { guardPct?: number; adjustPct?: number; floorPct?: number }; // Guyton-Klinger dynamic spending: flex living-spend with the portfolio. If the net-of-pension withdrawal RATE drifts guardPct% (default 20) above its initial level, cut spending adjustPct% (default 10); if it drifts guardPct% below, raise it — never below the greater of essentials or floorPct% (default 70) of the initial spend. Presence enables it.
   lumpSum?: { atAge: number; amount: number }; // one-off tax-free super withdrawal at an age (spent), capped at the accessible super balance then
   recontribute?: { perYear: number; fromAge: number; untilAge: number }; // recontribution: after-tax (non-concessional) top-up of super from outside savings, each year from fromAge to untilAge (a one-off when they're equal), age ≤75, within the NCC + total-super caps
-  careerBreak?: { atAge: number; years: number; spendFromSavings: number }; // "gap years": person 0 takes `years` off from age `atAge` — no salary or super contributions in that window, drawing `spendFromSavings`/yr from outside savings to live (single: savings additions also pause). Super keeps earning on the existing balance; the lost contributions + compounding are the cost.
+  careerBreak?: { atAge: number; years: number; spendFromSavings: number }; // DEPRECATED single-person form (person 0); read via getCareerBreaks(). Kept so plans saved before careerBreaks[] still load.
+  careerBreaks?: CareerBreak[]; // "gap years": each entry = person `who` takes `years` off from their age `atAge` — no salary or super contributions in that window, drawing `spendFromSavings`/yr from outside savings to live. Savings additions pause only when EVERY working member is on a break that year. Super keeps earning on the existing balance; the lost contributions + compounding are the main cost.
   investmentProperties?: PropertyDetail[]; // income-producing properties (source of truth)
   investmentProperty?: PropertyDetail; // DEPRECATED legacy single property — read via getInvestmentProperties()
   // Which optional sections the user has explicitly answered in the wizard (incl.
@@ -185,6 +195,14 @@ export function getInvestmentProperties(plan: RetirementPlan): PropertyDetail[] 
 /** Whether the plan has at least one investment property. */
 export function hasInvestmentProperty(plan: RetirementPlan): boolean {
   return getInvestmentProperties(plan).length > 0;
+}
+
+/** Career breaks on a plan, normalising the deprecated single-person `careerBreak`
+ *  (person 0) into the `careerBreaks[]` form. An explicit `careerBreaks` wins. Only
+ *  breaks targeting a real person are returned. */
+export function getCareerBreaks(plan: RetirementPlan): CareerBreak[] {
+  const raw = plan.careerBreaks ?? (plan.careerBreak ? [{ ...plan.careerBreak, who: 0 }] : []);
+  return raw.filter((b) => b.who >= 0 && b.who < plan.people.length);
 }
 
 /**

@@ -455,7 +455,7 @@ describe("Gap years (career break)", () => {
   it("lowers super at retirement (missed contributions + compounding)", () => {
     const b = worker();
     const withBreak = applyOne(b, "gap-years", { startAge: 47, years: 3, spendFromSavings: 40_000 });
-    expect(withBreak.careerBreak).toEqual({ atAge: 47, years: 3, spendFromSavings: 40_000 });
+    expect(withBreak.careerBreaks).toEqual([{ atAge: 47, years: 3, spendFromSavings: 40_000, who: 0 }]);
     const noBreak = simulate(b, cfg).superAtRetirement;
     const broken = simulate(withBreak, cfg).superAtRetirement;
     expect(broken).toBeLessThan(noBreak);
@@ -493,5 +493,60 @@ describe("Gap years (career break)", () => {
     for (const row of r.rows) expect(row.outside).toBeGreaterThanOrEqual(-1);
     const first = r.rows.find((x) => x.age === 47)!.breakdown;
     expect(first.careerBreakDraw!).toBeLessThan(40_000); // capped by the ~$15k available
+  });
+});
+
+describe("Gap years — couples (choose which partner, or both)", () => {
+  const couple = (over: Partial<RetirementPlan> = {}) =>
+    base({
+      household: "couple", superMode: "individual",
+      people: [
+        { currentAge: 45, superBalance: 200_000, salary: 100_000, voluntaryConcessional: 0, voluntaryNonConcessional: 0 },
+        { currentAge: 45, superBalance: 150_000, salary: 80_000, voluntaryConcessional: 0, voluntaryNonConcessional: 0 },
+      ],
+      retirementAge: 65, outsideSuper: 250_000, annualOutsideSavings: 12_000, ...over,
+    });
+
+  it("offers a gap-years card for each partner", () => {
+    const ids = buildStrategyCatalog(couple()).map((c) => c.id);
+    expect(ids).toContain("gap-years"); // you
+    expect(ids).toContain("gap-years-1"); // partner
+  });
+
+  it("targets the chosen partner only; the other keeps earning and saving", () => {
+    const partnerBreak = applyOne(couple(), "gap-years-1", { startAge: 47, years: 2, spendFromSavings: 30_000 });
+    expect(partnerBreak.careerBreaks).toEqual([{ atAge: 47, years: 2, spendFromSavings: 30_000, who: 1 }]);
+    const b47 = simulate(partnerBreak, cfg).rows.find((x) => x.age === 47)!.breakdown;
+    expect(b47.salaryIncome).toBe(100_000); // only person 0's salary — partner is off
+    expect(b47.savings).toBe(12_000); // person 0 still works → household savings continue
+    expect(b47.careerBreakDraw).toBeCloseTo(30_000, 0);
+  });
+
+  it("models BOTH partners off — savings pause only when neither is earning", () => {
+    const b = couple();
+    const cat = buildStrategyCatalog(b);
+    const both = applyStrategies(b, cat, new Set(["gap-years", "gap-years-1"]), {
+      "gap-years": { startAge: 47, years: 2, spendFromSavings: 40_000 },
+      "gap-years-1": { startAge: 47, years: 2, spendFromSavings: 30_000 },
+    });
+    expect(both.careerBreaks).toHaveLength(2);
+    const b47 = simulate(both, cfg).rows.find((x) => x.age === 47)!.breakdown;
+    expect(b47.salaryIncome).toBe(0); // both off
+    expect(b47.savings).toBe(0); // nobody earning → savings additions pause
+    expect(b47.careerBreakDraw).toBeCloseTo(70_000, 0); // both living costs summed
+  });
+
+  it("staggered breaks: savings continue in the year only one partner is off", () => {
+    const b = couple();
+    const cat = buildStrategyCatalog(b);
+    const both = applyStrategies(b, cat, new Set(["gap-years", "gap-years-1"]), {
+      "gap-years": { startAge: 47, years: 1, spendFromSavings: 40_000 }, // person 0 off at 47 only
+      "gap-years-1": { startAge: 50, years: 1, spendFromSavings: 30_000 }, // partner off at 50 only
+    });
+    const at = (age: number) => simulate(both, cfg).rows.find((x) => x.age === age)!.breakdown;
+    expect(at(47).savings).toBe(12_000); // partner still working
+    expect(at(50).savings).toBe(12_000); // person 0 still working
+    expect(at(47).salaryIncome).toBe(80_000); // person 0 off, partner earns
+    expect(at(50).salaryIncome).toBe(100_000); // partner off, person 0 earns
   });
 });
