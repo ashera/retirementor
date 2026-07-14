@@ -445,7 +445,9 @@ export default function YearDetailModal({
                   No tax this year. The dividends on your outside-super savings are taxable, but{" "}
                   {row.phase === "pension"
                     ? "the seniors offset (SAPTO) covers them"
-                    : "they sit within the tax-free threshold"}{" "}
+                    : plan.household === "couple"
+                      ? "split across both of you, each share sits within the tax-free threshold"
+                      : "they sit within the tax-free threshold"}{" "}
                   at this income level — so nothing is payable. Super drawdowns and the Age Pension are
                   tax-free from 60, and capital growth outside super isn&apos;t taxed until you sell.
                 </>
