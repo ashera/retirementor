@@ -367,9 +367,14 @@ export function simulate(
       // otherwise only needs this in retirement (the means test), but the net-worth
       // band spans the whole timeline, so we compute it here too.
       const accumPropertyEquity = properties.reduce((s, prop) => s + netEquity(prop, propertyValueAt(prop, t)), 0);
+      // Net rent the properties throw off during the working years too (positive
+      // income, or a negative cash drain for a geared property) — surfaced on the
+      // income chart alongside take-home pay. Like salary take-home it's disposable
+      // income, not auto-saved, so it doesn't itself move the balance.
+      const accumRentCash = properties.reduce((s, prop) => s + netRentCash(prop, propertyValueAt(prop, t)), 0);
 
       rows.push(
-        row(oldest, startSuper, startOutside, 0, 0, 0, 0, "accumulation", true, 0, accumPropertyEquity, {
+        row(oldest, startSuper, startOutside, 0, 0, 0, 0, "accumulation", true, accumRentCash, accumPropertyEquity, {
           openingSuper: startSuper,
           openingOutside: startOutside,
           closingSuper: totalSuper(),
@@ -393,7 +398,7 @@ export function simulate(
           outsideTax: 0,
           agePension: 0,
           pension: null,
-          rentIncome: 0,
+          rentIncome: accumRentCash,
           minDrawdown: 0,
           minDrawdownParts: [],
           livingSpend: 0,

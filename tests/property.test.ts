@@ -50,6 +50,16 @@ describe("Investment property", () => {
     expect(row.propertyEquity).toBe(300_000);
   });
 
+  it("surfaces net rent during the accumulation (pre-retirement) years too", () => {
+    const r = simulate(base({
+      people: [{ currentAge: 55, superBalance: 300_000, salary: 90_000, voluntaryConcessional: 0, voluntaryNonConcessional: 0 }],
+      retirementAge: 67, investmentProperty: prop(),
+    }), cfg);
+    const acc = rowAt(r, 60); // a working (accumulation) year
+    expect(acc.phase).toBe("accumulation");
+    expect(acc.rentIncome).toBeGreaterThan(3_000); // net rent, not 0 (was hard-coded 0 before)
+  });
+
   it("a negatively-geared property yields NEGATIVE net rent (raw, not clamped)", () => {
     // The income chart + year modal rely on rentIncome being the RAW net figure so
     // they can net a geared property's cash drain out of total income.
