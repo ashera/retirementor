@@ -338,6 +338,13 @@ export function simulate(
 
     if (accumPhase) {
       // --- Accumulation: add contributions (net of 15%), then grow. ---
+      // A career break ("gap years") for person 0: across the chosen window they
+      // earn nothing, so they make no super contributions and — if single — stop
+      // adding to savings, and they draw living costs from savings (below). Super
+      // keeps earning on the existing balance; the missed contributions and their
+      // compounding are the real cost.
+      const cb = plan.careerBreak;
+      const p0OnBreak = !!cb && ages[0] >= cb.atAge && ages[0] < cb.atAge + cb.years;
       let contribGross = 0;
       let contribTax = 0;
       let contribNet = 0;
@@ -348,7 +355,9 @@ export function simulate(
       let ttrBenefit = 0; // net super gained from a Transition-to-Retirement swap this year
       const taxables: number[] = []; // per-person taxable salary — base for the rental tax/deduction
       plan.people.forEach((p, i) => {
-        const r = contribute(p, accum[i], 1, i === 0 && ages[i] >= preservationAge);
+        const onBreak = i === 0 && p0OnBreak;
+        const person = onBreak ? { ...p, salary: 0, voluntaryConcessional: 0 } : p;
+        const r = contribute(person, accum[i], 1, i === 0 && ages[i] >= preservationAge && !onBreak);
         accum[i] = r.newBalance;
         contribGross += r.contribGross;
         contribTax += r.contribTax;
@@ -360,7 +369,10 @@ export function simulate(
         ttrBenefit += r.ttrBenefit;
         taxables.push(r.taxable);
       });
-      const savings = plan.annualOutsideSavings;
+      // A single person on a break has no income to save from; a couple's partner
+      // keeps working, so household savings continue (a documented simplification —
+      // person 0's own share isn't separated out).
+      const savings = p0OnBreak && plan.people.length === 1 ? 0 : plan.annualOutsideSavings;
       const outsideHalf = Math.pow(1 + realReturn, 0.5);
       outside = startOutside * (1 + realReturn) + savings * outsideHalf;
       const outsideGrowth = outside - startOutside - savings;
@@ -399,6 +411,10 @@ export function simulate(
       // funded from salary (its negative-gearing tax saving is already in accumRentTax).
       const rentSaved = Math.max(0, accumRentCash - accumRentTax);
       outside += rentSaved;
+      // Living costs funded from savings during a career break, floored at what the
+      // outside pool actually holds (super is preserved, so it can't fund a break).
+      const careerBreakDraw = p0OnBreak ? Math.min(cb!.spendFromSavings, Math.max(0, outside)) : 0;
+      outside -= careerBreakDraw;
 
       rows.push(
         row(oldest, startSuper, startOutside, 0, 0, 0, 0, "accumulation", true, accumRentCash, accumPropertyEquity, {
@@ -414,7 +430,7 @@ export function simulate(
           contribTax,
           contribNet,
           savings,
-          salaryIncome: plan.people.reduce((s, p) => s + p.salary, 0),
+          salaryIncome: plan.people.reduce((s, p, i) => s + (i === 0 && p0OnBreak ? 0 : p.salary), 0),
           takeHome,
           ttrBenefit,
           workIncome: 0,
@@ -428,6 +444,7 @@ export function simulate(
           rentIncome: accumRentCash,
           rentTax: accumRentTax,
           rentSaved,
+          careerBreakDraw,
           minDrawdown: 0,
           minDrawdownParts: [],
           livingSpend: 0,

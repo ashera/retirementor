@@ -64,6 +64,7 @@ export function yearFlow(row: YearRow): YearFlow {
     { key: "lumpSum", label: "Lump sum withdrawn from super", amount: -(b.lumpSum ?? 0) },
     { key: "outsideTax", label: "Tax on savings (dividends + realised gains)", amount: -b.outsideTax },
     { key: "rentSaved", label: "Net rent reinvested", amount: b.rentSaved ?? 0 },
+    { key: "careerBreak", label: "Living costs during your career break", amount: -(b.careerBreakDraw ?? 0) },
   ];
 
   const lines = candidate.filter((l) => Math.abs(l.amount) > EPS);

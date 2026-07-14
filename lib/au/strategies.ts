@@ -572,6 +572,42 @@ export function buildStrategyCatalog(
     });
   }
 
+  // Gap years — person 0 takes a career break during their working years: no pay
+  // or contributions, living off savings. The cost is the missed super
+  // contributions and their compounding (plus the savings drawn to live).
+  if (plan.people[0]?.salary > 0 && plan.people[0].currentAge < plan.retirementAge) {
+    const p0 = plan.people[0];
+    const startMin = p0.currentAge;
+    const startMax = Math.max(startMin, plan.retirementAge - 1);
+    const maxYears = Math.min(10, Math.max(1, plan.retirementAge - startMin - 1));
+    cards.push({
+      id: "gap-years",
+      group: "work",
+      label: "Take gap years off work",
+      blurb: "Model a career break — a stretch of years with no pay and no super contributions, living off your savings. See what it costs your retirement, then pair it with 'Retire later' to make the time up.",
+      params: [
+        { key: "startAge", label: "Start at age", min: startMin, max: startMax, step: 1, default: Math.min(startMax, startMin + 5), suffix: "yrs" },
+        { key: "years", label: "Years off", min: 1, max: maxYears, step: 1, default: Math.min(2, maxYears), suffix: "yrs" },
+        { key: "spendFromSavings", label: "Spend from savings", min: 0, max: 120_000, step: 5_000, default: 40_000, prefix: "$", suffix: "/yr" },
+      ],
+      note: (v) => {
+        const start = Math.round(v.startAge);
+        const yrs = Math.round(v.years);
+        const effYears = Math.max(0, Math.min(start + yrs, plan.retirementAge) - start);
+        const runsPast = start + yrs > plan.retirementAge;
+        return (
+          `You take ${yrs} year${yrs === 1 ? "" : "s"} off from age ${start} to ${start + yrs}` +
+          `${isCouple ? " (your partner keeps working)" : ""}: no salary and no super contributions in those years, and you ` +
+          `draw ${fmtCurrency(v.spendFromSavings)}/yr from your savings to live${isCouple ? "" : " (and stop adding to savings)"}. ` +
+          `Your super keeps earning on what's already there, but misses ${effYears} year${effYears === 1 ? "" : "s"} of ` +
+          `contributions and their compounding — usually the biggest cost.` +
+          `${runsPast ? ` (Capped at your retirement age of ${plan.retirementAge}.)` : ""} Pair with 'Retire later' to make the years up.`
+        );
+      },
+      apply: (p, v) => ({ ...p, careerBreak: { atAge: v.startAge, years: v.years, spendFromSavings: v.spendFromSavings } }),
+    });
+  }
+
   if (working && plan.people[0]?.salary > 0) {
     cards.push({
       id: "salary-sacrifice",

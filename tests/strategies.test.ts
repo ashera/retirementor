@@ -438,3 +438,60 @@ describe("What-If strategies", () => {
     expect(composed.mortgage?.strategy).toBe("clear_at_retirement");
   });
 });
+
+describe("Gap years (career break)", () => {
+  const worker = (over: Partial<RetirementPlan> = {}) =>
+    base({
+      people: [{ currentAge: 45, superBalance: 200_000, salary: 100_000, voluntaryConcessional: 0, voluntaryNonConcessional: 0 }],
+      retirementAge: 65, outsideSuper: 150_000, annualOutsideSavings: 10_000, ...over,
+    });
+
+  it("offers the lever only while person 0 is still working", () => {
+    expect(buildStrategyCatalog(worker()).map((c) => c.id)).toContain("gap-years");
+    const retired = base({ people: [{ currentAge: 68, superBalance: 300_000, salary: 0, voluntaryConcessional: 0, voluntaryNonConcessional: 0 }], retirementAge: 65 });
+    expect(buildStrategyCatalog(retired).map((c) => c.id)).not.toContain("gap-years");
+  });
+
+  it("lowers super at retirement (missed contributions + compounding)", () => {
+    const b = worker();
+    const withBreak = applyOne(b, "gap-years", { startAge: 47, years: 3, spendFromSavings: 40_000 });
+    expect(withBreak.careerBreak).toEqual({ atAge: 47, years: 3, spendFromSavings: 40_000 });
+    const noBreak = simulate(b, cfg).superAtRetirement;
+    const broken = simulate(withBreak, cfg).superAtRetirement;
+    expect(broken).toBeLessThan(noBreak);
+  });
+
+  it("pauses contributions/savings and draws living costs during the break only", () => {
+    const b = worker();
+    const r = simulate(applyOne(b, "gap-years", { startAge: 47, years: 3, spendFromSavings: 40_000 }), cfg);
+    const at = (age: number) => r.rows.find((x) => x.age === age)!.breakdown;
+    // Break years 47,48,49: no contributions, no salary, savings paused, $40k drawn.
+    for (const age of [47, 48, 49]) {
+      expect(at(age).contribNet).toBe(0);
+      expect(at(age).salaryIncome).toBe(0);
+      expect(at(age).savings).toBe(0);
+      expect(at(age).careerBreakDraw).toBeCloseTo(40_000, 0);
+    }
+    // Working years around it are unaffected.
+    expect(at(46).contribNet).toBeGreaterThan(0);
+    expect(at(46).careerBreakDraw ?? 0).toBe(0);
+    expect(at(50).contribNet).toBeGreaterThan(0);
+  });
+
+  it("keeps the accumulation ledger reconciling with the break draw", () => {
+    const r = simulate(applyOne(worker(), "gap-years", { startAge: 47, years: 3, spendFromSavings: 40_000 }), cfg);
+    for (const row of r.rows.filter((x) => x.phase === "accumulation")) {
+      const b = row.breakdown;
+      const closing = b.openingOutside + b.savings + b.outsideGrowth - b.outsideTax + (b.rentSaved ?? 0) - (b.careerBreakDraw ?? 0);
+      expect(Math.abs(closing - b.closingOutside)).toBeLessThan(1);
+    }
+  });
+
+  it("floors the living-cost draw at the savings available (never negative)", () => {
+    // Tiny outside balance, big requested draw → draw is capped, outside stays ≥ 0.
+    const r = simulate(applyOne(worker({ outsideSuper: 15_000, annualOutsideSavings: 0 }), "gap-years", { startAge: 47, years: 3, spendFromSavings: 40_000 }), cfg);
+    for (const row of r.rows) expect(row.outside).toBeGreaterThanOrEqual(-1);
+    const first = r.rows.find((x) => x.age === 47)!.breakdown;
+    expect(first.careerBreakDraw!).toBeLessThan(40_000); // capped by the ~$15k available
+  });
+});
