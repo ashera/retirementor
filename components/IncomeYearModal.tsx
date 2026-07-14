@@ -3,6 +3,7 @@
 import { fmtCurrency } from "@/lib/au/format";
 import { minDrawdownRate, type EngineConfig } from "@/lib/au/config";
 import { getInvestmentProperties, type RetirementPlan, type YearRow } from "@/lib/au/types";
+import { netRentCash, propertyValueAt } from "@/lib/au/property";
 
 const cur = (n: number) => fmtCurrency(Math.round(n));
 
@@ -90,6 +91,14 @@ export default function IncomeYearModal({
   const yearsElapsed = row.age - oldestCurrentAge;
   const propsList = getInvestmentProperties(plan);
   const propertyCount = propsList.length;
+  // Per-property net rent this year (same computation the engine sums into rentIncome:
+  // net rent for held properties, $0 once sold). Only shown when there's more than one.
+  const rentByProperty = propsList
+    .map((prop, i) => ({
+      name: prop.name?.trim() || `Property ${i + 1}`,
+      net: prop.strategy === "sell" && row.age >= prop.sellAtAge ? 0 : netRentCash(prop, propertyValueAt(prop, yearsElapsed)),
+    }))
+    .filter((x) => Math.abs(x.net) > 0.5);
 
   // Working-year waterfall: how gross salary is reduced to take-home. Salary
   // sacrifice (concessional above compulsory SG) is pre-tax; income tax follows;
@@ -238,17 +247,27 @@ export default function IncomeYearModal({
                 </p>
               </section>
 
-              {(rent > 0 || rentShortfall > 0) && (
+              {(rent > 0 || rentShortfall > 0 || rentByProperty.length > 0) && (
                 <section>
                   <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted">
                     Investment property income
                   </h3>
                   <div className="rounded-xl border border-line bg-panel px-4 py-1">
-                    {rent > 0 && (
-                      <Row color="#fb923c" label="Net rent" sub="Rent after costs and loan interest — income on top of your salary this year." value={rent} />
-                    )}
-                    {rentShortfall > 0 && (
-                      <Row color="#fb923c" label="Rental shortfall" sub="Your geared property's loan interest and costs exceed its rent — a cash cost this year, funded from your pay (negatively geared)." value={-rentShortfall} />
+                    {propertyCount > 1 ? (
+                      rentByProperty.map((rp) => (
+                        <Row key={rp.name} color="#fb923c" label={rp.name}
+                          sub={rp.net < 0 ? "Geared — loan interest and costs exceed its rent (a cash cost, funded from your pay)." : "Net rent after costs and loan interest."}
+                          value={rp.net} />
+                      ))
+                    ) : (
+                      <>
+                        {rent > 0 && (
+                          <Row color="#fb923c" label="Net rent" sub="Rent after costs and loan interest — income on top of your salary this year." value={rent} />
+                        )}
+                        {rentShortfall > 0 && (
+                          <Row color="#fb923c" label="Rental shortfall" sub="Your geared property's loan interest and costs exceed its rent — a cash cost this year, funded from your pay (negatively geared)." value={-rentShortfall} />
+                        )}
+                      </>
                     )}
                   </div>
                   <p className="mt-1 text-[11px] leading-snug text-muted">
@@ -333,11 +352,21 @@ export default function IncomeYearModal({
                   {(pension > 0 || row.age >= config.agePensionAge) && (
                     <Row color="#a78bfa" label="Age Pension" sub={pensionReason} value={pension} />
                   )}
-                  {rent > 0 && (
-                    <Row color="#fb923c" label="Net rent" sub="Actual rent from your investment property, after costs and loan interest." value={rent} />
-                  )}
-                  {rentShortfall > 0 && (
-                    <Row color="#fb923c" label="Rental shortfall" sub="Your geared property's loan interest and costs exceed its rent — the difference is funded from the drawdown below." value={-rentShortfall} />
+                  {propertyCount > 1 ? (
+                    rentByProperty.map((rp) => (
+                      <Row key={rp.name} color="#fb923c" label={rp.name}
+                        sub={rp.net < 0 ? "Geared — loan interest and costs exceed its rent (funded from the drawdown below)." : "Net rent after costs and loan interest."}
+                        value={rp.net} />
+                    ))
+                  ) : (
+                    <>
+                      {rent > 0 && (
+                        <Row color="#fb923c" label="Net rent" sub="Actual rent from your investment property, after costs and loan interest." value={rent} />
+                      )}
+                      {rentShortfall > 0 && (
+                        <Row color="#fb923c" label="Rental shortfall" sub="Your geared property's loan interest and costs exceed its rent — the difference is funded from the drawdown below." value={-rentShortfall} />
+                      )}
+                    </>
                   )}
                   {spendableSuper > 0 && (
                     <Row color="#34d399" label="From your super" sub="Drawn tax-free (accessible from 60) — see the working below." value={spendableSuper} />

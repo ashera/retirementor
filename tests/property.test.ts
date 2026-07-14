@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { simulate } from "../lib/au/simulate";
 import { DEFAULT_CONFIG as cfg } from "../lib/au/config";
 import { DEFAULT_PLAN, type PropertyDetail, type RetirementPlan } from "../lib/au/types";
-import { capitalGainsTax } from "../lib/au/property";
+import { capitalGainsTax, netRentCash, propertyValueAt } from "../lib/au/property";
 import { incomeTax } from "../lib/au/tax";
 
 const base = (over: Partial<RetirementPlan> = {}): RetirementPlan => ({
@@ -112,6 +112,23 @@ describe("Multiple investment properties", () => {
     const two = rowAt(simulate(base({ people: super0, investmentProperties: [prop(), prop()] }), cfg), 67);
     expect(two.rentIncome).toBeCloseTo(one.rentIncome * 2, 0);
     expect(two.propertyEquity).toBe(one.propertyEquity * 2);
+  });
+
+  it("per-property net rent (as the income modal recomputes it) sums to the engine's total", () => {
+    // Mix: positive, negatively-geared, and one that sells at 70 — across the
+    // accumulation, pre-sale and post-sale phases the per-property figures the modal
+    // shows must reconcile with the engine's combined rentIncome.
+    const props: PropertyDetail[] = [
+      prop({ name: "A" }), prop({ name: "B", grossYield: 3, loanBalance: 450_000 }),
+      prop({ name: "C", strategy: "sell", sellAtAge: 70 }),
+    ];
+    const r = simulate(base({ people: [{ currentAge: 55, superBalance: 400_000, salary: 90_000, voluntaryConcessional: 0, voluntaryNonConcessional: 0 }], retirementAge: 67, investmentProperties: props }), cfg);
+    for (const age of [60, 68, 72]) {
+      const row = rowAt(r, age);
+      const t = age - 55;
+      const perProp = props.reduce((s, pr) => s + (pr.strategy === "sell" && age >= pr.sellAtAge ? 0 : netRentCash(pr, propertyValueAt(pr, t))), 0);
+      expect(perProp).toBeCloseTo(row.rentIncome, 0);
+    }
   });
 
   it("tracks each property's sale independently", () => {
