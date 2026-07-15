@@ -42,13 +42,32 @@ export function netEquity(p: PropertyDetail, value: number): number {
   return Math.max(0, value - p.loanBalance);
 }
 
-/** CGT on sale — 50% discount (held > 12 months), in today's dollars. */
-export function capitalGainsTax(p: PropertyDetail, value: number): number {
+// How a realised capital gain is taxed. Mirrors config.outsideTax so property and
+// outside-super gains use the same rules. Standalone here (the gain isn't stacked on
+// other income — a documented single-taxpayer simplification).
+export interface CgtRules {
+  regime: "indexed" | "discount";
+  discountPct: number; // "discount" regime: fraction of the gain excluded (e.g. 50)
+  minRatePct: number; // "indexed" regime: minimum tax rate on the real gain (e.g. 30)
+  onAgePension: boolean; // Age Pension recipients are exempt from the 30% minimum
+}
+
+// Pre-2027 default so callers without engine context (illustrative notes, older
+// tests) keep the historical behaviour unless they opt into the reform.
+export const DISCOUNT_CGT_RULES: CgtRules = { regime: "discount", discountPct: 50, minRatePct: 30, onAgePension: false };
+
+/** CGT on sale, in today's dollars. "discount" = 50% discount then marginal;
+ *  "indexed" (post-1 July 2027) = the whole real gain at the marginal rate with a
+ *  30% minimum (Age Pension recipients exempt from the minimum). */
+export function capitalGainsTax(p: PropertyDetail, value: number, rules: CgtRules = DISCOUNT_CGT_RULES): number {
   const gain = Math.max(0, value - p.purchasePrice);
-  return incomeTax(gain * 0.5);
+  if (gain <= 0) return 0;
+  if (rules.regime === "discount") return incomeTax(gain * (1 - rules.discountPct / 100));
+  const marginal = incomeTax(gain); // real gain, fully taxable
+  return rules.onAgePension ? marginal : Math.max(marginal, (rules.minRatePct / 100) * gain);
 }
 
 /** Cash released by a sale: value, less the loan repaid and CGT. */
-export function netSaleProceeds(p: PropertyDetail, value: number): number {
-  return Math.max(0, value - p.loanBalance - capitalGainsTax(p, value));
+export function netSaleProceeds(p: PropertyDetail, value: number, rules: CgtRules = DISCOUNT_CGT_RULES): number {
+  return Math.max(0, value - p.loanBalance - capitalGainsTax(p, value, rules));
 }

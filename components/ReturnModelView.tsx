@@ -6,9 +6,58 @@ import {
   BarChart, Bar, Cell, XAxis, YAxis, ReferenceLine, ResponsiveContainer, Tooltip,
 } from "recharts";
 import AdminTabs from "@/components/AdminTabs";
-import { setReturnModel } from "@/app/actions/admin";
+import { setReturnModel, setCgtRegime } from "@/app/actions/admin";
 import { fmtCurrency } from "@/lib/au/format";
 import type { HistoricalStats } from "@/lib/au/historicalReturns";
+
+type CgtRegime = "indexed" | "discount";
+
+function CgtRegimeControl({ regime }: { regime: CgtRegime }) {
+  const [sel, setSel] = useState<CgtRegime>(regime);
+  const [pending, start] = useTransition();
+  const [msg, setMsg] = useState<string | null>(null);
+  const dirty = sel !== regime;
+  const save = () =>
+    start(async () => {
+      const r = await setCgtRegime(sel);
+      setMsg(r.ok ? "Saved — the live planner now uses this CGT regime." : r.error ?? "Failed.");
+      setTimeout(() => setMsg(null), 3500);
+    });
+  return (
+    <section className="mb-8 rounded-xl border border-line bg-panel p-5">
+      <h2 className="mb-1 text-sm font-semibold text-white">Capital gains tax regime (outside super &amp; property)</h2>
+      <p className="mb-3 max-w-2xl text-xs text-muted">
+        <strong className="text-slate-200">Reform (from 1 July 2027)</strong> — the 50% discount is replaced by
+        cost-base indexation (only the real gain is taxed) plus a 30% minimum, from which Age Pension recipients are
+        exempt. Because the model is in today&apos;s dollars, the tracked gain already is the indexed real gain.
+        <strong className="text-slate-200"> Pre-2027</strong> — the old 50% discount. Applies to every user&apos;s projection.
+      </p>
+      <div className="flex flex-wrap items-center gap-4">
+        <div className="inline-flex rounded-lg border border-line bg-panel-2 p-1">
+          {(["indexed", "discount"] as const).map((m) => (
+            <button
+              key={m}
+              onClick={() => setSel(m)}
+              className={`rounded-md px-4 py-1.5 text-sm font-medium transition ${sel === m ? "bg-accent text-ink" : "text-muted hover:text-white"}`}
+            >
+              {m === "indexed" ? "Reform (indexation + 30% min)" : "Pre-2027 (50% discount)"}
+            </button>
+          ))}
+        </div>
+        <div className="ml-auto flex items-center gap-3">
+          {msg && <span className="text-xs text-muted">{msg}</span>}
+          <button
+            onClick={save}
+            disabled={!dirty || pending}
+            className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-ink transition disabled:opacity-40"
+          >
+            {pending ? "Saving…" : "Save"}
+          </button>
+        </div>
+      </div>
+    </section>
+  );
+}
 
 type Model = "gaussian" | "bootstrap";
 interface PreviewRow { spend: number; gaussian: number; bootstrap: number }
@@ -28,11 +77,12 @@ function Stat({ label, value, sub }: { label: string; value: string; sub?: strin
 }
 
 export default function ReturnModelView({
-  model, blockYears, stats, series, preview, sampleOutside,
+  model, blockYears, cgtRegime, stats, series, preview, sampleOutside,
   staleCount = 0, feedbackCount = 0, adviserCount = 0,
 }: {
   model: Model;
   blockYears: number;
+  cgtRegime: CgtRegime;
   stats: HistoricalStats;
   series: { year: number; real: number }[];
   preview: PreviewRow[];
@@ -121,6 +171,8 @@ export default function ReturnModelView({
           whole market cycles (a full boom/bust). ~10 years is a good middle.
         </p>
       </section>
+
+      <CgtRegimeControl regime={cgtRegime} />
 
       {/* Historical data */}
       <section className="mb-8">

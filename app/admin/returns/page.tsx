@@ -52,6 +52,7 @@ export default async function ReturnModelAdminPage() {
     <ReturnModelView
       model={config.returnModel ?? "gaussian"}
       blockYears={config.bootstrapBlockYears ?? 10}
+      cgtRegime={config.outsideTax.cgtRegime}
       stats={historicalStats()}
       series={historicalSeries()}
       preview={preview}

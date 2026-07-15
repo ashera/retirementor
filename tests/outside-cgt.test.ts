@@ -7,9 +7,10 @@ import { residentIncomeTax } from "../lib/au/scenarios/reference";
 // Deferred-CGT model for the outside-super (personal/brokerage) pool. An equity
 // return splits into a dividend YIELD (realised — taxed each year at marginal
 // rates) and capital GROWTH (unrealised — deferred until units are sold to fund
-// spending, then taxed on the realised slice with the 50% CGT discount). This is
-// far more accurate than the old model, which taxed the whole return as ordinary
-// income every year and so massively over-taxed a share/ETF portfolio.
+// spending, then taxed on the realised slice). Under the post-1 July 2027 regime
+// (the default) the model is in today's dollars, so the tracked gain is already the
+// CPI-indexed REAL gain: the whole real gain is taxable at the marginal rate with a
+// 30% minimum (no Age Pension in this pre-67 window, so the minimum applies).
 //
 // Validated against an INDEPENDENT year-by-year recurrence derived from that rule
 // (not the engine). To make the closed form exact: inflation 0 (today's $ = nominal),
@@ -18,7 +19,7 @@ import { residentIncomeTax } from "../lib/au/scenarios/reference";
 
 const cfg = { ...DEFAULT_CONFIG, livingStandardsGrowthPct: 0 };
 const YIELD = cfg.outsideTax.incomeYieldPct / 100;
-const DISCOUNT = 1 - cfg.outsideTax.cgtDiscountPct / 100;
+const MINRATE = cfg.outsideTax.cgtMinRatePct / 100;
 
 const R = 6; // fixed nominal return (%) each year
 const OUTSIDE0 = 2_000_000;
@@ -49,8 +50,12 @@ function oracle(years: number) {
     const income = value * YIELD;
     ug += value * r - income;
     value *= 1 + r;
-    // 3. Tax the year's assessable outside income (pre-67 resident scale, no work).
-    const tax = residentIncomeTax(income + DISCOUNT * realized);
+    // 3. Tax: dividends (marginal) + CGT under the indexed regime — the whole real
+    //    gain, marginal, with a 30% minimum (no Age Pension here → the minimum binds).
+    const divTax = residentIncomeTax(income);
+    const marginalGain = residentIncomeTax(income + realized) - residentIncomeTax(income);
+    const cgt = Math.max(marginalGain, MINRATE * realized);
+    const tax = divTax + cgt;
     value -= tax;
     out.push({ age: 60 + i, tax, closing: value });
   }

@@ -117,6 +117,34 @@ export async function setReturnModel(
   return { ok: true };
 }
 
+/** Switch the outside-super capital-gains regime site-wide: "indexed" (the post-1
+ *  July 2027 reform — full real gain, 30% minimum) or "discount" (pre-2027 50%). */
+export async function setCgtRegime(regime: "indexed" | "discount"): Promise<AdminResult> {
+  const admin = await getAdmin();
+  if (!admin) return { error: "Not authorised." };
+  if (regime !== "indexed" && regime !== "discount") return { error: "Unknown regime." };
+
+  const active = await query<{ id: string; financial_year: string; data: EngineConfig }>(
+    "select id, financial_year, data from ref_data_versions where is_active limit 1",
+  );
+  const version = active.rows[0];
+  if (!version) return { error: "No active version." };
+
+  const prev = version.data.outsideTax?.cgtRegime ?? "indexed";
+  const data = setByPath<EngineConfig>(version.data, "outsideTax.cgtRegime", regime);
+  await query("update ref_data_versions set data = $1, updated_at = now() where id = $2", [
+    JSON.stringify(data),
+    version.id,
+  ]);
+  await query(
+    `insert into ref_data_audit (version_id, financial_year, param_key, action, old_value, new_value, changed_by, changed_by_email)
+     values ($1,$2,'cgt_regime','edit',$3,$4,$5,$6)`,
+    [version.id, version.financial_year, prev, regime, admin.id, admin.email],
+  );
+  revalidate();
+  return { ok: true };
+}
+
 /** Mark a parameter as verified now, by the current admin. */
 export async function verifyParam(
   versionId: string,

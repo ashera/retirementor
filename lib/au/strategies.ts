@@ -154,9 +154,20 @@ export function resolveValues(card: StrategyCard, overrides?: Record<string, num
  *  balance that will actually be there. */
 export function buildStrategyCatalog(
   plan: RetirementPlan,
-  opts?: { superAtAge?: (age: number) => number; outsideAtAge?: (age: number) => number },
+  opts?: { superAtAge?: (age: number) => number; outsideAtAge?: (age: number) => number; config?: EngineConfig },
 ): StrategyCard[] {
   const cards: StrategyCard[] = [];
+  // CGT rules for the sell-property preview note (mirrors the engine's regime). A
+  // property sale usually produces a large gain, so the pre-2027 50% discount vs the
+  // post-2027 full-real-gain treatment changes the preview materially.
+  const cgtRules = opts?.config
+    ? {
+        regime: opts.config.outsideTax.cgtRegime,
+        discountPct: opts.config.outsideTax.cgtDiscountPct,
+        minRatePct: opts.config.outsideTax.cgtMinRatePct,
+        onAgePension: false,
+      }
+    : undefined;
   const oldest = maxCurrentAge(plan);
   const working = oldest < plan.retirementAge;
   // These levers act on person 0 ("you") — retirement age, salary sacrifice, TTR.
@@ -332,9 +343,9 @@ export function buildStrategyCatalog(
       // Live tax read-out at the chosen sale age: sale price, CGT and what's left.
       note: (v) => {
         const value = propertyValueAt(pr, Math.max(0, v.age - oldest));
-        const cgt = capitalGainsTax(pr, value);
+        const cgt = capitalGainsTax(pr, value, cgtRules);
         const loan = pr.loanBalance ?? 0;
-        const net = netSaleProceeds(pr, value);
+        const net = netSaleProceeds(pr, value, cgtRules);
         return `At age ${v.age}: sells for ~${fmtCurrency(value)}${loan ? `, less the ${fmtCurrency(loan)} loan` : ""}, less ~${fmtCurrency(cgt)} CGT → ~${fmtCurrency(net)} into savings.`;
       },
       apply: (p, v) => {

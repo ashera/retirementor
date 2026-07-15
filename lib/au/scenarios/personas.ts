@@ -138,6 +138,15 @@ function outsideCheckpoint(
   );
 }
 
+// Independent CGT rules mirroring config.outsideTax (regime + 30% minimum + the
+// Age Pension exemption from that minimum).
+const cgtRules = (config: EngineConfig, onAgePension = false): ref.RefCgtRules => ({
+  regime: config.outsideTax.cgtRegime,
+  discountPct: config.outsideTax.cgtDiscountPct,
+  minRatePct: config.outsideTax.cgtMinRatePct,
+  onAgePension,
+});
+
 function propertyCheckpoints(
   p: PropertyDetail, years: number, row: { propertyEquity: number; rentIncome: number },
   config: EngineConfig,
@@ -392,8 +401,12 @@ function sellingSam(config: EngineConfig): PersonaReport {
   const years = 7;
   const row = r.rows.find((x) => x.age === 67)!;
   const v = ref.propertyValueAt(prop, years);
-  const cgt = ref.propertyCGT(prop, years);
-  const proceeds = ref.propertySaleProceeds(prop, years);
+  // Sells at 67; the Age Pension exemption from the 30% minimum uses the PRIOR year
+  // (66, pre-pension-age → not a recipient), so the minimum applies.
+  const rules = cgtRules(config, false);
+  const cgt = ref.propertyCGT(prop, years, rules);
+  const proceeds = ref.propertySaleProceeds(prop, years, rules);
+  const taxable = rules.regime === "discount" ? (v - 300_000) * 0.5 : Math.max(0, v - 300_000);
 
   return finish({
     key: "selling-sam",
@@ -402,8 +415,8 @@ function sellingSam(config: EngineConfig): PersonaReport {
     covers: ["Single", "Homeowner", "Property sale", "Capital gains tax", "Part pension"],
     assumptions: [
       "Today's dollars (inflation 0%); sells the property at 67.",
-      "Sale triggers CGT (50% discount on the gain, resident brackets); net proceeds move into outside-super and become assessable/deemed.",
-      "Simplification: CGT is on the discounted gain alone, ignoring other income and SAPTO.",
+      "Sale triggers CGT under the active regime; net proceeds move into outside-super and become assessable/deemed.",
+      "Simplification: CGT is on the standalone gain, ignoring other income and SAPTO.",
       `Reference data: FY${config.financialYear} config seed.`,
     ],
     inputs: [
@@ -417,8 +430,8 @@ function sellingSam(config: EngineConfig): PersonaReport {
       superCheckpoint([{ name: "Sam", person }], 6, 0, years, row.totalSuper, config),
       moneyCheck(
         "Capital gains tax on sale", "Age 67",
-        "Independent: 50% discount on the gain, resident tax brackets",
-        `Grown value ${m(v)} − cost base ${m(300_000)} = ${m(v - 300_000)} gain × 50% = ${m((v - 300_000) * 0.5)} taxable → CGT ${m(cgt)}.`,
+        "Independent: CGT under the active regime, resident tax brackets",
+        `Grown value ${m(v)} − cost base ${m(300_000)} = ${m(v - 300_000)} gain → ${m(taxable)} taxable → CGT ${m(cgt)}.`,
         Math.round(cgt), Math.round(row.breakdown.propertyCgt),
       ),
       moneyCheck(
@@ -945,9 +958,9 @@ function fireFern(config: EngineConfig): PersonaReport {
     investmentReturn: 6, inflation: 0, lifeExpectancy: 90,
   };
   const r = simulate(plan, config);
-  const yld = config.outsideTax.incomeYieldPct, disc = config.outsideTax.cgtDiscountPct;
+  const yld = config.outsideTax.incomeYieldPct;
   const outsideAt = (age: number) => r.rows.find((x) => x.age === age)!.outside;
-  const refAt = (age: number) => ref.outsideBridgeWithCgt(1_500_000, 70_000, 6, yld, disc, age - 52);
+  const refAt = (age: number) => ref.outsideBridgeWithCgt(1_500_000, 70_000, 6, yld, age - 52, cgtRules(config, false));
   const bridgeSuperDraw = Math.max(0, ...r.rows.filter((x) => x.phase === "bridge").map((x) => x.superDrawn));
   const taxAt55 = r.rows.find((x) => x.age === 55)!.breakdown.outsideTax;
 
@@ -971,8 +984,8 @@ function fireFern(config: EngineConfig): PersonaReport {
     checkpoints: [
       moneyCheck(
         "Outside pool after 3 bridge years", "Age 55",
-        "Independent deferred-CGT recurrence — dividends taxed yearly, discounted gains realised on drawdown",
-        `${m(1_500_000)} opening, ${m(70_000)}/yr drawn, 6% real, ${yld}% yield, ${disc}% CGT discount, over 3 years → ${m(Math.round(refAt(55)))}.`,
+        "Independent deferred-CGT recurrence — dividends taxed yearly, gains realised on drawdown under the active regime",
+        `${m(1_500_000)} opening, ${m(70_000)}/yr drawn, 6% real, ${yld}% yield, ${config.outsideTax.cgtRegime} CGT, over 3 years → ${m(Math.round(refAt(55)))}.`,
         Math.round(refAt(55)), Math.round(outsideAt(55)), 2,
       ),
       moneyCheck(

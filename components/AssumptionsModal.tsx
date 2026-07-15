@@ -100,15 +100,32 @@ export default function AssumptionsModal({
           <Section title="Outside super (personal investments)">
             <Row label="Dividend/distribution yield (taxed each year)" value={`${pct(config.outsideTax.incomeYieldPct)} of the balance`} />
             <Row label="Capital growth" value="deferred — taxed only when sold to fund spending" />
-            <Row label="Capital gains tax" value={`${pct(config.outsideTax.cgtDiscountPct, 0)} discount (held > 12 months), at your marginal rate`} />
-            <p className="mt-1.5 text-[11px] leading-snug text-muted">
-              Uses current law — the 50% CGT discount, in force until 30 June 2027. From 1 July 2027 the discount
-              is replaced by cost-base indexation and a 30% minimum tax on gains; for a retiree drawing down, the
-              effect on whether the money lasts is minimal —{" "}
-              <a href="/case-studies/will-the-cgt-changes-hurt-your-retirement" className="text-accent hover:underline">
-                see the case study
-              </a>.
-            </p>
+            {config.outsideTax.cgtRegime === "indexed" ? (
+              <>
+                <Row label="Capital gains tax" value={`whole real (inflation-adjusted) gain at your marginal rate, min ${pct(config.outsideTax.cgtMinRatePct, 0)}`} />
+                <p className="mt-1.5 text-[11px] leading-snug text-muted">
+                  Reflects the <strong className="text-slate-200">1 July 2027 reform</strong>: the 50% CGT discount is
+                  replaced by cost-base indexation (so only the real, above-inflation gain is taxed) plus a{" "}
+                  {pct(config.outsideTax.cgtMinRatePct, 0)} minimum tax on that gain — from which Age Pension recipients
+                  are exempt. Because everything here is in today's dollars, the tracked gain already is the indexed
+                  real gain.{" "}
+                  <a href="/case-studies/will-the-cgt-changes-hurt-your-retirement" className="text-accent hover:underline">
+                    See the case study
+                  </a>.
+                </p>
+              </>
+            ) : (
+              <>
+                <Row label="Capital gains tax" value={`${pct(config.outsideTax.cgtDiscountPct, 0)} discount (held > 12 months), at your marginal rate`} />
+                <p className="mt-1.5 text-[11px] leading-snug text-muted">
+                  Uses the pre-2027 law — the 50% CGT discount, in force until 30 June 2027. From 1 July 2027 it's
+                  replaced by cost-base indexation and a 30% minimum tax on gains.{" "}
+                  <a href="/case-studies/will-the-cgt-changes-hurt-your-retirement" className="text-accent hover:underline">
+                    See the case study
+                  </a>.
+                </p>
+              </>
+            )}
           </Section>
 
           <Section title={`Age Pension (${hh})`}>

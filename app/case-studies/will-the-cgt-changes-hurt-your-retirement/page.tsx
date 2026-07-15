@@ -33,8 +33,10 @@ const fmtM = (n: number) => `$${(n / 1_000_000).toFixed(n >= 1_000_000 ? 2 : 1)}
 
 export default async function CgtCaseStudy() {
   if (!meta) notFound();
-  const now = await getActiveConfig(); // current law: 50% CGT discount
-  const post2027: EngineConfig = { ...now, outsideTax: { ...now.outsideTax, cgtDiscountPct: 0 } };
+  const active = await getActiveConfig();
+  // Compare the two regimes head-to-head, holding every other assumption fixed.
+  const now: EngineConfig = { ...active, outsideTax: { ...active.outsideTax, cgtRegime: "discount" } }; // pre-2027: 50% discount
+  const post2027: EngineConfig = { ...active, outsideTax: { ...active.outsideTax, cgtRegime: "indexed" } }; // the reform: indexation + 30% min
   const mc = { iterations: 800, seed: 0x9e3779b9 } as const;
   const succ = (p: RetirementPlan, c: EngineConfig) => Math.round(runMonteCarlo(p, c, mc).successRate * 100);
 

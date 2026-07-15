@@ -32,12 +32,12 @@ describe("withDefaults config backfill", () => {
   it("NEVER overrides values already stored", () => {
     const custom: EngineConfig = {
       ...DEFAULT_CONFIG,
-      outsideTax: { incomeYieldPct: 4, cgtDiscountPct: 0 },
+      outsideTax: { incomeYieldPct: 4, cgtDiscountPct: 0, cgtRegime: "discount", cgtMinRatePct: 30 },
       returnModel: "gaussian",
       bootstrapBlockYears: 5,
     };
     const filled = withDefaults(custom);
-    expect(filled.outsideTax).toEqual({ incomeYieldPct: 4, cgtDiscountPct: 0 });
+    expect(filled.outsideTax).toEqual({ incomeYieldPct: 4, cgtDiscountPct: 0, cgtRegime: "discount", cgtMinRatePct: 30 });
     expect(filled.returnModel).toBe("gaussian");
     expect(filled.bootstrapBlockYears).toBe(5);
   });

@@ -101,7 +101,14 @@ export interface EngineConfig {
   // as ordinary income every year (which badly over-taxes an equity portfolio).
   outsideTax: {
     incomeYieldPct: number; // dividend/distribution yield as % of value (real terms)
-    cgtDiscountPct: number; // capital-gains discount on realised gains (e.g. 50)
+    cgtDiscountPct: number; // OLD-law capital-gains discount on realised gains (50); used when cgtRegime = "discount"
+    // How realised capital gains are taxed. "indexed" = the post-1 July 2027 reform:
+    // the 50% discount is gone; because the model is in today's dollars the tracked
+    // gain is already the CPI-indexed REAL gain, so the whole real gain is taxable at
+    // the marginal rate, with a `cgtMinRatePct` minimum (Age Pension recipients are
+    // exempt from that minimum). "discount" = the pre-2027 law (50% discount, marginal).
+    cgtRegime: "indexed" | "discount";
+    cgtMinRatePct: number; // minimum tax rate on real gains under the indexed regime (30)
   };
 
   // Monte Carlo return model (lib/au/historicalReturns.ts). "gaussian" draws each
@@ -176,7 +183,9 @@ export const DEFAULT_CONFIG: EngineConfig = {
 
   outsideTax: {
     incomeYieldPct: 2.5, // ~broad-market dividend yield (global/AU blend, real)
-    cgtDiscountPct: 50, // ATO 50% discount for assets held > 12 months
+    cgtDiscountPct: 50, // pre-2027 ATO 50% discount (assets held > 12 months); used only when cgtRegime = "discount"
+    cgtRegime: "indexed", // default to the post-1 July 2027 reform (indexation + 30% minimum)
+    cgtMinRatePct: 30, // minimum tax on real gains under the reform (Age Pension recipients exempt)
   },
 
   returnModel: "bootstrap",
@@ -288,6 +297,17 @@ export function withDefaults(data: EngineConfig): EngineConfig {
   // backfill: without it the engine would tax outside gains with NO discount.
   if (out.outsideTax == null) {
     out = { ...out, outsideTax: DEFAULT_CONFIG.outsideTax };
+  } else if (out.outsideTax.cgtRegime == null) {
+    // Backfill the 1 July 2027 CGT-reform fields for configs seeded before they
+    // existed — defaulting to the reform ("indexed" + 30% minimum), the new baseline.
+    out = {
+      ...out,
+      outsideTax: {
+        ...out.outsideTax,
+        cgtRegime: DEFAULT_CONFIG.outsideTax.cgtRegime,
+        cgtMinRatePct: DEFAULT_CONFIG.outsideTax.cgtMinRatePct,
+      },
+    };
   }
   // Monte Carlo return model, added after the initial seed.
   if (out.returnModel == null) {

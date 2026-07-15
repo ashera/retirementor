@@ -129,21 +129,42 @@ export function outsideAccumWithTax(
   return value;
 }
 
+// How a realised capital gain is taxed (independent mirror of config.outsideTax).
+export interface RefCgtRules {
+  regime: "indexed" | "discount";
+  discountPct: number; // "discount": excluded fraction of the gain (50)
+  minRatePct: number; // "indexed": minimum tax rate on the real gain (30)
+  onAgePension: boolean; // exempt from the 30% minimum
+}
+
+/** Tax on a realised outside-super gain of `realized` sitting on top of `income`
+ *  (the dividend yield already assessed) at the ordinary resident scale — mirrors
+ *  the engine. "discount" = 50% assessable; "indexed" (post-2027) = the whole real
+ *  gain, marginal, with a 30% minimum (Age Pension recipients exempt). */
+function refGainTax(income: number, realized: number, cgt: RefCgtRules): number {
+  if (realized <= 0) return 0;
+  if (cgt.regime === "discount") {
+    return residentIncomeTax(income + (1 - cgt.discountPct / 100) * realized) - residentIncomeTax(income);
+  }
+  const marginal = residentIncomeTax(income + realized) - residentIncomeTax(income);
+  return cgt.onAgePension ? marginal : Math.max(marginal, (cgt.minRatePct / 100) * realized);
+}
+
 /**
  * Independent recurrence for the OUTSIDE-super pool through the early-retirement
  * bridge (pre-preservation-age): each year the whole spend is drawn from outside
- * (super is locked, no Age Pension yet), realising a proportional, 50%-discounted
- * capital gain; the dividend yield is taxed as income; capital growth is deferred.
- * Mirrors the engine's deferred-CGT model (lib/au/simulate.ts) at the ordinary
- * resident scale. Real terms (inflation 0), so `realReturnPct` is applied directly.
+ * (super is locked, no Age Pension yet), realising a proportional capital gain; the
+ * dividend yield is taxed as income; capital growth is deferred. Mirrors the
+ * engine's deferred-CGT model at the ordinary resident scale (no Age Pension in the
+ * bridge → the 30% minimum binds). Real terms (inflation 0), so `realReturnPct` is
+ * applied directly.
  */
 export function outsideBridgeWithCgt(
   opening: number, spendPerYear: number, realReturnPct: number,
-  incomeYieldPct: number, cgtDiscountPct: number, years: number,
+  incomeYieldPct: number, years: number, cgt: RefCgtRules,
 ): number {
   const r = realReturnPct / 100;
   const yld = incomeYieldPct / 100;
-  const keep = 1 - cgtDiscountPct / 100; // taxable fraction of a realised gain
   let value = opening;
   let unrealizedGain = 0; // basis resets to value at the retirement boundary → 0
   for (let i = 0; i < years; i++) {
@@ -155,7 +176,7 @@ export function outsideBridgeWithCgt(
     const income = value * yld;
     unrealizedGain += value * r - income; // capital growth deferred
     value *= 1 + r;
-    value -= residentIncomeTax(income + keep * realized); // pre-Age-Pension scale, no work
+    value -= residentIncomeTax(income) + refGainTax(income, realized, cgt); // dividends + CGT
   }
   return value;
 }
@@ -221,12 +242,15 @@ export function propertyNetRent(p: PropertyDetail, years: number): number {
 export function propertyNetEquity(p: PropertyDetail, years: number): number {
   return Math.max(0, propertyValueAt(p, years) - p.loanBalance);
 }
-export function propertyCGT(p: PropertyDetail, years: number): number {
+export function propertyCGT(p: PropertyDetail, years: number, cgt: RefCgtRules): number {
   const gain = Math.max(0, propertyValueAt(p, years) - p.purchasePrice);
-  return incomeTax(gain * 0.5); // 50% CGT discount, held > 12 months
+  if (gain <= 0) return 0;
+  if (cgt.regime === "discount") return incomeTax(gain * (1 - cgt.discountPct / 100));
+  const marginal = incomeTax(gain); // real gain, fully taxable, standalone
+  return cgt.onAgePension ? marginal : Math.max(marginal, (cgt.minRatePct / 100) * gain);
 }
-export function propertySaleProceeds(p: PropertyDetail, years: number): number {
-  return Math.max(0, propertyValueAt(p, years) - p.loanBalance - propertyCGT(p, years));
+export function propertySaleProceeds(p: PropertyDetail, years: number, cgt: RefCgtRules): number {
+  return Math.max(0, propertyValueAt(p, years) - p.loanBalance - propertyCGT(p, years, cgt));
 }
 
 // ── Mortgage cost (fixed nominal, deflated to today's dollars) ───────────────

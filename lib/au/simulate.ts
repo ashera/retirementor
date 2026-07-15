@@ -125,6 +125,8 @@ export function simulate(
   let unrealizedGain = 0;
   const outsideIncomeYield = (config.outsideTax?.incomeYieldPct ?? 0) / 100;
   const cgtDiscount = 1 - (config.outsideTax?.cgtDiscountPct ?? 0) / 100;
+  const cgtRegime = config.outsideTax?.cgtRegime ?? "indexed";
+  const cgtMinRate = (config.outsideTax?.cgtMinRatePct ?? 30) / 100;
 
   const startOldest = Math.max(...plan.people.map((p) => p.currentAge));
   const horizon = Math.max(0, Math.round(plan.lifeExpectancy - startOldest));
@@ -665,9 +667,17 @@ export function simulate(
       if (sold[pi]) return;
       const value = propertyValueAt(prop, t);
       if (prop.strategy === "sell" && oldest >= prop.sellAtAge) {
-        const proceeds = netSaleProceeds(prop, value);
+        // The Age Pension exemption from the 30% minimum uses the PRIOR year's
+        // receipt (this year's pension is worked out after the sale, below).
+        const cgtRules = {
+          regime: cgtRegime,
+          discountPct: config.outsideTax?.cgtDiscountPct ?? 50,
+          minRatePct: config.outsideTax?.cgtMinRatePct ?? 30,
+          onAgePension: rows.length > 0 && rows[rows.length - 1].agePension > 0,
+        };
+        const proceeds = netSaleProceeds(prop, value, cgtRules);
         propertyProceeds += proceeds;
-        propertyCgt += capitalGainsTax(prop, value);
+        propertyCgt += capitalGainsTax(prop, value, cgtRules);
         outside += proceeds;
         sold[pi] = true;
       } else {
@@ -865,31 +875,48 @@ export function simulate(
     outside *= 1 + realReturn;
 
     // Super's real edge: pension-phase super earnings are tax-free, but money held
-    // OUTSIDE super is taxable. In retirement we tax, at each person's marginal rate
-    // (stacked on any part-time work income so the tax-free threshold + SAPTO aren't
-    // double-used), the year's assessable outside income = the dividend yield PLUS
-    // the discounted capital gain realised by this year's withdrawals. Deferring the
-    // unrealised growth and applying the 50% CGT discount is what an ETF/share
-    // investor actually experiences — taxing the full return as income every year
-    // (the old model) massively over-taxed an equity portfolio. Before Age Pension
-    // age it's the ordinary scale (no SAPTO); from pension age SAPTO shields modest
-    // amounts. (During accumulation the dividend yield is taxed too — stacked on
-    // salary at the ordinary scale — but no gains are realised, so it's yield-only.)
+    // OUTSIDE super is taxable. In retirement we tax the year's outside income — the
+    // dividend yield PLUS the capital gain realised by this year's withdrawals — at
+    // each person's marginal rate, stacked on any part-time/salary income so the
+    // tax-free threshold + SAPTO aren't double-used. Deferring the unrealised growth
+    // (only the yield is taxed each year) is what an ETF/share investor experiences;
+    // taxing the whole return as income every year badly over-taxes equities.
+    //   The capital gain's treatment follows `cgtRegime`:
+    //   • "indexed" (post-1 July 2027 reform): the model is in today's dollars, so the
+    //     tracked gain is already the CPI-indexed REAL gain — the WHOLE real gain is
+    //     taxable at the marginal rate, subject to a `cgtMinRatePct` (30%) minimum,
+    //     from which Age Pension recipients are exempt.
+    //   • "discount" (pre-2027 law): only 50% of the real gain is assessable, marginal.
+    // (During accumulation the dividend yield is taxed too — stacked on salary — but
+    // no gains are realised, so it's yield-only.)
     let outsideTax = 0;
-    if (!accumPhase) {
-      const assessable = outsideIncome + cgtDiscount * realizedGain; // today's $
-      if (assessable > 0) {
-        const assessPer = assessable / workers; // household assessable split per person
-        // Stack each person's share on THEIR OWN work income — a still-working
-        // partner's salary (staggered retirement) plus their share of any part-time
-        // work — so an outside gain isn't taxed from the $0 threshold when it
-        // actually sits on top of a high salary.
-        outsideTax = plan.people.reduce((s, p, i) => {
-          const workPer = (t < retireOffsets[i] ? p.salary * gapScale : 0) + grossWork / workers;
-          return s + Math.max(0, taxAtAge(workPer + assessPer, ages[i]) - taxAtAge(workPer, ages[i]));
-        }, 0);
-        outside = Math.max(0, outside - outsideTax);
-      }
+    if (!accumPhase && (outsideIncome > 0 || realizedGain > 0)) {
+      const incPer = outsideIncome / workers;
+      const gainPer = Math.max(0, realizedGain) / workers;
+      const onAgePension = agePensionAmt > 0; // exemption from the 30% minimum
+      outsideTax = plan.people.reduce((s, p, i) => {
+        const workPer = (t < retireOffsets[i] ? p.salary * gapScale : 0) + grossWork / workers;
+        // Dividends: ordinary income, marginal, stacked on this person's work income.
+        const divTax = Math.max(0, taxAtAge(workPer + incPer, ages[i]) - taxAtAge(workPer, ages[i]));
+        // Capital gain: stacked on top of work income + dividends.
+        let cgt = 0;
+        if (gainPer > 0) {
+          const base = workPer + incPer;
+          if (cgtRegime === "discount") {
+            cgt = Math.max(0, taxAtAge(base + cgtDiscount * gainPer, ages[i]) - taxAtAge(base, ages[i]));
+          } else {
+            const marginal = Math.max(0, taxAtAge(base + gainPer, ages[i]) - taxAtAge(base, ages[i]));
+            cgt = onAgePension ? marginal : Math.max(marginal, cgtMinRate * gainPer);
+          }
+        }
+        return s + divTax + cgt;
+      }, 0);
+      // Can't pay more tax than the pool holds — in the year outside is drawn to $0
+      // to fund spending, the CGT on that final drawdown has nothing left to come
+      // from (a small edge understatement; the recorded tax matches what's deducted
+      // so the ledger reconciles).
+      outsideTax = Math.min(outsideTax, Math.max(0, outside));
+      outside -= outsideTax;
     }
 
     const phase: Phase =

@@ -196,7 +196,7 @@ export default function WhatIfView({
     return (age: number) => byAge.get(Math.round(age)) ?? 0;
   }, [baseRes]);
   const catalog = useMemo(
-    () => (baseline ? buildStrategyCatalog(baseline, { superAtAge, outsideAtAge }) : []),
+    () => (baseline ? buildStrategyCatalog(baseline, { superAtAge, outsideAtAge, config }) : []),
     [baseline, superAtAge, outsideAtAge],
   );
 
