@@ -1290,22 +1290,19 @@ function StrategyCardRow({
           {sustainable && (
             <div className="rounded-lg border border-accent/30 bg-accent/5 px-3 py-2 text-xs">
               {/* Likelihood at the current spend (anchor) → at the chosen spend */}
-              <div className="mb-1.5 flex items-center gap-1.5 border-b border-line pb-1.5">
-                <span className="text-muted">Likely to last:</span>
+              <div className="mb-1.5 flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5 border-b border-line pb-1.5">
+                <span className="text-muted">Chance of lasting to {sustainable.life}:</span>
                 {sustainable.startedPct != null ? (
                   <>
-                    <span className="font-semibold tabular-nums text-slate-200" title="At your current spending">
-                      {sustainable.startedPct}%
-                    </span>
+                    <span className="font-semibold tabular-nums text-slate-200">{sustainable.startedPct}%</span>
+                    <span className="text-[10px] text-muted">at your current spend</span>
                     {sustainable.nowPct != null && sustainable.nowPct !== sustainable.startedPct && (
                       <>
                         <span className="text-muted">→</span>
-                        <span
-                          className={`font-semibold tabular-nums ${sustainable.nowPct >= sustainable.startedPct ? "text-accent" : "text-amber-400"}`}
-                          title="At the spend you've chosen"
-                        >
+                        <span className={`font-semibold tabular-nums ${sustainable.nowPct >= sustainable.startedPct ? "text-accent" : "text-amber-400"}`}>
                           {sustainable.nowPct}%
                         </span>
+                        <span className="text-[10px] text-muted">at the spend you&apos;ve set</span>
                       </>
                     )}
                   </>
@@ -1315,7 +1312,6 @@ function StrategyCardRow({
                 {sustainable.likelihoodPending && (
                   <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent" aria-label="updating" />
                 )}
-                <span className="ml-auto text-[10px] text-muted">chance of lasting to {sustainable.life}</span>
               </div>
               {sustainable.safe == null && sustainable.safePending ? (
                 <span className="flex items-center gap-1.5 text-muted">
