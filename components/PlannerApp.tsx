@@ -398,15 +398,34 @@ export default function PlannerApp({
     return () => clearTimeout(id);
   }, [plan, config, ready, configured]);
   const maxSpend = mcMaxSpend ?? gs.maxSpend; // prudent once settled, central meanwhile
-  // Personal SAFE WITHDRAWAL RATE: the whole-portfolio withdrawal rate at the prudent
-  // (85% MC) max spend, measured on the same basis as the current-rate headline — so
-  // it drops straight onto the withdrawal-rate bar as a second marker. Pension-aware
-  // (netSpend already nets the Age Pension), so it usually sits above the classic 4%.
-  const safeRate = useMemo(() => {
-    if (maxSpend == null) return null;
-    const w = initialWithdrawal(simulate(withSpend(plan, maxSpend), config));
-    return w ? w.portfolioRate : null;
-  }, [plan, config, maxSpend]);
+  // SAFE WITHDRAWAL RATE marker — a FIXED benchmark, computed on STEADY (flat real)
+  // spending like the classic 4% rule, so it's a stable property of the portfolio and
+  // doesn't wobble as the budget's level or shape (the "spending smile") changes. It's
+  // still pension-aware (netSpend nets the Age Pension), so it typically sits above 4%.
+  // Keyed on the plan MINUS its spending fields, so adjusting the budget never even
+  // recomputes it (and never moves the arrow).
+  const flatKey = useMemo(() => {
+    /* eslint-disable @typescript-eslint/no-unused-vars */
+    const { targetSpending, spendingStages, spendingMode, budget, guardrails, ...rest } = plan;
+    /* eslint-enable @typescript-eslint/no-unused-vars */
+    return JSON.stringify(rest);
+  }, [plan]);
+  const [safeRate, setSafeRate] = useState<number | null>(null);
+  const [safeRatePending, setSafeRatePending] = useState(false);
+  useEffect(() => {
+    if (!ready || !configured) return;
+    setSafeRatePending(true);
+    const id = setTimeout(() => {
+      const flat: RetirementPlan = { ...plan, spendingMode: "flat" };
+      const ms = maxSpendForConfidence(flat, config, MC_CONFIDENCE_TARGET, MC_CONFIDENCE_MC);
+      const w = initialWithdrawal(simulate(withSpend(flat, ms), config));
+      setSafeRate(w ? w.portfolioRate : null);
+      setSafeRatePending(false);
+    }, 400);
+    return () => clearTimeout(id);
+    // Deliberately keyed on the non-spending plan, so budget tweaks don't recompute it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flatKey, config, ready, configured]);
   // Trim vs boost is decided against the SAME prudent (85% MC) bar the spend
   // lever shows, so the card never contradicts itself (e.g. "trim to $X" while a
   // "spend more" button sits below). Over the bar → offer a trim; under it → a boost.
@@ -1021,7 +1040,7 @@ export default function PlannerApp({
       </Link>
 
       {/* Withdrawal-rate diagnostic */}
-      <WithdrawalRateCard result={result} plan={plan} successPct={successPct} safeRate={safeRate} safePending={mcMaxPending} />
+      <WithdrawalRateCard result={result} plan={plan} successPct={successPct} safeRate={safeRate} safePending={safeRatePending} />
 
       {/* Assets chart */}
       <div className="rounded-2xl border border-line bg-panel p-6">

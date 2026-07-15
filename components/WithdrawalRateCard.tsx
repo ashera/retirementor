@@ -150,8 +150,8 @@ export default function WithdrawalRateCard({
         {safePct != null ? (
           <>
             The classic guide is about 4%, but Australia&apos;s Age Pension is a safety net, so your{" "}
-            <span className="font-semibold text-sky-300">personal safe rate is ~{safePct}%</span> — the most
-            you could draw and still be about {safeConfidence}% likely to last to age {plan.lifeExpectancy}.
+            <span className="font-semibold text-sky-300">safe rate is ~{safePct}%</span> — the most you could
+            draw at a steady income and still be about {safeConfidence}% likely to last to age {plan.lifeExpectancy}.
             {overSafe
               ? ` You're drawing ${pct}%, above that — see the `
               : ` You're at ${pct}%, comfortably within it — the `}
