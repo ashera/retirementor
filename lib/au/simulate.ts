@@ -453,6 +453,8 @@ export function simulate(
           rentTax: accumRentTax,
           rentSaved,
           careerBreakDraw,
+          onBreak: plan.people.some((_, i) => onBreak(i)), // any member on a gap year → charts shade it
+
           minDrawdown: 0,
           minDrawdownParts: [],
           livingSpend: 0,

@@ -13,6 +13,7 @@ import {
 } from "recharts";
 import type { SimResult, YearRow } from "@/lib/au/types";
 import { fmtCompact, fmtCurrency } from "@/lib/au/format";
+import { breakSpans, breakSpanLabel } from "@/lib/au/breakSpans";
 import { rowNetWorth } from "@/lib/au/networth";
 
 export interface SpendingBand {
@@ -208,6 +209,21 @@ export default function RetirementChart({
               fill: b.fill,
               fontSize: 11,
             }}
+          />
+        ))}
+        {/* Career-break ("gap year") spans — shaded so the working-years dip is
+            clearly its full length. */}
+        {breakSpans(result.rows as YearRow[]).map((s) => (
+          <ReferenceArea
+            key={`brk-${s.from}`}
+            x1={s.from}
+            x2={s.to + 1}
+            fill="#f59e0b"
+            fillOpacity={0.1}
+            stroke="#f59e0b"
+            strokeOpacity={0.3}
+            strokeDasharray="3 3"
+            label={{ value: breakSpanLabel(s), position: "insideTop", fill: "#fbbf24", fontSize: 10 }}
           />
         ))}
         <defs>

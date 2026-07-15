@@ -4,6 +4,7 @@ import {
   Area,
   AreaChart,
   CartesianGrid,
+  ReferenceArea,
   ReferenceLine,
   ResponsiveContainer,
   Tooltip,
@@ -12,6 +13,7 @@ import {
 } from "recharts";
 import type { SimResult, YearRow } from "@/lib/au/types";
 import { fmtCompact, fmtCurrency } from "@/lib/au/format";
+import { breakSpans, breakSpanLabel } from "@/lib/au/breakSpans";
 
 function IncomeTooltip({
   active,
@@ -146,6 +148,21 @@ export default function IncomeChart({
           tickFormatter={fmtCompact}
         />
         <Tooltip content={<IncomeTooltip />} />
+        {/* Career-break ("gap year") spans — shaded so a multi-year break reads as its
+            full length (the stepped income bands sit half a column off their ticks). */}
+        {breakSpans(rows).map((s) => (
+          <ReferenceArea
+            key={`brk-${s.from}`}
+            x1={s.from}
+            x2={s.to + 1}
+            fill="#f59e0b"
+            fillOpacity={0.12}
+            stroke="#f59e0b"
+            strokeOpacity={0.35}
+            strokeDasharray="3 3"
+            label={{ value: breakSpanLabel(s), position: "insideTop", fill: "#fbbf24", fontSize: 10 }}
+          />
+        ))}
         {/* Super's minimum drawdown % steps up at these ages, which forces more out
             of super — nudging the super-vs-savings split and causing visible steps. */}
         {(minDrawdownBands ?? [])

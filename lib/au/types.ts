@@ -340,6 +340,7 @@ export interface YearBreakdown {
   outsideTax: number; // income tax on outside-super earnings — the dividend/distribution yield each year (both phases) plus realised gains on sale (retirement); super pension earnings are tax-free
   rentSaved?: number; // accumulation only: positive after-tax net rent reinvested into the outside pool (a geared loss isn't — it's a disposable drain)
   careerBreakDraw?: number; // accumulation only: living costs drawn from outside savings during a career break ("gap years"), floored at the balance available
+  onBreak?: boolean; // accumulation only: at least one member is on a career break ("gap year") this year — charts shade the span
   // Retirement income
   agePension: number;
   pension: PensionBreakdown | null; // means-test working behind agePension (null before pension age)

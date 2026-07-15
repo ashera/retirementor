@@ -585,7 +585,6 @@ export function buildStrategyCatalog(
     const startMax = Math.max(startMin, retireAge - 1);
     const maxYears = Math.min(10, Math.max(1, retireAge - startMin - 1));
     const Subject = i === 0 ? "You" : "Your partner";
-    const other = i === 0 ? "your partner" : "you";
     cards.push({
       id: i === 0 ? "gap-years" : `gap-years-${i}`,
       group: "work",
@@ -603,7 +602,8 @@ export function buildStrategyCatalog(
         const runsPast = start + yrs > retireAge;
         return (
           `${isCouple ? `${Subject} take${i === 0 ? "" : "s"}` : "You take"} ${yrs} year${yrs === 1 ? "" : "s"} off from age ${start} to ${start + yrs}` +
-          `${isCouple ? ` (${other} keep${i === 0 ? "s" : ""} working)` : ""}: no salary and no super contributions in those years, and ` +
+          `${isCouple ? ` (models ${i === 0 ? "your" : "your partner's"} time off only — the other partner has a separate card)` : ""}: ` +
+          `no salary and no super contributions in those years, and ` +
           `${fmtCurrency(v.spendFromSavings)}/yr is drawn from savings to live${isCouple ? "" : " (and you stop adding to savings)"}. ` +
           `Super keeps earning on what's already there, but misses ${effYears} year${effYears === 1 ? "" : "s"} of ` +
           `contributions and their compounding — usually the biggest cost.` +
