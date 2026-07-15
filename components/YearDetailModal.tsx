@@ -442,14 +442,24 @@ export default function YearDetailModal({
             <p className="text-center text-xs leading-relaxed text-muted">
               {b.outsideGrowth > 1 ? (
                 <>
-                  No tax this year. The dividends on your outside-super savings are taxable, but{" "}
-                  {row.phase === "pension"
-                    ? "the seniors offset (SAPTO) covers them"
-                    : plan.household === "couple"
-                      ? "split across both of you, each share sits within the tax-free threshold"
-                      : "they sit within the tax-free threshold"}{" "}
-                  at this income level — so nothing is payable. Super drawdowns and the Age Pension are
-                  tax-free from 60, and capital growth outside super isn&apos;t taxed until you sell.
+                  No tax this year. Most of the {fmtCurrency(Math.round(b.outsideGrowth))} outside-super growth is
+                  capital gains — not taxed until you sell.{" "}
+                  {(b.outsideDividend ?? 0) > 1 ? (
+                    <>
+                      Only the {fmtCurrency(Math.round(b.outsideDividend!))} of dividends is taxable this year, and{" "}
+                      {row.phase === "pension"
+                        ? plan.household === "couple"
+                          ? "split across both of you, each partner's seniors offset (SAPTO) and low-income offset cover their share"
+                          : "the seniors offset (SAPTO) and low-income offset cover it"
+                        : plan.household === "couple"
+                          ? "split across both of you, each share sits within the tax-free threshold"
+                          : "it sits within the tax-free threshold"}{" "}
+                      — so nothing is payable.
+                    </>
+                  ) : (
+                    <>The Age Pension is tax-free, and no units were sold, so there&apos;s no taxable income.</>
+                  )}{" "}
+                  Super drawdowns and the Age Pension are tax-free from 60.
                 </>
               ) : (
                 <>No tax this year — super drawdowns and the Age Pension are tax-free from age 60.</>

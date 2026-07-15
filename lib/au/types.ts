@@ -338,6 +338,7 @@ export interface YearBreakdown {
   fees: number; // fixed admin + insurance $ deducted from super this year
   earningsTax: number; // approx 15% super earnings tax (accumulation only)
   outsideTax: number; // income tax on outside-super earnings — the dividend/distribution yield each year (both phases) plus realised gains on sale (retirement); super pension earnings are tax-free
+  outsideDividend?: number; // the assessable dividend/distribution income that year (the taxable slice of the outside return; capital growth is deferred)
   rentSaved?: number; // accumulation only: positive after-tax net rent reinvested into the outside pool (a geared loss isn't — it's a disposable drain)
   careerBreakDraw?: number; // accumulation only: living costs drawn from outside savings during a career break ("gap years"), floored at the balance available
   onBreak?: boolean; // accumulation only: at least one member is on a career break ("gap year") this year — charts shade the span
