@@ -1344,30 +1344,6 @@ function StrategyCardRow({
               </div>
             </div>
           )}
-          {card.note && (
-            <div className="flex items-start gap-3 rounded-xl border border-accent/30 bg-accent/[0.06] px-4 py-3 text-xs leading-relaxed text-slate-200 shadow-sm ring-1 ring-inset ring-white/5">
-              {/* RetireWiz mark. The artwork sits on solid black — mix-blend
-                  'lighten' drops that against the card, like the header logo. */}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/whatif-icon.png"
-                alt=""
-                aria-hidden
-                className="mt-0.5 h-9 w-9 shrink-0"
-                style={{ mixBlendMode: "lighten" }}
-              />
-              <span>{spendNote ?? card.note(values)}</span>
-            </div>
-          )}
-          <div className="flex justify-end">
-            <button
-              type="button"
-              onClick={onAssumptions}
-              className="text-[11px] font-medium text-muted underline-offset-2 transition hover:text-accent hover:underline"
-            >
-              🔍 Assumptions used in this strategy
-            </button>
-          </div>
           {sustainable && (
             <div className="rounded-lg border border-accent/30 bg-accent/5 px-3 py-2 text-xs">
               {/* Withdrawal rate at the chosen spend, on the dashboard's 0–10% band
@@ -1487,6 +1463,32 @@ function StrategyCardRow({
               ) : null}
             </div>
           )}
+          {/* Note + assumptions sit at the very bottom, consistent with every
+              other strategy card (this card's analysis box comes just above). */}
+          {card.note && (
+            <div className="flex items-start gap-3 rounded-xl border border-accent/30 bg-accent/[0.06] px-4 py-3 text-xs leading-relaxed text-slate-200 shadow-sm ring-1 ring-inset ring-white/5">
+              {/* RetireWiz mark. The artwork sits on solid black — mix-blend
+                  'lighten' drops that against the card, like the header logo. */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/whatif-icon.png"
+                alt=""
+                aria-hidden
+                className="mt-0.5 h-9 w-9 shrink-0"
+                style={{ mixBlendMode: "lighten" }}
+              />
+              <span>{spendNote ?? card.note(values)}</span>
+            </div>
+          )}
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={onAssumptions}
+              className="text-[11px] font-medium text-muted underline-offset-2 transition hover:text-accent hover:underline"
+            >
+              🔍 Assumptions used in this strategy
+            </button>
+          </div>
         </div>
       )}
     </div>
