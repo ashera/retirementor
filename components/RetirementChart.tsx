@@ -329,7 +329,7 @@ export default function RetirementChart({
           stroke="#a78bfa"
           strokeDasharray="6 4"
           label={{
-            value: `Pension ${result.agePensionAge}`,
+            value: `Age Pension ${result.agePensionAge}`,
             position: "insideTop",
             fill: "#a78bfa",
             fontSize: 11,
