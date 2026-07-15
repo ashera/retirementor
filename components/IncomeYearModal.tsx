@@ -409,7 +409,18 @@ export default function IncomeYearModal({
                       value={-rentTax} />
                   )}
                   {spendableSuper > 0 && (
-                    <Row color="#34d399" label="From your super" sub="Drawn tax-free (accessible from 60) — see the working below." value={spendableSuper} />
+                    <Row
+                      color="#34d399"
+                      label="From your super"
+                      sub={(() => {
+                        if (minDraw <= 1) return "Drawn tax-free (accessible from 60) — see the working below.";
+                        const base = `Drawn tax-free (accessible from 60). Your mandatory minimum drawdown this year is ${cur(minDraw)} (${Math.round(minRate * 100)}% at age ${row.age})`;
+                        if (superToppedUp) return `${base}; you draw above it to cover your spending — see the working below.`;
+                        if (minReinvested) return `${base} — more than you're spending, so ${cur(superReinvested)} of it is reinvested into savings — see the working below.`;
+                        return `${base} — see the working below.`;
+                      })()}
+                      value={spendableSuper}
+                    />
                   )}
                   {fromOutside > 0 && (
                     <Row color="#38bdf8" label="From outside super" sub="Drawn from your savings outside super to cover the rest." value={fromOutside} />
