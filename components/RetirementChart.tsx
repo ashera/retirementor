@@ -23,21 +23,22 @@ export interface SpendingBand {
   fill: string;
 }
 
-// A reference-line label wrapped onto multiple centred lines, so a longer marker
-// (e.g. "Partner super unlocks 66") doesn't sprawl across several years of the axis.
+// A reference-line label wrapped onto multiple centred lines and anchored near the
+// BOTTOM of the chart — so a longer marker (e.g. "Partner super unlocks 66") neither
+// sprawls across several years of the axis nor collides with the Retire / Partner /
+// Age Pension labels clustered along the top.
 function WrappedLabel({
   viewBox,
   lines,
   fill,
-  topOffset,
 }: {
-  viewBox?: { x?: number; y?: number };
+  viewBox?: { x?: number; y?: number; height?: number };
   lines: string[];
   fill: string;
-  topOffset: number;
 }) {
   const x = viewBox?.x ?? 0;
-  const y = (viewBox?.y ?? 0) + topOffset;
+  const bottom = (viewBox?.y ?? 0) + (viewBox?.height ?? 0);
+  const y = bottom - 12 * lines.length - 6; // keep both lines clear of the axis
   return (
     <text x={x} y={y} fill={fill} fontSize={11} textAnchor="middle">
       {lines.map((ln, i) => (
@@ -345,11 +346,10 @@ export default function RetirementChart({
             x={result.superUnlockAge}
             stroke="#eab308"
             strokeDasharray="6 4"
-            label={(props: { viewBox?: { x?: number; y?: number } }) => (
+            label={(props: { viewBox?: { x?: number; y?: number; height?: number } }) => (
               <WrappedLabel
                 viewBox={props.viewBox}
                 fill="#facc15"
-                topOffset={58}
                 lines={
                   result.superUnlockIsPartner
                     ? ["Partner super", `unlocks ${result.superUnlockAge}`]
