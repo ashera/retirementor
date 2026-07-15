@@ -234,7 +234,11 @@ export default function WhatIfView({
 
   // Monte Carlo success %. A FIXED seed means baseline and composed run against the
   // same market paths, so the comparison is fair and doesn't jitter as you toggle.
-  const MC = { iterations: 1000, seed: 12345 } as const;
+  // Use the SAME seed as runMonteCarlo's default (0x9e3779b9) — which the dashboard
+  // "how likely" gauge and the safe-spend solver (MC_CONFIDENCE_MC) also use — so this
+  // card's "chance of lasting" agrees with its "safe spend ~85%" line and with the
+  // dashboard, instead of drifting a few points off on an unrelated seed.
+  const MC = { iterations: 1000, seed: 0x9e3779b9 } as const;
   const baseMc = useMemo(
     () => (baseline ? runMonteCarlo(baseline, config, MC).successRate : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
