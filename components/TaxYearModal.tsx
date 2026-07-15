@@ -38,10 +38,21 @@ function PersonBlock({ d, showName }: { d: PersonTaxDetail; showName: boolean })
       {anyOrdinary && (
         <div className="border-t border-line">
           <Line label="Assessable income" value={cur(ordinary)} strong />
-          <Line label="Income tax (marginal rates)" value={cur(d.gross)} tone="text-slate-300" />
-          {d.lito > 0.5 && <Line label="less Low Income Tax Offset (LITO)" value={`−${cur(d.lito)}`} tone="text-emerald-400" indent />}
-          {d.sapto > 0.5 && <Line label="less Seniors offset (SAPTO)" value={`−${cur(d.sapto)}`} tone="text-emerald-400" indent />}
-          <Line label="Income tax payable" value={cur(d.incomeTax)} strong />
+          {d.lito > 0.5 || d.sapto > 0.5 ? (
+            <>
+              <Line label="Income tax (marginal rates)" value={cur(d.gross)} tone="text-slate-300" />
+              {d.lito > 0.5 && <Line label="less Low Income Tax Offset (LITO)" value={`−${cur(d.lito)}`} tone="text-emerald-400" indent />}
+              {d.sapto > 0.5 && <Line label="less Seniors offset (SAPTO)" value={`−${cur(d.sapto)}`} tone="text-emerald-400" indent />}
+              <Line label="Income tax payable" value={cur(d.incomeTax)} strong />
+            </>
+          ) : (
+            <Line
+              label="Income tax"
+              value={cur(d.incomeTax)}
+              sub={d.incomeTax < 0.5 && ordinary > 0.5 ? "within the tax-free threshold" : undefined}
+              strong
+            />
+          )}
         </div>
       )}
       {d.medicare > 0.5 && <Line label="Medicare levy (2%)" value={cur(d.medicare)} tone="text-pink-300" />}
@@ -80,6 +91,10 @@ export default function TaxYearModal({
   const propertyCgt = b.propertyCgt ?? 0;
   const total = (b.incomeTax ?? 0) + (b.medicare ?? 0) + contrib + earnings + (b.capitalGains ?? 0);
   const isCouple = plan.people.length > 1;
+  const hasPersonal = detail.some((d) => Math.abs(d.salary + d.work + d.rent + d.dividends) > 0.5 || d.gross > 0.5 || d.cgt > 0.5);
+  const hasContent = hasPersonal || contrib > 0.5 || earnings > 0.5 || propertyCgt > 0.5;
+  const litoZeroed = total < 1 && detail.some((d) => d.lito > 0.5 || d.sapto > 0.5);
+  const anySapto = detail.some((d) => d.sapto > 0.5);
   const phaseLabel =
     row.phase === "accumulation" ? "still working"
       : row.phase === "bridge" ? "retired — before super unlocks"
@@ -108,14 +123,22 @@ export default function TaxYearModal({
         </div>
 
         <div className="space-y-4 overflow-y-auto px-6 py-5">
-          {total < 1 ? (
+          {!hasContent ? (
             <p className="text-center text-sm text-muted">
-              No tax this year. Super pension drawdowns and the Age Pension are tax-free from age 60, and any capital
-              growth outside super isn&apos;t taxed until you sell.
+              No tax this year — you have no taxable income. Super pension drawdowns and the Age Pension are tax-free
+              from age 60, and any capital growth outside super isn&apos;t taxed until you sell.
             </p>
           ) : (
             <>
-              {detail.some((d) => Math.abs(d.salary + d.work + d.rent + d.dividends) > 0.5 || d.gross > 0.5 || d.cgt > 0.5) && (
+              {total < 1 && (
+                <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/5 px-4 py-2.5 text-sm text-emerald-200">
+                  <span className="font-semibold text-emerald-300">No tax payable this year.</span>{" "}
+                  {litoZeroed
+                    ? `Your taxable income is fully covered by the tax-free threshold and the low-income (LITO)${anySapto ? " and seniors (SAPTO)" : ""} offset${anySapto ? "s" : ""} — see the working below.`
+                    : "Your taxable income sits within the tax-free threshold — see the working below."}
+                </div>
+              )}
+              {hasPersonal && (
                 <section>
                   <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted">
                     Personal income {isCouple ? "(each partner taxed separately)" : "tax"}
