@@ -756,6 +756,8 @@ export default function WhatIfView({
                             likelihoodPending: mcPending,
                             nowRate,
                             safeRate,
+                            loan: spendMix?.loan ?? 0,
+                            currentSpend: annualSpend(baseline),
                             onSetSafe: () => {
                               if (safeSpend != null) setParam("adjust-spending", "spend", safeSpend);
                             },
@@ -1068,6 +1070,8 @@ function StrategyCardRow({
     likelihoodPending: boolean;
     nowRate: number | null; // live whole-portfolio withdrawal rate at the chosen spend (fraction)
     safeRate: number | null; // whole-portfolio rate at the safe spend — the % twin of `safe`
+    loan: number; // composed plan's annual home-loan cost — a held (fixed) spend element on top of living
+    currentSpend: number; // baseline living spend, the "vs now" anchor for the note
     onSetSafe: () => void;
   };
 }) {
@@ -1131,6 +1135,25 @@ function StrategyCardRow({
   const safeRatePct = sustainable?.safeRate != null ? +(sustainable.safeRate * 100).toFixed(1) : null;
   const safeRateMarker =
     sustainable?.safeRate != null ? Math.min(100, Math.max(0, (sustainable.safeRate / 0.1) * 100)) : null;
+  // A home loan is a held (fixed) spending element funded on top of living costs.
+  // When there is one, the spend slider and every spend figure on this card show
+  // the loan-inclusive TOTAL, while `values.spend` stays in living terms internally
+  // (the sims, safe-spend solve and rate all measure living + the separate loan).
+  const spendLoan = sustainable?.loan ?? 0;
+  const spendNote =
+    sustainable && spendLoan > 0
+      ? (() => {
+          const total = values.spend + spendLoan;
+          const diff = values.spend - sustainable.currentSpend;
+          const vs =
+            Math.abs(diff) >= 500 ? ` (${diff > 0 ? "+" : "−"}${fmtCurrency(Math.abs(diff))} vs now)` : "";
+          return (
+            `You're setting total spend to ${fmtCurrency(total)}/yr${vs}. Your essentials and home loan ` +
+            `(${fmtCurrency(spendLoan)}/yr) stay fixed underneath — only the discretionary on top moves. ` +
+            `Spending more runs your savings down faster (fewer years); spending less makes them last longer.`
+          );
+        })()
+      : null;
   return (
     <div className={`rounded-2xl border p-4 transition ${on ? "border-accent/40 bg-accent/5" : "border-line bg-panel"}`}>
       <div className="flex items-center gap-3">
@@ -1192,14 +1215,17 @@ function StrategyCardRow({
             // card, so the slider just uses its own hint (the dynamicMax still
             // caps it at the equity actually freed).
             const hint = pm.hint;
+            // Spend slider shows the loan-inclusive TOTAL; `values.spend` stays in
+            // living terms, so we display +loan and store the entered value −loan.
+            const off = sustainable && pm.key === "spend" ? spendLoan : 0;
             return (
               <Field
                 key={pm.key}
                 label={pm.label}
-                value={Math.min(Math.max(values[pm.key], effMin), effMax)}
-                onChange={(v) => onParam(pm.key, v)}
-                min={effMin}
-                max={effMax}
+                value={Math.min(Math.max(values[pm.key], effMin), effMax) + off}
+                onChange={(v) => onParam(pm.key, v - off)}
+                min={effMin + off}
+                max={effMax + off}
                 step={pm.step}
                 prefix={pm.prefix}
                 suffix={pm.suffix}
@@ -1220,11 +1246,18 @@ function StrategyCardRow({
               </span>
             </div>
           )}
-          {/* Essentials held + the discretionary portion being flexed. */}
+          {/* The held (fixed) budget — essentials, plus any home loan — and the
+              discretionary portion being flexed. */}
           {sustainable && (
             <div className="flex flex-wrap justify-between gap-x-4 gap-y-1 rounded-lg border border-line bg-panel-2 px-3 py-2 text-xs">
               <span className="text-muted">
-                Essentials held: <span className="font-semibold text-slate-300">{fmtCurrency(sustainable.essentials)}/yr</span>
+                {spendLoan > 0 ? "Essentials + home loan held: " : "Essentials held: "}
+                <span className="font-semibold text-slate-300">
+                  {fmtCurrency(sustainable.essentials + spendLoan)}/yr
+                </span>
+                {spendLoan > 0 && (
+                  <span className="text-[10px] text-muted"> (incl. {fmtCurrency(spendLoan)} loan)</span>
+                )}
               </span>
               <span className="text-muted">
                 Discretionary:{" "}
@@ -1323,7 +1356,7 @@ function StrategyCardRow({
                 className="mt-0.5 h-9 w-9 shrink-0"
                 style={{ mixBlendMode: "lighten" }}
               />
-              <span>{card.note(values)}</span>
+              <span>{spendNote ?? card.note(values)}</span>
             </div>
           )}
           <div className="flex justify-end">
@@ -1427,7 +1460,7 @@ function StrategyCardRow({
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-slate-300">
                       Safe spend: up to{" "}
-                      <span className="font-semibold text-accent">{fmtCurrency(sustainable.safe)}/yr</span> — about{" "}
+                      <span className="font-semibold text-accent">{fmtCurrency(sustainable.safe + spendLoan)}/yr</span> — about{" "}
                       {sustainable.targetPct}% likely to last to {sustainable.life}.
                       {sustainable.safePending && (
                         <span className="ml-1 inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-accent align-middle" />
@@ -1442,7 +1475,7 @@ function StrategyCardRow({
                     </button>
                   </div>
                   <div className="mt-1 text-[11px] text-muted">
-                    On steady average returns it stretches to ~{fmtCurrency(sustainable.stretch)}/yr, but with little
+                    On steady average returns it stretches to ~{fmtCurrency(sustainable.stretch + spendLoan)}/yr, but with little
                     buffer for market swings.
                   </div>
                   {values.spend > sustainable.safe + 500 && (
