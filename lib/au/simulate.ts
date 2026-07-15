@@ -25,7 +25,7 @@ import {
 } from "./types";
 import { mortgageActiveAtAge, mortgageAnnualCost } from "./mortgage";
 import { budgetSplit, presetCategories } from "./budget";
-import { residentIncomeTax, seniorIncomeTax, medicareLevy } from "./tax";
+import { residentIncomeTax, seniorIncomeTax, medicareLevy, personTax, type CgtParams } from "./tax";
 import {
   capitalGainsTax,
   netEquity,
@@ -33,7 +33,7 @@ import {
   netSaleProceeds,
   propertyValueAt,
 } from "./property";
-import type { Person, Phase, RetirementPlan, SimResult, YearBreakdown, YearRow } from "./types";
+import type { Person, PersonTaxDetail, Phase, RetirementPlan, SimResult, YearBreakdown, YearRow } from "./types";
 
 const EPS = 1e-6;
 
@@ -127,6 +127,39 @@ export function simulate(
   const cgtDiscount = 1 - (config.outsideTax?.cgtDiscountPct ?? 0) / 100;
   const cgtRegime = config.outsideTax?.cgtRegime ?? "indexed";
   const cgtMinRate = (config.outsideTax?.cgtMinRatePct ?? 30) / 100;
+  const cgtParamsBase: Omit<CgtParams, "onAgePension"> = {
+    regime: cgtRegime,
+    discountPct: config.outsideTax?.cgtDiscountPct ?? 50,
+    minRatePct: config.outsideTax?.cgtMinRatePct ?? 30,
+  };
+  // One person's consolidated tax for the tax-analysis modal: all ordinary income
+  // (salary, part-time work, net rent, dividends) taxed together with a single LITO
+  // + SAPTO, plus Medicare and CGT on any realised gain.
+  const taxDetailFor = (
+    i: number,
+    comps: { salary: number; work: number; rent: number; dividends: number; gain: number },
+    senior: boolean,
+    onAgePension: boolean,
+  ): PersonTaxDetail => {
+    const pt = personTax(
+      [
+        { key: "salary", amount: comps.salary },
+        { key: "work", amount: comps.work },
+        { key: "rent", amount: comps.rent },
+        { key: "dividends", amount: comps.dividends },
+      ],
+      comps.salary + comps.work,
+      comps.gain,
+      senior,
+      plan.household,
+      { ...cgtParamsBase, onAgePension },
+    );
+    return {
+      label: plan.people.length > 1 && i === 1 ? "Your partner" : "You",
+      salary: comps.salary, work: comps.work, rent: comps.rent, dividends: comps.dividends, gain: comps.gain,
+      gross: pt.gross, lito: pt.lito, sapto: pt.sapto, incomeTax: pt.incomeTax, medicare: pt.medicare, cgt: pt.cgt,
+    };
+  };
 
   const startOldest = Math.max(...plan.people.map((p) => p.currentAge));
   const horizon = Math.max(0, Math.round(plan.lifeExpectancy - startOldest));
@@ -367,7 +400,6 @@ export function simulate(
       let feesPaid = 0;
       let takeHome = 0; // net cash from salary after income tax and pre-tax sacrifice
       let ttrBenefit = 0; // net super gained from a Transition-to-Retirement swap this year
-      let salaryIncomeTax = 0; // personal income tax on salary (after LITO)
       let medicare = 0; // Medicare levy on salary
       const taxables: number[] = []; // per-person taxable salary — base for the rental tax/deduction
       plan.people.forEach((p, i) => {
@@ -383,7 +415,6 @@ export function simulate(
         earningsTax += r.earningsTax;
         takeHome += r.takeHome;
         ttrBenefit += r.ttrBenefit;
-        salaryIncomeTax += r.salaryIncomeTax;
         medicare += r.medicareLevyPaid;
         taxables.push(r.taxable);
       });
@@ -423,6 +454,10 @@ export function simulate(
       // negative gearing (the working-years benefit). NEGATIVE rentTax = a tax saving.
       const accumRentPer = accumRentCash / Math.max(1, plan.people.length);
       const accumRentTax = accumRentCash === 0 ? 0 : taxables.reduce((s, tx) => s + (residentIncomeTax(tx + accumRentPer) - residentIncomeTax(tx)), 0);
+      // Per-person consolidated tax for the tax modal (all ordinary income together).
+      const accumTaxDetail = plan.people.map((_, i) =>
+        taxDetailFor(i, { salary: taxables[i], work: 0, rent: accumRentPer, dividends: outsidePerAccum, gain: 0 }, false, false),
+      );
       // Positive net rent (after its income tax) is reinvested into the outside pool,
       // so a cash-flow-positive property visibly builds wealth over the working years.
       // A geared loss is NOT drawn from the pool here — it's a disposable cash drain
@@ -463,11 +498,13 @@ export function simulate(
           earningsTax: Math.max(0, earningsTax),
           outsideTax: accumOutsideTax,
           outsideDividend: outsideIncomeAccum,
-          // Tax-analysis totals: income tax = salary + net rent + outside dividends
-          // (all ordinary income); no capital gains realised while working.
-          incomeTax: salaryIncomeTax + accumRentTax + accumOutsideTax,
+          // Tax-analysis totals (consolidated per person — salary + net rent +
+          // dividends taxed together with one LITO/SAPTO). No gains realised while
+          // working, so no capital gains. `medicare` from the salary tax above.
+          incomeTax: accumTaxDetail.reduce((s, d) => s + d.incomeTax, 0),
           medicare,
           capitalGains: 0,
+          taxDetail: accumTaxDetail,
           agePension: 0,
           pension: null,
           rentIncome: accumRentCash,
@@ -527,8 +564,6 @@ export function simulate(
     let workEarningsTax = 0;
     let workTakeHome = 0; // still-working partners' net salary → offsets spending
     let workGrossSalary = 0; // gross → Age Pension income test
-    let workSalaryTax = 0; // income tax on a gap-year partner's salary (for the tax analysis)
-    let workMedicare = 0;
     plan.people.forEach((p, i) => {
       if (t >= retireOffsets[i]) return; // already retired — drawn down below
       const r = contribute(p, accum[i], gapScale, i === 0 && ages[i] >= preservationAge);
@@ -541,8 +576,6 @@ export function simulate(
       workEarningsTax += r.earningsTax;
       workTakeHome += r.takeHome;
       workGrossSalary += p.salary * gapScale;
-      workSalaryTax += r.salaryIncomeTax;
-      workMedicare += r.medicareLevyPaid;
     });
 
     // Only RETIRED members at/over preservation age can draw down (and are
@@ -942,6 +975,24 @@ export function simulate(
       outside -= outsideTax;
     }
 
+    // Per-person consolidated tax for the tax modal (gap salary + part-time work +
+    // net rent + dividends taxed together; realised gain on top with the regime).
+    const onAgePensionRet = agePensionAmt > 0;
+    const retTaxDetail = plan.people.map((p, i) =>
+      taxDetailFor(
+        i,
+        {
+          salary: t < retireOffsets[i] ? p.salary * gapScale : 0,
+          work: grossWork / workers,
+          rent: rentCash / workers,
+          dividends: outsideIncome / workers,
+          gain: Math.max(0, realizedGain) / workers,
+        },
+        ages[i] >= pensionAge,
+        onAgePensionRet,
+      ),
+    );
+
     const phase: Phase =
       oldest >= pensionAge
         ? "pension"
@@ -973,12 +1024,14 @@ export function simulate(
         earningsTax: Math.max(0, workEarningsTax + retAccumTax),
         outsideTax,
         outsideDividend: outsideIncome,
-        // Tax-analysis totals: income tax = ordinary income (gap salary + part-time
-        // work + net rent + outside dividends); capital gains = outside realised gains
-        // + any property-sale CGT. Super pension drawdowns and the Age Pension are tax-free.
-        incomeTax: workSalaryTax + workTax + rentTax + outsideDivTax,
-        medicare: workMedicare,
-        capitalGains: outsideCgtTax + propertyCgt,
+        // Tax-analysis totals (consolidated per person). Income tax = ordinary income
+        // (gap salary + part-time work + net rent + dividends) taxed together with one
+        // LITO/SAPTO; capital gains = outside realised gains + property-sale CGT. Super
+        // pension drawdowns and the Age Pension are tax-free.
+        incomeTax: retTaxDetail.reduce((s, d) => s + d.incomeTax, 0),
+        medicare: retTaxDetail.reduce((s, d) => s + d.medicare, 0),
+        capitalGains: retTaxDetail.reduce((s, d) => s + d.cgt, 0) + propertyCgt,
+        taxDetail: retTaxDetail,
         agePension: agePensionAmt,
         pension: pensionBreakdown,
         rentIncome: rentCash,

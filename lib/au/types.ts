@@ -128,6 +128,23 @@ export interface CareerBreak {
   who: number; // person index (0 = "you")
 }
 
+// One person's income-tax reconciliation for a year — all ordinary income taxed
+// together, with a single LITO + SAPTO application. For the tax-analysis modal.
+export interface PersonTaxDetail {
+  label: string; // "You" / "Your partner" (or name)
+  salary: number; // taxable salary (after any sacrifice)
+  work: number; // part-time work income
+  rent: number; // net rent share (can be negative — negative gearing)
+  dividends: number; // outside-super dividend share
+  gain: number; // realised capital gain share
+  gross: number; // bracket tax on total ordinary income, before offsets
+  lito: number; // Low Income Tax Offset applied
+  sapto: number; // Seniors & Pensioners Tax Offset applied
+  incomeTax: number; // net ordinary income tax after LITO + SAPTO
+  medicare: number;
+  cgt: number; // tax on the realised gain (regime + 30% minimum)
+}
+
 export interface RetirementPlan {
   household: Household;
   people: Person[]; // 1 entry for single, 2 for couple
@@ -348,6 +365,7 @@ export interface YearBreakdown {
   incomeTax?: number;
   medicare?: number;
   capitalGains?: number;
+  taxDetail?: PersonTaxDetail[]; // per-person income-tax reconciliation for the tax modal (gross → LITO → SAPTO → net)
   rentSaved?: number; // accumulation only: positive after-tax net rent reinvested into the outside pool (a geared loss isn't — it's a disposable drain)
   careerBreakDraw?: number; // accumulation only: living costs drawn from outside savings during a career break ("gap years"), floored at the balance available
   onBreak?: boolean; // accumulation only: at least one member is on a career break ("gap year") this year — charts shade the span

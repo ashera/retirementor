@@ -9,6 +9,7 @@ import YearDetailModal from "@/components/YearDetailModal";
 import IncomeYearModal from "@/components/IncomeYearModal";
 import IncomeChart from "@/components/IncomeChart";
 import TaxChart from "@/components/TaxChart";
+import TaxYearModal from "@/components/TaxYearModal";
 import FanChart from "@/components/FanChart";
 import MonteCarloMark from "@/components/MonteCarloMark";
 import ReturnSeriesModal from "@/components/ReturnSeriesModal";
@@ -249,6 +250,7 @@ export default function PlannerApp({
   const [boostOpen, setBoostOpen] = useState(false);
   const [selectedAge, setSelectedAge] = useState<number | null>(null);
   const [incomeAge, setIncomeAge] = useState<number | null>(null);
+  const [taxAge, setTaxAge] = useState<number | null>(null);
   const [fanAge, setFanAge] = useState<number | null>(null);
   const [showReturnSeries, setShowReturnSeries] = useState(false);
   const [saveName, setSaveName] = useState("");
@@ -1224,10 +1226,17 @@ export default function PlannerApp({
               <LegendDot color="#38bdf8" label="Capital gains" />
             </div>
           </div>
-          <TaxChart result={result} />
+          <TaxChart
+            result={result}
+            onSelectYear={(age) => {
+              track("Year breakdown opened", { chart: "tax" });
+              setTaxAge(age);
+            }}
+          />
           <p className="mt-2 text-center text-xs text-muted">
             Every tax the projection charges, by type. Super pension drawdowns and the Age Pension are tax-free, so tax
             usually falls sharply at retirement. Income tax is after the low-income (LITO) and seniors (SAPTO) offsets.
+            Click any year for the full breakdown.
           </p>
         </div>
       </div>
@@ -1752,6 +1761,26 @@ export default function PlannerApp({
               onNext={() => setIncomeAge((a) => (a != null ? Math.min(max, a + 1) : a))}
               canPrev={incomeAge > min}
               canNext={incomeAge < max}
+            />
+          );
+        })()}
+
+      {taxAge != null &&
+        (() => {
+          const ages = result.rows.map((r) => r.age);
+          const row = result.rows.find((r) => r.age === taxAge);
+          if (!row) return null;
+          const min = ages[0];
+          const max = ages[ages.length - 1];
+          return (
+            <TaxYearModal
+              row={row}
+              plan={plan}
+              onClose={() => setTaxAge(null)}
+              onPrev={() => setTaxAge((a) => (a != null ? Math.max(min, a - 1) : a))}
+              onNext={() => setTaxAge((a) => (a != null ? Math.min(max, a + 1) : a))}
+              canPrev={taxAge > min}
+              canNext={taxAge < max}
             />
           );
         })()}
