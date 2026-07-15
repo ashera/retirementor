@@ -30,7 +30,8 @@ import {
 } from "@/components/explainers";
 import { runMonteCarlo, MC_CONFIDENCE_TARGET, MC_CONFIDENCE_MC } from "@/lib/au/montecarlo";
 import { whatWillItTake, earliestRetirement } from "@/lib/au/goalseek";
-import { maxSpendForConfidence } from "@/lib/au/strategies";
+import { maxSpendForConfidence, withSpend } from "@/lib/au/strategies";
+import { initialWithdrawal } from "@/lib/au/withdrawal";
 import TrimSpendingModal from "@/components/TrimSpendingModal";
 import BoostSpendingModal from "@/components/BoostSpendingModal";
 import ProbabilityYearModal from "@/components/ProbabilityYearModal";
@@ -397,6 +398,15 @@ export default function PlannerApp({
     return () => clearTimeout(id);
   }, [plan, config, ready, configured]);
   const maxSpend = mcMaxSpend ?? gs.maxSpend; // prudent once settled, central meanwhile
+  // Personal SAFE WITHDRAWAL RATE: the whole-portfolio withdrawal rate at the prudent
+  // (85% MC) max spend, measured on the same basis as the current-rate headline — so
+  // it drops straight onto the withdrawal-rate bar as a second marker. Pension-aware
+  // (netSpend already nets the Age Pension), so it usually sits above the classic 4%.
+  const safeRate = useMemo(() => {
+    if (maxSpend == null) return null;
+    const w = initialWithdrawal(simulate(withSpend(plan, maxSpend), config));
+    return w ? w.portfolioRate : null;
+  }, [plan, config, maxSpend]);
   // Trim vs boost is decided against the SAME prudent (85% MC) bar the spend
   // lever shows, so the card never contradicts itself (e.g. "trim to $X" while a
   // "spend more" button sits below). Over the bar → offer a trim; under it → a boost.
@@ -1011,7 +1021,7 @@ export default function PlannerApp({
       </Link>
 
       {/* Withdrawal-rate diagnostic */}
-      <WithdrawalRateCard result={result} plan={plan} successPct={successPct} />
+      <WithdrawalRateCard result={result} plan={plan} successPct={successPct} safeRate={safeRate} safePending={mcMaxPending} />
 
       {/* Assets chart */}
       <div className="rounded-2xl border border-line bg-panel p-6">

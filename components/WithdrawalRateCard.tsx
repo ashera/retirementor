@@ -4,6 +4,7 @@ import { hasStaggeredRetirement, type RetirementPlan, type SimResult } from "@/l
 import { fmtCurrency } from "@/lib/au/format";
 import { retirementGoal, type GoalBreakdown } from "@/lib/au/goal";
 import { initialWithdrawal, withdrawalBand, type InitialWithdrawal } from "@/lib/au/withdrawal";
+import { MC_CONFIDENCE_TARGET } from "@/lib/au/montecarlo";
 import Explainer from "@/components/Explainer";
 
 /** Join a list into "a, b and c". */
@@ -34,7 +35,21 @@ const TONE: Record<"accent" | "amber" | "red", { text: string; badge: string }> 
  * drawdown year, with a safe/moderate/high guidance band. Read-only; it explains
  * sustainability alongside "money lasts" and the likelihood gauge.
  */
-export default function WithdrawalRateCard({ result, plan, successPct }: { result: SimResult; plan: RetirementPlan; successPct: number }) {
+export default function WithdrawalRateCard({
+  result,
+  plan,
+  successPct,
+  safeRate = null,
+  safePending = false,
+}: {
+  result: SimResult;
+  plan: RetirementPlan;
+  successPct: number;
+  // Personal safe withdrawal rate (the whole-portfolio rate at the 85%-MC max spend),
+  // measured on the same basis as the headline so it drops onto the same bar.
+  safeRate?: number | null;
+  safePending?: boolean;
+}) {
   const w = initialWithdrawal(result);
   if (!w) return null;
   // Headline is the WHOLE-PORTFOLIO rate (super + outside savings) — the number the
@@ -45,6 +60,10 @@ export default function WithdrawalRateCard({ result, plan, successPct }: { resul
   const band = withdrawalBand(w.portfolioRate);
   const tone = TONE[band.tone];
   const markerPct = Math.min(100, Math.max(0, (w.portfolioRate / 0.1) * 100)); // 0–10% scale
+  const safeMarkerPct = safeRate != null ? Math.min(100, Math.max(0, (safeRate / 0.1) * 100)) : null;
+  const safePct = safeRate != null ? +(safeRate * 100).toFixed(1) : null;
+  const safeConfidence = Math.round(MC_CONFIDENCE_TARGET * 100);
+  const overSafe = safeRate != null && w.portfolioRate > safeRate + 0.0005; // drawing above the safe rate
   const goal = retirementGoal(plan);
   const reds = reductions(w, goal);
   const superPct = +(w.rate * 100).toFixed(1);
@@ -86,7 +105,8 @@ export default function WithdrawalRateCard({ result, plan, successPct }: { resul
         </div>
       )}
 
-      {/* Guidance band bar (0–10% scale) with a marker at the rate */}
+      {/* Guidance band bar (0–10% scale): current rate (white) with the classic 4%
+          anchor, and — below — an arrow at YOUR personal safe withdrawal rate. */}
       <div className="mt-4">
         <div className="relative h-2 w-full overflow-hidden rounded-full">
           <div className="absolute inset-0 flex">
@@ -94,23 +114,57 @@ export default function WithdrawalRateCard({ result, plan, successPct }: { resul
             <div className="h-full bg-amber-500/60" style={{ width: "20%" }} />
             <div className="h-full bg-red-500/60" style={{ width: "40%" }} />
           </div>
+          {/* Classic 4% anchor */}
+          <div className="absolute inset-y-0 w-px bg-white/40" style={{ left: "40%" }} />
+          {/* Current rate */}
           <div
             className="absolute top-1/2 h-4 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow"
             style={{ left: `${markerPct}%` }}
           />
         </div>
-        <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-0.5 text-[10px] text-muted">
+        {/* Safe-rate arrow, pointing up at the bar */}
+        {safeMarkerPct != null && (
+          <div className="relative mt-px h-2.5">
+            <span
+              className="absolute top-0 -translate-x-1/2 text-[10px] leading-none text-sky-400"
+              style={{ left: `${safeMarkerPct}%` }}
+              aria-hidden
+            >
+              ▲
+            </span>
+          </div>
+        )}
+        <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-0.5 text-[10px] text-muted">
           <span><span className="font-semibold text-emerald-400">≤4%</span> safe</span>
           <span><span className="font-semibold text-amber-400">4–6%</span> moderate</span>
           <span><span className="font-semibold text-red-400">&gt;6%</span> high</span>
+          {safePct != null && (
+            <span className="flex items-center gap-1 text-sky-300">
+              <span aria-hidden>▲</span> your safe rate ~{safePct}%{safePending ? " …" : ""}
+            </span>
+          )}
         </div>
       </div>
 
       <p className="mt-3 text-xs text-muted">
-        A lower rate lasts longer. The classic guide is about 4%, but Australia&apos;s Age Pension is a
-        safety net, so a higher rate can still last — your{" "}
-        <a href="#likelihood" className="text-accent hover:underline">{successPct}% likelihood</a>{" "}
-        is the real test.
+        {safePct != null ? (
+          <>
+            The classic guide is about 4%, but Australia&apos;s Age Pension is a safety net, so your{" "}
+            <span className="font-semibold text-sky-300">personal safe rate is ~{safePct}%</span> — the most
+            you could draw and still be about {safeConfidence}% likely to last to age {plan.lifeExpectancy}.
+            {overSafe
+              ? ` You're drawing ${pct}%, above that — see the `
+              : ` You're at ${pct}%, comfortably within it — the `}
+            <a href="#likelihood" className="text-accent hover:underline">{successPct}% likelihood</a>{overSafe ? "." : " confirms it."}
+          </>
+        ) : (
+          <>
+            A lower rate lasts longer. The classic guide is about 4%, but Australia&apos;s Age Pension is a
+            safety net, so a higher rate can still last — your{" "}
+            <a href="#likelihood" className="text-accent hover:underline">{successPct}% likelihood</a>{" "}
+            is the real test.
+          </>
+        )}
       </p>
     </div>
   );
