@@ -57,13 +57,13 @@ const WR_BADGE: Record<"accent" | "amber" | "red", string> = {
   red: "bg-red-500/15 text-red-400",
 };
 
-/** A single continuous "how long does it last" score so we can show deltas even
- *  when both plans reach life expectancy (life + years of buffer left at the end).
- *  Uses a fixed denominator/life so strategies stay comparable. */
-function lastsScore(res: SimResult, denom: number, life: number): number {
-  if (!res.lastsToLifeExpectancy) return res.depletedAge ?? 0;
-  const finalTotal = res.rows.length ? res.rows[res.rows.length - 1].total : 0;
-  return life + finalTotal / denom;
+/** How long the money lasts, as an age: the depletion age if it runs out before
+ *  life expectancy, otherwise life expectancy itself. Deliberately does NOT add the
+ *  end-of-plan leftover as extra "years" — that cushion is a dollar amount, shown by
+ *  the net-worth / money-left chips, so "Money lasts" only moves when longevity
+ *  genuinely changes (a plan that reaches life expectancy either way = 0 yrs). */
+function lastsScore(res: SimResult, life: number): number {
+  return res.lastsToLifeExpectancy ? life : res.depletedAge ?? 0;
 }
 
 const lastsLabel = (res: SimResult, plan: RetirementPlan) =>
@@ -258,9 +258,8 @@ export default function WhatIfView({
   // much better off overall (dollars).
   const marginal = useMemo(() => {
     if (!baseline || !baseRes) return {} as Record<string, Marginal>;
-    const denom = annualSpend(baseline);
     const life = baseline.lifeExpectancy;
-    const baseScore = lastsScore(baseRes, denom, life);
+    const baseScore = lastsScore(baseRes, life);
     const baseParts = planParts(baseRes);
     const baseTermNW = baseRes.rows.length ? rowNetWorth(baseRes.rows[baseRes.rows.length - 1]) : 0;
     const out: Record<string, Marginal> = {};
@@ -272,7 +271,7 @@ export default function WhatIfView({
       const shortfallAvoided = baseParts.shortfall - parts.shortfall;
       const termNW = res.rows.length ? rowNetWorth(res.rows[res.rows.length - 1]) : 0;
       out[card.id] = {
-        years: lastsScore(res, denom, life) - baseScore,
+        years: lastsScore(res, life) - baseScore,
         moneyLeft,
         shortfallAvoided,
         netWorth: termNW - baseTermNW,
@@ -320,6 +319,12 @@ export default function WhatIfView({
   // dashboard's withdrawal-rate card, so the two surfaces agree.
   const [safeRate, setSafeRate] = useState<number | null>(null);
   const [safePending, setSafePending] = useState(false);
+  // The Adjust-spending card's "at your current spend" anchor: the likelihood with
+  // the OTHER active What-If levers applied but the spend left at its current level
+  // — so the card measures what CHANGING SPEND does on top of the rest of the
+  // scenario, not against the bare planner baseline. Same seed as compMc so the two
+  // ends of the arrow are directly comparable.
+  const [anchorMc, setAnchorMc] = useState<number | null>(null);
   useEffect(() => {
     if (!baseline) return;
     setSafePending(true);
@@ -331,6 +336,7 @@ export default function WhatIfView({
       setSafeSpend(ss);
       const w = ss != null ? initialWithdrawal(simulate(withSpend(base, ss), config)) : null;
       setSafeRate(w ? w.portfolioRate : null);
+      setAnchorMc(runMonteCarlo(base, config, MC).successRate);
       setSafePending(false);
     }, 450);
     return () => clearTimeout(id);
@@ -751,7 +757,7 @@ export default function WhatIfView({
                             safePending,
                             targetPct: Math.round(SAFE_TARGET * 100),
                             life: baseline.lifeExpectancy,
-                            startedPct: baseMc != null ? Math.round(baseMc * 100) : null,
+                            startedPct: anchorMc != null ? Math.round(anchorMc * 100) : null,
                             nowPct: compMc != null ? Math.round(compMc * 100) : null,
                             likelihoodPending: mcPending,
                             nowRate,
