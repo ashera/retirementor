@@ -223,7 +223,9 @@ export default function RetirementChart({
             stroke="#f59e0b"
             strokeOpacity={0.3}
             strokeDasharray="3 3"
-            label={{ value: breakSpanLabel(s), position: "insideTop", fill: "#fbbf24", fontSize: 10 }}
+            // Centre the label so it clears the Retire/Pension reference-line labels
+            // that sit along the top of this chart.
+            label={{ value: breakSpanLabel(s), position: "center", fill: "#fbbf24", fontSize: 10 }}
           />
         ))}
         <defs>
