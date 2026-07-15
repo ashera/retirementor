@@ -147,6 +147,7 @@ export function simulate(
   // marker that explains the accumulation→pension band flip. null when the transfer
   // coincides with retirement (nothing to distinguish from the Retire marker).
   let superUnlockAge: number | null = null;
+  let superUnlockIsPartner = false; // whose super it is — a partner's (index > 0) vs your own
 
   // A home loan carried into retirement. `mortgageCleared` flips true once a
   // "clear at retirement" lump sum has been paid off from super.
@@ -548,7 +549,10 @@ export function simulate(
         // A preserved balance unlocking AFTER the household retired (an early
         // retiree turning 60) flips the accumulation band to pension mid-retirement
         // — flag the FIRST such age so the chart can explain it.
-        if (t > earliestOffset && toPension > 1 && superUnlockAge === null) superUnlockAge = oldest;
+        if (t > earliestOffset && toPension > 1 && superUnlockAge === null) {
+          superUnlockAge = oldest;
+          superUnlockIsPartner = i > 0;
+        }
         pension[i] += toPension;
         accum[i] -= toPension;
         transferred[i] = true;
@@ -957,6 +961,7 @@ export function simulate(
     retirementAge: plan.retirementAge,
     partnerRetirementAge: hasStaggeredRetirement(plan) ? personRetirementAge(plan, 1) : null,
     superUnlockAge,
+    superUnlockIsPartner,
     agePensionAge: pensionAge,
     superAtRetirement,
     totalAtRetirement,

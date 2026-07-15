@@ -404,6 +404,7 @@ export interface SimResult {
   // retiree turning 60. Drives a chart marker explaining the accumulation→pension
   // flip; null when the transfer coincides with retirement.
   superUnlockAge: number | null;
+  superUnlockIsPartner: boolean; // the unlocking super is a partner's (not "your" own)
   agePensionAge: number; // from the active config (used for chart markers)
   superAtRetirement: number; // combined super when retirement begins
   totalAtRetirement: number; // total investable assets when retirement begins

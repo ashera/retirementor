@@ -21,6 +21,7 @@ describe("superUnlockAge (preserved super transferring mid-retirement)", () => {
       retirementAge: 60,
     }), cfg);
     expect(r.superUnlockAge).toBe(66);
+    expect(r.superUnlockIsPartner).toBe(true); // it's the partner's super, not yours
     // Sanity: the accumulation band collapses into pension that year.
     const at = (age: number) => r.rows.find((x) => x.age === age)!.breakdown;
     expect(at(65).accumSuper).toBeGreaterThan(1);
@@ -43,5 +44,6 @@ describe("superUnlockAge (preserved super transferring mid-retirement)", () => {
       retirementAge: 55, // bridge: retired but under 60, super preserved until 60
     }), cfg);
     expect(r.superUnlockAge).toBe(60);
+    expect(r.superUnlockIsPartner).toBe(false); // your own super
   });
 });

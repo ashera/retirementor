@@ -23,6 +23,32 @@ export interface SpendingBand {
   fill: string;
 }
 
+// A reference-line label wrapped onto multiple centred lines, so a longer marker
+// (e.g. "Partner super unlocks 66") doesn't sprawl across several years of the axis.
+function WrappedLabel({
+  viewBox,
+  lines,
+  fill,
+  topOffset,
+}: {
+  viewBox?: { x?: number; y?: number };
+  lines: string[];
+  fill: string;
+  topOffset: number;
+}) {
+  const x = viewBox?.x ?? 0;
+  const y = (viewBox?.y ?? 0) + topOffset;
+  return (
+    <text x={x} y={y} fill={fill} fontSize={11} textAnchor="middle">
+      {lines.map((ln, i) => (
+        <tspan key={ln} x={x} dy={i === 0 ? 0 : 12}>
+          {ln}
+        </tspan>
+      ))}
+    </text>
+  );
+}
+
 type ChartRow = Partial<YearRow> & {
   age: number;
   baselineTotal?: number;
@@ -319,13 +345,18 @@ export default function RetirementChart({
             x={result.superUnlockAge}
             stroke="#eab308"
             strokeDasharray="6 4"
-            label={{
-              value: `Super unlocks ${result.superUnlockAge}`,
-              position: "insideTop",
-              fill: "#facc15",
-              fontSize: 11,
-              dy: 40,
-            }}
+            label={(props: { viewBox?: { x?: number; y?: number } }) => (
+              <WrappedLabel
+                viewBox={props.viewBox}
+                fill="#facc15"
+                topOffset={58}
+                lines={
+                  result.superUnlockIsPartner
+                    ? ["Partner super", `unlocks ${result.superUnlockAge}`]
+                    : ["Super unlocks", `${result.superUnlockAge}`]
+                }
+              />
+            )}
           />
         )}
         {depletedAge !== null && (
