@@ -19,6 +19,7 @@ import {
   resolveValues,
   maxSustainableSpend,
   maxSpendForConfidence,
+  withSpend,
   essentialsFloor,
   GROUP_LABEL,
   type StrategyCard,
@@ -33,6 +34,7 @@ import StrategyAssumptionsModal from "@/components/StrategyAssumptionsModal";
 import GuardrailsTimelineModal from "@/components/GuardrailsTimelineModal";
 import SpendingBreakdown from "@/components/SpendingBreakdown";
 import { retirementGoal } from "@/lib/au/goal";
+import { initialWithdrawal, withdrawalBand } from "@/lib/au/withdrawal";
 import Field from "@/components/Field";
 
 const PLAN_KEY = "au-retirement-plan";
@@ -41,6 +43,19 @@ const GROUP_ORDER: StrategyGroup[] = ["home", "mortgage", "property", "timing", 
 
 const annualSpend = (p: RetirementPlan) =>
   Math.max(1, p.spendingMode === "stages" ? p.spendingStages.goGo : p.targetSpending);
+
+// Withdrawal-rate band → colours, matching the dashboard's rate card so the two
+// surfaces read identically (accent = safe, amber = moderate, red = high).
+const WR_TONE: Record<"accent" | "amber" | "red", string> = {
+  accent: "text-emerald-400",
+  amber: "text-amber-400",
+  red: "text-red-400",
+};
+const WR_BADGE: Record<"accent" | "amber" | "red", string> = {
+  accent: "bg-emerald-500/15 text-emerald-400",
+  amber: "bg-amber-500/15 text-amber-400",
+  red: "bg-red-500/15 text-red-400",
+};
 
 /** A single continuous "how long does it last" score so we can show deltas even
  *  when both plans reach life expectancy (life + years of buffer left at the end).
@@ -300,6 +315,10 @@ export default function WhatIfView({
   // Heavy (bisected MC), so debounced off the interaction path with a pending
   // pulse — same pattern as the composed MC above.
   const [safeSpend, setSafeSpend] = useState<number | null>(null);
+  // The whole-portfolio withdrawal rate at that safe spend — the % twin of the
+  // dollar figure, measured on the SAME basis (withSpend, portfolioRate) as the
+  // dashboard's withdrawal-rate card, so the two surfaces agree.
+  const [safeRate, setSafeRate] = useState<number | null>(null);
   const [safePending, setSafePending] = useState(false);
   useEffect(() => {
     if (!baseline) return;
@@ -308,12 +327,23 @@ export default function WhatIfView({
     others.delete("adjust-spending");
     const base = applyStrategies(baseline, catalog, others, values);
     const id = setTimeout(() => {
-      setSafeSpend(maxSpendForConfidence(base, config, SAFE_TARGET, SAFE_MC));
+      const ss = maxSpendForConfidence(base, config, SAFE_TARGET, SAFE_MC);
+      setSafeSpend(ss);
+      const w = ss != null ? initialWithdrawal(simulate(withSpend(base, ss), config)) : null;
+      setSafeRate(w ? w.portfolioRate : null);
       setSafePending(false);
     }, 450);
     return () => clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [baseline, catalog, active, otherValsKey, config]);
+
+  // The live withdrawal rate at the spend the slider is currently set to — read
+  // off the composed sim result, so it moves as you drag and correctly accounts
+  // for the essentials-fixed / discretionary-flexed split this card applies.
+  const nowRate = useMemo(
+    () => (compRes ? initialWithdrawal(compRes)?.portfolioRate ?? null : null),
+    [compRes],
+  );
 
   // Guardrails outlook — the flexible-spending downside a fixed safe-spend can't
   // show (worst-case cut depth + how long, and the central spend path). Only when
@@ -724,6 +754,8 @@ export default function WhatIfView({
                             startedPct: baseMc != null ? Math.round(baseMc * 100) : null,
                             nowPct: compMc != null ? Math.round(compMc * 100) : null,
                             likelihoodPending: mcPending,
+                            nowRate,
+                            safeRate,
                             onSetSafe: () => {
                               if (safeSpend != null) setParam("adjust-spending", "spend", safeSpend);
                             },
@@ -1034,6 +1066,8 @@ function StrategyCardRow({
     startedPct: number | null; // MC success at the current (baseline) spend — the anchor
     nowPct: number | null; // MC success at the chosen spend (composed)
     likelihoodPending: boolean;
+    nowRate: number | null; // live whole-portfolio withdrawal rate at the chosen spend (fraction)
+    safeRate: number | null; // whole-portfolio rate at the safe spend — the % twin of `safe`
     onSetSafe: () => void;
   };
 }) {
@@ -1083,6 +1117,20 @@ function StrategyCardRow({
   // 87%-fixed plan that raises on average but crashes in a downturn isn't "funded".
   const gHeadroom =
     guardrails?.fixedPct != null && guardrails.fixedPct >= guardrails.targetPct + 5 && gRaises;
+  // Withdrawal-rate readout for the spend slider: the % twin of the safe-spend
+  // dollar figure, on the same 0–10% band scale (4% anchor + ▲ safe-rate) as the
+  // dashboard's rate card, with a live marker that slides as you drag.
+  const wr =
+    sustainable?.nowRate != null
+      ? {
+          pct: +(sustainable.nowRate * 100).toFixed(1),
+          band: withdrawalBand(sustainable.nowRate),
+          marker: Math.min(100, Math.max(0, (sustainable.nowRate / 0.1) * 100)),
+        }
+      : null;
+  const safeRatePct = sustainable?.safeRate != null ? +(sustainable.safeRate * 100).toFixed(1) : null;
+  const safeRateMarker =
+    sustainable?.safeRate != null ? Math.min(100, Math.max(0, (sustainable.safeRate / 0.1) * 100)) : null;
   return (
     <div className={`rounded-2xl border p-4 transition ${on ? "border-accent/40 bg-accent/5" : "border-line bg-panel"}`}>
       <div className="flex items-center gap-3">
@@ -1289,6 +1337,57 @@ function StrategyCardRow({
           </div>
           {sustainable && (
             <div className="rounded-lg border border-accent/30 bg-accent/5 px-3 py-2 text-xs">
+              {/* Withdrawal rate at the chosen spend, on the dashboard's 0–10% band
+                  bar (4% anchor + live white marker + ▲ your safe rate). The same
+                  Safe-Withdrawal-Rate lens as the dashboard, so the two agree. */}
+              {wr && (
+                <div className="mb-1.5 border-b border-line pb-2">
+                  <div className="mb-1.5 flex flex-wrap items-baseline gap-x-1.5">
+                    <span className="text-muted">That&apos;s a</span>
+                    <span className={`font-semibold tabular-nums ${WR_TONE[wr.band.tone]}`}>{wr.pct}%</span>
+                    <span className="text-muted">withdrawal rate</span>
+                    <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide ${WR_BADGE[wr.band.tone]}`}>
+                      {wr.band.label}
+                    </span>
+                  </div>
+                  <div className="relative h-2 w-full overflow-hidden rounded-full">
+                    <div className="absolute inset-0 flex">
+                      <div className="h-full bg-emerald-500/60" style={{ width: "40%" }} />
+                      <div className="h-full bg-amber-500/60" style={{ width: "20%" }} />
+                      <div className="h-full bg-red-500/60" style={{ width: "40%" }} />
+                    </div>
+                    {/* Classic 4% anchor */}
+                    <div className="absolute inset-y-0 w-px bg-white/40" style={{ left: "40%" }} />
+                    {/* Live marker at the chosen spend's rate */}
+                    <div
+                      className="absolute top-1/2 h-4 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow transition-[left] duration-150"
+                      style={{ left: `${wr.marker}%` }}
+                    />
+                  </div>
+                  {/* ▲ your safe withdrawal rate */}
+                  {safeRateMarker != null && (
+                    <div className="relative mt-px h-2.5">
+                      <span
+                        className="absolute top-0 -translate-x-1/2 text-[10px] leading-none text-sky-400"
+                        style={{ left: `${safeRateMarker}%` }}
+                        aria-hidden
+                      >
+                        ▲
+                      </span>
+                    </div>
+                  )}
+                  <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[10px] text-muted">
+                    <span><span className="font-semibold text-emerald-400">≤4%</span> safe</span>
+                    <span><span className="font-semibold text-amber-400">4–6%</span> moderate</span>
+                    <span><span className="font-semibold text-red-400">&gt;6%</span> high</span>
+                    {safeRatePct != null && (
+                      <span className="flex items-center gap-1 text-sky-300">
+                        <span aria-hidden>▲</span> your safe rate ~{safeRatePct}%{sustainable.safePending ? " …" : ""}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
               {/* Likelihood at the current spend (anchor) → at the chosen spend */}
               <div className="mb-1.5 flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5 border-b border-line pb-1.5">
                 <span className="text-muted">Chance of lasting to {sustainable.life}:</span>
