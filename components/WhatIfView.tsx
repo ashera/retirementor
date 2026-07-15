@@ -281,6 +281,34 @@ export default function WhatIfView({
     return out;
   }, [baseline, baseRes, catalog, values, config]);
 
+  // The Adjust-spending card measures against your CURRENT SCENARIO, not the bare
+  // baseline. Its likelihood, safe spend and withdrawal rate all sit on the plan
+  // with your other active levers applied, so its "Money lasts / net worth" chip
+  // must too — otherwise the chip strips those levers out and can read a loss the
+  // real scenario doesn't have (e.g. "−5 yrs" while you're still 85% to reach 90).
+  // Delta = (other levers + the set spend) − (other levers, at the current spend).
+  const spendDelta = useMemo(() => {
+    if (!baseline) return null;
+    const others = new Set(active);
+    others.delete("adjust-spending");
+    const base = applyStrategies(baseline, catalog, others, values);
+    const set = applyStrategies(baseline, catalog, new Set([...others, "adjust-spending"]), values);
+    const baseR = simulate(base, config);
+    const setR = simulate(set, config);
+    const life = baseline.lifeExpectancy;
+    const bp = planParts(baseR);
+    const sp = planParts(setR);
+    const baseNW = baseR.rows.length ? rowNetWorth(baseR.rows[baseR.rows.length - 1]) : 0;
+    const setNW = setR.rows.length ? rowNetWorth(setR.rows[setR.rows.length - 1]) : 0;
+    return {
+      years: lastsScore(setR, life) - lastsScore(baseR, life),
+      moneyLeft: sp.final - bp.final,
+      shortfallAvoided: bp.shortfall - sp.shortfall,
+      netWorth: setNW - baseNW,
+      takeHomeNow: setR.rows[0]?.takeHome ?? 0,
+    } as Marginal;
+  }, [baseline, catalog, active, values, config]);
+
   // "You could spend up to $X" — the highest spend that still lasts to life
   // expectancy, solved on the plan with the OTHER active levers applied (so it
   // reflects the rest of the scenario) and independent of the spend slider itself.
@@ -723,7 +751,15 @@ export default function WhatIfView({
                     key={card.id}
                     card={card}
                     on={active.has(card.id)}
-                    delta={marginal[card.id] ?? { years: 0, moneyLeft: 0, shortfallAvoided: 0, netWorth: 0, takeHomeNow: 0 }}
+                    delta={
+                      (card.id === "adjust-spending" ? spendDelta : marginal[card.id]) ?? {
+                        years: 0,
+                        moneyLeft: 0,
+                        shortfallAvoided: 0,
+                        netWorth: 0,
+                        takeHomeNow: 0,
+                      }
+                    }
                     incomeDelta={affordable[card.id] ?? null}
                     incomePending={affordablePending}
                     life={baseline.lifeExpectancy}
