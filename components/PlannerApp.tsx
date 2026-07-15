@@ -212,6 +212,7 @@ export default function PlannerApp({
   draft = null,
   config,
   reviewDue = 0,
+  userStats = null,
   sharedPlan = null,
 }: {
   user: { email: string; isAdmin: boolean; name?: string | null; avatarUrl?: string | null } | null;
@@ -219,6 +220,7 @@ export default function PlannerApp({
   draft?: PlanDraft | null;
   config: EngineConfig;
   reviewDue?: number;
+  userStats?: { total: number; last7Days: number } | null;
   // Public read-only view (a share link or a curated /scenario/<slug> demo):
   // preload this scenario and never read or write the viewer's own localStorage /
   // cloud draft. `basePath` is this view's root (e.g. "/s/<token>" or
@@ -637,6 +639,20 @@ export default function PlannerApp({
         <div className="flex items-center gap-3">
         {user ? (
           <>
+            {user.isAdmin && userStats && (
+              <Link
+                href="/admin/users"
+                title="Total users · signed up in the last 7 days"
+                className="flex items-center gap-1.5 rounded-full border border-line bg-panel-2 px-3 py-1.5 text-xs font-medium text-slate-300 transition hover:border-accent/50 hover:text-white"
+              >
+                <span aria-hidden>👥</span>
+                <span className="tabular-nums text-white">{userStats.total.toLocaleString()}</span>
+                <span className="text-muted">users</span>
+                {userStats.last7Days > 0 && (
+                  <span className="tabular-nums text-emerald-400">+{userStats.last7Days} · 7d</span>
+                )}
+              </Link>
+            )}
             {user.isAdmin && (
               <Link
                 href="/admin/review"

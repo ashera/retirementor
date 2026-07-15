@@ -26,6 +26,22 @@ export async function listUsers(): Promise<AdminUserRow[]> {
   return r.rows;
 }
 
+export interface UserStats {
+  total: number;
+  last7Days: number; // signed up in the last 7 days
+}
+
+/** Headline user counts for the admin stats pill. */
+export async function getUserStats(): Promise<UserStats> {
+  const r = await query<{ total: number; last7days: number }>(
+    `select count(*)::int as total,
+            count(*) filter (where created_at >= now() - interval '7 days')::int as last7days
+       from users`,
+  );
+  const row = r.rows[0];
+  return { total: row?.total ?? 0, last7Days: row?.last7days ?? 0 };
+}
+
 export async function getUserDetail(id: string): Promise<AdminUserDetail | null> {
   try {
     const u = await query<AdminUserRow>(`${ROW_SELECT} where u.id = $1`, [id]);
