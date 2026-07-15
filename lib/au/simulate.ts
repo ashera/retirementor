@@ -141,6 +141,12 @@ export function simulate(
   let firstAgePensionAge: number | null = null;
   let superAtRetirement = 0;
   let totalAtRetirement = 0;
+  // The (oldest-person's) age at which a member's PRESERVED super first unlocks
+  // and transfers into the tax-free pension pool AFTER the household has already
+  // entered retirement — i.e. an early retiree waiting to turn 60. Drives a chart
+  // marker that explains the accumulation→pension band flip. null when the transfer
+  // coincides with retirement (nothing to distinguish from the Retire marker).
+  let superUnlockAge: number | null = null;
 
   // A home loan carried into retirement. `mortgageCleared` flips true once a
   // "clear at retirement" lump sum has been paid off from super.
@@ -539,6 +545,10 @@ export function simulate(
       accessibleIdx.forEach((i) => {
         if (transferred[i]) return;
         const toPension = Math.min(accum[i], config.transferBalanceCap);
+        // A preserved balance unlocking AFTER the household retired (an early
+        // retiree turning 60) flips the accumulation band to pension mid-retirement
+        // — flag the FIRST such age so the chart can explain it.
+        if (t > earliestOffset && toPension > 1 && superUnlockAge === null) superUnlockAge = oldest;
         pension[i] += toPension;
         accum[i] -= toPension;
         transferred[i] = true;
@@ -946,6 +956,7 @@ export function simulate(
     rows,
     retirementAge: plan.retirementAge,
     partnerRetirementAge: hasStaggeredRetirement(plan) ? personRetirementAge(plan, 1) : null,
+    superUnlockAge,
     agePensionAge: pensionAge,
     superAtRetirement,
     totalAtRetirement,

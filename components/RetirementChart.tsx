@@ -310,6 +310,24 @@ export default function RetirementChart({
             dy: 22,
           }}
         />
+        {/* An early retiree's preserved super unlocking at 60 mid-retirement: the
+            accumulation (yellow) balance moves into the tax-free pension (green)
+            pool. Coloured to the accumulation band it's leaving; labelled lower so
+            it clears the Retire/Pension labels. */}
+        {result.superUnlockAge != null && (
+          <ReferenceLine
+            x={result.superUnlockAge}
+            stroke="#eab308"
+            strokeDasharray="6 4"
+            label={{
+              value: `Super unlocks ${result.superUnlockAge}`,
+              position: "insideTop",
+              fill: "#facc15",
+              fontSize: 11,
+              dy: 40,
+            }}
+          />
+        )}
         {depletedAge !== null && (
           <ReferenceLine
             x={depletedAge}

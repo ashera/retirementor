@@ -399,6 +399,11 @@ export interface SimResult {
   // A partner who retires at a different time (staggered retirement); null when
   // there's no partner or both retire together. Drives a second chart marker.
   partnerRetirementAge: number | null;
+  // The (oldest-person's) age at which a member's preserved super first unlocks and
+  // moves into the tax-free pension pool AFTER retirement has begun — an early
+  // retiree turning 60. Drives a chart marker explaining the accumulation→pension
+  // flip; null when the transfer coincides with retirement.
+  superUnlockAge: number | null;
   agePensionAge: number; // from the active config (used for chart markers)
   superAtRetirement: number; // combined super when retirement begins
   totalAtRetirement: number; // total investable assets when retirement begins
