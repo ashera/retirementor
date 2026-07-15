@@ -268,6 +268,8 @@ export function simulate(
         superGrowth: newBalance - opening - net,
         takeHome,
         taxable, // taxable salary (after sacrifice) — the base a rental loss/gain stacks on
+        salaryIncomeTax: residentIncomeTax(taxable), // personal income tax on the salary (after LITO), surfaced for the tax analysis
+        medicareLevyPaid: medicareLevy(taxable),
         ttrBenefit,
       };
     };
@@ -365,6 +367,8 @@ export function simulate(
       let feesPaid = 0;
       let takeHome = 0; // net cash from salary after income tax and pre-tax sacrifice
       let ttrBenefit = 0; // net super gained from a Transition-to-Retirement swap this year
+      let salaryIncomeTax = 0; // personal income tax on salary (after LITO)
+      let medicare = 0; // Medicare levy on salary
       const taxables: number[] = []; // per-person taxable salary — base for the rental tax/deduction
       plan.people.forEach((p, i) => {
         const brk = onBreak(i);
@@ -379,6 +383,8 @@ export function simulate(
         earningsTax += r.earningsTax;
         takeHome += r.takeHome;
         ttrBenefit += r.ttrBenefit;
+        salaryIncomeTax += r.salaryIncomeTax;
+        medicare += r.medicareLevyPaid;
         taxables.push(r.taxable);
       });
       // Savings additions pause only when no one's earning (a single on a break, or
@@ -457,6 +463,11 @@ export function simulate(
           earningsTax: Math.max(0, earningsTax),
           outsideTax: accumOutsideTax,
           outsideDividend: outsideIncomeAccum,
+          // Tax-analysis totals: income tax = salary + net rent + outside dividends
+          // (all ordinary income); no capital gains realised while working.
+          incomeTax: salaryIncomeTax + accumRentTax + accumOutsideTax,
+          medicare,
+          capitalGains: 0,
           agePension: 0,
           pension: null,
           rentIncome: accumRentCash,
@@ -516,6 +527,8 @@ export function simulate(
     let workEarningsTax = 0;
     let workTakeHome = 0; // still-working partners' net salary → offsets spending
     let workGrossSalary = 0; // gross → Age Pension income test
+    let workSalaryTax = 0; // income tax on a gap-year partner's salary (for the tax analysis)
+    let workMedicare = 0;
     plan.people.forEach((p, i) => {
       if (t >= retireOffsets[i]) return; // already retired — drawn down below
       const r = contribute(p, accum[i], gapScale, i === 0 && ages[i] >= preservationAge);
@@ -528,6 +541,8 @@ export function simulate(
       workEarningsTax += r.earningsTax;
       workTakeHome += r.takeHome;
       workGrossSalary += p.salary * gapScale;
+      workSalaryTax += r.salaryIncomeTax;
+      workMedicare += r.medicareLevyPaid;
     });
 
     // Only RETIRED members at/over preservation age can draw down (and are
@@ -891,32 +906,39 @@ export function simulate(
     // (During accumulation the dividend yield is taxed too — stacked on salary — but
     // no gains are realised, so it's yield-only.)
     let outsideTax = 0;
+    let outsideDivTax = 0; // dividend portion (ordinary income) — for the tax analysis
+    let outsideCgtTax = 0; // realised-gain portion (capital gains) — for the tax analysis
     if (!accumPhase && (outsideIncome > 0 || realizedGain > 0)) {
       const incPer = outsideIncome / workers;
       const gainPer = Math.max(0, realizedGain) / workers;
       const onAgePension = agePensionAmt > 0; // exemption from the 30% minimum
-      outsideTax = plan.people.reduce((s, p, i) => {
+      plan.people.forEach((p, i) => {
         const workPer = (t < retireOffsets[i] ? p.salary * gapScale : 0) + grossWork / workers;
         // Dividends: ordinary income, marginal, stacked on this person's work income.
-        const divTax = Math.max(0, taxAtAge(workPer + incPer, ages[i]) - taxAtAge(workPer, ages[i]));
+        outsideDivTax += Math.max(0, taxAtAge(workPer + incPer, ages[i]) - taxAtAge(workPer, ages[i]));
         // Capital gain: stacked on top of work income + dividends.
-        let cgt = 0;
         if (gainPer > 0) {
           const base = workPer + incPer;
           if (cgtRegime === "discount") {
-            cgt = Math.max(0, taxAtAge(base + cgtDiscount * gainPer, ages[i]) - taxAtAge(base, ages[i]));
+            outsideCgtTax += Math.max(0, taxAtAge(base + cgtDiscount * gainPer, ages[i]) - taxAtAge(base, ages[i]));
           } else {
             const marginal = Math.max(0, taxAtAge(base + gainPer, ages[i]) - taxAtAge(base, ages[i]));
-            cgt = onAgePension ? marginal : Math.max(marginal, cgtMinRate * gainPer);
+            outsideCgtTax += onAgePension ? marginal : Math.max(marginal, cgtMinRate * gainPer);
           }
         }
-        return s + divTax + cgt;
-      }, 0);
+      });
+      outsideTax = outsideDivTax + outsideCgtTax;
       // Can't pay more tax than the pool holds — in the year outside is drawn to $0
       // to fund spending, the CGT on that final drawdown has nothing left to come
       // from (a small edge understatement; the recorded tax matches what's deducted
-      // so the ledger reconciles).
-      outsideTax = Math.min(outsideTax, Math.max(0, outside));
+      // so the ledger reconciles). Apportion the cap across the two slices.
+      const capped = Math.min(outsideTax, Math.max(0, outside));
+      if (outsideTax > 0 && capped < outsideTax) {
+        const f = capped / outsideTax;
+        outsideDivTax *= f;
+        outsideCgtTax *= f;
+      }
+      outsideTax = capped;
       outside -= outsideTax;
     }
 
@@ -951,6 +973,12 @@ export function simulate(
         earningsTax: Math.max(0, workEarningsTax + retAccumTax),
         outsideTax,
         outsideDividend: outsideIncome,
+        // Tax-analysis totals: income tax = ordinary income (gap salary + part-time
+        // work + net rent + outside dividends); capital gains = outside realised gains
+        // + any property-sale CGT. Super pension drawdowns and the Age Pension are tax-free.
+        incomeTax: workSalaryTax + workTax + rentTax + outsideDivTax,
+        medicare: workMedicare,
+        capitalGains: outsideCgtTax + propertyCgt,
         agePension: agePensionAmt,
         pension: pensionBreakdown,
         rentIncome: rentCash,

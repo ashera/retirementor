@@ -8,6 +8,7 @@ import RetirementChart from "@/components/RetirementChart";
 import YearDetailModal from "@/components/YearDetailModal";
 import IncomeYearModal from "@/components/IncomeYearModal";
 import IncomeChart from "@/components/IncomeChart";
+import TaxChart from "@/components/TaxChart";
 import FanChart from "@/components/FanChart";
 import MonteCarloMark from "@/components/MonteCarloMark";
 import ReturnSeriesModal from "@/components/ReturnSeriesModal";
@@ -1207,6 +1208,28 @@ export default function PlannerApp({
           makes you draw a bigger slice of super at those ages, which can shift the super-vs-savings mix and cause the
           steps you see. Click any year for the full breakdown.
         </p>
+
+        {/* Tax analysis */}
+        <div className="mt-6 border-t border-line pt-5">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <h3 className="text-sm font-semibold text-white">
+              Tax analysis <span className="font-normal text-muted">— what you pay each year</span>
+            </h3>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+              <LegendDot color="#e2e8f0" label="Total tax" />
+              <LegendDot color="#fbbf24" label="Income tax" />
+              <LegendDot color="#f472b6" label="Medicare" />
+              <LegendDot color="#34d399" label="Super contributions" />
+              <LegendDot color="#a78bfa" label="Super earnings" />
+              <LegendDot color="#38bdf8" label="Capital gains" />
+            </div>
+          </div>
+          <TaxChart result={result} />
+          <p className="mt-2 text-center text-xs text-muted">
+            Every tax the projection charges, by type. Super pension drawdowns and the Age Pension are tax-free, so tax
+            usually falls sharply at retirement. Income tax is after the low-income (LITO) and seniors (SAPTO) offsets.
+          </p>
+        </div>
       </div>
 
       {/* Likelihood (Monte Carlo) */}

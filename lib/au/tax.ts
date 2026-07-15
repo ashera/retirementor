@@ -77,3 +77,69 @@ export function seniorIncomeTax(income: number, household: "single" | "couple"):
 
 /** @deprecated Renamed to {@link seniorIncomeTax} (also covers investment earnings). */
 export const seniorEmploymentTax = seniorIncomeTax;
+
+// ── Consolidated per-person tax ──────────────────────────────────────────────
+// One person's whole tax for a year: all ordinary income (salary, net rent,
+// dividends, part-time work) taxed together on ONE marginal scale with a SINGLE
+// LITO + SAPTO application, plus Medicare on employment income and CGT on any
+// realised gain. The ordinary sources are CHAINED in order, so each source's tax
+// is its marginal increment on top of the ones before it (they sum to the total
+// income tax) — this lets the engine attribute each slice to the right pool while
+// the total stays a proper, once-offset figure.
+
+export interface CgtParams {
+  regime: "indexed" | "discount";
+  discountPct: number; // "discount": excluded fraction of the gain (50)
+  minRatePct: number; // "indexed": minimum tax on the real gain (30)
+  onAgePension: boolean; // exempt from the 30% minimum
+}
+
+export interface PersonTax {
+  ordinary: number; // total ordinary assessable income
+  gross: number; // bracket tax on ordinary income, before offsets
+  lito: number; // Low Income Tax Offset applied
+  sapto: number; // Seniors & Pensioners Tax Offset applied (0 if not a senior)
+  incomeTax: number; // net ordinary income tax after LITO + SAPTO
+  medicare: number; // 2% Medicare levy on employment income
+  cgt: number; // tax on the realised capital gain (regime + 30% minimum)
+  bySource: Record<string, number>; // chained net-tax increment per ordinary source (sums to incomeTax)
+  total: number; // incomeTax + medicare + cgt
+}
+
+export function personTax(
+  sources: { key: string; amount: number }[], // ordinary income, in chain order (e.g. salary, rent, dividends, work)
+  employment: number, // salary + part-time work (base for Medicare)
+  realizedGain: number, // outside-super realised gain (full real; the regime is applied here)
+  senior: boolean, // at/over Age Pension age → SAPTO applies
+  household: "single" | "couple",
+  cgt: CgtParams,
+): PersonTax {
+  const netTax = (x: number) => (senior ? seniorIncomeTax(x, household) : residentIncomeTax(x));
+  const bySource: Record<string, number> = {};
+  let running = 0;
+  let prev = 0; // netTax(0)
+  for (const s of sources) {
+    running += s.amount;
+    const tax = netTax(Math.max(0, running));
+    bySource[s.key] = tax - prev; // marginal increment (can be negative — e.g. negative gearing)
+    prev = tax;
+  }
+  const O = Math.max(0, running);
+  const gross = incomeTax(O);
+  const litoApplied = Math.min(lito(O), gross);
+  const afterLito = gross - litoApplied;
+  const saptoApplied = senior ? Math.min(SAPTO_MAX[household], afterLito) : 0;
+  const incomeTaxNet = afterLito - saptoApplied; // == netTax(O)
+  const medicare = medicareLevy(Math.max(0, employment));
+  let cgtTax = 0;
+  const g = Math.max(0, realizedGain);
+  if (g > 0) {
+    if (cgt.regime === "discount") {
+      cgtTax = Math.max(0, netTax(O + (1 - cgt.discountPct / 100) * g) - netTax(O));
+    } else {
+      const marginal = Math.max(0, netTax(O + g) - netTax(O));
+      cgtTax = cgt.onAgePension ? marginal : Math.max(marginal, (cgt.minRatePct / 100) * g);
+    }
+  }
+  return { ordinary: running, gross, lito: litoApplied, sapto: saptoApplied, incomeTax: incomeTaxNet, medicare, cgt: cgtTax, bySource, total: incomeTaxNet + medicare + cgtTax };
+}
