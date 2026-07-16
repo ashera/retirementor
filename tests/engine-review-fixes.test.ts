@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { simulate } from "../lib/au/simulate";
-import { DEFAULT_CONFIG } from "../lib/au/config";
+import { DEFAULT_CONFIG, withDefaults } from "../lib/au/config";
 import { incomeTax, medicareLevy, sapto, seniorIncomeTax, residentIncomeTax } from "../lib/au/tax";
+import { outstandingBalance } from "../lib/au/mortgage";
 import { guardrailsTimeline } from "../lib/au/guardrails";
 import { bootstrapShockPath } from "../lib/au/historicalReturns";
 import { DEFAULT_PLAN, type RetirementPlan, type Person } from "../lib/au/types";
@@ -219,5 +220,79 @@ describe("Review pass-2 #6 — a career break during the staggered gap is honour
     // The lost contributions cost real super by the time they'd have retired (67).
     const endSuper = (p: RetirementPlan) => simulate(p, cfg).rows.find((r) => r.age === 67)!.totalSuper;
     expect(endSuper(withBreak)).toBeLessThan(endSuper(noBreak));
+  });
+});
+
+// ── Tier-3 backlog (2026-07-16) ──────────────────────────────────────────────
+describe("Review T3-1 — keepSuperInAccumulation shelters an under-67 partner's super", () => {
+  it("exempts a retired under-67 partner's accumulation-phase super from the means test", () => {
+    const common = { household: "couple" as const, superMode: "individual" as const, retirementAge: 68, outsideSuper: 50_000, targetSpending: 55_000 };
+    const people = () => [P({ currentAge: 68, superBalance: 300_000 }), P({ currentAge: 63, superBalance: 300_000, retirementAge: 63 })];
+    const sheltered = base({ ...common, people: people(), keepSuperInAccumulation: true });
+    const assessed = base({ ...common, people: people() }); // default → partner's super in pension phase, assessed
+    // Under-67 partner's super is assessable only once it's a pension (income stream) —
+    // in accumulation it's exempt until pension age, so sheltering lifts the pension.
+    expect(rowAt(sheltered, 68).agePension).toBeGreaterThan(rowAt(assessed, 68).agePension + 2_000);
+  });
+});
+
+describe("Review T3-2 — a couple's property gain is split across co-owners", () => {
+  it("taxes a jointly-owned gain as two shares, so a couple pays less CGT than a single", () => {
+    const prop = { name: "IP", value: 900_000, purchasePrice: 300_000, growthReal: 0, grossYield: 0, costRatio: 0, loanBalance: 0, loanRate: 0, strategy: "sell" as const, sellAtAge: 68 };
+    const common = { retirementAge: 68, outsideSuper: 100_000, targetSpending: 40_000, investmentProperties: [prop] };
+    const single = base({ ...common, people: [P({ currentAge: 68, superBalance: 500_000 })] });
+    const couple = base({ ...common, household: "couple", superMode: "individual", people: [P({ currentAge: 68, superBalance: 500_000 }), P({ currentAge: 68, superBalance: 500_000 })] });
+    const singleCgt = rowAt(single, 68).breakdown.propertyCgt ?? 0;
+    const coupleCgt = rowAt(couple, 68).breakdown.propertyCgt ?? 0;
+    expect(singleCgt).toBeGreaterThan(0);
+    expect(coupleCgt).toBeLessThan(singleCgt); // $600k gain split 2×$300k → lower progressive tax
+  });
+});
+
+describe("Review T3-3 — a property sale scheduled in the working years happens then", () => {
+  it("sells during accumulation (proceeds into savings), not deferred to retirement", () => {
+    const prop = { name: "IP", value: 500_000, purchasePrice: 400_000, growthReal: 0, grossYield: 0, costRatio: 0, loanBalance: 0, loanRate: 0, strategy: "sell" as const, sellAtAge: 60 };
+    const plan = base({ people: [P({ currentAge: 55, superBalance: 300_000, salary: 80_000 })], retirementAge: 67, outsideSuper: 50_000, investmentProperties: [prop] });
+    const rows = simulate(plan, cfg).rows;
+    const sale = rows.find((r) => (r.breakdown.propertyProceeds ?? 0) > 0)!;
+    expect(sale.age).toBe(60); // sold at the scheduled age, in the working years
+    expect(sale.phase).toBe("accumulation");
+    expect(sale.breakdown.propertyProceeds).toBeGreaterThan(400_000); // ~$500k less CGT into savings
+    // Rows plot the OPENING balance, so the proceeds show at the next year's open.
+    expect(rows.find((r) => r.age === 61)!.outside).toBeGreaterThan(rows.find((r) => r.age === 60)!.outside + 400_000);
+  });
+});
+
+describe("Review T3-5 — an underwater property sale charges the shortfall to savings", () => {
+  it("reduces savings by the negative equity instead of dropping it", () => {
+    const prop = { name: "IP", value: 300_000, purchasePrice: 300_000, growthReal: 0, grossYield: 0, costRatio: 0, loanBalance: 450_000, loanRate: 0, strategy: "sell" as const, sellAtAge: 68 };
+    const plan = base({ people: [P({ currentAge: 66, superBalance: 300_000 })], retirementAge: 66, outsideSuper: 400_000, targetSpending: 30_000, investmentProperties: [prop] });
+    const sale = rowAt(plan, 68).breakdown;
+    expect(sale.propertyCgt).toBe(0); // value == cost base → no gain
+    expect(sale.propertyProceeds).toBeCloseTo(-150_000, -2); // 300k value − 450k loan = −150k shortfall paid from savings
+  });
+});
+
+describe("Review T3-6 — a downsize nets a P&I loan at its amortised balance", () => {
+  it("releases equity against the paid-down balance, not the full original", () => {
+    const mortgage = { type: "principal_interest" as const, balance: 300_000, interestRate: 5, annualRepayment: 30_000, payoffAge: 78, strategy: "carry" as const };
+    const plan = base({
+      people: [P({ currentAge: 60, superBalance: 400_000 })], retirementAge: 60, targetSpending: 40_000,
+      home: { value: 1_000_000, growthReal: 0, downsize: { atAge: 65, newValue: 600_000, toSuper: 0 } }, mortgage,
+    });
+    const amortised = outstandingBalance(mortgage, 5); // t=5 at the downsize (currentAge 60 → age 65)
+    expect(amortised).toBeLessThan(300_000); // paid down below the original
+    const release = rowAt(plan, 65).breakdown.homeProceeds ?? 0;
+    expect(release).toBeCloseTo(1_000_000 - 600_000 - amortised, -2);
+  });
+});
+
+describe("Review T3-4 — CGT discount input is normalised + clamped", () => {
+  it("reads a fraction (0.5) as 50% and clamps out-of-range values", () => {
+    const mk = (pct: number) => withDefaults({ ...DEFAULT_CONFIG, outsideTax: { ...DEFAULT_CONFIG.outsideTax, cgtDiscountPct: pct } }).outsideTax.cgtDiscountPct;
+    expect(mk(0.5)).toBe(50); // the classic "0.5 vs 50" entry mistake
+    expect(mk(50)).toBe(50); // already a percent — unchanged
+    expect(mk(500)).toBe(100); // clamped to the max
+    expect(mk(-5)).toBe(0); // clamped to the min
   });
 });

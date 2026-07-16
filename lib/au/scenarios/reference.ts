@@ -242,15 +242,22 @@ export function propertyNetRent(p: PropertyDetail, years: number): number {
 export function propertyNetEquity(p: PropertyDetail, years: number): number {
   return Math.max(0, propertyValueAt(p, years) - p.loanBalance);
 }
-export function propertyCGT(p: PropertyDetail, years: number, cgt: RefCgtRules): number {
+export function propertyCGT(p: PropertyDetail, years: number, cgt: RefCgtRules, owners = 1): number {
   const gain = Math.max(0, propertyValueAt(p, years) - p.purchasePrice);
   if (gain <= 0) return 0;
-  if (cgt.regime === "discount") return incomeTax(gain * (1 - cgt.discountPct / 100));
-  const marginal = incomeTax(gain); // real gain, fully taxable, standalone
-  return cgt.onAgePension ? marginal : Math.max(marginal, (cgt.minRatePct / 100) * gain);
+  const n = Math.max(1, Math.round(owners)); // jointly-owned gain splits across co-owners
+  const gainPer = gain / n;
+  const perOwner =
+    cgt.regime === "discount"
+      ? incomeTax(gainPer * (1 - cgt.discountPct / 100))
+      : cgt.onAgePension
+        ? incomeTax(gainPer) // real gain, fully taxable, standalone
+        : Math.max(incomeTax(gainPer), (cgt.minRatePct / 100) * gainPer);
+  return perOwner * n;
 }
-export function propertySaleProceeds(p: PropertyDetail, years: number, cgt: RefCgtRules): number {
-  return Math.max(0, propertyValueAt(p, years) - p.loanBalance - propertyCGT(p, years, cgt));
+export function propertySaleProceeds(p: PropertyDetail, years: number, cgt: RefCgtRules, owners = 1): number {
+  // Not floored — an underwater sale (loan > value) leaves a shortfall paid from savings.
+  return propertyValueAt(p, years) - p.loanBalance - propertyCGT(p, years, cgt, owners);
 }
 
 // ── Mortgage cost (fixed nominal, deflated to today's dollars) ───────────────

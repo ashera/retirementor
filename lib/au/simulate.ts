@@ -23,16 +23,10 @@ import {
   spendingForAge,
   startingSuperBalances,
 } from "./types";
-import { mortgageActiveAtAge, mortgageAnnualCost } from "./mortgage";
+import { mortgageActiveAtAge, mortgageAnnualCost, outstandingBalance } from "./mortgage";
 import { budgetSplit, presetCategories } from "./budget";
 import { residentIncomeTax, seniorIncomeTax, medicareLevy, personTax, type CgtParams } from "./tax";
-import {
-  capitalGainsTax,
-  netEquity,
-  netRentCash,
-  netSaleProceeds,
-  propertyValueAt,
-} from "./property";
+import { capitalGainsTax, netEquity, netRentCash, propertyValueAt } from "./property";
 import type { Person, PersonTaxDetail, Phase, RetirementPlan, SimResult, YearBreakdown, YearRow } from "./types";
 
 const EPS = 1e-6;
@@ -345,11 +339,12 @@ export function simulate(
     // would silently destroy that much freed equity. (An active interest-only loan
     // keeps its balance; a P&I loan's balance isn't amortised here — a smaller,
     // conservative under-statement — but a GONE loan must count as $0.)
-    // A fixed nominal loan balance is worth less in today's dollars each year — the
-    // same way the repayment (mortgageCost, below) is deflated. Deflate it wherever
-    // it meets a real-dollar figure (equity release, net worth, clear-from-super), or
-    // an inflation-era clear/downsize over-states the debt and destroys real equity.
-    const loanBalReal = mortgage ? mortgage.balance / Math.pow(1 + plan.inflation / 100, t) : 0;
+    // The loan's TODAY'S-DOLLARS balance wherever it meets a real-dollar figure
+    // (equity release, net worth, clear-from-super): the OUTSTANDING nominal balance —
+    // amortised for a P&I loan part-way through its term, constant for interest-only —
+    // deflated the same way the repayment (mortgageCost, below) is. Using the full
+    // original balance would over-state the debt and destroy real equity.
+    const loanBalReal = mortgage ? outstandingBalance(mortgage, t) / Math.pow(1 + plan.inflation / 100, t) : 0;
     const loanBal =
       mortgage && !mortgageCleared && mortgageActiveAtAge(mortgage, oldest) ? loanBalReal : 0;
     let homeProceedsThisYear = 0;
@@ -449,16 +444,39 @@ export function simulate(
           : taxables.reduce((s, tx) => s + Math.max(0, residentIncomeTax(tx + outsidePerAccum) - residentIncomeTax(tx)), 0);
       outside -= accumOutsideTax;
 
-      // Held investment-property equity (value − loan) for the net-worth view.
-      // Nothing sells while working, so every property still counts. The engine
+      // A property whose sale age falls in the WORKING years is sold then — its
+      // proceeds (value less loan and CGT) land in savings — rather than the sale
+      // being deferred to retirement. Proceeds are NOT floored: an underwater sale's
+      // shortfall reduces savings. CGT splits across co-owners, standalone (no Age
+      // Pension in the working years, so the 30% indexed minimum binds).
+      let accumPropertyProceeds = 0;
+      let accumPropertyCgt = 0;
+      properties.forEach((prop, pi) => {
+        if (sold[pi] || prop.strategy !== "sell" || oldest < prop.sellAtAge) return;
+        const value = propertyValueAt(prop, t);
+        const cgtPaid = capitalGainsTax(
+          prop,
+          value,
+          { regime: cgtRegime, discountPct: config.outsideTax?.cgtDiscountPct ?? 50, minRatePct: config.outsideTax?.cgtMinRatePct ?? 30, onAgePension: false },
+          plan.people.length,
+        );
+        const proceeds = value - prop.loanBalance - cgtPaid;
+        outside += proceeds;
+        accumPropertyProceeds += proceeds;
+        accumPropertyCgt += cgtPaid;
+        sold[pi] = true;
+      });
+
+      // Held investment-property equity (value − loan) for the net-worth view. A
+      // sold property drops out (its equity became savings above). The engine
       // otherwise only needs this in retirement (the means test), but the net-worth
       // band spans the whole timeline, so we compute it here too.
-      const accumPropertyEquity = properties.reduce((s, prop) => s + netEquity(prop, propertyValueAt(prop, t)), 0);
+      const accumPropertyEquity = properties.reduce((s, prop, pi) => s + (sold[pi] ? 0 : netEquity(prop, propertyValueAt(prop, t))), 0);
       // Net rent the properties throw off during the working years too (positive
       // income, or a negative cash drain for a geared property) — surfaced on the
       // income chart alongside take-home pay. Like salary take-home it's disposable
       // income, not auto-saved, so it doesn't itself move the balance.
-      const accumRentCash = properties.reduce((s, prop) => s + netRentCash(prop, propertyValueAt(prop, t)), 0);
+      const accumRentCash = properties.reduce((s, prop, pi) => s + (sold[pi] ? 0 : netRentCash(prop, propertyValueAt(prop, t))), 0);
       // Income tax on that rent, marginal, stacked on each owner's taxable salary and
       // split equally across the household. A rental LOSS reduces income tax — this is
       // negative gearing (the working-years benefit). NEGATIVE rentTax = a tax saving.
@@ -531,8 +549,8 @@ export function simulate(
           mortgageCleared: 0,
           lumpSum: 0,
           recontribution: 0,
-          propertyProceeds: 0,
-          propertyCgt: 0,
+          propertyProceeds: accumPropertyProceeds,
+          propertyCgt: accumPropertyCgt,
           homeProceeds: 0,
           homeProceedsToSuper: 0,
           homeValue: homeValueThisYear,
@@ -744,9 +762,13 @@ export function simulate(
           minRatePct: config.outsideTax?.cgtMinRatePct ?? 30,
           onAgePension: rows.length > 0 && rows[rows.length - 1].agePension > 0,
         };
-        const proceeds = netSaleProceeds(prop, value, cgtRules);
+        // Split the gain across co-owners (household size). Proceeds are NOT floored
+        // at $0: an underwater sale (loan > value) leaves a shortfall that must be
+        // repaid from savings, so it reduces `outside` rather than silently vanishing.
+        const cgtPaid = capitalGainsTax(prop, value, cgtRules, plan.people.length);
+        const proceeds = value - prop.loanBalance - cgtPaid;
         propertyProceeds += proceeds;
-        propertyCgt += capitalGainsTax(prop, value, cgtRules);
+        propertyCgt += cgtPaid;
         outside += proceeds;
         sold[pi] = true;
       } else {
@@ -798,18 +820,18 @@ export function simulate(
     let pensionBreakdown: YearBreakdown["pension"] = null;
     const pensionEligible = ages.filter((a) => a >= pensionAge).length;
     if (pensionEligible > 0) {
-      // A member who has reached Age Pension age but is still WORKING holds their super
-      // in accumulation — exempt only UNTIL pension age, so from pension age it IS
-      // assessed (assets + deeming) even though it can't yet be drawn. accessibleSuper
-      // already counts retired-at-preservation (pension-phase) balances; add any
-      // pension-age worker's balance it misses.
-      const workingPensionAgeSuper = plan.people.reduce(
-        (s, _p, i) =>
-          s +
-          (ages[i] >= pensionAge && !(t >= retireOffsets[i] && ages[i] >= preservationAge) ? superOf(i) : 0),
+      // Super assessed by the means test, per Services Australia:
+      //   • from Age Pension age → ALL of that member's super (accumulation AND
+      //     pension phase), whether they've retired or are still working;
+      //   • under Age Pension age → only super that's in PENSION phase (an
+      //     account-based income stream has begun). Accumulation-phase super — a
+      //     still-working balance, a keepSuperInAccumulation retiree, or the excess
+      //     above the Transfer Balance Cap — stays exempt until pension age.
+      // (accessibleSuper drives DRAWDOWN eligibility and is left untouched.)
+      const assessedSuper = plan.people.reduce(
+        (s, _p, i) => s + (ages[i] >= pensionAge ? superOf(i) : pension[i]),
         0,
       );
-      const assessedSuper = accessibleSuper + workingPensionAgeSuper;
       const financialAssets = outside + assessedSuper;
       const ap = agePension(
         {

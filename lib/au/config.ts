@@ -317,5 +317,16 @@ export function withDefaults(data: EngineConfig): EngineConfig {
       bootstrapBlockYears: DEFAULT_CONFIG.bootstrapBlockYears,
     };
   }
+  // Guard the CGT discount against the classic "0.5 vs 50" entry mistake. It is a
+  // PERCENT (50 = a 50% discount, used as 1 − pct/100), so a value entered as a
+  // fraction (0 < x ≤ 1) almost certainly meant 0.5 → 50%. Normalise that, then
+  // clamp to 0–100 so a stray value can never distort the discount branch.
+  if (out.outsideTax && Number.isFinite(out.outsideTax.cgtDiscountPct)) {
+    const raw = out.outsideTax.cgtDiscountPct;
+    const normalised = Math.min(100, Math.max(0, raw > 0 && raw <= 1 ? raw * 100 : raw));
+    if (normalised !== raw) {
+      out = { ...out, outsideTax: { ...out.outsideTax, cgtDiscountPct: normalised } };
+    }
+  }
   return out;
 }

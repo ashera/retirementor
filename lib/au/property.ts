@@ -58,13 +58,28 @@ export const DISCOUNT_CGT_RULES: CgtRules = { regime: "discount", discountPct: 5
 
 /** CGT on sale, in today's dollars. "discount" = 50% discount then marginal;
  *  "indexed" (post-1 July 2027) = the whole real gain at the marginal rate with a
- *  30% minimum (Age Pension recipients exempt from the minimum). */
-export function capitalGainsTax(p: PropertyDetail, value: number, rules: CgtRules = DISCOUNT_CGT_RULES): number {
+ *  30% minimum (Age Pension recipients exempt from the minimum).
+ *  A jointly-owned property splits the gain across `owners`, so each co-owner is
+ *  taxed on their share on their own scale — a couple isn't taxed as one big gain.
+ *  (Still standalone per owner — not stacked on their other income — a documented
+ *  simplification.) */
+export function capitalGainsTax(
+  p: PropertyDetail,
+  value: number,
+  rules: CgtRules = DISCOUNT_CGT_RULES,
+  owners = 1,
+): number {
   const gain = Math.max(0, value - p.purchasePrice);
   if (gain <= 0) return 0;
-  if (rules.regime === "discount") return incomeTax(gain * (1 - rules.discountPct / 100));
-  const marginal = incomeTax(gain); // real gain, fully taxable
-  return rules.onAgePension ? marginal : Math.max(marginal, (rules.minRatePct / 100) * gain);
+  const n = Math.max(1, Math.round(owners));
+  const gainPer = gain / n;
+  const perOwner =
+    rules.regime === "discount"
+      ? incomeTax(gainPer * (1 - rules.discountPct / 100))
+      : rules.onAgePension
+        ? incomeTax(gainPer) // real gain, fully taxable
+        : Math.max(incomeTax(gainPer), (rules.minRatePct / 100) * gainPer);
+  return perOwner * n;
 }
 
 /** Cash released by a sale: value, less the loan repaid and CGT. */

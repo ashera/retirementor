@@ -25,6 +25,24 @@ export function mortgageActiveAtAge(m: MortgageDetail, oldestAge: number): boole
 }
 
 /**
+ * Outstanding NOMINAL balance after `yearsElapsed` years of repayments. An
+ * interest-only loan never amortises (balance constant). A P&I loan pays down via
+ * the standard amortisation recurrence Bₙ = B₀(1+r)ⁿ − M·((1+r)ⁿ−1)/r, floored at
+ * 0 — so a downsize/clear part-way through the loan nets the balance actually still
+ * owed, not the full original amount. Callers deflate this to today's dollars.
+ */
+export function outstandingBalance(m: MortgageDetail, yearsElapsed: number): number {
+  if (m.type === "interest_only") return Math.max(0, m.balance);
+  const n = Math.max(0, yearsElapsed);
+  const M = Math.max(0, m.annualRepayment);
+  const r = m.interestRate / 100;
+  if (M <= 0) return Math.max(0, m.balance);
+  if (r <= 0) return Math.max(0, m.balance - M * n);
+  const grown = Math.pow(1 + r, n);
+  return Math.max(0, m.balance * grown - (M * (grown - 1)) / r);
+}
+
+/**
  * Suggested payoff age for a P&I loan, from the standard amortisation formula:
  *   n = -ln(1 - i·B/M) / ln(1+i)   (monthly i, repayment M, balance B)
  * Returns null when the repayment doesn't even cover the interest (never
