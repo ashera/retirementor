@@ -61,18 +61,27 @@ export function medicareLevy(taxable: number): number {
   return Math.min(0.02 * t, 0.1 * (t - MEDICARE_LOW_INCOME_THRESHOLD));
 }
 
-// Max SAPTO (Seniors & Pensioners Tax Offset), per person. The offset makes
-// modest senior income effectively tax-free (single ~$35k, each of a couple
-// ~$32k before any tax).
+// SAPTO (Seniors & Pensioners Tax Offset), per person. Max offset makes modest
+// senior income effectively tax-free (single ~$35k, each of a couple ~$32k), then
+// shades out at 12.5c per $1 of rebate income above the threshold — fully gone by
+// ~$50,119 (single) / ~$41,790 each (couple). (ATO SAPTO rates.)
 const SAPTO_MAX = { single: 2_230, couple: 1_602 };
+const SAPTO_SHADE_IN = { single: 32_279, couple: 28_974 }; // rebate income where the taper begins
+const SAPTO_TAPER = 0.125;
+
+/** The SAPTO available at a given rebate income (≈ taxable income in this model),
+ *  after the 12.5c/$ high-income phase-out. */
+export function sapto(rebateIncome: number, household: "single" | "couple"): number {
+  return Math.max(0, SAPTO_MAX[household] - SAPTO_TAPER * Math.max(0, rebateIncome - SAPTO_SHADE_IN[household]));
+}
 
 /** Approx income tax on a senior/pensioner's assessable income (per person):
- *  ordinary resident tax less LITO AND the SAPTO offset (both non-refundable).
- *  Ignores SAPTO's high-income phase-out — fine for the modest amounts modelled —
- *  and the Medicare levy (which SAPTO recipients on low incomes generally don't
- *  pay). Used for both part-time employment income and outside-super earnings. */
+ *  ordinary resident tax less LITO AND the (tapered) SAPTO offset, both
+ *  non-refundable. Ignores the Medicare levy (which SAPTO recipients on low incomes
+ *  generally don't pay). Used for both part-time employment income and outside-super
+ *  earnings. */
 export function seniorIncomeTax(income: number, household: "single" | "couple"): number {
-  return Math.max(0, incomeTax(income) - lito(income) - SAPTO_MAX[household]);
+  return Math.max(0, incomeTax(income) - lito(income) - sapto(income, household));
 }
 
 /** @deprecated Renamed to {@link seniorIncomeTax} (also covers investment earnings). */
@@ -128,7 +137,7 @@ export function personTax(
   const gross = incomeTax(O);
   const litoApplied = Math.min(lito(O), gross);
   const afterLito = gross - litoApplied;
-  const saptoApplied = senior ? Math.min(SAPTO_MAX[household], afterLito) : 0;
+  const saptoApplied = senior ? Math.min(sapto(O, household), afterLito) : 0;
   const incomeTaxNet = afterLito - saptoApplied; // == netTax(O)
   const medicare = medicareLevy(Math.max(0, employment));
   let cgtTax = 0;

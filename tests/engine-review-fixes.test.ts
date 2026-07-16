@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { simulate } from "../lib/au/simulate";
 import { DEFAULT_CONFIG } from "../lib/au/config";
-import { incomeTax, medicareLevy } from "../lib/au/tax";
+import { incomeTax, medicareLevy, sapto, seniorIncomeTax, residentIncomeTax } from "../lib/au/tax";
 import { guardrailsTimeline } from "../lib/au/guardrails";
 import { bootstrapShockPath } from "../lib/au/historicalReturns";
 import { DEFAULT_PLAN, type RetirementPlan, type Person } from "../lib/au/types";
@@ -129,5 +129,95 @@ describe("Review Tier-3 fixes", () => {
     const path = bootstrapShockPath(() => 0.5, 20, Number.NaN);
     expect(path).toHaveLength(21);
     expect(path.every((v) => Number.isFinite(v))).toBe(true);
+  });
+});
+
+// ── Pass 2 (2026-07-16): a second adversarial review, different partition ─────
+describe("Review pass-2 #1 — a pension-age partner's super is assessed while still working", () => {
+  it("assesses a still-working 68-year-old's super the same as if it were in pension phase", () => {
+    // Only difference between the two plans: whether partner #2 (68, $300k super,
+    // earns nothing) has retired. Their super is assessable from Age Pension age
+    // either way, so the household pension must match. Pre-fix, the working case
+    // omitted their super from the assets test and paid a much larger pension.
+    const common = { household: "couple" as const, superMode: "individual" as const, retirementAge: 68, outsideSuper: 50_000, targetSpending: 55_000 };
+    const retired = base({ ...common, people: [P({ currentAge: 68, superBalance: 300_000 }), P({ currentAge: 68, superBalance: 300_000, retirementAge: 68 })] });
+    const working = base({ ...common, people: [P({ currentAge: 68, superBalance: 300_000 }), P({ currentAge: 68, superBalance: 300_000, salary: 0, retirementAge: 75 })] });
+    const pRetired = rowAt(retired, 68).agePension;
+    const pWorking = rowAt(working, 68).agePension;
+    expect(pRetired).toBeGreaterThan(5_000); // part-pension (assets under the cutout)
+    // Assessed either way — the tiny residual is just one year's super growth landing
+    // before the means test for a working member vs after for a retired one. Pre-fix
+    // the working case omitted $300k of super and paid ~$20k more pension.
+    expect(Math.abs(pWorking - pRetired)).toBeLessThan(3_000);
+  });
+});
+
+describe("Review pass-2 #5 — Work Bonus is per pension-age earner, not per household member", () => {
+  it("excludes $7,800 only for the partner who has reached Age Pension age", () => {
+    const plan = base({
+      household: "couple", superMode: "individual", retirementAge: 67,
+      people: [P({ currentAge: 67, superBalance: 100_000 }), P({ currentAge: 63, superBalance: 100_000, retirementAge: 63 })],
+      outsideSuper: 20_000, targetSpending: 40_000, workIncome: { perYear: 30_000, untilAge: 80 },
+    });
+    // $30k work split 15k/15k: the 67-year-old gets the $7,800 bonus (→ 7,200), the
+    // 63-year-old does not (→ 15,000). Pre-fix a flat 2×$7,800 gave 30k−15.6k = 14.4k.
+    const other = rowAt(plan, 67).breakdown.pension!.otherIncome;
+    expect(other).toBeCloseTo(22_200, 0);
+  });
+});
+
+describe("Review pass-2 #4 — SAPTO phases out at high income", () => {
+  it("grants full SAPTO on modest income, tapers it, and removes it entirely above ~$50k", () => {
+    expect(sapto(30_000, "single")).toBeCloseTo(2_230, 0); // below the shade-in threshold
+    expect(seniorIncomeTax(30_000, "single")).toBe(0); // modest senior income stays tax-free
+    expect(sapto(45_000, "single")).toBeCloseTo(640, 0); // (45,000−32,279)·0.125 = 1,590 withdrawn
+    expect(sapto(50_119, "single")).toBeCloseTo(0, 0); // fully phased out
+    // Above the cut-out the senior pays the ordinary (LITO-only) tax — no free SAPTO.
+    expect(seniorIncomeTax(80_000, "single")).toBeCloseTo(residentIncomeTax(80_000), 0);
+  });
+});
+
+describe("Review pass-2 #2 — retirement tax reconciles with the consolidated modal", () => {
+  it("stacks net rent + outside earnings on ONE tax scale (charged == personTax), not independently", () => {
+    const plan = base({
+      people: [P({ currentAge: 67, superBalance: 300_000 })], retirementAge: 67,
+      outsideSuper: 900_000, targetSpending: 90_000, lifeExpectancy: 90,
+      investmentProperties: [{ name: "IP", value: 600_000, purchasePrice: 400_000, growthReal: 0, grossYield: 8, costRatio: 20, loanBalance: 0, loanRate: 0, strategy: "hold", sellAtAge: 99 }],
+    });
+    const r = simulate(plan, cfg).rows.find((x) => x.age === 70)!.breakdown;
+    const charged = (r.rentTax ?? 0) + (r.outsideTax ?? 0); // actually deducted from the pools
+    const modal = (r.incomeTax ?? 0) + ((r.capitalGains ?? 0) - (r.propertyCgt ?? 0)); // consolidated personTax (excl property-sale CGT)
+    expect(charged).toBeGreaterThan(1_000); // rent + a drawn outside pool → real tax
+    expect(charged).toBeCloseTo(modal, 0); // was ~$5k apart when rent & outside stacked separately
+  });
+});
+
+describe("Review pass-2 #3 — clear-at-retirement pays the loan's real value, not the nominal balance", () => {
+  it("deflates the $200k nominal balance to today's dollars at the clear year", () => {
+    const plan = base({
+      people: [P({ currentAge: 55, superBalance: 500_000 })], retirementAge: 67, inflation: 2.5, targetSpending: 40_000,
+      mortgage: { type: "interest_only", balance: 200_000, interestRate: 6, annualRepayment: 0, payoffAge: null, strategy: "clear_at_retirement" },
+    });
+    const cleared = simulate(plan, cfg).rows.find((r) => r.breakdown.mortgageCleared > 0)!;
+    const expected = 200_000 / 1.025 ** (cleared.age - 55); // deflated to the clear year (CPI)
+    expect(cleared.breakdown.mortgageCleared).toBeCloseTo(expected, 0);
+    expect(cleared.breakdown.mortgageCleared).toBeLessThan(190_000); // not the raw nominal balance
+  });
+});
+
+describe("Review pass-2 #6 — a career break during the staggered gap is honoured", () => {
+  it("stops the still-working partner's salary + contributions during the break", () => {
+    const people = (): Person[] => [P({ currentAge: 60, superBalance: 300_000, retirementAge: 60 }), P({ currentAge: 58, superBalance: 300_000, salary: 90_000, retirementAge: 67 })];
+    const common = { household: "couple" as const, superMode: "individual" as const, retirementAge: 60, outsideSuper: 200_000, targetSpending: 50_000, lifeExpectancy: 90 };
+    const noBreak = base({ ...common, people: people() });
+    const withBreak = base({ ...common, people: people(), careerBreaks: [{ atAge: 62, years: 2, spendFromSavings: 0, who: 1 }] });
+    // Partner #2 hits age 62 when the household (person 0) is 64 — rows are keyed by
+    // the oldest age. In that year they earn nothing and add no super.
+    const breakRow = simulate(withBreak, cfg).rows.find((r) => r.age === 64)!.breakdown;
+    expect(breakRow.onBreak).toBe(true);
+    expect(breakRow.salaryIncome).toBe(0);
+    // The lost contributions cost real super by the time they'd have retired (67).
+    const endSuper = (p: RetirementPlan) => simulate(p, cfg).rows.find((r) => r.age === 67)!.totalSuper;
+    expect(endSuper(withBreak)).toBeLessThan(endSuper(noBreak));
   });
 });

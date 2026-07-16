@@ -227,9 +227,11 @@ describe("What-If strategies", () => {
     const card = cardById(b, "downsize");
     const rows = simulate(card.apply(b, resolveValues(card, { age: 67, newValue: 600_000, toSuper: 0 })), cfg).rows;
     const nw = (age: number) => { const r = rows.find((x) => x.age === age)!; return r.homeEquity + r.totalSuper + r.outside; };
-    // The net-worth home band already nets the $300k mortgage before the downsize,
-    // and becomes the new home value once the loan is discharged at the sale.
-    expect(rows.find((r) => r.age === 66)!.homeEquity).toBeCloseTo(700_000, -2);
+    // The net-worth home band nets the mortgage at its TODAY'S-DOLLARS value — the
+    // $300k nominal loan deflated by inflation (the same basis as the repayment) —
+    // before the downsize, and becomes the new home value once the loan is discharged.
+    const deflatedLoan = 300_000 / (1 + b.inflation / 100) ** 2; // age 66 = t=2 (currentAge 64)
+    expect(rows.find((r) => r.age === 66)!.homeEquity).toBeCloseTo(1_000_000 - deflatedLoan, -2);
     expect(rows.find((r) => r.age === 67)!.homeEquity).toBeCloseTo(600_000, -2);
     // The downsize adds no net-worth cliff: the drop into the downsize year is the
     // same normal drawdown as an ordinary year, NOT the $300k loan the old gross

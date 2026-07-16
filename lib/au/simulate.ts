@@ -242,6 +242,12 @@ export function simulate(
     // works (handled per-person inside the retirement branch below).
     const accumPhase = t < earliestOffset;
 
+    // Is member `i` on a scheduled career break this year? Hoisted to loop scope so
+    // BOTH the accumulation branch and the staggered-retirement working loop honour
+    // it (a break landing in the retirement gap used to be silently ignored).
+    const onBreak = (i: number) =>
+      careerBreaks.some((b) => b.who === i && ages[i] >= b.atAge && ages[i] < b.atAge + b.years);
+
     // This year's returns (constant mean, or a Monte Carlo draw). Super and the
     // outside pool each carry their own nominal return.
     const nom = nominalReturns ? (nominalReturns[t] ?? plan.investmentReturn) : plan.investmentReturn;
@@ -339,8 +345,13 @@ export function simulate(
     // would silently destroy that much freed equity. (An active interest-only loan
     // keeps its balance; a P&I loan's balance isn't amortised here — a smaller,
     // conservative under-statement — but a GONE loan must count as $0.)
+    // A fixed nominal loan balance is worth less in today's dollars each year — the
+    // same way the repayment (mortgageCost, below) is deflated. Deflate it wherever
+    // it meets a real-dollar figure (equity release, net worth, clear-from-super), or
+    // an inflation-era clear/downsize over-states the debt and destroys real equity.
+    const loanBalReal = mortgage ? mortgage.balance / Math.pow(1 + plan.inflation / 100, t) : 0;
     const loanBal =
-      mortgage && !mortgageCleared && mortgageActiveAtAge(mortgage, oldest) ? mortgage.balance : 0;
+      mortgage && !mortgageCleared && mortgageActiveAtAge(mortgage, oldest) ? loanBalReal : 0;
     let homeProceedsThisYear = 0;
     let homeToSuperThisYear = 0;
     if (downsize && !downsized && oldest >= downsize.atAge) {
@@ -375,7 +386,7 @@ export function simulate(
     // which discharges the loan from the sale proceeds (mortgageCleared is already
     // set at the top of this loop when a downsize/sale happens).
     const outstandingLoan =
-      mortgage && !mortgageCleared && isHomeowner && mortgageActiveAtAge(mortgage, oldest) ? mortgage.balance : 0;
+      mortgage && !mortgageCleared && isHomeowner && mortgageActiveAtAge(mortgage, oldest) ? loanBalReal : 0;
     const homeEquityThisYear = Math.max(0, homeValueThisYear - outstandingLoan);
 
     // Balances at the START of this year (on the birthday) — this is what each
@@ -390,7 +401,6 @@ export function simulate(
       // from savings (below). Savings additions pause only when EVERY member is on
       // a break (nobody's earning). Super keeps earning on the existing balance; the
       // missed contributions and their compounding are the real cost.
-      const onBreak = (i: number) => careerBreaks.some((b) => b.who === i && ages[i] >= b.atAge && ages[i] < b.atAge + b.years);
       const anyoneWorking = plan.people.some((_, i) => !onBreak(i));
       let contribGross = 0;
       let contribTax = 0;
@@ -564,9 +574,17 @@ export function simulate(
     let workEarningsTax = 0;
     let workTakeHome = 0; // still-working partners' net salary → offsets spending
     let workGrossSalary = 0; // gross → Age Pension income test
+    let workOnBreak = false; // any still-working partner on a career break this year
     plan.people.forEach((p, i) => {
       if (t >= retireOffsets[i]) return; // already retired — drawn down below
-      const r = contribute(p, accum[i], gapScale, i === 0 && ages[i] >= preservationAge);
+      // A career break landing in the staggered gap: no salary, no contributions
+      // (super still earns on the existing balance) — the lost salary offset and
+      // missed contributions ARE the cost; the household's retirement spend still
+      // funds living, so we don't also draw spendFromSavings (that would double-count).
+      const brk = onBreak(i);
+      if (brk) workOnBreak = true;
+      const person = brk ? { ...p, salary: 0, voluntaryConcessional: 0 } : p;
+      const r = contribute(person, accum[i], gapScale, i === 0 && ages[i] >= preservationAge && !brk);
       accum[i] = r.newBalance;
       workContribGross += r.contribGross;
       workContribTax += r.contribTax;
@@ -575,7 +593,7 @@ export function simulate(
       workSuperGrowth += r.superGrowth;
       workEarningsTax += r.earningsTax;
       workTakeHome += r.takeHome;
-      workGrossSalary += p.salary * gapScale;
+      workGrossSalary += brk ? 0 : p.salary * gapScale;
     });
 
     // Only RETIRED members at/over preservation age can draw down (and are
@@ -628,12 +646,14 @@ export function simulate(
       mortgage &&
       mortgage.strategy === "clear_at_retirement" &&
       !mortgageCleared &&
-      accessibleSuper >= mortgage.balance
+      accessibleSuper >= loanBalReal
     ) {
-      drawSuper(accessibleIdx, mortgage.balance);
-      accessibleSuper -= mortgage.balance;
+      // Pay off the loan's TODAY'S-DOLLARS value (the same deflated basis the carry
+      // repayment uses) — not the raw nominal balance, which would over-draw super.
+      drawSuper(accessibleIdx, loanBalReal);
+      accessibleSuper -= loanBalReal;
       mortgageCleared = true;
-      mortgageClearedNow = mortgage.balance;
+      mortgageClearedNow = loanBalReal;
     }
 
     // One-off lump sum withdrawn from super at a chosen age. Only accessible super
@@ -756,10 +776,20 @@ export function simulate(
     const grossWork = work && oldest < work.untilAge ? Math.max(0, work.perYear) : 0;
     const workTax = grossWork > 0 ? ages.reduce((s, a) => s + taxAtAge(grossWork / workers, a), 0) : 0;
     const netWork = grossWork - workTax;
-    const assessableWork = Math.max(0, grossWork - 7_800 * workers);
-    // A still-working partner's salary is ordinary assessable income for the
-    // pension income test (no Work Bonus — that's for pension-age workers).
-    const assessableOther = rentAssessable + assessableWork + workGrossSalary;
+    // Per-person EMPLOYMENT income = this person's share of part-time work plus, for a
+    // still-working partner in the staggered gap, their career salary. The Work Bonus
+    // excludes the first $7,800/yr of EACH PENSION-AGE person's employment income from
+    // the income test — applied per person once they reach Age Pension age (not a flat
+    // household deduction, and it now also covers a pension-age partner's salary).
+    const employmentPer = plan.people.map((p, i) => {
+      const career = t < retireOffsets[i] && !onBreak(i) ? p.salary * gapScale : 0;
+      return grossWork / workers + career;
+    });
+    const assessableEmployment = employmentPer.reduce(
+      (s, emp, i) => s + Math.max(0, emp - (ages[i] >= pensionAge ? Math.min(7_800, emp) : 0)),
+      0,
+    );
+    const assessableOther = rentAssessable + assessableEmployment;
 
     // Age Pension (household level, from pension age). Financial assets are deemed;
     // an investment property's equity is assessable but NOT deemed, and its rent is
@@ -768,7 +798,19 @@ export function simulate(
     let pensionBreakdown: YearBreakdown["pension"] = null;
     const pensionEligible = ages.filter((a) => a >= pensionAge).length;
     if (pensionEligible > 0) {
-      const financialAssets = outside + accessibleSuper;
+      // A member who has reached Age Pension age but is still WORKING holds their super
+      // in accumulation — exempt only UNTIL pension age, so from pension age it IS
+      // assessed (assets + deeming) even though it can't yet be drawn. accessibleSuper
+      // already counts retired-at-preservation (pension-phase) balances; add any
+      // pension-age worker's balance it misses.
+      const workingPensionAgeSuper = plan.people.reduce(
+        (s, _p, i) =>
+          s +
+          (ages[i] >= pensionAge && !(t >= retireOffsets[i] && ages[i] >= preservationAge) ? superOf(i) : 0),
+        0,
+      );
+      const assessedSuper = accessibleSuper + workingPensionAgeSuper;
+      const financialAssets = outside + assessedSuper;
       const ap = agePension(
         {
           household: plan.household,
@@ -787,7 +829,7 @@ export function simulate(
       agePensionAmt = plan.household === "couple" && pensionEligible < 2 ? ap.annual / 2 : ap.annual;
       pensionBreakdown = {
         outsideAssets: outside,
-        accessibleSuper,
+        accessibleSuper: assessedSuper,
         propertyEquity,
         propertyParts,
         assessableAssets: financialAssets + propertyEquity,
@@ -945,13 +987,18 @@ export function simulate(
       const incPer = outsideIncome / workers;
       const gainPer = Math.max(0, realizedGain) / workers;
       const onAgePension = agePensionAmt > 0; // exemption from the 30% minimum
+      const rentPer = rentCash / workers; // net rent already assessed this year (may be a loss)
       plan.people.forEach((p, i) => {
+        // Outside earnings chain ON TOP of ALL this person's ordinary income already
+        // assessed — employment AND net rent — so the tax-free threshold / LITO / SAPTO
+        // aren't consumed separately by each source (matches personTax's single stack).
         const workPer = (t < retireOffsets[i] ? p.salary * gapScale : 0) + grossWork / workers;
-        // Dividends: ordinary income, marginal, stacked on this person's work income.
-        outsideDivTax += Math.max(0, taxAtAge(workPer + incPer, ages[i]) - taxAtAge(workPer, ages[i]));
-        // Capital gain: stacked on top of work income + dividends.
+        const ordBase = workPer + rentPer;
+        // Dividends: ordinary income, marginal, stacked on employment + net rent.
+        outsideDivTax += Math.max(0, taxAtAge(ordBase + incPer, ages[i]) - taxAtAge(ordBase, ages[i]));
+        // Capital gain: stacked on top of employment + net rent + dividends.
         if (gainPer > 0) {
-          const base = workPer + incPer;
+          const base = ordBase + incPer;
           if (cgtRegime === "discount") {
             outsideCgtTax += Math.max(0, taxAtAge(base + cgtDiscount * gainPer, ages[i]) - taxAtAge(base, ages[i]));
           } else {
@@ -1050,6 +1097,7 @@ export function simulate(
         homeProceedsToSuper: homeToSuperThisYear,
         homeValue: homeValueThisYear,
         homeEquity: homeEquityThisYear,
+        onBreak: workOnBreak, // a still-working partner on a gap year → charts shade it
       }),
     );
   }

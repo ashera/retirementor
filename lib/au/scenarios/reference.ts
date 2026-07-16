@@ -289,16 +289,24 @@ export function residentIncomeTax(taxable: number): number {
 }
 
 // ── Seniors & Pensioners Tax Offset (SAPTO) ──────────────────────────────────
-// Max SAPTO per person (ATO). Makes modest senior income effectively tax-free
-// (single ~$35k; each of a couple ~$32k). Re-stated from the published figure so
-// the reference doesn't share the engine's tax module.
+// Max SAPTO per person (ATO), then a 12.5c/$ phase-out on rebate income above the
+// threshold — fully withdrawn by ~$50,119 (single) / ~$41,790 each (couple).
+// Re-stated from the published figures so the reference doesn't share the engine's
+// tax module. (Check: (50_119-32_279)*0.125 = 2_230; (41_790-28_974)*0.125 = 1_602.)
 const SAPTO_MAX = { single: 2_230, couple: 1_602 } as const;
+const SAPTO_SHADE_IN = { single: 32_279, couple: 28_974 } as const;
+const SAPTO_TAPER = 0.125;
+
+/** SAPTO available at a rebate income (≈ taxable income here), after the phase-out. */
+export function sapto(rebateIncome: number, household: Household): number {
+  return Math.max(0, SAPTO_MAX[household] - SAPTO_TAPER * Math.max(0, rebateIncome - SAPTO_SHADE_IN[household]));
+}
 
 /** Resident income tax on a senior/pensioner, per person: ordinary tax less LITO
- *  AND SAPTO (floored at 0). Ignores the high-income phase-out + Medicare levy (as
- *  the engine does). Covers part-time employment AND outside investment earnings. */
+ *  AND the (tapered) SAPTO, floored at 0. Ignores the Medicare levy (as the engine
+ *  does). Covers part-time employment AND outside investment earnings. */
 export function seniorIncomeTax(income: number, household: Household): number {
-  return Math.max(0, incomeTax(income) - lito(income) - SAPTO_MAX[household]);
+  return Math.max(0, incomeTax(income) - lito(income) - sapto(income, household));
 }
 
 /** Retirement-phase per-person income tax. SAPTO only applies from Age Pension
