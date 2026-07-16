@@ -159,12 +159,12 @@ export default function WithdrawalRateCard({
           <span><span className="font-semibold text-red-400">&gt;6%</span> high</span>
           {safePct != null && (
             <span className="flex items-center gap-1 text-sky-300">
-              <span aria-hidden>▲</span> your safe rate ~{safePct}%{safePending ? " …" : ""}
+              <span aria-hidden>▲</span> SWR ~{safePct}%{safePending ? " …" : ""}
             </span>
           )}
           {flexPct != null && (
             <span className="flex items-center gap-1 text-violet-300">
-              <span aria-hidden>▲</span> with flexible spending ~{flexPct}%
+              <span aria-hidden>▲</span> flexible SWR ~{flexPct}%
             </span>
           )}
         </div>
@@ -174,8 +174,9 @@ export default function WithdrawalRateCard({
         {safePct != null ? (
           <>
             The classic guide is about 4%, but Australia&apos;s Age Pension is a safety net, so your{" "}
-            <span className="font-semibold text-sky-300">safe rate is ~{safePct}%</span> — the most you could
-            draw at a steady income and still be about {safeConfidence}% likely to last to age {plan.lifeExpectancy}.
+            <span className="font-semibold text-sky-300">safe withdrawal rate (SWR) is ~{safePct}%</span> — the
+            most you could draw at a steady income and still be about {safeConfidence}% likely to last to age{" "}
+            {plan.lifeExpectancy}.
             {overSafe
               ? ` You're drawing ${pct}%, above that — see the `
               : ` You're at ${pct}%, comfortably within it — the `}
@@ -184,9 +185,9 @@ export default function WithdrawalRateCard({
               <>
                 {" "}
                 <span className="text-violet-300">Flexible spending</span> — easing back a little after market
-                falls — could lift your safe <em>starting</em> rate to{" "}
-                <span className="font-semibold text-violet-300">~{flexPct}%</span>, in exchange for a variable
-                income (you&apos;d trim in rough markets rather than draw a fixed amount).
+                falls — could lift your SWR to{" "}
+                <span className="font-semibold text-violet-300">~{flexPct}%</span>, but this becomes a{" "}
+                <em>starting</em> rate you&apos;d trim in rough markets rather than a fixed draw.
               </>
             )}
           </>

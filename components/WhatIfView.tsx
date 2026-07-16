@@ -1378,9 +1378,9 @@ function StrategyCardRow({
                 guardrails.flexSafeRate != null &&
                 guardrails.flexSafeRate > guardrails.steadySafeRate + 0.002 && (
                   <div className="border-t border-line pt-1.5 text-slate-300">
-                    It lifts your safe <em>starting</em> rate from{" "}
-                    <span className="font-semibold text-sky-300">{(guardrails.steadySafeRate * 100).toFixed(1)}%</span> to{" "}
-                    <span className="font-semibold text-violet-300">{(guardrails.flexSafeRate * 100).toFixed(1)}%</span>
+                    It lifts your <span className="text-sky-300">SWR</span> from{" "}
+                    <span className="font-semibold text-sky-300">{(guardrails.steadySafeRate * 100).toFixed(1)}%</span> to a{" "}
+                    <span className="font-semibold text-violet-300">flexible {(guardrails.flexSafeRate * 100).toFixed(1)}%</span>
                     {guardrails.steadySafeSpend != null && guardrails.flexSafeSpend != null && (
                       <>
                         {" "}
@@ -1388,7 +1388,7 @@ function StrategyCardRow({
                         <span className="font-semibold text-violet-300">{fmtCurrency(guardrails.flexSafeSpend + gLoan)}/yr</span>)
                       </>
                     )}{" "}
-                    — the trade-off is a variable income: you&apos;d trim in rough markets rather than draw a fixed amount.
+                    — but this becomes a <em>starting</em> rate you&apos;d trim in rough markets, not a fixed draw.
                   </div>
                 )}
               {/* The cost — or, for a well-funded plan, the upside. */}
@@ -1500,12 +1500,12 @@ function StrategyCardRow({
                     <span><span className="font-semibold text-red-400">&gt;6%</span> high</span>
                     {safeRatePct != null && (
                       <span className="flex items-center gap-1 text-sky-300">
-                        <span aria-hidden>▲</span> safe rate ~{safeRatePct}%{sustainable.safePending ? " …" : ""}
+                        <span aria-hidden>▲</span> SWR ~{safeRatePct}%{sustainable.safePending ? " …" : ""}
                       </span>
                     )}
                     {flexSafePct != null && (
                       <span className="flex items-center gap-1 text-violet-300">
-                        <span aria-hidden>▲</span> flexible ~{flexSafePct}%
+                        <span aria-hidden>▲</span> flexible SWR ~{flexSafePct}%
                       </span>
                     )}
                   </div>
