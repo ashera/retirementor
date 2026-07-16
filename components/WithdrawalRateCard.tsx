@@ -40,6 +40,7 @@ export default function WithdrawalRateCard({
   plan,
   successPct,
   safeRate = null,
+  flexSafeRate = null,
   safePending = false,
 }: {
   result: SimResult;
@@ -48,6 +49,9 @@ export default function WithdrawalRateCard({
   // Personal safe withdrawal rate (the whole-portfolio rate at the 85%-MC max spend),
   // measured on the same basis as the headline so it drops onto the same bar.
   safeRate?: number | null;
+  // The safe rate under FLEXIBLE spending (Guyton-Klinger guardrails) — higher,
+  // because trimming in downturns lets you start higher. Shown as a second marker.
+  flexSafeRate?: number | null;
   safePending?: boolean;
 }) {
   const w = initialWithdrawal(result);
@@ -62,6 +66,11 @@ export default function WithdrawalRateCard({
   const markerPct = Math.min(100, Math.max(0, (w.portfolioRate / 0.1) * 100)); // 0–10% scale
   const safeMarkerPct = safeRate != null ? Math.min(100, Math.max(0, (safeRate / 0.1) * 100)) : null;
   const safePct = safeRate != null ? +(safeRate * 100).toFixed(1) : null;
+  // The flexible-spending rate, only surfaced when it's meaningfully above the steady
+  // one (guardrails always lifts it, but guard against noise / a null result).
+  const showFlex = flexSafeRate != null && safeRate != null && flexSafeRate > safeRate + 0.002;
+  const flexMarkerPct = showFlex ? Math.min(100, Math.max(0, (flexSafeRate! / 0.1) * 100)) : null;
+  const flexPct = showFlex ? +(flexSafeRate! * 100).toFixed(1) : null;
   const safeConfidence = Math.round(MC_CONFIDENCE_TARGET * 100);
   const overSafe = safeRate != null && w.portfolioRate > safeRate + 0.0005; // drawing above the safe rate
   const goal = retirementGoal(plan);
@@ -122,7 +131,8 @@ export default function WithdrawalRateCard({
             style={{ left: `${markerPct}%` }}
           />
         </div>
-        {/* Safe-rate arrow, pointing up at the bar */}
+        {/* Safe-rate arrows, pointing up at the bar: steady (sky) and, if higher,
+            flexible-spending (violet). */}
         {safeMarkerPct != null && (
           <div className="relative mt-px h-2.5">
             <span
@@ -132,6 +142,15 @@ export default function WithdrawalRateCard({
             >
               ▲
             </span>
+            {flexMarkerPct != null && (
+              <span
+                className="absolute top-0 -translate-x-1/2 text-[10px] leading-none text-violet-400"
+                style={{ left: `${flexMarkerPct}%` }}
+                aria-hidden
+              >
+                ▲
+              </span>
+            )}
           </div>
         )}
         <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-0.5 text-[10px] text-muted">
@@ -141,6 +160,11 @@ export default function WithdrawalRateCard({
           {safePct != null && (
             <span className="flex items-center gap-1 text-sky-300">
               <span aria-hidden>▲</span> your safe rate ~{safePct}%{safePending ? " …" : ""}
+            </span>
+          )}
+          {flexPct != null && (
+            <span className="flex items-center gap-1 text-violet-300">
+              <span aria-hidden>▲</span> with flexible spending ~{flexPct}%
             </span>
           )}
         </div>
@@ -156,6 +180,15 @@ export default function WithdrawalRateCard({
               ? ` You're drawing ${pct}%, above that — see the `
               : ` You're at ${pct}%, comfortably within it — the `}
             <a href="#likelihood" className="text-accent hover:underline">{successPct}% likelihood</a>{overSafe ? "." : " confirms it."}
+            {flexPct != null && (
+              <>
+                {" "}
+                <span className="text-violet-300">Flexible spending</span> — easing back a little after market
+                falls — could lift your safe <em>starting</em> rate to{" "}
+                <span className="font-semibold text-violet-300">~{flexPct}%</span>, in exchange for a variable
+                income (you&apos;d trim in rough markets rather than draw a fixed amount).
+              </>
+            )}
           </>
         ) : (
           <>

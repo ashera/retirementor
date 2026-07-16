@@ -325,7 +325,10 @@ export default function WhatIfView({
     if (!baseline) return null;
     const others = new Set(active);
     others.delete("adjust-spending");
-    return maxSustainableSpend(applyStrategies(baseline, catalog, others, values), config);
+    // Guardrails stripped: this is the FIXED-spending ceiling (the flexible one is
+    // surfaced separately on the withdrawal-rate bar + guardrails card).
+    const base: RetirementPlan = { ...applyStrategies(baseline, catalog, others, values), guardrails: undefined };
+    return maxSustainableSpend(base, config);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [baseline, catalog, active, otherValsKey, config]);
 
@@ -350,6 +353,12 @@ export default function WhatIfView({
   // dollar figure, measured on the SAME basis (withSpend, portfolioRate) as the
   // dashboard's withdrawal-rate card, so the two surfaces agree.
   const [safeRate, setSafeRate] = useState<number | null>(null);
+  // The safe spend/rate under FLEXIBLE spending (guardrails): higher, because trimming
+  // in downturns lets you start higher. The steady figures above are computed with
+  // guardrails STRIPPED so they stay a stable "fixed spending" benchmark; these are
+  // computed with guardrails FORCED — the gap is the uplift flexible spending buys.
+  const [flexSafeSpend, setFlexSafeSpend] = useState<number | null>(null);
+  const [flexSafeRate, setFlexSafeRate] = useState<number | null>(null);
   const [safePending, setSafePending] = useState(false);
   // The Adjust-spending card's "at your current spend" anchor: the likelihood with
   // the OTHER active What-If levers applied but the spend left at its current level
@@ -362,13 +371,21 @@ export default function WhatIfView({
     setSafePending(true);
     const others = new Set(active);
     others.delete("adjust-spending");
-    const base = applyStrategies(baseline, catalog, others, values);
+    const composedOthers = applyStrategies(baseline, catalog, others, values);
+    // Steady = fixed spending (guardrails stripped); flex = guardrails forced on.
+    const steadyBase: RetirementPlan = { ...composedOthers, guardrails: undefined };
+    const flexBase: RetirementPlan = { ...composedOthers, guardrails: {} };
     const id = setTimeout(() => {
-      const ss = maxSpendForConfidence(base, config, SAFE_TARGET, SAFE_MC);
+      const ss = maxSpendForConfidence(steadyBase, config, SAFE_TARGET, SAFE_MC);
       setSafeSpend(ss);
-      const w = ss != null ? initialWithdrawal(simulate(withSpend(base, ss), config)) : null;
+      const w = ss != null ? initialWithdrawal(simulate(withSpend(steadyBase, ss), config)) : null;
       setSafeRate(w ? w.portfolioRate : null);
-      setAnchorMc(runMonteCarlo(base, config, MC).successRate);
+      const fs = maxSpendForConfidence(flexBase, config, SAFE_TARGET, SAFE_MC);
+      setFlexSafeSpend(fs);
+      const wf = fs != null ? initialWithdrawal(simulate(withSpend(flexBase, fs), config)) : null;
+      setFlexSafeRate(wf ? wf.portfolioRate : null);
+      // Anchor reflects the REAL scenario (other levers as toggled, incl. guardrails).
+      setAnchorMc(runMonteCarlo(composedOthers, config, MC).successRate);
       setSafePending(false);
     }, 450);
     return () => clearTimeout(id);
@@ -785,6 +802,11 @@ export default function WhatIfView({
                             fixedPct: grUplift ? Math.round(grUplift.fixed * 100) : null,
                             flexPct: grUplift ? Math.round(grUplift.flex * 100) : null,
                             targetPct: Math.round(SAFE_TARGET * 100),
+                            // Safe-rate uplift: steady (fixed) vs flexible (guardrails).
+                            steadySafeSpend: safeSpend,
+                            steadySafeRate: safeRate,
+                            flexSafeSpend,
+                            flexSafeRate,
                           }
                         : undefined
                     }
@@ -802,6 +824,8 @@ export default function WhatIfView({
                             likelihoodPending: mcPending,
                             nowRate,
                             safeRate,
+                            flexSafeRate,
+                            flexSafeSpend,
                             loan: spendMix?.loan ?? 0,
                             currentSpend: annualSpend(baseline),
                             onSetSafe: () => {
@@ -1103,6 +1127,10 @@ function StrategyCardRow({
     fixedPct: number | null; // likelihood to last at the current spend WITHOUT guardrails
     flexPct: number | null; // likelihood to last at the current spend WITH guardrails
     targetPct: number;
+    steadySafeSpend: number | null; // safe spend at fixed spending (the % twin: steadySafeRate)
+    steadySafeRate: number | null;
+    flexSafeSpend: number | null; // safe spend under flexible spending (higher)
+    flexSafeRate: number | null;
   };
   sustainable?: {
     essentials: number; // needs floor held fixed — the slider's lower bound
@@ -1115,7 +1143,9 @@ function StrategyCardRow({
     nowPct: number | null; // MC success at the chosen spend (composed)
     likelihoodPending: boolean;
     nowRate: number | null; // live whole-portfolio withdrawal rate at the chosen spend (fraction)
-    safeRate: number | null; // whole-portfolio rate at the safe spend — the % twin of `safe`
+    safeRate: number | null; // whole-portfolio rate at the (steady) safe spend — the % twin of `safe`
+    flexSafeRate: number | null; // safe rate under FLEXIBLE spending (guardrails) — the second marker
+    flexSafeSpend: number | null; // safe spend under flexible spending — the $ twin
     loan: number; // composed plan's annual home-loan cost — a held (fixed) spend element on top of living
     currentSpend: number; // baseline living spend, the "vs now" anchor for the note
     onSetSafe: () => void;
@@ -1181,6 +1211,12 @@ function StrategyCardRow({
   const safeRatePct = sustainable?.safeRate != null ? +(sustainable.safeRate * 100).toFixed(1) : null;
   const safeRateMarker =
     sustainable?.safeRate != null ? Math.min(100, Math.max(0, (sustainable.safeRate / 0.1) * 100)) : null;
+  // Flexible-spending (guardrails) safe rate — a second marker, only when it's
+  // meaningfully above the steady one (it always lifts it, but guard against noise).
+  const showFlex =
+    sustainable?.flexSafeRate != null && sustainable.safeRate != null && sustainable.flexSafeRate > sustainable.safeRate + 0.002;
+  const flexSafePct = showFlex ? +(sustainable!.flexSafeRate! * 100).toFixed(1) : null;
+  const flexRateMarker = showFlex ? Math.min(100, Math.max(0, (sustainable!.flexSafeRate! / 0.1) * 100)) : null;
   // A home loan is a held (fixed) spending element funded on top of living costs.
   // When there is one, the spend slider and every spend figure on this card show
   // the loan-inclusive TOTAL, while `values.spend` stays in living terms internally
@@ -1337,6 +1373,24 @@ function StrategyCardRow({
                   </>
                 )}
               </div>
+              {/* The safe-rate uplift flexible spending buys, with the trade-off. */}
+              {guardrails.steadySafeRate != null &&
+                guardrails.flexSafeRate != null &&
+                guardrails.flexSafeRate > guardrails.steadySafeRate + 0.002 && (
+                  <div className="border-t border-line pt-1.5 text-slate-300">
+                    It lifts your safe <em>starting</em> rate from{" "}
+                    <span className="font-semibold text-sky-300">{(guardrails.steadySafeRate * 100).toFixed(1)}%</span> to{" "}
+                    <span className="font-semibold text-violet-300">{(guardrails.flexSafeRate * 100).toFixed(1)}%</span>
+                    {guardrails.steadySafeSpend != null && guardrails.flexSafeSpend != null && (
+                      <>
+                        {" "}
+                        ({fmtCurrency(guardrails.steadySafeSpend + gLoan)} →{" "}
+                        <span className="font-semibold text-violet-300">{fmtCurrency(guardrails.flexSafeSpend + gLoan)}/yr</span>)
+                      </>
+                    )}{" "}
+                    — the trade-off is a variable income: you&apos;d trim in rough markets rather than draw a fixed amount.
+                  </div>
+                )}
               {/* The cost — or, for a well-funded plan, the upside. */}
               <div className="border-t border-line pt-1.5 text-slate-300">
                 {guardrails.pending ? (
@@ -1419,7 +1473,7 @@ function StrategyCardRow({
                       style={{ left: `${wr.marker}%` }}
                     />
                   </div>
-                  {/* ▲ your safe withdrawal rate */}
+                  {/* ▲ your steady safe rate (sky) + flexible-spending rate (violet) */}
                   {safeRateMarker != null && (
                     <div className="relative mt-px h-2.5">
                       <span
@@ -1429,6 +1483,15 @@ function StrategyCardRow({
                       >
                         ▲
                       </span>
+                      {flexRateMarker != null && (
+                        <span
+                          className="absolute top-0 -translate-x-1/2 text-[10px] leading-none text-violet-400"
+                          style={{ left: `${flexRateMarker}%` }}
+                          aria-hidden
+                        >
+                          ▲
+                        </span>
+                      )}
                     </div>
                   )}
                   <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[10px] text-muted">
@@ -1437,7 +1500,12 @@ function StrategyCardRow({
                     <span><span className="font-semibold text-red-400">&gt;6%</span> high</span>
                     {safeRatePct != null && (
                       <span className="flex items-center gap-1 text-sky-300">
-                        <span aria-hidden>▲</span> your safe rate ~{safeRatePct}%{sustainable.safePending ? " …" : ""}
+                        <span aria-hidden>▲</span> safe rate ~{safeRatePct}%{sustainable.safePending ? " …" : ""}
+                      </span>
+                    )}
+                    {flexSafePct != null && (
+                      <span className="flex items-center gap-1 text-violet-300">
+                        <span aria-hidden>▲</span> flexible ~{flexSafePct}%
                       </span>
                     )}
                   </div>

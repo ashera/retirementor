@@ -410,16 +410,26 @@ export default function PlannerApp({
     /* eslint-enable @typescript-eslint/no-unused-vars */
     return JSON.stringify(rest);
   }, [plan]);
+  // Two safe rates on the same portfolio: the STEADY one (fixed spending — the
+  // classic "safe withdrawal rate") and the FLEXIBLE one (Guyton-Klinger guardrails,
+  // which lets you START higher because it trims in downturns). Guardrails is
+  // stripped/forced explicitly, so both are independent of whatever the loaded plan
+  // carries — the steady marker never drifts, and the flexible marker shows the uplift.
   const [safeRate, setSafeRate] = useState<number | null>(null);
+  const [flexSafeRate, setFlexSafeRate] = useState<number | null>(null);
   const [safeRatePending, setSafeRatePending] = useState(false);
   useEffect(() => {
     if (!ready || !configured) return;
     setSafeRatePending(true);
     const id = setTimeout(() => {
-      const flat: RetirementPlan = { ...plan, spendingMode: "flat" };
-      const ms = maxSpendForConfidence(flat, config, MC_CONFIDENCE_TARGET, MC_CONFIDENCE_MC);
-      const w = initialWithdrawal(simulate(withSpend(flat, ms), config));
-      setSafeRate(w ? w.portfolioRate : null);
+      const rateFor = (guardrails: RetirementPlan["guardrails"]): number | null => {
+        const p: RetirementPlan = { ...plan, spendingMode: "flat", guardrails };
+        const ms = maxSpendForConfidence(p, config, MC_CONFIDENCE_TARGET, MC_CONFIDENCE_MC);
+        const w = initialWithdrawal(simulate(withSpend(p, ms), config));
+        return w ? w.portfolioRate : null;
+      };
+      setSafeRate(rateFor(undefined)); // steady / fixed spending
+      setFlexSafeRate(rateFor({})); // flexible spending (guardrails)
       setSafeRatePending(false);
     }, 400);
     return () => clearTimeout(id);
@@ -1040,7 +1050,7 @@ export default function PlannerApp({
       </Link>
 
       {/* Withdrawal-rate diagnostic */}
-      <WithdrawalRateCard result={result} plan={plan} successPct={successPct} safeRate={safeRate} safePending={safeRatePending} />
+      <WithdrawalRateCard result={result} plan={plan} successPct={successPct} safeRate={safeRate} flexSafeRate={flexSafeRate} safePending={safeRatePending} />
 
       {/* Assets chart */}
       <div className="rounded-2xl border border-line bg-panel p-6">
