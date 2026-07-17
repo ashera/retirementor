@@ -155,27 +155,31 @@ export default function WhatIfView({
     } catch {}
     setCurrent(cur);
 
-    // (B) "Edit in What-If": /what-if?edit=<planId> reopens that saved
-    // scenario's exact strategy selection. (A) Otherwise restore the last board
-    // state from localStorage so returning to the page keeps your work.
-    let restore: WhatIfSaved | undefined;
+    // (B) "Edit in What-If": /what-if?edit=<planId> reopens that saved scenario's
+    // exact selection, INCLUDING its baseline. (A) Otherwise — a fresh visit, e.g.
+    // arriving from the dashboard — keep the baseline on the CURRENT plan (the scenario
+    // you're viewing) and restore only the toggled strategies, so the board reflects
+    // what's on the dashboard. (Previously the saved baselineId was restored here too,
+    // so the board could open on a DIFFERENT saved scenario than the dashboard's.)
     try {
       const editId = new URLSearchParams(window.location.search).get("edit");
       const editPlan = editId ? savedPlans.find((s) => s.id === editId) : undefined;
       if (editPlan?.data.whatIf) {
-        restore = editPlan.data.whatIf;
+        const wf = editPlan.data.whatIf;
+        if (wf.baselineId) setBaselineId(wf.baselineId);
+        setActive(new Set(wf.active ?? []));
+        setValues(wf.values ?? {});
         window.history.replaceState(null, "", "/what-if"); // don't re-trigger on refresh
       } else {
         const raw = localStorage.getItem(WHATIF_KEY);
-        if (raw) restore = JSON.parse(raw) as WhatIfSaved;
+        if (raw) {
+          const board = JSON.parse(raw) as WhatIfSaved;
+          setActive(new Set(board.active ?? []));
+          setValues(board.values ?? {});
+          // baselineId intentionally left at its "current" default.
+        }
       }
     } catch {}
-
-    if (restore) {
-      if (restore.baselineId) setBaselineId(restore.baselineId);
-      setActive(new Set(restore.active ?? []));
-      setValues(restore.values ?? {});
-    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
