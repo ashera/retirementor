@@ -17,6 +17,7 @@ export interface SavedPlan {
 export interface ActionResult {
   ok?: boolean;
   error?: string;
+  id?: string; // set by savePlan → the new row's id
 }
 
 export async function listPlans(): Promise<SavedPlan[]> {
@@ -95,12 +96,12 @@ export async function savePlan(
   const trimmed = name.trim();
   if (!trimmed) return { error: "Give your plan a name." };
 
-  await query(
-    "insert into plans (user_id, name, data) values ($1, $2, $3)",
+  const r = await query<{ id: string }>(
+    "insert into plans (user_id, name, data) values ($1, $2, $3) returning id",
     [user.id, trimmed, JSON.stringify(data)],
   );
   revalidatePath("/");
-  return { ok: true };
+  return { ok: true, id: r.rows[0]?.id };
 }
 
 export async function deletePlan(id: string): Promise<ActionResult> {

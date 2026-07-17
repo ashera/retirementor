@@ -113,7 +113,7 @@ function fmtDeltaYr(d: number): string | null {
 
 export default function WhatIfView({
   config,
-  savedPlans,
+  savedPlans: initialSavedPlans,
   signedIn,
   sharedPlan = null,
 }: {
@@ -126,6 +126,9 @@ export default function WhatIfView({
   sharedPlan?: { plan: RetirementPlan; name: string; basePath: string } | null;
 }) {
   const shared = !!sharedPlan;
+  // Local so a just-saved scenario appears in the picker immediately (the server
+  // prop only refreshes on navigation).
+  const [savedPlans, setSavedPlans] = useState<SavedPlan[]>(initialSavedPlans);
   const [current, setCurrent] = useState<RetirementPlan | null>(null);
   const [baselineId, setBaselineId] = useState("current");
   // When reopening a scenario's saved strategies, the baseline is the ORIGINAL plan
@@ -543,14 +546,40 @@ export default function WhatIfView({
       baselineId,
       baselinePlan: baseline ? { ...baseline, whatIf: undefined } : undefined,
     };
-    const res = await savePlan(name, { ...composed, whatIf });
+    const savedData: RetirementPlan = { ...composed, whatIf };
+    const res = await savePlan(name, savedData);
     setSaving(false);
-    if (res.error) setSaveMsg(res.error);
-    else {
-      setSaveMsg(`Saved “${name}” — reopen it any time from the dashboard (“Edit in What-If”).`);
-      setSaveName("");
-      track("What-if saved");
+    if (res.error) {
+      setSaveMsg(res.error);
+      return;
     }
+    if (res.id) {
+      // The saved scenario is now the baseline: add it to the picker, select it, and
+      // mirror it to the planner's working plan so navigating back opens on it.
+      const saved: SavedPlan = {
+        id: res.id,
+        name,
+        data: savedData,
+        updated_at: new Date().toISOString(),
+        share_token: null,
+      };
+      setSavedPlans((prev) => [saved, ...prev]); // newest-first, matching listPlans()
+      setEditBaseline(null);
+      setCurrent(savedData);
+      setBaselineId(res.id);
+      setActive(new Set());
+      setValues({});
+      try {
+        const json = JSON.stringify(savedData);
+        localStorage.setItem(PLAN_KEY, json);
+        localStorage.setItem("au-retirement-baseline", json);
+        localStorage.setItem("au-retirement-baseline-name", name);
+        localStorage.setItem("au-retirement-plan-ts", String(Date.now()));
+      } catch {}
+    }
+    setSaveMsg(`Saved “${name}” — it’s now your baseline (and the plan you’ll see back on the dashboard).`);
+    setSaveName("");
+    track("What-if saved");
   };
 
   // Show TTR only once the (composed) retirement age clears 60 — so it also
