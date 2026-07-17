@@ -35,6 +35,16 @@ export async function adminGetPlanData(
   return { ok: true, name: row.name, data: row.data };
 }
 
+/** Delete any user's saved scenario by id (admin only). */
+export async function adminDeletePlan(planId: string): Promise<AdminResult> {
+  const admin = await getAdmin();
+  if (!admin) return { error: "Not authorised." };
+  const r = await query("delete from plans where id = $1", [planId]);
+  if (!r.rowCount) return { error: "Plan not found." };
+  revalidatePath("/admin/users"); // refresh the user list's plan counts
+  return { ok: true };
+}
+
 function revalidate() {
   revalidatePath("/admin");
   revalidatePath("/admin/review");

@@ -77,7 +77,7 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
         <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted">
           Saved scenarios ({u.plans.length})
         </h2>
-        <UserPlansList plans={u.plans} />
+        <UserPlansList plans={u.plans} email={u.email} />
       </section>
     </main>
   );
