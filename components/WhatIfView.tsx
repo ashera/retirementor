@@ -557,6 +557,25 @@ export default function WhatIfView({
       <div className="mb-6 flex items-center justify-between gap-3">
         <Link
           href={shared ? sharedPlan!.basePath : "/"}
+          onClick={(e) => {
+            // If the user switched the baseline picker to a saved scenario, carry it
+            // back so the planner opens on the same scenario. ("Current" and a reopened
+            // scenario's starting point already match the planner's working plan.)
+            if (shared || editBaseline || baselineId === "current") return;
+            const sp = savedPlans.find((s) => s.id === baselineId);
+            if (!sp) return;
+            try {
+              const json = JSON.stringify({ ...DEFAULT_PLAN, ...sp.data });
+              localStorage.setItem(PLAN_KEY, json);
+              localStorage.setItem("au-retirement-baseline", json);
+              localStorage.setItem("au-retirement-baseline-name", sp.name);
+              localStorage.setItem("au-retirement-plan-ts", String(Date.now()));
+              e.preventDefault();
+              window.location.href = "/"; // full nav → planner mounts fresh and reads storage
+            } catch {
+              /* fall through to the normal Link navigation */
+            }
+          }}
           className="text-sm font-medium text-muted hover:text-white"
         >
           ← Back to {shared ? "the shared scenario" : "planner"}
