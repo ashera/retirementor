@@ -935,13 +935,6 @@ export default function PlannerApp({
             ⚖ Compare scenarios
             <span aria-hidden>→</span>
           </Link>
-          <Link
-            href="/what-if"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-accent/40 bg-accent/10 px-3 py-1.5 text-sm font-semibold text-accent transition hover:bg-accent/20"
-          >
-            🎛 What if…
-            <span aria-hidden>→</span>
-          </Link>
         </div>
       </div>
       )}
@@ -1037,10 +1030,10 @@ export default function PlannerApp({
         onClick={() => track("What-if promo clicked")}
         className="group mb-6 block rounded-2xl border border-accent/40 bg-accent/[0.07] px-5 py-4 transition hover:border-accent/70 hover:bg-accent/10"
       >
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-start gap-3">
-            <span className="text-2xl" aria-hidden>🎛</span>
-            <div>
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex min-w-0 items-start gap-3">
+            <span className="shrink-0 text-2xl" aria-hidden>🎛</span>
+            <div className="min-w-0">
               <div className="font-semibold text-white">What if you changed something?</div>
               <div className="text-sm text-muted">
                 Try strategies — downsize, retire later, salary-sacrifice, work part-time and more — and watch how
@@ -1057,28 +1050,28 @@ export default function PlannerApp({
             already shape the numbers above; a ✓ confirms it's still in force, ⚠ flags
             one a later dashboard edit has overridden. */}
         {applied.length > 0 && (
-          <div className="mt-3 border-t border-accent/20 pt-3">
-            <div className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted">
-              This saved plan already applies these What-If changes — they&apos;re in the numbers above
+          <div className="mt-4 border-t border-accent/20 pt-3">
+            <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted">
+              What-If changes on this plan — already in the numbers above
             </div>
             <div className="flex flex-wrap gap-2">
               {applied.map((s) => (
                 <span
                   key={s.id}
-                  className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs ${
+                  className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium ${
                     s.reflected
-                      ? "border-accent/30 bg-accent/10 text-slate-200"
-                      : "border-amber-500/30 bg-amber-500/10 text-amber-300"
+                      ? "border-accent/40 bg-accent/10 text-accent"
+                      : "border-amber-500/40 bg-amber-500/10 text-amber-300"
                   }`}
                   title={
                     s.reflected
                       ? "Reflected in your dashboard numbers"
-                      : "Listed in your saved What-If selection, but a later edit to this plan has overridden it — it's not currently reflected"
+                      : "In your saved What-If selection, but a later edit to this plan has overridden it — not currently reflected"
                   }
                 >
                   <span aria-hidden>{s.reflected ? "✓" : "⚠"}</span>
                   {s.label}
-                  {!s.reflected && <span className="text-[10px] text-amber-400/80">overridden</span>}
+                  {!s.reflected && <span className="text-[10px] font-normal text-amber-400/80">overridden</span>}
                 </span>
               ))}
             </div>
