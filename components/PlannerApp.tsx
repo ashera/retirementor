@@ -1043,7 +1043,7 @@ export default function PlannerApp({
             </div>
           </div>
           <span className="shrink-0 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-ink transition group-hover:brightness-110">
-            {applied.length > 0 ? "Edit in What-If →" : "Try What-If →"}
+            {applied.length > 0 ? "Edit What-If Strategies →" : "Try What-If Strategies →"}
           </span>
         </div>
         {/* What-If strategies baked into THIS saved plan (see appliedStrategies): they
