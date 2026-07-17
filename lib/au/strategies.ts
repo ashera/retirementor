@@ -748,9 +748,19 @@ export function appliedStrategies(plan: RetirementPlan, config: EngineConfig): A
     `${Math.round(r.superAtRetirement)}|${r.lastsToLifeExpectancy}|${r.depletedAge ?? ""}|${Math.round(r.rows[r.rows.length - 1]?.total ?? 0)}`;
   const baseFp = fingerprint(simulate(plan, config));
   const prettify = (id: string) => id.replace(/-/g, " ").replace(/^\w/, (c) => c.toUpperCase());
+  // "sell-prop-{i}" cards carry no static label and are dropped from the catalog once
+  // the property is already selling — so name them from the plan's property (its own
+  // name if set, else "Investment Property N", 1-based).
+  const sellPropLabel = (id: string): string | null => {
+    const m = id.match(/^sell-prop-(\d+)$/);
+    if (!m) return null;
+    const i = Number(m[1]);
+    const name = getInvestmentProperties(plan)[i]?.name?.trim() || `Investment Property ${i + 1}`;
+    return `Sell ${name}`;
+  };
   return active.map((id) => {
     const card = catalog.find((c) => c.id === id);
-    const label = card?.label ?? STRATEGY_LABELS[id] ?? prettify(id);
+    const label = sellPropLabel(id) ?? card?.label ?? STRATEGY_LABELS[id] ?? prettify(id);
     // A card whose effect is already applied is dropped from the catalog, so its
     // absence confirms it's baked in (reflected). When it IS still offered, re-apply
     // it: if that changes the simulation, a later edit overrode it — not reflected.

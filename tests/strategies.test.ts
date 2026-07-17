@@ -574,4 +574,16 @@ describe("appliedStrategies — What-If changes baked into a saved plan", () => 
     expect(by["keep-accumulation"].reflected).toBe(true);
     expect(by["part-time-work"].reflected).toBe(false); // re-applying it changes the sim
   });
+
+  it("labels a sold-property strategy by its name, else 'Investment Property N'", () => {
+    const plan = base({
+      people: [{ currentAge: 62, superBalance: 700_000, salary: 0, voluntaryConcessional: 0, voluntaryNonConcessional: 0 }],
+      retirementAge: 62, targetSpending: 60_000,
+      investmentProperties: [prop({ name: "Pimpama", strategy: "sell", sellAtAge: 70 }), prop({ strategy: "sell", sellAtAge: 70 })],
+      whatIf: { active: ["sell-prop-0", "sell-prop-1"], values: {}, baselineId: "current" },
+    });
+    const labels = appliedStrategies(plan, cfg).map((s) => s.label);
+    expect(labels).toContain("Sell Pimpama"); // named
+    expect(labels).toContain("Sell Investment Property 2"); // unnamed → 1-based index
+  });
 });
