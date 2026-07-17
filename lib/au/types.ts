@@ -199,6 +199,11 @@ export interface WhatIfSaved {
   active: string[]; // strategy card ids that are toggled on
   values: Record<string, Record<string, number>>; // per-card param values
   baselineId: string; // "current" or a saved-plan id
+  // The actual plan the strategies were applied to (the board's baseline at save
+  // time). Stored so reopening can put the strategies back on their ORIGINAL base —
+  // `baselineId: "current"` isn't recoverable later (it now points at the composed,
+  // strategies-baked-in plan). Its own `whatIf` is stripped to avoid recursion.
+  baselinePlan?: RetirementPlan;
 }
 
 /** All investment properties on a plan, tolerating the legacy single-property

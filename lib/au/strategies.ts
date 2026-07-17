@@ -732,6 +732,34 @@ const STRATEGY_LABELS: Record<string, string> = {
 };
 
 /**
+ * Reconstruct an approximate ORIGINAL baseline by removing the field footprints of the
+ * given active strategies from a composed plan. A best-effort fallback for scenarios
+ * saved before the exact baseline was stored (WhatIfSaved.baselinePlan), so their
+ * strategies can still open as editable toggles. Footprint-less levers (adjust-spending,
+ * retire-later, salary-sacrifice) can't be reversed and stay in the base — harmless,
+ * since re-toggling them on the same values is a no-op.
+ */
+export function stripStrategyFields(plan: RetirementPlan, activeIds: string[]): RetirementPlan {
+  const has = (id: string) => activeIds.includes(id);
+  let p: RetirementPlan = { ...plan, whatIf: undefined };
+  if (has("guardrails")) p = { ...p, guardrails: undefined };
+  if (has("keep-accumulation")) p = { ...p, keepSuperInAccumulation: undefined };
+  if (has("recontribute")) p = { ...p, recontribute: undefined };
+  if (has("lump-sum")) p = { ...p, lumpSum: undefined };
+  if (has("ttr")) p = { ...p, ttr: undefined };
+  if (has("part-time-work")) p = { ...p, workIncome: undefined };
+  if (has("downsize") && p.home) p = { ...p, home: { ...p.home, downsize: undefined } };
+  if (has("sell-and-rent") && p.home) p = { ...p, home: { ...p.home, sellAndRent: undefined } };
+  if (has("clear-mortgage") && p.mortgage) p = { ...p, mortgage: { ...p.mortgage, strategy: "carry" } };
+  if (activeIds.some((id) => id === "gap-years" || id.startsWith("gap-years-"))) p = { ...p, careerBreaks: undefined, careerBreak: undefined };
+  const sold = activeIds.filter((id) => /^sell-prop-\d+$/.test(id)).map((id) => Number(id.slice("sell-prop-".length)));
+  if (sold.length && p.investmentProperties) {
+    p = { ...p, investmentProperties: p.investmentProperties.map((pr, i) => (sold.includes(i) ? { ...pr, strategy: "hold" } : pr)) };
+  }
+  return p;
+}
+
+/**
  * Which strategies a plan carries and whether each is still reflected in the dashboard
  * numbers. Two sources, so nothing baked into the plan is missed:
  *   (1) DIRECT field detection — strategies that leave an engine-field footprint

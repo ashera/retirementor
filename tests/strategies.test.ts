@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { simulate } from "../lib/au/simulate";
 import { DEFAULT_CONFIG as cfg } from "../lib/au/config";
 import { DEFAULT_PLAN, getInvestmentProperties, type PropertyDetail, type RetirementPlan } from "../lib/au/types";
-import { buildStrategyCatalog, applyStrategies, resolveValues, maxSustainableSpend, maxSpendForConfidence, essentialsFloor, withSpend, appliedStrategies } from "../lib/au/strategies";
+import { buildStrategyCatalog, applyStrategies, resolveValues, maxSustainableSpend, maxSpendForConfidence, essentialsFloor, withSpend, appliedStrategies, stripStrategyFields } from "../lib/au/strategies";
 import { runMonteCarlo } from "../lib/au/montecarlo";
 import { incomeTax, medicareLevy } from "../lib/au/tax";
 import { rowNetWorth } from "../lib/au/networth";
@@ -573,6 +573,21 @@ describe("appliedStrategies — What-If changes baked into a saved plan", () => 
     expect(by["guardrails"].label).toBe("Flexible spending (guardrails)");
     expect(by["keep-accumulation"].reflected).toBe(true);
     expect(by["part-time-work"].reflected).toBe(false); // re-applying it changes the sim
+  });
+
+  it("stripStrategyFields removes only the ACTIVE strategies' footprints", () => {
+    const plan = base({
+      guardrails: {}, keepSuperInAccumulation: true,
+      home: { value: 900_000, growthReal: 0, downsize: { atAge: 70, newValue: 500_000, toSuper: 0 } },
+    });
+    const stripped = stripStrategyFields(plan, ["guardrails", "downsize"]);
+    expect(stripped.guardrails).toBeUndefined(); // active → removed
+    expect(stripped.home?.downsize).toBeUndefined(); // active → removed
+    expect(stripped.keepSuperInAccumulation).toBe(true); // not in the active list → kept
+    // Re-applying the stripped strategies reconstructs the original composed plan.
+    const cat = buildStrategyCatalog(stripped);
+    const back = applyStrategies(stripped, cat, new Set(["guardrails"]), {});
+    expect(back.guardrails).toEqual({});
   });
 
   it("lists a field-baked strategy (guardrails) even when the What-If bookmark omits it", () => {

@@ -21,6 +21,7 @@ import {
   maxSpendForConfidence,
   withSpend,
   essentialsFloor,
+  stripStrategyFields,
   GROUP_LABEL,
   type StrategyCard,
   type StrategyGroup,
@@ -39,6 +40,7 @@ import Field from "@/components/Field";
 
 const PLAN_KEY = "au-retirement-plan";
 const WHATIF_KEY = "au-whatif-board"; // persists the board selection across visits
+const EDIT_BASELINE_OPT = "__scenario_base__"; // picker value while reopening a scenario's saved baseline
 const GROUP_ORDER: StrategyGroup[] = ["home", "mortgage", "property", "timing", "work"];
 
 const annualSpend = (p: RetirementPlan) =>
@@ -126,6 +128,11 @@ export default function WhatIfView({
   const shared = !!sharedPlan;
   const [current, setCurrent] = useState<RetirementPlan | null>(null);
   const [baselineId, setBaselineId] = useState("current");
+  // When reopening a scenario's saved strategies, the baseline is the ORIGINAL plan
+  // stored with it (not `current`/a saved id) — so the strategies show as editable
+  // toggles on top of it. Set → overrides the picker; cleared when the user picks a
+  // different baseline. (SENTINEL is the picker value shown while it's active.)
+  const [editBaseline, setEditBaseline] = useState<RetirementPlan | null>(null);
   const [active, setActive] = useState<Set<string>>(new Set());
   const [values, setValues] = useState<Record<string, Record<string, number>>>({});
   const [saveName, setSaveName] = useState("");
@@ -155,21 +162,30 @@ export default function WhatIfView({
     } catch {}
     setCurrent(cur);
 
-    // (B) "Edit in What-If": /what-if?edit=<planId> reopens that saved scenario's
-    // exact selection, INCLUDING its baseline. (A) Otherwise — a fresh visit, e.g.
-    // arriving from the dashboard — keep the baseline on the CURRENT plan (the scenario
-    // you're viewing) and restore only the toggled strategies, so the board reflects
-    // what's on the dashboard. (Previously the saved baselineId was restored here too,
-    // so the board could open on a DIFFERENT saved scenario than the dashboard's.)
+    // Reopen a board, in priority order:
+    //  (B) /what-if?edit=<planId> → that saved scenario's exact selection.
+    //  (C) the CURRENT (dashboard) plan's OWN bookmark, if it's a saved-from-What-If
+    //      scenario → so its strategies open as editable toggles on their original
+    //      baseline (not baked-in and invisible).
+    //  (A) otherwise the persisted board — strategies only, baseline stays "current"
+    //      — so a fresh visit reflects the plan you're viewing on the dashboard.
+    // `composedPlan` is the plan the strategies are baked into (used to reconstruct
+    // an approximate baseline for scenarios saved before baselinePlan was stored).
+    const reopen = (wf: WhatIfSaved, composedPlan: RetirementPlan) => {
+      if (wf.baselinePlan) setEditBaseline({ ...DEFAULT_PLAN, ...wf.baselinePlan }); // exact
+      else if (wf.baselineId && wf.baselineId !== "current") setBaselineId(wf.baselineId); // resolvable saved baseline
+      else setEditBaseline(stripStrategyFields(composedPlan, wf.active ?? [])); // old "current"-baseline save → best effort
+      setActive(new Set(wf.active ?? []));
+      setValues(wf.values ?? {});
+    };
     try {
       const editId = new URLSearchParams(window.location.search).get("edit");
       const editPlan = editId ? savedPlans.find((s) => s.id === editId) : undefined;
       if (editPlan?.data.whatIf) {
-        const wf = editPlan.data.whatIf;
-        if (wf.baselineId) setBaselineId(wf.baselineId);
-        setActive(new Set(wf.active ?? []));
-        setValues(wf.values ?? {});
+        reopen(editPlan.data.whatIf, { ...DEFAULT_PLAN, ...editPlan.data });
         window.history.replaceState(null, "", "/what-if"); // don't re-trigger on refresh
+      } else if (cur.whatIf) {
+        reopen(cur.whatIf, cur);
       } else {
         const raw = localStorage.getItem(WHATIF_KEY);
         if (raw) {
@@ -197,11 +213,12 @@ export default function WhatIfView({
   }, [baselineId, active, values]);
 
   const baseline: RetirementPlan | null = useMemo(() => {
+    if (editBaseline) return editBaseline; // reopening a scenario's saved strategies
     if (!current) return null;
     if (baselineId === "current") return current;
     const sp = savedPlans.find((s) => s.id === baselineId);
     return sp ? { ...DEFAULT_PLAN, ...sp.data } : current;
-  }, [current, baselineId, savedPlans]);
+  }, [editBaseline, current, baselineId, savedPlans]);
 
   const baseRes = useMemo(() => (baseline ? simulate(baseline, config) : null), [baseline, config]);
   // Projected super / outside-savings at an age (start-of-year), so the lump-sum
@@ -223,6 +240,7 @@ export default function WhatIfView({
   // explicit handler, not an effect, so restoring a saved selection on mount
   // (which sets baselineId) does NOT wipe the restored toggles.
   const switchBaseline = (id: string) => {
+    setEditBaseline(null); // leaving the reopened-scenario baseline
     setBaselineId(id);
     setActive(new Set());
     setValues({});
@@ -505,9 +523,16 @@ export default function WhatIfView({
     setSaving(true);
     setSaveMsg(null);
     const name = saveName.trim() || "What-if scenario";
-    // Store the board selection alongside the composed plan so the scenario can
-    // be reopened and tweaked later via "Edit in What-If".
-    const whatIf: WhatIfSaved = { active: [...active], values, baselineId };
+    // Store the board selection alongside the composed plan so the scenario can be
+    // reopened and tweaked later. Include the ACTUAL baseline the strategies sit on
+    // (its own whatIf stripped) so reopening can put them back on that original base
+    // — the composed plan alone has them baked in and can't show them as toggles.
+    const whatIf: WhatIfSaved = {
+      active: [...active],
+      values,
+      baselineId,
+      baselinePlan: baseline ? { ...baseline, whatIf: undefined } : undefined,
+    };
     const res = await savePlan(name, { ...composed, whatIf });
     setSaving(false);
     if (res.error) setSaveMsg(res.error);
@@ -536,14 +561,17 @@ export default function WhatIfView({
         >
           ← Back to {shared ? "the shared scenario" : "planner"}
         </Link>
-        {savedPlans.length > 0 && (
+        {(savedPlans.length > 0 || editBaseline) && (
           <label className="flex items-center gap-2 text-sm text-muted">
             Baseline:
             <select
-              value={baselineId}
-              onChange={(e) => switchBaseline(e.target.value)}
+              value={editBaseline ? EDIT_BASELINE_OPT : baselineId}
+              onChange={(e) => {
+                if (e.target.value !== EDIT_BASELINE_OPT) switchBaseline(e.target.value);
+              }}
               className="rounded-lg border border-line bg-panel-2 px-3 py-1.5 text-sm font-medium text-slate-200"
             >
+              {editBaseline && <option value={EDIT_BASELINE_OPT}>This scenario&apos;s starting point</option>}
               <option value="current">Current plan</option>
               {savedPlans.map((sp) => (
                 <option key={sp.id} value={sp.id}>{sp.name}</option>
