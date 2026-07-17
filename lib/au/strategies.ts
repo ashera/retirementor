@@ -4,7 +4,7 @@
 // Phase 1 covers the levers that already map to the engine; home downsizing,
 // sell-&-rent and part-time work land in later phases.
 
-import type { RetirementPlan } from "./types";
+import type { RetirementPlan, SimResult } from "./types";
 import { getCareerBreaks, getInvestmentProperties, personRetirementOffset, startingSuperBalances } from "./types";
 import { fmtCurrency } from "./format";
 import { propertyValueAt, capitalGainsTax, netSaleProceeds } from "./property";
@@ -703,4 +703,60 @@ export function applyStrategies(
     p = card.apply(p, resolveValues(card, values[card.id]));
   }
   return p;
+}
+
+/** A What-If strategy that a SAVED plan carries, and whether it's still reflected in
+ *  the plan's numbers. */
+export interface AppliedStrategy {
+  id: string;
+  label: string;
+  reflected: boolean; // baked into the dashboard numbers, vs overridden by a later edit
+}
+
+// Labels by strategy id — a fallback for `appliedStrategies` when a card is no longer
+// in the catalog (a card whose effect is already applied is excluded from it, so its
+// label can't be read from there). Kept in sync with the card definitions above.
+const STRATEGY_LABELS: Record<string, string> = {
+  downsize: "Downsize your home",
+  "sell-and-rent": "Sell up and rent",
+  "clear-mortgage": "Clear the mortgage with super",
+  "retire-later": "Retire later",
+  "lump-sum": "Take a lump sum",
+  recontribute: "Recontribute savings to super",
+  "keep-accumulation": "Keep super in accumulation",
+  "adjust-spending": "Adjust discretionary spending",
+  guardrails: "Flexible spending (guardrails)",
+  "part-time-work": "Work part-time in early retirement",
+  "salary-sacrifice": "Salary-sacrifice more",
+  ttr: "Transition to Retirement",
+};
+
+/**
+ * Which What-If strategies a saved plan carries, and whether each is still reflected
+ * in the dashboard view. Saving from the What-If board writes the COMPOSED plan (the
+ * strategies baked into the engine fields) plus the board selection in `plan.whatIf`,
+ * so the dashboard already shows their effect. We confirm each is still in force by
+ * RE-APPLYING it: if that leaves the simulation unchanged it's already baked in
+ * (reflected); if re-applying changes the outcome, a later dashboard edit overrode it,
+ * so it's no longer reflected. Returns [] when the plan has no What-If selection.
+ */
+export function appliedStrategies(plan: RetirementPlan, config: EngineConfig): AppliedStrategy[] {
+  const active = plan.whatIf?.active ?? [];
+  if (active.length === 0) return [];
+  const catalog = buildStrategyCatalog(plan, { config });
+  const fingerprint = (r: SimResult) =>
+    `${Math.round(r.superAtRetirement)}|${r.lastsToLifeExpectancy}|${r.depletedAge ?? ""}|${Math.round(r.rows[r.rows.length - 1]?.total ?? 0)}`;
+  const baseFp = fingerprint(simulate(plan, config));
+  const prettify = (id: string) => id.replace(/-/g, " ").replace(/^\w/, (c) => c.toUpperCase());
+  return active.map((id) => {
+    const card = catalog.find((c) => c.id === id);
+    const label = card?.label ?? STRATEGY_LABELS[id] ?? prettify(id);
+    // A card whose effect is already applied is dropped from the catalog, so its
+    // absence confirms it's baked in (reflected). When it IS still offered, re-apply
+    // it: if that changes the simulation, a later edit overrode it — not reflected.
+    if (!card) return { id, label, reflected: true };
+    const values = resolveValues(card, plan.whatIf?.values?.[id]);
+    const reflected = fingerprint(simulate(card.apply(plan, values), config)) === baseFp;
+    return { id, label, reflected };
+  });
 }

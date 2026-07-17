@@ -30,7 +30,7 @@ import {
 } from "@/components/explainers";
 import { runMonteCarlo, MC_CONFIDENCE_TARGET, MC_CONFIDENCE_MC } from "@/lib/au/montecarlo";
 import { whatWillItTake, earliestRetirement } from "@/lib/au/goalseek";
-import { maxSpendForConfidence, withSpend } from "@/lib/au/strategies";
+import { maxSpendForConfidence, withSpend, appliedStrategies } from "@/lib/au/strategies";
 import { initialWithdrawal } from "@/lib/au/withdrawal";
 import TrimSpendingModal from "@/components/TrimSpendingModal";
 import BoostSpendingModal from "@/components/BoostSpendingModal";
@@ -373,6 +373,9 @@ export default function PlannerApp({
   }, [ready, configured, user]);
 
   const result = useMemo(() => simulate(plan, config), [plan, config]);
+  // What-If strategies this saved plan carries (baked into the numbers above), and
+  // whether each is still reflected — so the dashboard is honest about what's applied.
+  const applied = useMemo(() => appliedStrategies(plan, config), [plan, config]);
   const mc = useMemo(() => runMonteCarlo(plan, config), [plan, config]);
   const successPct = Math.round(mc.successRate * 100);
   const successTone: "accent" | "amber" | "red" =
@@ -1032,21 +1035,55 @@ export default function PlannerApp({
       <Link
         href={whatIfHref}
         onClick={() => track("What-if promo clicked")}
-        className="group mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-accent/40 bg-accent/[0.07] px-5 py-4 transition hover:border-accent/70 hover:bg-accent/10"
+        className="group mb-6 block rounded-2xl border border-accent/40 bg-accent/[0.07] px-5 py-4 transition hover:border-accent/70 hover:bg-accent/10"
       >
-        <div className="flex items-start gap-3">
-          <span className="text-2xl" aria-hidden>🎛</span>
-          <div>
-            <div className="font-semibold text-white">What if you changed something?</div>
-            <div className="text-sm text-muted">
-              Try strategies — downsize, retire later, salary-sacrifice, work part-time and more — and watch how
-              your balance, income and how long it lasts respond. It never touches this plan.
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <span className="text-2xl" aria-hidden>🎛</span>
+            <div>
+              <div className="font-semibold text-white">What if you changed something?</div>
+              <div className="text-sm text-muted">
+                Try strategies — downsize, retire later, salary-sacrifice, work part-time and more — and watch how
+                your balance, income and how long it lasts respond.
+                {applied.length === 0 && " It never touches this plan."}
+              </div>
             </div>
           </div>
+          <span className="shrink-0 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-ink transition group-hover:brightness-110">
+            {applied.length > 0 ? "Edit in What-If →" : "Try What-If →"}
+          </span>
         </div>
-        <span className="shrink-0 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-ink transition group-hover:brightness-110">
-          Try What-If →
-        </span>
+        {/* What-If strategies baked into THIS saved plan (see appliedStrategies): they
+            already shape the numbers above; a ✓ confirms it's still in force, ⚠ flags
+            one a later dashboard edit has overridden. */}
+        {applied.length > 0 && (
+          <div className="mt-3 border-t border-accent/20 pt-3">
+            <div className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted">
+              This saved plan already applies these What-If changes — they&apos;re in the numbers above
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {applied.map((s) => (
+                <span
+                  key={s.id}
+                  className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs ${
+                    s.reflected
+                      ? "border-accent/30 bg-accent/10 text-slate-200"
+                      : "border-amber-500/30 bg-amber-500/10 text-amber-300"
+                  }`}
+                  title={
+                    s.reflected
+                      ? "Reflected in your dashboard numbers"
+                      : "Listed in your saved What-If selection, but a later edit to this plan has overridden it — it's not currently reflected"
+                  }
+                >
+                  <span aria-hidden>{s.reflected ? "✓" : "⚠"}</span>
+                  {s.label}
+                  {!s.reflected && <span className="text-[10px] text-amber-400/80">overridden</span>}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
       </Link>
 
       {/* Withdrawal-rate diagnostic */}

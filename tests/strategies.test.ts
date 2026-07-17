@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { simulate } from "../lib/au/simulate";
 import { DEFAULT_CONFIG as cfg } from "../lib/au/config";
 import { DEFAULT_PLAN, getInvestmentProperties, type PropertyDetail, type RetirementPlan } from "../lib/au/types";
-import { buildStrategyCatalog, applyStrategies, resolveValues, maxSustainableSpend, maxSpendForConfidence, essentialsFloor, withSpend } from "../lib/au/strategies";
+import { buildStrategyCatalog, applyStrategies, resolveValues, maxSustainableSpend, maxSpendForConfidence, essentialsFloor, withSpend, appliedStrategies } from "../lib/au/strategies";
 import { runMonteCarlo } from "../lib/au/montecarlo";
 import { incomeTax, medicareLevy } from "../lib/au/tax";
 import { rowNetWorth } from "../lib/au/networth";
@@ -550,5 +550,28 @@ describe("Gap years — couples (choose which partner, or both)", () => {
     expect(at(50).savings).toBe(12_000); // person 0 still working
     expect(at(47).salaryIncome).toBe(80_000); // person 0 off, partner earns
     expect(at(50).salaryIncome).toBe(100_000); // partner off, person 0 earns
+  });
+});
+
+describe("appliedStrategies — What-If changes baked into a saved plan", () => {
+  it("returns [] for a plan with no What-If selection", () => {
+    expect(appliedStrategies(base({}), cfg)).toEqual([]);
+  });
+
+  it("marks a baked-in strategy reflected, and a stale one overridden", () => {
+    const plan = base({
+      people: [{ currentAge: 62, superBalance: 800_000, salary: 0, voluntaryConcessional: 0, voluntaryNonConcessional: 0 }],
+      retirementAge: 62, outsideSuper: 200_000, targetSpending: 55_000,
+      guardrails: {}, keepSuperInAccumulation: true,
+      // Bookmark lists three; guardrails + keep-accumulation are baked in, but
+      // part-time-work was never applied (no workIncome) → not reflected.
+      whatIf: { active: ["guardrails", "keep-accumulation", "part-time-work"], values: {}, baselineId: "current" },
+    });
+    const applied = appliedStrategies(plan, cfg);
+    const by = Object.fromEntries(applied.map((s) => [s.id, s]));
+    expect(by["guardrails"].reflected).toBe(true);
+    expect(by["guardrails"].label).toBe("Flexible spending (guardrails)");
+    expect(by["keep-accumulation"].reflected).toBe(true);
+    expect(by["part-time-work"].reflected).toBe(false); // re-applying it changes the sim
   });
 });
