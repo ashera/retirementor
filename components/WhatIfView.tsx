@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import type { EngineConfig } from "@/lib/au/config";
 import type { RetirementPlan, SimResult, WhatIfSaved } from "@/lib/au/types";
@@ -148,6 +148,18 @@ export default function WhatIfView({
   // so the empty first render can't clobber the saved selection.
   const persistReady = useRef(false);
 
+  // Open a saved What-If board so its strategies show as editable toggles on the
+  // baseline they were built from. `composedPlan` is the plan the strategies are
+  // baked into — used to reconstruct an approximate baseline for scenarios saved
+  // before the exact baselinePlan was stored.
+  const reopen = useCallback((wf: WhatIfSaved, composedPlan: RetirementPlan) => {
+    if (wf.baselinePlan) setEditBaseline({ ...DEFAULT_PLAN, ...wf.baselinePlan }); // exact
+    else if (wf.baselineId && wf.baselineId !== "current") setBaselineId(wf.baselineId); // resolvable saved baseline
+    else setEditBaseline(stripStrategyFields(composedPlan, wf.active ?? [])); // old "current"-baseline save → best effort
+    setActive(new Set(wf.active ?? []));
+    setValues(wf.values ?? {});
+  }, []);
+
   useEffect(() => {
     if (sharedPlan) {
       // Public share view: start from the shared scenario with a clean board;
@@ -169,15 +181,6 @@ export default function WhatIfView({
     //      baseline (not baked-in and invisible).
     //  (A) otherwise the persisted board — strategies only, baseline stays "current"
     //      — so a fresh visit reflects the plan you're viewing on the dashboard.
-    // `composedPlan` is the plan the strategies are baked into (used to reconstruct
-    // an approximate baseline for scenarios saved before baselinePlan was stored).
-    const reopen = (wf: WhatIfSaved, composedPlan: RetirementPlan) => {
-      if (wf.baselinePlan) setEditBaseline({ ...DEFAULT_PLAN, ...wf.baselinePlan }); // exact
-      else if (wf.baselineId && wf.baselineId !== "current") setBaselineId(wf.baselineId); // resolvable saved baseline
-      else setEditBaseline(stripStrategyFields(composedPlan, wf.active ?? [])); // old "current"-baseline save → best effort
-      setActive(new Set(wf.active ?? []));
-      setValues(wf.values ?? {});
-    };
     try {
       const editId = new URLSearchParams(window.location.search).get("edit");
       const editPlan = editId ? savedPlans.find((s) => s.id === editId) : undefined;
@@ -240,11 +243,18 @@ export default function WhatIfView({
   // explicit handler, not an effect, so restoring a saved selection on mount
   // (which sets baselineId) does NOT wipe the restored toggles.
   const switchBaseline = (id: string) => {
+    setSaveMsg(null);
+    // "Current plan" that carries its own What-If bookmark → reopen it decomposed,
+    // so its baked-in strategies stay visible/editable (same as the initial load).
+    if (id === "current" && current?.whatIf) {
+      setBaselineId("current");
+      reopen(current.whatIf, current);
+      return;
+    }
     setEditBaseline(null); // leaving the reopened-scenario baseline
     setBaselineId(id);
     setActive(new Set());
     setValues({});
-    setSaveMsg(null);
   };
 
   const composed = useMemo(
@@ -580,7 +590,7 @@ export default function WhatIfView({
         >
           ← Back to {shared ? "the shared scenario" : "planner"}
         </Link>
-        {(savedPlans.length > 0 || editBaseline) && (
+        {savedPlans.length > 0 && (
           <label className="flex items-center gap-2 text-sm text-muted">
             Baseline:
             <select
@@ -590,8 +600,10 @@ export default function WhatIfView({
               }}
               className="rounded-lg border border-line bg-panel-2 px-3 py-1.5 text-sm font-medium text-slate-200"
             >
-              {editBaseline && <option value={EDIT_BASELINE_OPT}>This scenario&apos;s starting point</option>}
-              <option value="current">Current plan</option>
+              {/* One familiar entry for the plan you're on. When it carries baked-in
+                  strategies its value is the sentinel, so `baseline` decomposes it
+                  and the strategies show as editable toggles. */}
+              <option value={editBaseline ? EDIT_BASELINE_OPT : "current"}>Current plan</option>
               {savedPlans.map((sp) => (
                 <option key={sp.id} value={sp.id}>{sp.name}</option>
               ))}
