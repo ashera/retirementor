@@ -109,6 +109,56 @@ const retire55Couple: RetirementPlan = {
   lifeExpectancy: 90,
 };
 
+// Fixed vs flexible (Guyton-Klinger guardrails) safe withdrawal rate. A relatable
+// "good saver" single retiring at 60 on $1.2M ($900k super + $300k outside),
+// homeowner, spending $55k. The point isn't the plan — it's the two SWR markers the
+// dashboard now draws: a STEADY (fixed-spending) SWR ~5.1% and a FLEXIBLE (guardrails)
+// SWR ~6.8% — the ~1.7pp uplift dynamic spending buys, and the honest trade-off (a
+// rough run trims the flexible plan to ~$57k for ~28 years, below the steady level).
+const swrGuardrails: RetirementPlan = {
+  ...DEFAULT_PLAN,
+  household: "single",
+  people: [
+    { ...DEFAULT_PLAN.people[0], currentAge: 60, superBalance: 900_000, salary: 0, voluntaryConcessional: 0, voluntaryNonConcessional: 0 },
+  ],
+  superMode: "individual",
+  homeowner: true,
+  outsideSuper: 300_000,
+  annualOutsideSavings: 0,
+  retirementAge: 60,
+  spendingMode: "flat",
+  targetSpending: 55_000,
+  investmentReturn: 7,
+  returnVolatility: 11,
+  inflation: 2.5,
+  lifeExpectancy: 90,
+};
+
+// The leaner "good saver" counterpart to the $1.2M SWR-vs-guardrails scenario: a
+// single homeowner retiring at 60 on $650k ($500k super + $150k outside), spending
+// $46k (right at their steady SWR). Same guardrails uplift (~1.8pp), but the rates
+// sit HIGHER — steady SWR ~7.1%, flexible ~8.9% — because a leaner portfolio leans
+// harder on the means-tested Age Pension backstop. The pair shows the uplift is
+// consistent across wealth levels while the absolute rate reflects pension reliance.
+const swrGuardrailsGoodSaver: RetirementPlan = {
+  ...DEFAULT_PLAN,
+  household: "single",
+  people: [
+    { ...DEFAULT_PLAN.people[0], currentAge: 60, superBalance: 500_000, salary: 0, voluntaryConcessional: 0, voluntaryNonConcessional: 0 },
+  ],
+  superMode: "individual",
+  homeowner: true,
+  outsideSuper: 150_000,
+  annualOutsideSavings: 0,
+  retirementAge: 60,
+  spendingMode: "flat",
+  targetSpending: 46_000,
+  investmentReturn: 7,
+  returnVolatility: 11,
+  inflation: 2.5,
+  lifeExpectancy: 90,
+};
+
 export const DEMO_SCENARIOS: DemoScenario[] = [
   {
     slug: "fire-at-45",
@@ -153,5 +203,27 @@ export const DEMO_SCENARIOS: DemoScenario[] = [
     threadUrl: "",
     sortOrder: 40,
     data: retire55Couple,
+  },
+  {
+    slug: "swr-vs-guardrails",
+    title: "Fixed vs flexible SWR · guardrails",
+    blurb:
+      "Retire at 60 on $1.2M ($900k super + $300k outside), homeowner single. Two safe-withdrawal-rate markers: a steady ~5.1% and a flexible (Guyton-Klinger guardrails) ~6.8% — the uplift dynamic spending buys, with the honest trade-off.",
+    context:
+      "Demonstrates the SWR + guardrails combo for a Reddit methodology discussion. The dashboard withdrawal-rate bar draws TWO markers: steady SWR ~5.1% ($61k/yr fixed) and flexible SWR ~6.8% ($82k/yr guardrails start) — a +1.7pp uplift, consistent with Guyton-Klinger. The honest counterweight: in a p10 rough run the flexible plan trims to ~$57k (−30%) for ~28 years, BELOW the steady $61k, because 'lasting' is achieved by cutting. Open What-If → Flexible spending (guardrails) to see the uplift line + trade-off. Ask r/fiaustralia: is the 'flexible SWR' framing fair, are the guardrail params (±20% rails, ±10% steps, essentials floor) sensible, and would bootstrapped historical sequences change the advantage?",
+    threadUrl: "", // paste the Reddit thread URL once posted
+    sortOrder: 50,
+    data: swrGuardrails,
+  },
+  {
+    slug: "swr-guardrails-good-saver",
+    title: "Good saver · fixed vs flexible SWR",
+    blurb:
+      "The leaner counterpart: retire at 60 on $650k ($500k super + $150k outside), homeowner single, $46k/yr. Steady SWR ~7.1% vs flexible (guardrails) ~8.9% — same ~1.8pp uplift, higher rates because a modest portfolio leans on the Age Pension.",
+    context:
+      "The 'good saver' pair to swr-vs-guardrails. $650k, retire 60, $46k (right at the steady SWR). Steady SWR ~7.1% ($46k) vs flexible SWR ~8.9% ($58k) — a +1.8pp uplift, same magnitude as the $1.2M case, but the absolute rates sit HIGHER because the means-tested Age Pension backstop does more work for a leaner portfolio (this is the AU twist on the US 4% rule). Honest trade-off: a p10 rough run trims the flexible plan to ~$41k (−30%) for ~29 years. Together the pair shows the guardrails uplift is consistent across wealth levels while the safe rate itself reflects pension reliance. Same Reddit methodology questions as swr-vs-guardrails.",
+    threadUrl: "",
+    sortOrder: 60,
+    data: swrGuardrailsGoodSaver,
   },
 ];
