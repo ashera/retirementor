@@ -1052,7 +1052,7 @@ export default function PlannerApp({
         {applied.length > 0 && (
           <div className="mt-4 border-t border-accent/20 pt-3">
             <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted">
-              What-If changes on this plan — already in the numbers above
+              Strategies applied to this plan — already in the numbers above
             </div>
             <div className="flex flex-wrap gap-2">
               {applied.map((s) => (

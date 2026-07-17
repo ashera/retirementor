@@ -732,41 +732,60 @@ const STRATEGY_LABELS: Record<string, string> = {
 };
 
 /**
- * Which What-If strategies a saved plan carries, and whether each is still reflected
- * in the dashboard view. Saving from the What-If board writes the COMPOSED plan (the
- * strategies baked into the engine fields) plus the board selection in `plan.whatIf`,
- * so the dashboard already shows their effect. We confirm each is still in force by
- * RE-APPLYING it: if that leaves the simulation unchanged it's already baked in
- * (reflected); if re-applying changes the outcome, a later dashboard edit overrode it,
- * so it's no longer reflected. Returns [] when the plan has no What-If selection.
+ * Which strategies a plan carries and whether each is still reflected in the dashboard
+ * numbers. Two sources, so nothing baked into the plan is missed:
+ *   (1) DIRECT field detection — strategies that leave an engine-field footprint
+ *       (guardrails, downsize/sell-rent, clear-mortgage, keep-accumulation,
+ *       recontribute, lump-sum, TTR, part-time work, gap years, a scheduled property
+ *       sale). These actually drive the numbers, so they're always reflected — and
+ *       they show regardless of the What-If bookmark (which can be missing or stale).
+ *       Guardrails in particular can ONLY come from the board, so a set `guardrails`
+ *       is always an applied strategy.
+ *   (2) BOOKMARK-only levers — retire-later / adjust-spending / salary-sacrifice
+ *       modify existing fields (retirement age, spend, contributions) with no clean
+ *       footprint, so they're knowable only from `plan.whatIf.active`. Any not already
+ *       detected are added, with `reflected` decided by re-applying: an unchanged
+ *       simulation means it's still baked in; a change means a later dashboard edit
+ *       overrode it. Returns [] when a plain plan carries nothing.
  */
 export function appliedStrategies(plan: RetirementPlan, config: EngineConfig): AppliedStrategy[] {
-  const active = plan.whatIf?.active ?? [];
-  if (active.length === 0) return [];
+  const detected: AppliedStrategy[] = [];
+  const add = (id: string, label: string) => detected.push({ id, label, reflected: true });
+  if (plan.guardrails) add("guardrails", "Flexible spending (guardrails)");
+  if (plan.home?.downsize) add("downsize", "Downsize your home");
+  if (plan.home?.sellAndRent) add("sell-and-rent", "Sell up and rent");
+  if (plan.mortgage?.strategy === "clear_at_retirement") add("clear-mortgage", "Clear the mortgage with super");
+  if (plan.keepSuperInAccumulation) add("keep-accumulation", "Keep super in accumulation");
+  if (plan.recontribute) add("recontribute", "Recontribute savings to super");
+  if (plan.lumpSum) add("lump-sum", "Take a lump sum");
+  if (plan.ttr) add("ttr", "Transition to Retirement");
+  if (plan.workIncome) add("part-time-work", "Work part-time in early retirement");
+  const couple = plan.people.length > 1;
+  getCareerBreaks(plan).forEach((brk) =>
+    add(
+      brk.who > 0 ? `gap-years-${brk.who}` : "gap-years",
+      couple ? `Take gap years off — ${brk.who === 0 ? "you" : "your partner"}` : "Take gap years off work",
+    ),
+  );
+  getInvestmentProperties(plan).forEach((pr, i) => {
+    if (pr.strategy === "sell") add(`sell-prop-${i}`, `Sell ${pr.name?.trim() || `Investment Property ${i + 1}`}`);
+  });
+
+  const detectedIds = new Set(detected.map((s) => s.id));
+  const bookmark = (plan.whatIf?.active ?? []).filter((id) => !detectedIds.has(id));
+  if (bookmark.length === 0) return detected;
+
   const catalog = buildStrategyCatalog(plan, { config });
   const fingerprint = (r: SimResult) =>
     `${Math.round(r.superAtRetirement)}|${r.lastsToLifeExpectancy}|${r.depletedAge ?? ""}|${Math.round(r.rows[r.rows.length - 1]?.total ?? 0)}`;
   const baseFp = fingerprint(simulate(plan, config));
   const prettify = (id: string) => id.replace(/-/g, " ").replace(/^\w/, (c) => c.toUpperCase());
-  // "sell-prop-{i}" cards carry no static label and are dropped from the catalog once
-  // the property is already selling — so name them from the plan's property (its own
-  // name if set, else "Investment Property N", 1-based).
-  const sellPropLabel = (id: string): string | null => {
-    const m = id.match(/^sell-prop-(\d+)$/);
-    if (!m) return null;
-    const i = Number(m[1]);
-    const name = getInvestmentProperties(plan)[i]?.name?.trim() || `Investment Property ${i + 1}`;
-    return `Sell ${name}`;
-  };
-  return active.map((id) => {
+  const extra = bookmark.map((id): AppliedStrategy => {
     const card = catalog.find((c) => c.id === id);
-    const label = sellPropLabel(id) ?? card?.label ?? STRATEGY_LABELS[id] ?? prettify(id);
-    // A card whose effect is already applied is dropped from the catalog, so its
-    // absence confirms it's baked in (reflected). When it IS still offered, re-apply
-    // it: if that changes the simulation, a later edit overrode it — not reflected.
-    if (!card) return { id, label, reflected: true };
-    const values = resolveValues(card, plan.whatIf?.values?.[id]);
-    const reflected = fingerprint(simulate(card.apply(plan, values), config)) === baseFp;
+    const label = card?.label ?? STRATEGY_LABELS[id] ?? prettify(id);
+    if (!card) return { id, label, reflected: true }; // no longer offered → already applied
+    const reflected = fingerprint(simulate(card.apply(plan, resolveValues(card, plan.whatIf?.values?.[id])), config)) === baseFp;
     return { id, label, reflected };
   });
+  return [...detected, ...extra];
 }

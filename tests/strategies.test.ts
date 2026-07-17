@@ -575,6 +575,16 @@ describe("appliedStrategies — What-If changes baked into a saved plan", () => 
     expect(by["part-time-work"].reflected).toBe(false); // re-applying it changes the sim
   });
 
+  it("lists a field-baked strategy (guardrails) even when the What-If bookmark omits it", () => {
+    // Guardrails is set on the plan but there's NO whatIf bookmark — it must still show,
+    // because it can only come from the board and it's driving the numbers.
+    const plan = base({ guardrails: {}, home: { value: 900_000, growthReal: 0, downsize: { atAge: 70, newValue: 500_000, toSuper: 0 } } });
+    const ids = appliedStrategies(plan, cfg).map((s) => s.id);
+    expect(ids).toContain("guardrails");
+    expect(ids).toContain("downsize");
+    expect(appliedStrategies(plan, cfg).every((s) => s.reflected)).toBe(true); // field-detected → reflected
+  });
+
   it("labels a sold-property strategy by its name, else 'Investment Property N'", () => {
     const plan = base({
       people: [{ currentAge: 62, superBalance: 700_000, salary: 0, voluntaryConcessional: 0, voluntaryNonConcessional: 0 }],
