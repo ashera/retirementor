@@ -67,6 +67,20 @@ const BASELINE_NAME_KEY = "au-retirement-baseline-name"; // label for the ghost 
 const WORKING_TS_KEY = "au-retirement-plan-ts"; // when the local working plan was last saved
 const NUDGE_KEY = "au-retirement-nudge-dismissed"; // signed-out "save your work" banner dismissed
 
+/** Deep structural equality (order-insensitive for object keys) — tells whether the
+ *  live plan still exactly matches a saved scenario's data (any edit stops the match).
+ *  Uses the UNION of keys so a `key: undefined` in memory equals a key dropped by the
+ *  DB's JSON round-trip (both read as undefined). */
+function deepEqual(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (typeof a !== "object" || typeof b !== "object" || a === null || b === null) return false;
+  const ao = a as Record<string, unknown>;
+  const bo = b as Record<string, unknown>;
+  const keys = new Set([...Object.keys(ao), ...Object.keys(bo)]);
+  for (const k of keys) if (!deepEqual(ao[k], bo[k])) return false;
+  return true;
+}
+
 // A blank starting point for a first-time visitor's "Enter my details" wizard:
 // the personal figures (age, super, salary) start empty (NaN renders as a blank
 // Field) so nothing looks like the user's data until they type it. Spending and
@@ -597,6 +611,14 @@ export default function PlannerApp({
   // or empty selection still resolves to something valid.
   const selectedPlan = savedPlans.find((sp) => sp.id === selectedPlanId) ?? savedPlans[0] ?? null;
 
+  // The saved scenario CURRENTLY ON SCREEN: the live plan matches a saved plan's data
+  // exactly. Any edit makes it stop matching → an unsaved working scenario. (Distinct
+  // from `selectedPlan`, which is just the dropdown's target for the action buttons.)
+  const currentSaved = useMemo(
+    () => savedPlans.find((sp) => deepEqual(plan, { ...DEFAULT_PLAN, ...sp.data })) ?? null,
+    [plan, savedPlans],
+  );
+
   const isCouple = plan.household === "couple";
   const comfortable = isCouple
     ? config.asfa.comfortable.couple
@@ -837,6 +859,15 @@ export default function PlannerApp({
       {/* Saved-scenarios card — signed-in users only. */}
       {user && (configured || savedPlans.length > 0) && (
       <div className="mb-6 rounded-2xl border border-line bg-panel px-5 py-4">
+        {/* What's on screen right now — a saved scenario (matched exactly) or an
+            unsaved working plan. Distinct from the dropdown, which just targets the
+            action buttons below. */}
+        <div className="mb-3 flex flex-wrap items-baseline gap-x-2 gap-y-1 border-b border-line pb-3">
+          <span className="text-[11px] font-medium uppercase tracking-wide text-muted">Currently viewing</span>
+          <span className={`text-sm font-semibold ${currentSaved ? "text-white" : "text-amber-300"}`}>
+            {currentSaved ? currentSaved.name : "Working Scenario (Not Yet Saved)"}
+          </span>
+        </div>
         <div className="flex flex-wrap items-center gap-3">
           <span className="text-xs font-semibold uppercase tracking-wide text-muted">
             Saved scenarios
