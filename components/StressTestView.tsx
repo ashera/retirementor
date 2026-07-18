@@ -100,16 +100,28 @@ function Row({
 export default function StressTestView({
   config,
   savedPlans,
+  sharedPlan = null,
 }: {
   config: EngineConfig;
   savedPlans: SavedPlan[];
+  // Public read-only view (a share link or a curated /scenario/<slug> demo):
+  // stress-test THIS scenario instead of the viewer's own stored plan. `basePath`
+  // is this view's root (e.g. "/s/<token>" or "/scenario/<slug>") for the back link.
+  sharedPlan?: { plan: RetirementPlan; name: string; basePath: string } | null;
 }) {
+  const shared = !!sharedPlan;
   const [plan, setPlan] = useState<RetirementPlan | null>(null);
   const [savedName, setSavedName] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [assumptionsOpen, setAssumptionsOpen] = useState(false);
 
   useEffect(() => {
+    if (sharedPlan) {
+      setPlan({ ...DEFAULT_PLAN, ...sharedPlan.plan });
+      setSavedName(sharedPlan.name);
+      track("Stress test viewed");
+      return;
+    }
     try {
       const raw = localStorage.getItem(PLAN_KEY);
       if (raw) setPlan({ ...DEFAULT_PLAN, ...JSON.parse(raw) });
@@ -167,8 +179,8 @@ export default function StressTestView({
   return (
     <div className="mx-auto max-w-5xl px-5 py-8">
       <div className="mb-6 flex items-center justify-between gap-3">
-        <Link href="/" className="text-sm font-medium text-muted hover:text-white">
-          ← Back to planner
+        <Link href={sharedPlan ? sharedPlan.basePath : "/"} className="text-sm font-medium text-muted hover:text-white">
+          ← Back to {shared ? "the scenario" : "planner"}
         </Link>
         <span className="text-sm text-muted">
           Testing <span className="font-semibold text-slate-200">{savedName ?? "your working scenario"}</span>
@@ -191,10 +203,10 @@ export default function StressTestView({
             Build or load a plan first, then come back to stress-test it.
           </p>
           <Link
-            href="/"
+            href={sharedPlan ? sharedPlan.basePath : "/"}
             className="mt-3 inline-block rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-ink transition hover:bg-accent-soft"
           >
-            ← Go to the planner
+            ← Go to the {shared ? "scenario" : "planner"}
           </Link>
         </div>
       ) : (

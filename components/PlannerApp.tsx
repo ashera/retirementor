@@ -249,6 +249,7 @@ export default function PlannerApp({
   // Keep What-If inside the shared context so it starts from THIS scenario, not
   // the viewer's own plan; signed-in/normal visitors go to the regular sandbox.
   const whatIfHref = sharedPlan ? `${sharedPlan.basePath}/what-if` : "/what-if";
+  const stressHref = sharedPlan ? `${sharedPlan.basePath}/stress-test` : "/stress-test";
   const router = useRouter();
   // The active scenario: raw inputs (base) + an explicit strategy layer. Everything
   // downstream reads the COMPOSED plan, which is DERIVED — never edited directly.
@@ -1135,13 +1136,6 @@ export default function PlannerApp({
             ⚖ Compare scenarios
             <span aria-hidden>→</span>
           </Link>
-          <Link
-            href="/stress-test"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-panel-2 px-3 py-1.5 text-sm font-medium text-slate-200 transition hover:border-accent/50 hover:text-white"
-          >
-            🏛 Stress-test against history
-            <span aria-hidden>→</span>
-          </Link>
         </div>
       </div>
       )}
@@ -1274,6 +1268,28 @@ export default function PlannerApp({
             </div>
           </div>
         )}
+      </Link>
+
+      {/* Stress-test invite — shown to everyone with a plan (incl. shared views), so
+          a shared scenario can be run against history from its read-only dashboard. */}
+      <Link
+        href={stressHref}
+        onClick={() => track("Stress test promo clicked")}
+        className="group mb-6 flex items-center justify-between gap-4 rounded-2xl border border-line bg-panel px-5 py-3.5 transition hover:border-accent/50"
+      >
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="shrink-0 text-2xl" aria-hidden>🏛</span>
+          <div className="min-w-0">
+            <div className="font-semibold text-white">Stress-test against history</div>
+            <div className="text-sm text-muted">
+              See if this plan survives every major downturn of the last century — 1929, the 1970s, the GFC — with
+              fixed vs flexible spending compared side by side.
+            </div>
+          </div>
+        </div>
+        <span className="shrink-0 rounded-lg border border-accent/40 bg-accent/10 px-4 py-2 text-sm font-semibold text-accent transition group-hover:bg-accent/20">
+          Run stress test →
+        </span>
       </Link>
 
       {/* Withdrawal-rate diagnostic */}
