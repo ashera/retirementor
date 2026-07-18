@@ -232,7 +232,7 @@ export default function WhatIfView({
   const loadingCard = loaderQueue?.[loadStep] ?? null;
   useEffect(() => {
     if (!loading) return;
-    const t = setTimeout(() => setLoadStep((s) => s + 1), 5000);
+    const t = setTimeout(() => setLoadStep((s) => s + 1), 3000);
     return () => clearTimeout(t);
   }, [loading, loadStep]);
   const skipLoader = () => setLoadStep(loaderQueue?.length ?? 0);
