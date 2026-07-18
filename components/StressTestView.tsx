@@ -108,7 +108,21 @@ export default function StressTestView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const result = useMemo(() => (plan ? runStressTest(plan, config) : null), [plan, config]);
+  // Run the battery both ways — fixed spending vs flexible (Guyton-Klinger
+  // guardrails) — since downturns are exactly where flexing spend earns its keep.
+  const fixed = useMemo(() => (plan ? runStressTest({ ...plan, guardrails: undefined }, config) : null), [plan, config]);
+  const flex = useMemo(
+    () => (plan ? runStressTest({ ...plan, guardrails: plan.guardrails ?? {} }, config) : null),
+    [plan, config],
+  );
+  const [mode, setMode] = useState<"fixed" | "flex">("fixed");
+  // Default to the scenario's own setting once the plan loads.
+  useEffect(() => {
+    if (plan) setMode(plan.guardrails ? "flex" : "fixed");
+  }, [plan]);
+
+  const result = mode === "flex" ? flex : fixed;
+  const uplift = fixed && flex ? flex.survived - fixed.survived : 0;
   const life = plan?.lifeExpectancy ?? 90;
 
   const tone =
@@ -157,6 +171,32 @@ export default function StressTestView({
         </div>
       ) : (
         <>
+          {/* Fixed vs flexible spending — downturns are where flexing survives more. */}
+          {fixed && flex && (
+            <div className="mb-5">
+              <div className="inline-flex rounded-xl border border-line bg-panel p-1 text-sm">
+                <button
+                  onClick={() => setMode("fixed")}
+                  className={`rounded-lg px-3 py-1.5 font-medium transition ${mode === "fixed" ? "bg-panel-2 text-white" : "text-muted hover:text-white"}`}
+                >
+                  Fixed spending · {fixed.survived}/{fixed.total}
+                </button>
+                <button
+                  onClick={() => setMode("flex")}
+                  className={`rounded-lg px-3 py-1.5 font-medium transition ${mode === "flex" ? "bg-panel-2 text-white" : "text-muted hover:text-white"}`}
+                >
+                  Flexible spending · {flex.survived}/{flex.total}
+                </button>
+              </div>
+              {uplift > 0 && (
+                <p className="mt-2 text-sm text-emerald-400">
+                  <span aria-hidden>💡</span> Flexible spending survives {uplift} more downturn{uplift === 1 ? "" : "s"} — it eases
+                  spending in the bad years (never below your essentials).
+                </p>
+              )}
+            </div>
+          )}
+
           {/* Headline scorecard */}
           <div className={`mb-5 rounded-2xl border ${toneRing} bg-panel p-5`}>
             <div className="text-xs font-semibold uppercase tracking-wide text-muted">Survival scorecard</div>

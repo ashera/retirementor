@@ -49,6 +49,18 @@ describe("historical stress test", () => {
     expect(r.worst!.depletionAge).not.toBeNull();
   });
 
+  it("flexible spending (guardrails) never survives fewer eras than fixed", () => {
+    for (const plan of [comfortable, stretched]) {
+      const fixed = runStressTest({ ...plan, guardrails: undefined }, cfg);
+      const flex = runStressTest({ ...plan, guardrails: {} }, cfg);
+      expect(flex.survived).toBeGreaterThanOrEqual(fixed.survived);
+    }
+    // On the stretched plan, flexing should actually help.
+    const fixed = runStressTest({ ...stretched, guardrails: undefined }, cfg);
+    const flex = runStressTest({ ...stretched, guardrails: {} }, cfg);
+    expect(flex.survived).toBeGreaterThan(fixed.survived);
+  });
+
   it("sorts worst-first: failures before survivors, earliest depletion first", () => {
     const eras = runStressTest(stretched, cfg).eras;
     const firstSurvivor = eras.findIndex((e) => e.lasts);
