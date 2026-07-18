@@ -146,6 +146,8 @@ try {
   // F — historical stress test renders a scorecard + fixed/flex toggle for the plan.
   await page.goto(`${BASE}/stress-test`, { waitUntil: "networkidle" });
   await page.waitForTimeout(1000);
+  await page.getByRole("button", { name: /Skip the theatrics/i }).click().catch(() => {}); // skip the timed run
+  await page.waitForTimeout(600);
   const st = await txt();
   ok("stress test shows a survival scorecard", /Survived \d+ of 7/.test(st));
   ok("stress test lists the era battery", st.includes("Global Financial Crisis") && st.includes("The Great Depression"));

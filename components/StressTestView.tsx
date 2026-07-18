@@ -6,11 +6,23 @@ import type { EngineConfig } from "@/lib/au/config";
 import type { RetirementPlan } from "@/lib/au/types";
 import { DEFAULT_PLAN } from "@/lib/au/types";
 import type { SavedPlan } from "@/app/actions/plans";
-import { runStressTest, type StressEraResult } from "@/lib/au/stresstest";
+import { runStressTest, STRESS_ERAS, type StressEraResult } from "@/lib/au/stresstest";
 import { fmtCurrency } from "@/lib/au/format";
 import { track } from "@/lib/analytics";
 import StressChart from "@/components/StressChart";
 import AssumptionsModal from "@/components/AssumptionsModal";
+
+// Tongue-in-cheek "the machine is doing something" lines, one per era, shown while
+// each stress test "runs". Purely theatrical.
+const QUIPS: Record<string, string> = {
+  "1929": "Dusting off the ledgers from 1929…",
+  "1937": "Bracing for the double dip…",
+  "1966": "Adjusting for a decade of inflation, one loaf of bread at a time…",
+  "1973": "Counting the oil barrels in case someone missed a few…",
+  "2000": "Waiting for dial-up to reconnect to your pets.com shares…",
+  "2008": "Politely asking the bank for your money back…",
+  "2022": "Watching shares and bonds fall together, awkwardly…",
+};
 
 const PLAN_KEY = "au-retirement-plan";
 const SAVED_ID_KEY = "au-retirement-saved-id";
@@ -127,6 +139,20 @@ export default function StressTestView({
   const uplift = fixed && flex ? flex.survived - fixed.survived : 0;
   const life = plan?.lifeExpectancy ?? 90;
 
+  // Theatrical run: reveal the eras one at a time (chronologically), each taking a
+  // random 5–10s to "test", with commentary in a modal. `step` = eras completed.
+  const [step, setStep] = useState(0);
+  const running = !!result && step < STRESS_ERAS.length;
+  const revealedIds = useMemo(() => new Set(STRESS_ERAS.slice(0, step).map((e) => e.id)), [step]);
+  const current = step < STRESS_ERAS.length ? STRESS_ERAS[step] : null;
+  useEffect(() => {
+    if (!result || step >= STRESS_ERAS.length) return;
+    const delay = 5000 + Math.floor(Math.random() * 5000);
+    const t = setTimeout(() => setStep((s) => s + 1), delay);
+    return () => clearTimeout(t);
+  }, [step, result]);
+  const skip = () => setStep(STRESS_ERAS.length);
+
   const tone =
     result == null
       ? "muted"
@@ -176,38 +202,55 @@ export default function StressTestView({
           <div className="grid gap-5 lg:grid-cols-2 lg:items-start">
             {/* Left: headline + ranked list */}
             <div className="space-y-4">
-              <div className={`rounded-2xl border ${toneRing} bg-panel p-5`}>
+              <div className={`rounded-2xl border ${running ? "border-line" : toneRing} bg-panel p-5`}>
                 <div className="text-xs font-semibold uppercase tracking-wide text-muted">Survival scorecard</div>
-                <div className={`mt-1 text-3xl font-bold ${toneText}`}>
-                  Survived {result.survived} of {result.total}
-                </div>
-                <p className="mt-1 text-sm text-muted">
-                  {result.survived === result.total
-                    ? "Your plan lasts to life expectancy through every downturn on record — a resilient plan."
-                    : result.worst
-                      ? `${result.worst.label} is the one that breaks it — your money runs out at age ${result.worst.depletionAge}.`
-                      : ""}
-                </p>
+                {running ? (
+                  <>
+                    <div className="mt-1 text-3xl font-bold text-amber-300">
+                      Running… {step}/{result.total}
+                    </div>
+                    <p className="mt-1 text-sm text-muted">Replaying each major downturn against your plan.</p>
+                  </>
+                ) : (
+                  <>
+                    <div className={`mt-1 text-3xl font-bold ${toneText}`}>
+                      Survived {result.survived} of {result.total}
+                    </div>
+                    <p className="mt-1 text-sm text-muted">
+                      {result.survived === result.total
+                        ? "Your plan lasts to life expectancy through every downturn on record — a resilient plan."
+                        : result.worst
+                          ? `${result.worst.label} is the one that breaks it — your money runs out at age ${result.worst.depletionAge}.`
+                          : ""}
+                    </p>
+                  </>
+                )}
               </div>
 
-              {/* Ranked, worst-first */}
+              {/* Ranked, worst-first — revealed as each era's test completes. */}
               <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-panel">
-                {result.eras.map((era) => (
-                  <Row
-                    key={era.id}
-                    era={era}
-                    life={life}
-                    selected={selectedId === era.id}
-                    onSelect={() => setSelectedId((cur) => (cur === era.id ? null : era.id))}
-                  />
-                ))}
+                {result.eras
+                  .filter((era) => revealedIds.has(era.id))
+                  .map((era) => (
+                    <Row
+                      key={era.id}
+                      era={era}
+                      life={life}
+                      selected={selectedId === era.id}
+                      onSelect={() => setSelectedId((cur) => (cur === era.id ? null : era.id))}
+                    />
+                  ))}
+                {running && (
+                  <li className="px-4 py-3 text-center text-xs text-muted">testing the rest…</li>
+                )}
               </ul>
             </div>
 
             {/* Right: spending strategy + chart + disclosure, sticky on wide screens */}
             <div className="space-y-4 lg:sticky lg:top-6">
-              {/* Fixed vs flexible spending — same card size as the scorecard. */}
-              {fixed && flex && (
+              {/* Fixed vs flexible spending — same card size as the scorecard.
+                  Hidden until the run finishes (its counts summarise every era). */}
+              {!running && fixed && flex && (
                 <div className="rounded-2xl border border-line bg-panel p-5">
                   <div className="text-xs font-semibold uppercase tracking-wide text-muted">Spending strategy</div>
                   <div className="mt-2 grid grid-cols-2 gap-1 rounded-xl border border-line bg-panel-2 p-1 text-sm">
@@ -237,7 +280,7 @@ export default function StressTestView({
                 </div>
               )}
 
-              <StressChart result={result} selectedId={selectedId} />
+              <StressChart result={result} selectedId={selectedId} revealed={revealedIds} />
             </div>
           </div>
 
@@ -255,6 +298,36 @@ export default function StressTestView({
             </p>
           </div>
         </>
+      )}
+
+      {/* Theatrical "running the tests" modal. */}
+      {running && current && (
+        <div className="fixed inset-0 z-50 grid place-items-center p-4">
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
+          <div className="relative w-full max-w-md rounded-2xl border border-line bg-panel p-6 text-center shadow-2xl">
+            <div className="text-xs font-semibold uppercase tracking-wide text-muted">
+              Stress test {step + 1} of {STRESS_ERAS.length}
+            </div>
+            <div className="mt-2 text-xl font-bold text-white">{current.label}</div>
+            <p className="mt-1 text-sm text-muted">{current.blurb}</p>
+            <div className="mt-5 flex items-center justify-center gap-2.5 text-sm font-medium text-accent">
+              <span className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-accent border-t-transparent" aria-hidden />
+              <span>
+                {QUIPS[current.id] ?? "Crunching the numbers…"}
+                <span className="ml-0.5 inline-block animate-pulse">▍</span>
+              </span>
+            </div>
+            <div className="mt-5 h-1.5 w-full overflow-hidden rounded-full bg-panel-2">
+              <div
+                className="h-full rounded-full bg-accent transition-all duration-500"
+                style={{ width: `${(step / STRESS_ERAS.length) * 100}%` }}
+              />
+            </div>
+            <button onClick={skip} className="mt-4 text-xs text-muted transition hover:text-white">
+              Skip the theatrics →
+            </button>
+          </div>
+        </div>
       )}
 
       {plan && (

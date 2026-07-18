@@ -9,10 +9,13 @@ import type { StressTestResult } from "@/lib/au/stresstest";
 export default function StressChart({
   result,
   selectedId,
+  revealed,
 }: {
   result: StressTestResult;
   selectedId: string | null;
+  revealed?: Set<string>; // when set, only draw these eras' lines (progressive reveal)
 }) {
+  const eras = revealed ? result.eras.filter((e) => revealed.has(e.id)) : result.eras;
   // Merge all series onto one row per age.
   const ages = result.central.map((p) => p.age);
   const byId = new Map(result.eras.map((e) => [e.id, new Map(e.path.map((p) => [p.age, p.total]))]));
@@ -43,7 +46,7 @@ export default function StressChart({
           />
           <ReferenceLine x={result.retireAge} stroke="#a78bfa" strokeDasharray="4 3" strokeOpacity={0.7} />
           {/* Era paths first (underneath), then the central reference on top. */}
-          {result.eras.map((e) => {
+          {eras.map((e) => {
             const sel = selectedId === e.id;
             const dim = selectedId != null && !sel;
             return (
