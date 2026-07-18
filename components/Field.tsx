@@ -12,6 +12,10 @@ interface FieldProps {
   prefix?: string;
   suffix?: string;
   hint?: string;
+  // When a What-If strategy controls this field, lock the input (its value is the
+  // strategy's) and explain where to change it. `value` should be the composed value.
+  locked?: boolean;
+  lockNote?: React.ReactNode;
 }
 
 export default function Field({
@@ -24,6 +28,8 @@ export default function Field({
   prefix,
   suffix,
   hint,
+  locked = false,
+  lockNote,
 }: FieldProps) {
   const clamp = (n: number) => Math.min(max, Math.max(min, n));
 
@@ -42,7 +48,7 @@ export default function Field({
 
   return (
     <div className="space-y-2">
-      <div className="flex items-baseline justify-between gap-3">
+      <div className={`flex items-baseline justify-between gap-3 ${locked ? "opacity-60" : ""}`}>
         <label className="text-sm font-medium text-slate-200">{label}</label>
         <div className="flex items-center gap-1 rounded-lg border border-line bg-panel-2 px-2 py-1">
           {prefix && <span className="text-xs text-muted">{prefix}</span>}
@@ -52,6 +58,7 @@ export default function Field({
             min={min}
             max={max}
             step={step}
+            disabled={locked}
             onFocus={() => setFocused(true)}
             onChange={(e) => {
               setText(e.target.value);
@@ -67,7 +74,7 @@ export default function Field({
               setText(String(next));
               if (next !== value) onChange(next);
             }}
-            className="w-24 bg-transparent text-right text-sm font-semibold tabular-nums text-white outline-none"
+            className="w-24 bg-transparent text-right text-sm font-semibold tabular-nums text-white outline-none disabled:cursor-not-allowed"
           />
           {suffix && <span className="text-xs text-muted">{suffix}</span>}
         </div>
@@ -78,10 +85,15 @@ export default function Field({
         min={min}
         max={max}
         step={step}
+        disabled={locked}
         onChange={(e) => onChange(clamp(parseFloat(e.target.value)))}
-        className="w-full"
+        className={`w-full ${locked ? "opacity-60" : ""}`}
       />
-      {hint && <p className="text-xs text-muted">{hint}</p>}
+      {locked && lockNote ? (
+        <p className="text-xs text-amber-300/90">{lockNote}</p>
+      ) : (
+        hint && <p className="text-xs text-muted">{hint}</p>
+      )}
     </div>
   );
 }

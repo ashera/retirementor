@@ -31,6 +31,7 @@ import {
 import { runMonteCarlo, MC_CONFIDENCE_TARGET, MC_CONFIDENCE_MC } from "@/lib/au/montecarlo";
 import { whatWillItTake, earliestRetirement } from "@/lib/au/goalseek";
 import { maxSpendForConfidence, withSpend, appliedStrategies } from "@/lib/au/strategies";
+import { composeScenario, toActiveScenario, EMPTY_LAYER, type StrategyLayer } from "@/lib/au/scenario";
 import { initialWithdrawal } from "@/lib/au/withdrawal";
 import TrimSpendingModal from "@/components/TrimSpendingModal";
 import BoostSpendingModal from "@/components/BoostSpendingModal";
@@ -247,9 +248,38 @@ export default function PlannerApp({
   // the viewer's own plan; signed-in/normal visitors go to the regular sandbox.
   const whatIfHref = sharedPlan ? `${sharedPlan.basePath}/what-if` : "/what-if";
   const router = useRouter();
-  const [plan, setPlan] = useState<RetirementPlan>(DEFAULT_PLAN);
+  // The active scenario: raw inputs (base) + an explicit strategy layer. Everything
+  // downstream reads the COMPOSED plan, which is DERIVED — never edited directly.
+  // Dashboard edits go to `base`; strategies win on any overlapping field.
+  const [base, setBase] = useState<RetirementPlan>(DEFAULT_PLAN);
+  const [strategies, setStrategies] = useState<StrategyLayer>(EMPTY_LAYER);
+  const plan = useMemo(() => composeScenario(base, strategies, config), [base, strategies, config]);
+  // The persist/save form of the active scenario: the composed plan plus a bookmark
+  // carrying the strategy layer + base, so a reload / save restores the strategies.
+  // Strategy-free plans store plain (no bookmark) — smaller and back-compatible.
+  const storable = useMemo<RetirementPlan>(
+    () =>
+      strategies.active.length === 0
+        ? { ...plan, whatIf: undefined }
+        : {
+            ...plan,
+            whatIf: {
+              active: [...strategies.active],
+              values: strategies.values,
+              baselineId: "current",
+              baselinePlan: { ...base, whatIf: undefined },
+            },
+          },
+    [plan, strategies, base],
+  );
+  // Adopt a composed plan as the active scenario (splits it into base + strategy layer).
+  const splitInto = (composed: RetirementPlan) => {
+    const sc = toActiveScenario(composed);
+    setBase(sc.base);
+    setStrategies(sc.strategies);
+  };
   // Baseline = the last committed plan (wizard / saved / load). Quick-adjust tweaks
-  // update `plan` only, so the chart can show a "vs saved" ghost line.
+  // update the active scenario only, so the chart can show a "vs saved" ghost line.
   const [baseline, setBaseline] = useState<RetirementPlan>(DEFAULT_PLAN);
   // Where the baseline came from, so the ghost line names it (a loaded/saved
   // scenario's name, or null when it's just the pre-tweak committed plan).
@@ -283,7 +313,7 @@ export default function PlannerApp({
     // never read or write this viewer's localStorage (it's someone else's plan).
     if (sharedPlan) {
       const working = { ...DEFAULT_PLAN, ...sharedPlan.plan };
-      setPlan(working);
+      splitInto(working);
       setBaseline(working);
       setBaselineName(sharedPlan.name);
       setConfigured(true);
@@ -304,7 +334,7 @@ export default function PlannerApp({
         // Cloud draft is at least as fresh (e.g. newer work from another device
         // or a first sign-in here) → adopt it and mirror to this device.
         const working = { ...DEFAULT_PLAN, ...draft.data };
-        setPlan(working);
+        splitInto(working);
         setBaseline(working);
         setBaselineName(null);
         setConfigured(true);
@@ -314,7 +344,7 @@ export default function PlannerApp({
       } else if (raw) {
         const working = { ...DEFAULT_PLAN, ...JSON.parse(raw) };
         const rawBase = localStorage.getItem(BASELINE_KEY);
-        setPlan(working);
+        splitInto(working);
         setBaseline(rawBase ? { ...DEFAULT_PLAN, ...JSON.parse(rawBase) } : working);
         setBaselineName(localStorage.getItem(BASELINE_NAME_KEY) || null);
         setConfigured(true);
@@ -323,7 +353,7 @@ export default function PlannerApp({
         // recent (listPlans() is ordered newest-first) straight into the dashboard.
         const sp = savedPlans[0];
         const working = { ...DEFAULT_PLAN, ...sp.data };
-        setPlan(working);
+        splitInto(working);
         setBaseline(working);
         setBaselineName(sp.name);
         setConfigured(true);
@@ -348,27 +378,36 @@ export default function PlannerApp({
     }
   };
 
-  // Keep a ref to the latest plan for the visibility-flush handler below.
-  const planRef = useRef(plan);
-  planRef.current = plan;
+  // Keep a ref to the latest storable plan for the visibility-flush handler below.
+  const storableRef = useRef(storable);
+  storableRef.current = storable;
 
-  // Debounced cloud auto-save of the working plan (signed-in users) so unsaved
+  // Persist the working scenario locally on every change (in its storable form, so
+  // the strategy layer survives a reload / hop to the other page). Skips the
+  // pre-ready mount, the empty Get-started state, and the read-only share view.
+  useEffect(() => {
+    if (!ready || !configured || shared) return;
+    persistWorking(storable);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storable, ready, configured, shared]);
+
+  // Debounced cloud auto-save of the working scenario (signed-in users) so unsaved
   // work is backed up server-side and follows them to other devices / survives
   // cleared browser storage.
   useEffect(() => {
     if (!ready || !user || !configured) return;
     const t = setTimeout(() => {
-      void saveDraft(plan);
+      void saveDraft(storable);
     }, 1500);
     return () => clearTimeout(t);
-  }, [plan, ready, user, configured]);
+  }, [storable, ready, user, configured]);
 
   // Best-effort flush when the tab is hidden, to catch edits made within the
   // debounce window (localStorage already holds them for this device).
   useEffect(() => {
     if (!user) return;
     const flush = () => {
-      if (document.visibilityState === "hidden" && configured) void saveDraft(planRef.current);
+      if (document.visibilityState === "hidden" && configured) void saveDraft(storableRef.current);
     };
     document.addEventListener("visibilitychange", flush);
     return () => document.removeEventListener("visibilitychange", flush);
@@ -389,7 +428,7 @@ export default function PlannerApp({
   const result = useMemo(() => simulate(plan, config), [plan, config]);
   // What-If strategies this saved plan carries (baked into the numbers above), and
   // whether each is still reflected — so the dashboard is honest about what's applied.
-  const applied = useMemo(() => appliedStrategies(plan, config), [plan, config]);
+  const applied = useMemo(() => appliedStrategies(storable, config), [storable, config]);
   const mc = useMemo(() => runMonteCarlo(plan, config), [plan, config]);
   const successPct = Math.round(mc.successRate * 100);
   const successTone: "accent" | "amber" | "red" =
@@ -469,7 +508,9 @@ export default function PlannerApp({
   const budgetBalanced = prudentDelta != null && !overspending && !spendHeadroom && !mcMaxPending;
 
   const tweaked = useMemo(
-    () => JSON.stringify(plan) !== JSON.stringify(baseline),
+    // Compare the composed plans without their bookmarks — a freshly-loaded scenario
+    // (baseline carries a bookmark; plan doesn't) isn't a "change".
+    () => JSON.stringify({ ...plan, whatIf: undefined }) !== JSON.stringify({ ...baseline, whatIf: undefined }),
     [plan, baseline],
   );
   const baselineResult = useMemo(
@@ -490,21 +531,35 @@ export default function PlannerApp({
     }
   };
 
-  // Commit a plan as the new baseline (wizard / load / save) and persist both.
-  // `name` labels the ghost line (a scenario name, or null for an unnamed plan).
-  const commit = (next: RetirementPlan, name: string | null = null) => {
-    setPlan(next);
-    setBaseline(next);
-    setBaselineName(name);
-    persistWorking(next);
+  // Persist the ghost-line baseline (a committed composed plan + its name).
+  const persistBaseline = (composed: RetirementPlan, name: string | null) => {
     if (shared) return; // read-only share view — don't touch the viewer's storage
     try {
-      localStorage.setItem(BASELINE_KEY, JSON.stringify(next));
+      localStorage.setItem(BASELINE_KEY, JSON.stringify(composed));
       if (name) localStorage.setItem(BASELINE_NAME_KEY, name);
       else localStorage.removeItem(BASELINE_NAME_KEY);
     } catch {
       /* ignore */
     }
+  };
+
+  // Commit a whole scenario as the new baseline (load / save / guide). Splits it
+  // into base + strategy layer; the working-plan storage is handled by the effect.
+  const commit = (next: RetirementPlan, name: string | null = null) => {
+    splitInto(next);
+    setBaseline(next);
+    setBaselineName(name);
+    persistBaseline(next, name);
+  };
+
+  // Commit an edited BASE (wizard re-entry) while KEEPING the strategy layer, and
+  // re-baseline to the resulting composed plan (no ghost line after a full re-entry).
+  const commitBase = (nextBase: RetirementPlan) => {
+    setBase(nextBase);
+    const composed = composeScenario(nextBase, strategies, config);
+    setBaseline(composed);
+    setBaselineName(null);
+    persistBaseline(composed, null);
   };
 
   // Leaving the first-run guide. Completing adopts the entered plan and shows the
@@ -525,21 +580,20 @@ export default function PlannerApp({
     setShowGuide(false);
   };
 
-  // Quick-adjust: update the working plan only (baseline stays for the ghost line).
+  // Quick-adjust: edit the base inputs only (the strategy layer and the ghost-line
+  // baseline are untouched). Strategies win, so a field a strategy overrides won't
+  // move here — the lever shows an override badge and points to What-If.
   const quickAdjust = (patch: Partial<RetirementPlan>) =>
-    setPlan((prev) => {
-      const next = { ...prev, ...patch };
-      persistWorking(next);
-      return next;
-    });
+    setBase((prev) => ({ ...prev, ...patch }));
 
   const resetToBaseline = () => {
-    setPlan(baseline);
-    persistWorking(baseline);
+    splitInto(baseline);
   };
 
   const handleComplete = (next: RetirementPlan) => {
-    commit(next);
+    // The wizard rewrites base inputs; keep any strategy layer on top of them.
+    if (configured) commitBase(next);
+    else commit(next); // first-run: no strategies yet
     setConfigured(true);
     setWizardOpen(false);
     setWizardSeed(null);
@@ -569,7 +623,7 @@ export default function PlannerApp({
     } catch {
       /* ignore */
     }
-    setPlan(DEFAULT_PLAN);
+    splitInto(DEFAULT_PLAN);
     setBaseline(DEFAULT_PLAN);
     setBaselineName(null);
     setConfigured(false);
@@ -581,12 +635,12 @@ export default function PlannerApp({
   const handleSave = () => {
     const name = saveName.trim() || `Plan ${savedPlans.length + 1}`;
     startTransition(async () => {
-      const res = await savePlan(name, plan);
+      const res = await savePlan(name, storable);
       if (res.error) setNotice(res.error);
       else {
-        // The current plan is now this named scenario — make it the baseline so
+        // The current scenario is now this named plan — make it the baseline so
         // any further quick-adjusts show a ghost line labelled with its name.
-        commit(plan, name);
+        commit(storable, name);
         setSaveName("");
         setNotice(`Saved “${name}”.`);
         track("Plan saved");
@@ -615,7 +669,11 @@ export default function PlannerApp({
   // exactly. Any edit makes it stop matching → an unsaved working scenario. (Distinct
   // from `selectedPlan`, which is just the dropdown's target for the action buttons.)
   const currentSaved = useMemo(
-    () => savedPlans.find((sp) => deepEqual(plan, { ...DEFAULT_PLAN, ...sp.data })) ?? null,
+    // Compare composed plans without their bookmarks — the live plan carries none.
+    () =>
+      savedPlans.find((sp) =>
+        deepEqual({ ...plan, whatIf: undefined }, { ...DEFAULT_PLAN, ...sp.data, whatIf: undefined }),
+      ) ?? null,
     [plan, savedPlans],
   );
 
@@ -630,6 +688,20 @@ export default function PlannerApp({
   const range = spendingRange(plan);
   // For the ASFA comparison, use the headline (go-go) figure when staged.
   const benchmarkSpend = isStaged ? stages.goGo : plan.targetSpending;
+
+  // A dashboard lever is "overridden" when a What-If strategy sets its field, so the
+  // composed value differs from the base input. Strategies win, so we lock the lever
+  // and point to What-If (retirement age ↔ Retire-later; spend ↔ Adjust spending).
+  const baseSpend = base.spendingMode === "stages" ? base.spendingStages.goGo : base.targetSpending;
+  const composedSpend = isStaged ? stages.goGo : plan.targetSpending;
+  const retireOverridden = plan.retirementAge !== base.retirementAge;
+  const spendOverridden = composedSpend !== baseSpend;
+  const lockNote = (label: string) => (
+    <>
+      Set by the <span className="font-semibold">{label}</span> strategy —{" "}
+      <a href={whatIfHref} className="underline hover:text-amber-200">change it in What-If →</a>
+    </>
+  );
 
   // True income need = living costs + any ongoing home-loan cost (see lib/au/goal).
   const goal = retirementGoal(plan);
@@ -1202,8 +1274,10 @@ export default function PlannerApp({
                 min={40}
                 max={75}
                 suffix="yrs"
+                locked={retireOverridden}
+                lockNote={lockNote("Retire later")}
               />
-              {earliest.age != null && earliest.age < plan.retirementAge && (
+              {!retireOverridden && earliest.age != null && earliest.age < plan.retirementAge && (
                 <button
                   onClick={() => quickAdjust({ retirementAge: earliest.age! })}
                   className="mt-1.5 text-xs font-medium text-accent transition hover:underline"
@@ -1218,7 +1292,7 @@ export default function PlannerApp({
               onChange={(v) =>
                 isStaged
                   ? quickAdjust({
-                      spendingStages: { ...plan.spendingStages, goGo: v },
+                      spendingStages: { ...base.spendingStages, goGo: v },
                     })
                   : quickAdjust({ targetSpending: v })
               }
@@ -1226,6 +1300,8 @@ export default function PlannerApp({
               max={200_000}
               step={1000}
               prefix="$"
+              locked={spendOverridden}
+              lockNote={lockNote("Adjust discretionary spending")}
             />
             {(() => {
               const feePct = plan.fees?.adminInvestmentPct ?? config.fees.adminInvestmentPct;
@@ -1804,18 +1880,15 @@ export default function PlannerApp({
 
       {wizardOpen && (
         <PlanWizard
-          initial={configured ? plan : (wizardSeed ?? BLANK_STARTER)}
+          initial={configured ? base : (wizardSeed ?? BLANK_STARTER)}
           configured={configured}
           config={config}
           onComplete={handleComplete}
           onProgress={(d) => {
-            // Only mirror progress into the live dashboard / storage once there's
-            // a real plan — a blank first-run wizard shouldn't push NaN fields
-            // into the (still empty) dashboard or persist a half-entered plan.
-            if (configured) {
-              setPlan(d);
-              persistWorking(d);
-            }
+            // Only mirror progress into the live dashboard once there's a real plan —
+            // a blank first-run wizard shouldn't push NaN fields into the (still
+            // empty) dashboard. Edits the base; the strategy layer stays on top.
+            if (configured) setBase(d);
           }}
           onClose={() => {
             setWizardOpen(false);
