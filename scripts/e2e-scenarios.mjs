@@ -149,7 +149,7 @@ try {
   const st = await txt();
   ok("stress test shows a survival scorecard", /Survived \d+ of 7/.test(st));
   ok("stress test lists the era battery", st.includes("Global Financial Crisis") && st.includes("The Great Depression"));
-  ok("stress test offers fixed-vs-flexible spending", /Fixed spending/.test(st) && /Flexible spending/.test(st));
+  ok("stress test offers fixed-vs-flexible spending", /Spending strategy/i.test(st) && /Fixed/.test(st) && /Flexible/.test(st));
 } catch (e) {
   console.error("\ne2e run threw — is `npm run dev` running at", BASE, "?\n ", e.message);
   ok("run completed without throwing", false);

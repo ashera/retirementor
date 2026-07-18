@@ -173,32 +173,6 @@ export default function StressTestView({
         </div>
       ) : (
         <>
-          {/* Fixed vs flexible spending — downturns are where flexing survives more. */}
-          {fixed && flex && (
-            <div className="mb-5">
-              <div className="inline-flex rounded-xl border border-line bg-panel p-1 text-sm">
-                <button
-                  onClick={() => setMode("fixed")}
-                  className={`rounded-lg px-3 py-1.5 font-medium transition ${mode === "fixed" ? "bg-panel-2 text-white" : "text-muted hover:text-white"}`}
-                >
-                  Fixed spending · {fixed.survived}/{fixed.total}
-                </button>
-                <button
-                  onClick={() => setMode("flex")}
-                  className={`rounded-lg px-3 py-1.5 font-medium transition ${mode === "flex" ? "bg-panel-2 text-white" : "text-muted hover:text-white"}`}
-                >
-                  Flexible spending · {flex.survived}/{flex.total}
-                </button>
-              </div>
-              {uplift > 0 && (
-                <p className="mt-2 text-sm text-emerald-400">
-                  <span aria-hidden>💡</span> Flexible spending survives {uplift} more downturn{uplift === 1 ? "" : "s"} — it eases
-                  spending in the bad years (never below your essentials).
-                </p>
-              )}
-            </div>
-          )}
-
           <div className="grid gap-5 lg:grid-cols-2 lg:items-start">
             {/* Left: headline + ranked list */}
             <div className="space-y-4">
@@ -230,8 +204,39 @@ export default function StressTestView({
               </ul>
             </div>
 
-            {/* Right: chart + disclosure, sticky on wide screens */}
-            <div className="space-y-3 lg:sticky lg:top-6">
+            {/* Right: spending strategy + chart + disclosure, sticky on wide screens */}
+            <div className="space-y-4 lg:sticky lg:top-6">
+              {/* Fixed vs flexible spending — same card size as the scorecard. */}
+              {fixed && flex && (
+                <div className="rounded-2xl border border-line bg-panel p-5">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-muted">Spending strategy</div>
+                  <div className="mt-2 grid grid-cols-2 gap-1 rounded-xl border border-line bg-panel-2 p-1 text-sm">
+                    <button
+                      onClick={() => setMode("fixed")}
+                      className={`rounded-lg px-3 py-1.5 text-center font-medium transition ${mode === "fixed" ? "bg-panel text-white shadow-sm" : "text-muted hover:text-white"}`}
+                    >
+                      Fixed · {fixed.survived}/{fixed.total}
+                    </button>
+                    <button
+                      onClick={() => setMode("flex")}
+                      className={`rounded-lg px-3 py-1.5 text-center font-medium transition ${mode === "flex" ? "bg-panel text-white shadow-sm" : "text-muted hover:text-white"}`}
+                    >
+                      Flexible · {flex.survived}/{flex.total}
+                    </button>
+                  </div>
+                  <p className="mt-3 text-sm text-muted">
+                    {mode === "flex"
+                      ? "Flexible spending (Guyton-Klinger guardrails) trims your drawdown about 10% after the market falls, and lets it rise again after strong years — but never below your essentials. That flex is what carries a plan through a bad run of returns."
+                      : "Fixed spending draws the same amount every year, whatever the markets do. Simple and predictable — but a bad run of returns early in retirement can drain the pot before it recovers."}
+                  </p>
+                  {uplift > 0 && (
+                    <p className="mt-2 text-sm font-medium text-emerald-400">
+                      <span aria-hidden>💡</span> Flexing spending survives {uplift} more of these downturn{uplift === 1 ? "" : "s"}.
+                    </p>
+                  )}
+                </div>
+              )}
+
               <StressChart result={result} selectedId={selectedId} />
               <p className="text-xs text-muted">
                 Each era replays its actual year-by-year real returns from the moment you retire, at full historical
