@@ -136,6 +136,8 @@ try {
   await page.locator('a[href*="what-if?edit="]').click();
   await page.waitForURL("**/what-if**").catch(() => {});
   await page.waitForTimeout(1200);
+  await page.getByRole("button", { name: /^Skip →$/ }).click().catch(() => {}); // skip the active-strategy loader
+  await page.waitForTimeout(400);
   ok("?edit opens What-If editing 'Scenario One'", (await txt()).includes("Scenario One"));
   const guardOn = await page.evaluate(() => {
     const label = [...document.querySelectorAll("*")].find((e) => e.textContent === "Flexible spending (guardrails)");

@@ -142,6 +142,12 @@ export default function WhatIfView({
   const [assumptionsOpen, setAssumptionsOpen] = useState(false);
   const [assumptionsCard, setAssumptionsCard] = useState<StrategyCard | null>(null);
   const [timelineOpen, setTimelineOpen] = useState(false);
+  // Priming loader: on load, walk through the strategies already active on this
+  // scenario (name + description, 5s each) so the user knows what's applied before
+  // scrolling. `loaderQueue` is snapshotted once so later toggles don't reopen it.
+  const [loaderQueue, setLoaderQueue] = useState<StrategyCard[] | null>(null);
+  const [loadStep, setLoadStep] = useState(0);
+  const loaderStarted = useRef(false);
 
   // Don't sync back to storage until the initial restore has been applied, so the
   // empty first render can't clobber the working plan.
@@ -212,6 +218,24 @@ export default function WhatIfView({
     () => (baseline ? applyStrategies(baseline, catalog, active, values) : null),
     [baseline, catalog, active, values],
   );
+
+  // Once the scenario has loaded, snapshot the active strategies (in catalog order)
+  // to walk through in the priming loader — runs once.
+  useEffect(() => {
+    if (loaderStarted.current || shared || !baseline) return;
+    loaderStarted.current = true;
+    setLoaderQueue(catalog.filter((c) => active.has(c.id)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [baseline, catalog, active, shared]);
+
+  const loading = loaderQueue != null && loadStep < loaderQueue.length;
+  const loadingCard = loaderQueue?.[loadStep] ?? null;
+  useEffect(() => {
+    if (!loading) return;
+    const t = setTimeout(() => setLoadStep((s) => s + 1), 5000);
+    return () => clearTimeout(t);
+  }, [loading, loadStep]);
+  const skipLoader = () => setLoadStep(loaderQueue?.length ?? 0);
 
   // Sync the active scenario back to the shared working plan so the dashboard
   // reflects every strategy change (and a plain reload restores it). Skips the
@@ -956,6 +980,33 @@ export default function WhatIfView({
         {!signedIn && <p className="mt-2 text-xs text-muted">Sign in to save scenarios to your account.</p>}
         {saveMsg && <p className="mt-2 text-xs text-accent">{saveMsg}</p>}
       </div>
+      )}
+
+      {/* Priming loader: walk through the strategies already active on this scenario. */}
+      {loading && loadingCard && loaderQueue && (
+        <div className="fixed inset-0 z-50 grid place-items-center p-4">
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
+          <div className="relative w-full max-w-md rounded-2xl border border-line bg-panel p-6 text-center shadow-2xl">
+            <div className="flex items-center justify-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted">
+              <span className="h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-accent border-t-transparent" aria-hidden />
+              Loading your active What-If strategies
+            </div>
+            <div className="mt-1 text-[11px] text-muted">
+              {loadStep + 1} of {loaderQueue.length}
+            </div>
+            <div className="mt-3 text-xl font-bold text-white">{loadingCard.label}</div>
+            {loadingCard.blurb && <p className="mt-1 text-sm text-muted">{loadingCard.blurb}</p>}
+            <div className="mt-5 h-1.5 w-full overflow-hidden rounded-full bg-panel-2">
+              <div
+                className="h-full rounded-full bg-accent transition-all duration-500"
+                style={{ width: `${(loadStep / loaderQueue.length) * 100}%` }}
+              />
+            </div>
+            <button onClick={skipLoader} className="mt-4 text-xs text-muted transition hover:text-white">
+              Skip →
+            </button>
+          </div>
+        </div>
       )}
 
       <GuardrailsTimelineModal open={timelineOpen} onClose={() => setTimelineOpen(false)} plan={composed} config={config} />
