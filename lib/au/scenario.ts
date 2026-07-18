@@ -75,11 +75,14 @@ export function toActiveScenario(
   };
 }
 
-/** Produce the RetirementPlan to persist for a scenario: the composed plan (so
- *  every consumer that reads a saved plan keeps working) plus a complete bookmark
- *  carrying the base + layer, so `toActiveScenario` round-trips it exactly. */
+/** Produce the RetirementPlan to persist/display for a scenario: the composed plan
+ *  (so every consumer that reads a saved plan keeps working) plus — when there ARE
+ *  strategies — a complete bookmark carrying the base + layer, so `toActiveScenario`
+ *  round-trips it exactly. Strategy-free scenarios store plain (no bookmark), which
+ *  is smaller and byte-compatible with plans saved before this model. */
 export function fromActiveScenario(scenario: ActiveScenario, config: EngineConfig): RetirementPlan {
   const composed = composeScenario(scenario.base, scenario.strategies, config);
+  if (scenario.strategies.active.length === 0) return composed; // already whatIf-free
   return {
     ...composed,
     whatIf: {
