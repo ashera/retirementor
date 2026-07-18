@@ -139,7 +139,7 @@ export default function StressTestView({
   const toneRing = { emerald: "border-emerald-500/30", amber: "border-amber-500/30", red: "border-red-500/30", muted: "border-line" }[tone];
 
   return (
-    <div className="mx-auto max-w-3xl px-5 py-8">
+    <div className="mx-auto max-w-5xl px-5 py-8">
       <div className="mb-6 flex items-center justify-between gap-3">
         <Link href="/" className="text-sm font-medium text-muted hover:text-white">
           ← Back to planner
@@ -199,46 +199,52 @@ export default function StressTestView({
             </div>
           )}
 
-          {/* Headline scorecard */}
-          <div className={`mb-5 rounded-2xl border ${toneRing} bg-panel p-5`}>
-            <div className="text-xs font-semibold uppercase tracking-wide text-muted">Survival scorecard</div>
-            <div className={`mt-1 text-3xl font-bold ${toneText}`}>
-              Survived {result.survived} of {result.total}
+          <div className="grid gap-5 lg:grid-cols-2 lg:items-start">
+            {/* Left: headline + ranked list */}
+            <div className="space-y-4">
+              <div className={`rounded-2xl border ${toneRing} bg-panel p-5`}>
+                <div className="text-xs font-semibold uppercase tracking-wide text-muted">Survival scorecard</div>
+                <div className={`mt-1 text-3xl font-bold ${toneText}`}>
+                  Survived {result.survived} of {result.total}
+                </div>
+                <p className="mt-1 text-sm text-muted">
+                  {result.survived === result.total
+                    ? "Your plan lasts to life expectancy through every downturn on record — a resilient plan."
+                    : result.worst
+                      ? `${result.worst.label} is the one that breaks it — your money runs out at age ${result.worst.depletionAge}.`
+                      : ""}
+                </p>
+              </div>
+
+              {/* Ranked, worst-first */}
+              <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-panel">
+                {result.eras.map((era) => (
+                  <Row
+                    key={era.id}
+                    era={era}
+                    life={life}
+                    selected={selectedId === era.id}
+                    onSelect={() => setSelectedId((cur) => (cur === era.id ? null : era.id))}
+                  />
+                ))}
+              </ul>
             </div>
-            <p className="mt-1 text-sm text-muted">
-              {result.survived === result.total
-                ? "Your plan lasts to life expectancy through every downturn on record — a resilient plan."
-                : result.worst
-                  ? `${result.worst.label} is the one that breaks it — your money runs out at age ${result.worst.depletionAge}.`
-                  : ""}
-            </p>
+
+            {/* Right: chart + disclosure, sticky on wide screens */}
+            <div className="space-y-3 lg:sticky lg:top-6">
+              <StressChart result={result} selectedId={selectedId} />
+              <p className="text-xs text-muted">
+                Each era replays its actual year-by-year real returns from the moment you retire, at full historical
+                severity, then reverts to your assumed return once the era&apos;s data runs out (1928–2025 US market
+                history, used as a proxy for a globally-diversified portfolio). It stresses the SEQUENCE of returns, not
+                your long-run return assumption. Past performance is not a guarantee of future performance. General
+                information only — not financial advice.{" "}
+                <button onClick={() => setAssumptionsOpen(true)} className="font-medium text-accent hover:underline">
+                  Assumptions &amp; limitations →
+                </button>
+              </p>
+            </div>
           </div>
-
-          {/* Ranked, worst-first */}
-          <ul className="mb-5 divide-y divide-line overflow-hidden rounded-2xl border border-line bg-panel">
-            {result.eras.map((era) => (
-              <Row
-                key={era.id}
-                era={era}
-                life={life}
-                selected={selectedId === era.id}
-                onSelect={() => setSelectedId((cur) => (cur === era.id ? null : era.id))}
-              />
-            ))}
-          </ul>
-
-          <StressChart result={result} selectedId={selectedId} />
-
-          <p className="mt-4 text-xs text-muted">
-            Each era replays its actual year-by-year real returns from the moment you retire, at full historical
-            severity, then reverts to your assumed return once the era&apos;s data runs out (1928–2025 US market history,
-            used as a proxy for a globally-diversified portfolio). It stresses the SEQUENCE of returns, not your
-            long-run return assumption. Past performance is not a guarantee of future performance. General information
-            only — not financial advice.{" "}
-            <button onClick={() => setAssumptionsOpen(true)} className="font-medium text-accent hover:underline">
-              Assumptions &amp; limitations →
-            </button>
-          </p>
         </>
       )}
 

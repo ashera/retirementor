@@ -30,7 +30,7 @@ export default function StressChart({
         Today&apos;s dollars. The bright line is your smooth projection; each faint line is one era&apos;s actual path —
         {" "}red ones run dry. {selectedId ? "Selected era highlighted." : "Tap a row above to highlight one."}
       </p>
-      <ResponsiveContainer width="100%" height={300}>
+      <ResponsiveContainer width="100%" height={260}>
         <LineChart data={data} margin={{ top: 6, right: 8, bottom: 4, left: 8 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#232c40" vertical={false} />
           <XAxis dataKey="age" stroke="#8b97ad" tick={{ fontSize: 11 }} tickMargin={6} />
