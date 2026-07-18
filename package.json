@@ -13,6 +13,7 @@
     "db:migrate": "tsx scripts/migrate.ts",
     "test": "vitest run",
     "test:record": "node scripts/run-tests.mjs",
+    "test:e2e": "node scripts/e2e-scenarios.mjs",
     "measure:report": "node scripts/measure-report.mjs"
   },
   "dependencies": {
