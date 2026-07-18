@@ -75,6 +75,10 @@ const _mean = HISTORICAL_REAL_EQUITY.reduce((a, b) => a + b, 0) / HISTORICAL_REA
 const _sd = Math.sqrt(
   HISTORICAL_REAL_EQUITY.reduce((a, b) => a + (b - _mean) ** 2, 0) / HISTORICAL_REAL_EQUITY.length,
 );
+/** Arithmetic mean of the real historical equity series (fraction). The stress test
+ *  subtracts this so it overlays each era's DEVIATIONS from history's own average
+ *  onto the plan's assumed drift — preserving the crash shape, not the US level. */
+export const HISTORICAL_REAL_MEAN = _mean;
 export const HISTORICAL_SHOCKS: readonly number[] = HISTORICAL_REAL_EQUITY.map((r) => (r - _mean) / _sd);
 
 /** The real-return series as {year, real} points (real is a fraction). */
