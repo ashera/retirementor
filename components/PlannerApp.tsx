@@ -1231,7 +1231,7 @@ export default function PlannerApp({
         onClick={() => track("What-if promo clicked")}
         className="group mb-6 block rounded-2xl border border-accent/40 bg-accent/[0.07] px-5 py-4 transition hover:border-accent/70 hover:bg-accent/10"
       >
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
           <div className="flex min-w-0 items-start gap-3">
             <span className="shrink-0 text-2xl" aria-hidden>🎛</span>
             <div className="min-w-0">
@@ -1243,7 +1243,7 @@ export default function PlannerApp({
               </div>
             </div>
           </div>
-          <span className="shrink-0 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-ink transition group-hover:brightness-110">
+          <span className="w-full shrink-0 rounded-lg bg-accent px-4 py-2 text-center text-sm font-semibold text-ink transition group-hover:brightness-110 sm:w-auto">
             {applied.length > 0 ? "Edit What-If Strategies →" : "Try What-If Strategies →"}
           </span>
         </div>
@@ -1275,7 +1275,7 @@ export default function PlannerApp({
       <Link
         href={stressHref}
         onClick={() => track("Stress test promo clicked")}
-        className="group mb-6 flex items-center justify-between gap-4 rounded-2xl border border-line bg-panel px-5 py-3.5 transition hover:border-accent/50"
+        className="group mb-6 flex flex-col gap-3 rounded-2xl border border-line bg-panel px-5 py-3.5 transition hover:border-accent/50 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
       >
         <div className="flex min-w-0 items-center gap-3">
           <span className="shrink-0 text-2xl" aria-hidden>🏛</span>
@@ -1287,7 +1287,7 @@ export default function PlannerApp({
             </div>
           </div>
         </div>
-        <span className="shrink-0 rounded-lg border border-accent/40 bg-accent/10 px-4 py-2 text-sm font-semibold text-accent transition group-hover:bg-accent/20">
+        <span className="w-full shrink-0 rounded-lg border border-accent/40 bg-accent/10 px-4 py-2 text-center text-sm font-semibold text-accent transition group-hover:bg-accent/20 sm:w-auto">
           Run stress test →
         </span>
       </Link>
