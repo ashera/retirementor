@@ -73,6 +73,15 @@ describe("historical stress test", () => {
     expect(cutEra!.deepestCutPct).toBeGreaterThan(0);
   });
 
+  it("the flexibility ladder is monotonic: deeper cuts never survive fewer eras", () => {
+    // Willing to cut more (lower floor %) → survive at least as many.
+    const toBone = runStressTest({ ...stretched, guardrails: { floorPct: 0 } }, cfg).survived;
+    const toTen = runStressTest({ ...stretched, guardrails: { floorPct: 90 } }, cfg).survived;
+    const noCut = runStressTest({ ...stretched, guardrails: undefined }, cfg).survived;
+    expect(toBone).toBeGreaterThanOrEqual(toTen);
+    expect(toTen).toBeGreaterThanOrEqual(noCut);
+  });
+
   it("sorts worst-first: failures before survivors, earliest depletion first", () => {
     const eras = runStressTest(stretched, cfg).eras;
     const firstSurvivor = eras.findIndex((e) => e.lasts);

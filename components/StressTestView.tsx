@@ -7,6 +7,7 @@ import type { RetirementPlan } from "@/lib/au/types";
 import { DEFAULT_PLAN } from "@/lib/au/types";
 import type { SavedPlan } from "@/app/actions/plans";
 import { runStressTest, STRESS_ERAS, type StressEraResult } from "@/lib/au/stresstest";
+import { essentialsFloor } from "@/lib/au/strategies";
 import { fmtCurrency } from "@/lib/au/format";
 import { track } from "@/lib/analytics";
 import StressChart from "@/components/StressChart";
@@ -163,6 +164,28 @@ export default function StressTestView({
     () => (flex ? flex.eras.filter((e) => e.cutYears > 0).sort((a, b) => b.deepestCutPct - a.deepestCutPct)[0] ?? null : null),
     [flex],
   );
+
+  // The flexibility ladder: how many eras survive at a few "how far would you cut?"
+  // floors — from cutting to the bone (essentials) down to not cutting at all
+  // (fixed). Makes the adherence risk concrete: your safety depends on how deep a
+  // cut you'd actually accept. (Deterministic sims, so re-running is cheap.)
+  const ladder = useMemo(() => {
+    if (!plan || !fixed || !flex) return null;
+    const spend = plan.spendingMode === "stages" ? plan.spendingStages.goGo : plan.targetSpending;
+    if (spend <= 0) return null;
+    const ess = essentialsFloor(plan, config);
+    const survivedAt = (floorPct: number) => runStressTest({ ...plan, guardrails: { floorPct } }, config).survived;
+    const cutPct = (floor: number) => Math.max(0, Math.round(((spend - floor) / spend) * 100));
+    return {
+      total: fixed.total,
+      rows: [
+        { floor: ess, cutPct: cutPct(ess), survived: survivedAt(0), essentials: true },
+        { floor: Math.max(ess, Math.round(0.8 * spend)), cutPct: cutPct(Math.max(ess, 0.8 * spend)), survived: survivedAt(80) },
+        { floor: Math.max(ess, Math.round(0.9 * spend)), cutPct: cutPct(Math.max(ess, 0.9 * spend)), survived: survivedAt(90) },
+        { floor: spend, cutPct: 0, survived: fixed.survived, fixed: true },
+      ],
+    };
+  }, [plan, config, fixed, flex]);
   const life = plan?.lifeExpectancy ?? 90;
 
   // Theatrical run: reveal the eras one at a time (chronologically), each taking a
@@ -317,6 +340,44 @@ export default function StressTestView({
               <StressChart result={result} selectedId={selectedId} revealed={revealedIds} />
             </div>
           </div>
+
+          {/* Flexibility ladder — how survival depends on how far you'd actually cut.
+              Only meaningful for flexible spending. */}
+          {mode === "flex" && ladder && (
+            <div className="mt-5 rounded-2xl border border-line bg-panel p-5">
+              <div className="text-xs font-semibold uppercase tracking-wide text-muted">How flexible would you really be?</div>
+              <p className="mt-1 text-sm text-muted">
+                &ldquo;Survives&rdquo; assumes you actually make the cuts. The less you&apos;d cut in a downturn, the fewer
+                you get through — the risk a Monte Carlo can&apos;t see.
+              </p>
+              <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {ladder.rows.map((r, i) => {
+                  const tone =
+                    r.survived === ladder.total ? "text-emerald-400" : r.survived >= Math.ceil(ladder.total * 0.6) ? "text-amber-400" : "text-red-400";
+                  return (
+                    <div key={i} className="rounded-xl border border-line bg-panel-2 p-3 text-center">
+                      <div className={`text-2xl font-bold ${tone}`}>
+                        {r.survived}
+                        <span className="text-base font-medium text-muted">/{ladder.total}</span>
+                      </div>
+                      <div className="mt-0.5 text-sm font-semibold text-white">
+                        {fmtCurrency(r.floor)}
+                        <span className="text-xs font-normal text-muted">/yr</span>
+                      </div>
+                      <div className="text-[11px] text-muted">
+                        {"fixed" in r && r.fixed ? "won't cut" : "essentials" in r && r.essentials ? `to the bone (−${r.cutPct}%)` : `cut to −${r.cutPct}%`}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="mt-3 text-sm text-amber-300/90">
+                <span aria-hidden>⚠</span> The gap from {ladder.rows[0].survived}/{ladder.total} to {ladder.rows[3].survived}/
+                {ladder.total} is how much of your safety rests on cutting hard in a downturn — the part a Monte Carlo
+                just assumes you&apos;ll do.
+              </p>
+            </div>
+          )}
 
           {/* Methodology / disclosure — spans both columns. */}
           <div className="mt-5 rounded-2xl border border-line bg-panel p-4">
