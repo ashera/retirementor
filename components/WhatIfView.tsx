@@ -12,7 +12,7 @@ import { fmtCurrency } from "@/lib/au/format";
 import { rowNetWorth } from "@/lib/au/networth";
 import { track } from "@/lib/analytics";
 import type { SavedPlan } from "@/app/actions/plans";
-import { savePlan, updatePlan } from "@/app/actions/plans";
+import { savePlan, updatePlan, saveDraft } from "@/app/actions/plans";
 import {
   buildStrategyCatalog,
   applyStrategies,
@@ -216,24 +216,37 @@ export default function WhatIfView({
   // Sync the active scenario back to the shared working plan so the dashboard
   // reflects every strategy change (and a plain reload restores it). Skips the
   // initial restore and the read-only share view.
+  // The active scenario in its storable form (composed + strategy bookmark).
+  const activeStorable = (): RetirementPlan | null =>
+    baseline
+      ? fromActiveScenario(
+          { base: baseline, strategies: { active: [...active], values }, name: savedName, savedId: null, dirty: true },
+          config,
+        )
+      : null;
+
   useEffect(() => {
     if (shared || !baseline) return;
     if (!persistReady.current) {
       persistReady.current = true;
       return;
     }
+    const storable = activeStorable();
+    if (!storable) return;
     try {
-      const storable = fromActiveScenario(
-        { base: baseline, strategies: { active: [...active], values }, name: savedName, savedId: null, dirty: true },
-        config,
-      );
       localStorage.setItem(PLAN_KEY, JSON.stringify(storable));
       localStorage.setItem(PLAN_TS_KEY, String(Date.now()));
     } catch {
       /* ignore storage failures */
     }
+    // Also keep the signed-in user's cloud draft current, so the working scenario
+    // (incl. strategy changes) survives across devices and can't be shadowed by a
+    // stale draft when the dashboard reloads.
+    if (!signedIn) return;
+    const t = setTimeout(() => void saveDraft(storable), 1200);
+    return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active, values, baseline, shared]);
+  }, [active, values, baseline, shared, signedIn]);
 
   const compRes = useMemo(() => (composed ? simulate(composed, config) : null), [composed, config]);
 
@@ -542,13 +555,32 @@ export default function WhatIfView({
     cards: catalog.filter((c) => c.group === g && cardVisible(c)),
   })).filter((x) => x.cards.length > 0);
 
+  // Heading back to the planner: flush the active scenario to BOTH the working plan
+  // (localStorage) and — for signed-in users — the cloud draft, awaited, so neither
+  // can be shadowed by a stale copy; then do a full navigation so the dashboard
+  // mounts fresh and opens on the scenario you were just using.
+  const backToPlanner = async () => {
+    const storable = activeStorable();
+    if (storable) {
+      try {
+        localStorage.setItem(PLAN_KEY, JSON.stringify(storable));
+        localStorage.setItem(PLAN_TS_KEY, String(Date.now()));
+        if (signedIn) await saveDraft(storable);
+      } catch {
+        /* fall through to navigation */
+      }
+    }
+    window.location.href = "/";
+  };
+
   return (
     <div className="mx-auto max-w-4xl px-5 py-8">
       <div className="mb-6 flex items-center justify-between gap-3">
-        {/* Every strategy change is synced to the shared working plan, so heading
-            back is a plain navigation — the dashboard already reflects it. */}
+        {/* Flush the active scenario, then full-navigate, so the planner opens on
+            exactly what you were using here (shared views just navigate normally). */}
         <Link
           href={shared ? sharedPlan!.basePath : "/"}
+          onClick={shared ? undefined : (e) => { e.preventDefault(); void backToPlanner(); }}
           className="text-sm font-medium text-muted hover:text-white"
         >
           ← Back to {shared ? "the shared scenario" : "planner"}
