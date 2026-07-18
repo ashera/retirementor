@@ -713,13 +713,21 @@ export default function PlannerApp({
   // or empty selection still resolves to something valid.
   const selectedPlan = savedPlans.find((sp) => sp.id === selectedPlanId) ?? savedPlans[0] ?? null;
 
-  // The active scenario's identity for the save/load UI:
-  //  - `activeName`  — the loaded/saved scenario's name (null = never-named working plan);
-  //  - `neverSaved`  — configured but not yet a saved plan (needs a first Save);
-  //  - `dirty`       — a saved scenario with unsaved edits vs its committed baseline.
-  const activeName = baselineName;
-  const neverSaved = configured && savedId == null;
-  const dirty = configured && savedId != null && tweaked;
+  // The active scenario's identity — derived from the saved-plan the working plan IS
+  // (savedId → savedPlans), so it's consistent everywhere the name is shown (e.g. the
+  // stress-test view uses the same lookup). NOT from baselineName, which the cloud
+  // draft restore clears.
+  //  - `savedPlan`  — the saved row this scenario is, or null (unsaved / stale id / deleted);
+  //  - `activeName` — that plan's name (null = never-named working plan);
+  //  - `neverSaved` — configured but not tied to a saved plan (needs a first Save);
+  //  - `dirty`      — a saved scenario whose working plan now differs from what's stored.
+  const savedPlan = savedId ? (savedPlans.find((sp) => sp.id === savedId) ?? null) : null;
+  const activeName = savedPlan?.name ?? null;
+  const neverSaved = configured && savedPlan == null;
+  const dirty =
+    configured &&
+    savedPlan != null &&
+    !deepEqual({ ...plan, whatIf: undefined }, { ...DEFAULT_PLAN, ...savedPlan.data, whatIf: undefined });
 
   const isCouple = plan.household === "couple";
   const comfortable = isCouple
@@ -1057,7 +1065,7 @@ export default function PlannerApp({
             first save. */}
         {configured && (
           <div className="mt-3 border-t border-line pt-3">
-            {savedId ? (
+            {savedPlan ? (
               <>
                 <div className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted">
                   {dirty ? "You have unsaved changes" : "This scenario is saved"}
