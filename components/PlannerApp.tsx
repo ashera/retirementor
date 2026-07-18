@@ -1127,6 +1127,13 @@ export default function PlannerApp({
             ⚖ Compare scenarios
             <span aria-hidden>→</span>
           </Link>
+          <Link
+            href="/stress-test"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-panel-2 px-3 py-1.5 text-sm font-medium text-slate-200 transition hover:border-accent/50 hover:text-white"
+          >
+            🏛 Stress-test against history
+            <span aria-hidden>→</span>
+          </Link>
         </div>
       </div>
       )}
