@@ -36,7 +36,7 @@ function Row({
           selected ? "bg-accent/[0.06]" : "hover:bg-white/[0.02]"
         }`}
       >
-        <div className="flex min-w-0 items-center gap-3">
+        <div className="flex min-w-0 flex-1 items-center gap-3">
           <span
             className={`grid h-6 w-6 shrink-0 place-items-center rounded-full text-xs font-bold ${
               era.lasts ? "bg-emerald-500/15 text-emerald-400" : "bg-red-500/15 text-red-400"
