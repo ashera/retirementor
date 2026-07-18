@@ -9,43 +9,77 @@ import type { SavedPlan } from "@/app/actions/plans";
 import { runStressTest, type StressEraResult } from "@/lib/au/stresstest";
 import { fmtCurrency } from "@/lib/au/format";
 import { track } from "@/lib/analytics";
+import StressChart from "@/components/StressChart";
 
 const PLAN_KEY = "au-retirement-plan";
 const SAVED_ID_KEY = "au-retirement-saved-id";
 
-function Row({ era, life }: { era: StressEraResult; life: number }) {
+function Row({
+  era,
+  life,
+  selected,
+  onSelect,
+}: {
+  era: StressEraResult;
+  life: number;
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  const yrsShort = life - (era.depletionAge ?? life);
   return (
-    <li
-      className={`flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-4 py-3 text-sm ${
-        era.lasts ? "" : "bg-red-500/[0.04]"
-      }`}
-    >
-      <div className="flex min-w-0 items-center gap-3">
-        <span
-          className={`grid h-6 w-6 shrink-0 place-items-center rounded-full text-xs font-bold ${
-            era.lasts ? "bg-emerald-500/15 text-emerald-400" : "bg-red-500/15 text-red-400"
-          }`}
-          aria-hidden
-        >
-          {era.lasts ? "✓" : "✕"}
-        </span>
-        <div className="min-w-0">
-          <div className="font-semibold text-white">{era.label}</div>
-          <div className="truncate text-xs text-muted">{era.blurb}</div>
+    <li className={era.lasts ? "" : "bg-red-500/[0.04]"}>
+      <button
+        onClick={onSelect}
+        aria-expanded={selected}
+        className={`flex w-full flex-wrap items-center justify-between gap-x-4 gap-y-1 px-4 py-3 text-left text-sm transition ${
+          selected ? "bg-accent/[0.06]" : "hover:bg-white/[0.02]"
+        }`}
+      >
+        <div className="flex min-w-0 items-center gap-3">
+          <span
+            className={`grid h-6 w-6 shrink-0 place-items-center rounded-full text-xs font-bold ${
+              era.lasts ? "bg-emerald-500/15 text-emerald-400" : "bg-red-500/15 text-red-400"
+            }`}
+            aria-hidden
+          >
+            {era.lasts ? "✓" : "✕"}
+          </span>
+          <div className="min-w-0">
+            <div className="font-semibold text-white">{era.label}</div>
+            <div className="truncate text-xs text-muted">{era.blurb}</div>
+          </div>
         </div>
-      </div>
-      <div className="shrink-0 text-right">
-        {era.lasts ? (
-          <div className="font-semibold text-emerald-400">lasts to {life}+</div>
-        ) : (
-          <div className="font-semibold text-red-400">runs out at {era.depletionAge}</div>
-        )}
-        <div className="text-xs text-muted">
-          {era.lasts
-            ? `dips to ${fmtCurrency(Math.max(0, Math.round(era.minBalance)))} at ${era.minAge}`
-            : `${life - (era.depletionAge ?? life)} yr${life - (era.depletionAge ?? life) === 1 ? "" : "s"} short of ${life}`}
+        <div className="shrink-0 text-right">
+          {era.lasts ? (
+            <div className="font-semibold text-emerald-400">lasts to {life}+</div>
+          ) : (
+            <div className="font-semibold text-red-400">runs out at {era.depletionAge}</div>
+          )}
+          <div className="text-xs text-muted">
+            {era.lasts
+              ? `dips to ${fmtCurrency(Math.max(0, Math.round(era.minBalance)))} at ${era.minAge}`
+              : `${yrsShort} yr${yrsShort === 1 ? "" : "s"} short of ${life}`}
+          </div>
         </div>
-      </div>
+      </button>
+      {selected && (
+        <dl className="grid grid-cols-3 gap-2 border-t border-line bg-black/10 px-4 py-3 text-center text-xs">
+          <div>
+            <dt className="text-muted">Worst drawdown</dt>
+            <dd className="mt-0.5 font-semibold text-white">−{Math.round(era.maxDrawdownPct)}%</dd>
+          </div>
+          <div>
+            <dt className="text-muted">Lowest balance</dt>
+            <dd className="mt-0.5 font-semibold text-white">
+              {fmtCurrency(Math.max(0, Math.round(era.minBalance)))} <span className="font-normal text-muted">at {era.minAge}</span>
+            </dd>
+          </div>
+          <div>
+            <dt className="text-muted">Ends with</dt>
+            <dd className="mt-0.5 font-semibold text-white">{fmtCurrency(Math.max(0, Math.round(era.finalBalance)))}</dd>
+          </div>
+        </dl>
+      )}
     </li>
   );
 }
@@ -59,6 +93,7 @@ export default function StressTestView({
 }) {
   const [plan, setPlan] = useState<RetirementPlan | null>(null);
   const [savedName, setSavedName] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   useEffect(() => {
     try {
@@ -138,11 +173,19 @@ export default function StressTestView({
           </div>
 
           {/* Ranked, worst-first */}
-          <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-panel">
+          <ul className="mb-5 divide-y divide-line overflow-hidden rounded-2xl border border-line bg-panel">
             {result.eras.map((era) => (
-              <Row key={era.id} era={era} life={life} />
+              <Row
+                key={era.id}
+                era={era}
+                life={life}
+                selected={selectedId === era.id}
+                onSelect={() => setSelectedId((cur) => (cur === era.id ? null : era.id))}
+              />
             ))}
           </ul>
+
+          <StressChart result={result} selectedId={selectedId} />
 
           <p className="mt-4 text-xs text-muted">
             Each era replays its actual year-by-year real returns from the moment you retire, at full historical

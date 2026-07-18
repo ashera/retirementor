@@ -43,6 +43,11 @@ export const STRESS_ERAS: readonly StressEra[] = [
   { id: "2022", label: "Inflation & rate shock (2022)", startYear: 2022, blurb: "Shares and bonds fell together as inflation forced the fastest rate rises in decades." },
 ];
 
+export interface BalancePoint {
+  age: number;
+  total: number;
+}
+
 export interface StressEraResult extends StressEra {
   lasts: boolean; // money still lasts to life expectancy
   depletionAge: number | null; // age it runs out, when it doesn't last
@@ -50,6 +55,7 @@ export interface StressEraResult extends StressEra {
   minBalance: number; // lowest total balance during retirement
   minAge: number; // age at that trough
   maxDrawdownPct: number; // worst peak-to-trough drop in retirement (%)
+  path: BalancePoint[]; // total balance by age (today's $) under this era
 }
 
 export interface StressTestResult {
@@ -57,6 +63,8 @@ export interface StressTestResult {
   survived: number;
   total: number;
   worst: StressEraResult | null;
+  central: BalancePoint[]; // the smooth, no-shock projection (reference line)
+  retireAge: number; // age the household begins retirement (chart marker)
 }
 
 /** Build the nominal return path (percent per year) for one era: normal returns up
@@ -109,6 +117,7 @@ function summarise(era: StressEra, res: SimResult, retireStartAge: number): Stre
     minBalance,
     minAge,
     maxDrawdownPct: maxDD * 100,
+    path: res.rows.map((r) => ({ age: r.age, total: r.total })),
   };
 }
 
@@ -116,6 +125,7 @@ function summarise(era: StressEra, res: SimResult, retireStartAge: number): Stre
  *  survivors by lowest final balance (closest calls first). */
 export function runStressTest(plan: RetirementPlan, config: EngineConfig): StressTestResult {
   const oldest = Math.max(...plan.people.map((x) => x.currentAge));
+  const retireAge = oldest + householdRetirementOffset(plan);
   const results = STRESS_ERAS.map((era) => {
     const { returns, outsideReturns, retireOffset } = eraReturnPath(plan, config, era);
     const res = simulate(plan, config, returns, outsideReturns);
@@ -127,5 +137,6 @@ export function runStressTest(plan: RetirementPlan, config: EngineConfig): Stres
     return a.finalBalance - b.finalBalance; // survivors: closest calls first
   });
   const survived = results.filter((r) => r.lasts).length;
-  return { eras: results, survived, total: results.length, worst: results[0] ?? null };
+  const central = simulate(plan, config).rows.map((r) => ({ age: r.age, total: r.total }));
+  return { eras: results, survived, total: results.length, worst: results[0] ?? null, central, retireAge };
 }
