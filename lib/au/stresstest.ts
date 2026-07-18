@@ -17,7 +17,7 @@
 //    (a cash-like pool doesn't crash as hard) — the same correlation model the MC uses.
 
 import type { RetirementPlan, SimResult } from "./types";
-import { householdRetirementOffset } from "./types";
+import { householdRetirementOffset, spendingForAge } from "./types";
 import type { EngineConfig } from "./config";
 import { simulate } from "./simulate";
 import { HISTORICAL_REAL_EQUITY, HIST_START_YEAR, HISTORICAL_REAL_MEAN } from "./historicalReturns";
@@ -56,6 +56,12 @@ export interface StressEraResult extends StressEra {
   minAge: number; // age at that trough
   maxDrawdownPct: number; // worst peak-to-trough drop in retirement (%)
   path: BalancePoint[]; // total balance by age (today's $) under this era
+  // The COST of flexing (only non-zero when guardrails are on): how far spending was
+  // cut below the plan's intended amount, and for how long. This is what "flexible
+  // spending survives" actually demands — the price behind the survival.
+  minLivingSpend: number; // lowest lifestyle spend in retirement (today's $)
+  deepestCutPct: number; // deepest cut below the intended spend (%)
+  cutYears: number; // retirement years spending was cut >5% below intended
 }
 
 export interface StressTestResult {
@@ -96,19 +102,32 @@ function eraReturnPath(
 }
 
 /** Summarise one simulated era run into a scorecard row. */
-function summarise(era: StressEra, res: SimResult, retireStartAge: number): StressEraResult {
+function summarise(era: StressEra, res: SimResult, retireStartAge: number, plan: RetirementPlan): StressEraResult {
   const retRows = res.rows.filter((r) => r.age >= retireStartAge);
   const finalBalance = res.rows.length ? res.rows[res.rows.length - 1].total : 0;
   let minBalance = Infinity;
   let minAge = retireStartAge;
   let peak = 0;
   let maxDD = 0;
+  let minLivingSpend = Infinity;
+  let deepestCut = 0;
+  let cutYears = 0;
   for (const r of retRows) {
     if (r.total < minBalance) { minBalance = r.total; minAge = r.age; }
     if (r.total > peak) peak = r.total;
     if (peak > 0) maxDD = Math.max(maxDD, (peak - r.total) / peak);
+    // Cost of flexing: actual lifestyle spend vs the plan's intended spend for the age.
+    const living = r.breakdown.livingSpend;
+    const intended = spendingForAge(plan, r.age);
+    if (living < minLivingSpend) minLivingSpend = living;
+    if (intended > 1) {
+      const cut = (intended - living) / intended;
+      if (cut > deepestCut) deepestCut = cut;
+      if (cut > 0.05) cutYears++;
+    }
   }
   if (!Number.isFinite(minBalance)) minBalance = finalBalance;
+  if (!Number.isFinite(minLivingSpend)) minLivingSpend = 0;
   return {
     ...era,
     lasts: res.lastsToLifeExpectancy,
@@ -118,6 +137,9 @@ function summarise(era: StressEra, res: SimResult, retireStartAge: number): Stre
     minAge,
     maxDrawdownPct: maxDD * 100,
     path: res.rows.map((r) => ({ age: r.age, total: r.total })),
+    minLivingSpend,
+    deepestCutPct: deepestCut * 100,
+    cutYears,
   };
 }
 
@@ -129,7 +151,7 @@ export function runStressTest(plan: RetirementPlan, config: EngineConfig): Stres
   const results = STRESS_ERAS.map((era) => {
     const { returns, outsideReturns, retireOffset } = eraReturnPath(plan, config, era);
     const res = simulate(plan, config, returns, outsideReturns);
-    return summarise(era, res, oldest + retireOffset);
+    return summarise(era, res, oldest + retireOffset, plan);
   });
   results.sort((a, b) => {
     if (a.lasts !== b.lasts) return a.lasts ? 1 : -1; // failures first

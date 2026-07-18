@@ -70,28 +70,37 @@ function Row({
           )}
           <div className="text-xs text-muted">
             {era.lasts
-              ? `dips to ${fmtCurrency(Math.max(0, Math.round(era.minBalance)))} at ${era.minAge}`
+              ? era.cutYears > 0
+                ? `${era.cutYears} yr${era.cutYears === 1 ? "" : "s"} below plan (low ${fmtCurrency(Math.round(era.minLivingSpend))})`
+                : `dips to ${fmtCurrency(Math.max(0, Math.round(era.minBalance)))} at ${era.minAge}`
               : `${yrsShort} yr${yrsShort === 1 ? "" : "s"} short of ${life}`}
           </div>
         </div>
       </button>
       {selected && (
-        <dl className="grid grid-cols-3 gap-2 border-t border-line bg-black/10 px-4 py-3 text-center text-xs">
-          <div>
-            <dt className="text-muted">Worst drawdown</dt>
-            <dd className="mt-0.5 font-semibold text-white">−{Math.round(era.maxDrawdownPct)}%</dd>
-          </div>
-          <div>
-            <dt className="text-muted">Lowest balance</dt>
-            <dd className="mt-0.5 font-semibold text-white">
-              {fmtCurrency(Math.max(0, Math.round(era.minBalance)))} <span className="font-normal text-muted">at {era.minAge}</span>
-            </dd>
-          </div>
-          <div>
-            <dt className="text-muted">Ends with</dt>
-            <dd className="mt-0.5 font-semibold text-white">{fmtCurrency(Math.max(0, Math.round(era.finalBalance)))}</dd>
-          </div>
-        </dl>
+        <>
+          <dl className="grid grid-cols-3 gap-2 border-t border-line bg-black/10 px-4 py-3 text-center text-xs">
+            <div>
+              <dt className="text-muted">Worst drawdown</dt>
+              <dd className="mt-0.5 font-semibold text-white">−{Math.round(era.maxDrawdownPct)}%</dd>
+            </div>
+            <div>
+              <dt className="text-muted">Lowest balance</dt>
+              <dd className="mt-0.5 font-semibold text-white">
+                {fmtCurrency(Math.max(0, Math.round(era.minBalance)))} <span className="font-normal text-muted">at {era.minAge}</span>
+              </dd>
+            </div>
+            <div>
+              <dt className="text-muted">Ends with</dt>
+              <dd className="mt-0.5 font-semibold text-white">{fmtCurrency(Math.max(0, Math.round(era.finalBalance)))}</dd>
+            </div>
+          </dl>
+          {era.cutYears > 0 && (
+            <div className="border-t border-line bg-amber-500/[0.06] px-4 py-2 text-center text-xs text-amber-300/90">
+              The cost of flexing: spending stayed below plan for {era.cutYears} year{era.cutYears === 1 ? "" : "s"}, bottoming at {fmtCurrency(Math.round(era.minLivingSpend))} (−{Math.round(era.deepestCutPct)}%).
+            </div>
+          )}
+        </>
       )}
     </li>
   );
@@ -149,6 +158,11 @@ export default function StressTestView({
 
   const result = mode === "flex" ? flex : fixed;
   const uplift = fixed && flex ? flex.survived - fixed.survived : 0;
+  // The era where flexing demanded the deepest spending cut — the honest "catch".
+  const worstFlexCut = useMemo(
+    () => (flex ? flex.eras.filter((e) => e.cutYears > 0).sort((a, b) => b.deepestCutPct - a.deepestCutPct)[0] ?? null : null),
+    [flex],
+  );
   const life = plan?.lifeExpectancy ?? 90;
 
   // Theatrical run: reveal the eras one at a time (chronologically), each taking a
@@ -287,6 +301,14 @@ export default function StressTestView({
                   {uplift > 0 && (
                     <p className="mt-2 text-sm font-medium text-emerald-400">
                       <span aria-hidden>💡</span> Flexing spending survives {uplift} more of these downturn{uplift === 1 ? "" : "s"}.
+                    </p>
+                  )}
+                  {mode === "flex" && worstFlexCut && (
+                    <p className="mt-2 text-sm text-amber-300/90">
+                      <span aria-hidden>⚠</span> The catch: it only works if you actually make the cuts. In the toughest run
+                      ({worstFlexCut.label}) that meant {worstFlexCut.cutYears} year
+                      {worstFlexCut.cutYears === 1 ? "" : "s"} below plan, bottoming at{" "}
+                      {fmtCurrency(Math.round(worstFlexCut.minLivingSpend))} (−{Math.round(worstFlexCut.deepestCutPct)}%).
                     </p>
                   )}
                 </div>

@@ -61,6 +61,18 @@ describe("historical stress test", () => {
     expect(flex.survived).toBeGreaterThan(fixed.survived);
   });
 
+  it("records the spending cut under flexible spending, but not under fixed", () => {
+    const fixed = runStressTest({ ...comfortable, guardrails: undefined }, cfg);
+    const flex = runStressTest({ ...comfortable, guardrails: {} }, cfg);
+    // Fixed spending is constant → no cut is ever recorded.
+    expect(fixed.eras.every((e) => e.cutYears === 0)).toBe(true);
+    // Flexible spending trims in the brutal eras → at least one era shows a real cut.
+    const cutEra = flex.eras.find((e) => e.cutYears > 0);
+    expect(cutEra).toBeTruthy();
+    expect(cutEra!.minLivingSpend).toBeLessThan(comfortable.targetSpending);
+    expect(cutEra!.deepestCutPct).toBeGreaterThan(0);
+  });
+
   it("sorts worst-first: failures before survivors, earliest depletion first", () => {
     const eras = runStressTest(stretched, cfg).eras;
     const firstSurvivor = eras.findIndex((e) => e.lasts);
