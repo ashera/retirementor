@@ -705,12 +705,12 @@ export function applyStrategies(
   return p;
 }
 
-/** A What-If strategy that a SAVED plan carries, and whether it's still reflected in
- *  the plan's numbers. */
+/** A What-If strategy that the active scenario carries. In the scenario model the
+ *  strategy layer always wins, so an applied strategy is always reflected in the
+ *  numbers — there's no "overridden" state to track. */
 export interface AppliedStrategy {
   id: string;
   label: string;
-  reflected: boolean; // baked into the dashboard numbers, vs overridden by a later edit
 }
 
 // Labels by strategy id — a fallback for `appliedStrategies` when a card is no longer
@@ -760,25 +760,20 @@ export function stripStrategyFields(plan: RetirementPlan, activeIds: string[]): 
 }
 
 /**
- * Which strategies a plan carries and whether each is still reflected in the dashboard
- * numbers. Two sources, so nothing baked into the plan is missed:
+ * Which strategies the active scenario carries, from two sources so nothing is missed:
  *   (1) DIRECT field detection — strategies that leave an engine-field footprint
  *       (guardrails, downsize/sell-rent, clear-mortgage, keep-accumulation,
  *       recontribute, lump-sum, TTR, part-time work, gap years, a scheduled property
- *       sale). These actually drive the numbers, so they're always reflected — and
- *       they show regardless of the What-If bookmark (which can be missing or stale).
- *       Guardrails in particular can ONLY come from the board, so a set `guardrails`
- *       is always an applied strategy.
+ *       sale). Guardrails in particular can ONLY come from the board.
  *   (2) BOOKMARK-only levers — retire-later / adjust-spending / salary-sacrifice
  *       modify existing fields (retirement age, spend, contributions) with no clean
- *       footprint, so they're knowable only from `plan.whatIf.active`. Any not already
- *       detected are added, with `reflected` decided by re-applying: an unchanged
- *       simulation means it's still baked in; a change means a later dashboard edit
- *       overrode it. Returns [] when a plain plan carries nothing.
+ *       footprint, so they're knowable only from `plan.whatIf.active`.
+ * The strategy layer always wins in the composed plan, so every applied strategy is
+ * reflected in the numbers. Returns [] when a plain plan carries nothing.
  */
 export function appliedStrategies(plan: RetirementPlan, config: EngineConfig): AppliedStrategy[] {
   const detected: AppliedStrategy[] = [];
-  const add = (id: string, label: string) => detected.push({ id, label, reflected: true });
+  const add = (id: string, label: string) => detected.push({ id, label });
   if (plan.guardrails) add("guardrails", "Flexible spending (guardrails)");
   if (plan.home?.downsize) add("downsize", "Downsize your home");
   if (plan.home?.sellAndRent) add("sell-and-rent", "Sell up and rent");
@@ -804,16 +799,10 @@ export function appliedStrategies(plan: RetirementPlan, config: EngineConfig): A
   if (bookmark.length === 0) return detected;
 
   const catalog = buildStrategyCatalog(plan, { config });
-  const fingerprint = (r: SimResult) =>
-    `${Math.round(r.superAtRetirement)}|${r.lastsToLifeExpectancy}|${r.depletedAge ?? ""}|${Math.round(r.rows[r.rows.length - 1]?.total ?? 0)}`;
-  const baseFp = fingerprint(simulate(plan, config));
   const prettify = (id: string) => id.replace(/-/g, " ").replace(/^\w/, (c) => c.toUpperCase());
-  const extra = bookmark.map((id): AppliedStrategy => {
-    const card = catalog.find((c) => c.id === id);
-    const label = card?.label ?? STRATEGY_LABELS[id] ?? prettify(id);
-    if (!card) return { id, label, reflected: true }; // no longer offered → already applied
-    const reflected = fingerprint(simulate(card.apply(plan, resolveValues(card, plan.whatIf?.values?.[id])), config)) === baseFp;
-    return { id, label, reflected };
-  });
+  const extra = bookmark.map((id): AppliedStrategy => ({
+    id,
+    label: catalog.find((c) => c.id === id)?.label ?? STRATEGY_LABELS[id] ?? prettify(id),
+  }));
   return [...detected, ...extra];
 }

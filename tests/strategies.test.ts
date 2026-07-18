@@ -558,21 +558,18 @@ describe("appliedStrategies — What-If changes baked into a saved plan", () => 
     expect(appliedStrategies(base({}), cfg)).toEqual([]);
   });
 
-  it("marks a baked-in strategy reflected, and a stale one overridden", () => {
+  it("lists field-detected and bookmark-only strategies together", () => {
     const plan = base({
       people: [{ currentAge: 62, superBalance: 800_000, salary: 0, voluntaryConcessional: 0, voluntaryNonConcessional: 0 }],
       retirementAge: 62, outsideSuper: 200_000, targetSpending: 55_000,
       guardrails: {}, keepSuperInAccumulation: true,
-      // Bookmark lists three; guardrails + keep-accumulation are baked in, but
-      // part-time-work was never applied (no workIncome) → not reflected.
       whatIf: { active: ["guardrails", "keep-accumulation", "part-time-work"], values: {}, baselineId: "current" },
     });
     const applied = appliedStrategies(plan, cfg);
     const by = Object.fromEntries(applied.map((s) => [s.id, s]));
-    expect(by["guardrails"].reflected).toBe(true);
-    expect(by["guardrails"].label).toBe("Flexible spending (guardrails)");
-    expect(by["keep-accumulation"].reflected).toBe(true);
-    expect(by["part-time-work"].reflected).toBe(false); // re-applying it changes the sim
+    expect(by["guardrails"].label).toBe("Flexible spending (guardrails)"); // field-detected
+    expect(by["keep-accumulation"]).toBeTruthy(); // field-detected
+    expect(by["part-time-work"]).toBeTruthy(); // bookmark-only, still listed
   });
 
   it("stripStrategyFields removes only the ACTIVE strategies' footprints", () => {
@@ -597,7 +594,6 @@ describe("appliedStrategies — What-If changes baked into a saved plan", () => 
     const ids = appliedStrategies(plan, cfg).map((s) => s.id);
     expect(ids).toContain("guardrails");
     expect(ids).toContain("downsize");
-    expect(appliedStrategies(plan, cfg).every((s) => s.reflected)).toBe(true); // field-detected → reflected
   });
 
   it("labels a sold-property strategy by its name, else 'Investment Property N'", () => {

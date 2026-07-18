@@ -445,8 +445,7 @@ export default function PlannerApp({
   }, [ready, configured, user]);
 
   const result = useMemo(() => simulate(plan, config), [plan, config]);
-  // What-If strategies this saved plan carries (baked into the numbers above), and
-  // whether each is still reflected — so the dashboard is honest about what's applied.
+  // The active scenario's strategy layer, for the chips (all baked into the numbers).
   const applied = useMemo(() => appliedStrategies(storable, config), [storable, config]);
   const mc = useMemo(() => runMonteCarlo(plan, config), [plan, config]);
   const successPct = Math.round(mc.successRate * 100);
@@ -1239,9 +1238,8 @@ export default function PlannerApp({
             {applied.length > 0 ? "Edit What-If Strategies →" : "Try What-If Strategies →"}
           </span>
         </div>
-        {/* What-If strategies baked into THIS saved plan (see appliedStrategies): they
-            already shape the numbers above; a ✓ confirms it's still in force, ⚠ flags
-            one a later dashboard edit has overridden. */}
+        {/* The active scenario's strategy layer (see appliedStrategies): each is
+            applied on top of your base inputs and already shapes the numbers above. */}
         {applied.length > 0 && (
           <div className="mt-4 border-t border-accent/20 pt-3">
             <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted">
@@ -1251,20 +1249,11 @@ export default function PlannerApp({
               {applied.map((s) => (
                 <span
                   key={s.id}
-                  className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium ${
-                    s.reflected
-                      ? "border-accent/40 bg-accent/10 text-accent"
-                      : "border-amber-500/40 bg-amber-500/10 text-amber-300"
-                  }`}
-                  title={
-                    s.reflected
-                      ? "Reflected in your dashboard numbers"
-                      : "In your saved What-If selection, but a later edit to this plan has overridden it — not currently reflected"
-                  }
+                  className="inline-flex items-center gap-1.5 rounded-full border border-accent/40 bg-accent/10 px-3 py-1 text-xs font-medium text-accent"
+                  title="Reflected in your dashboard numbers"
                 >
-                  <span aria-hidden>{s.reflected ? "✓" : "⚠"}</span>
+                  <span aria-hidden>✓</span>
                   {s.label}
-                  {!s.reflected && <span className="text-[10px] font-normal text-amber-400/80">overridden</span>}
                 </span>
               ))}
             </div>
