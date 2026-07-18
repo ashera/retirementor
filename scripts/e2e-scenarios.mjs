@@ -142,6 +142,14 @@ try {
     return label?.closest("div.rounded-2xl")?.querySelector('[role="switch"]')?.getAttribute("aria-checked");
   });
   ok("?edit shows the scenario's strategy toggled on", guardOn === "true");
+
+  // F — historical stress test renders a scorecard + fixed/flex toggle for the plan.
+  await page.goto(`${BASE}/stress-test`, { waitUntil: "networkidle" });
+  await page.waitForTimeout(1000);
+  const st = await txt();
+  ok("stress test shows a survival scorecard", /Survived \d+ of 7/.test(st));
+  ok("stress test lists the era battery", st.includes("Global Financial Crisis") && st.includes("The Great Depression"));
+  ok("stress test offers fixed-vs-flexible spending", /Fixed spending/.test(st) && /Flexible spending/.test(st));
 } catch (e) {
   console.error("\ne2e run threw — is `npm run dev` running at", BASE, "?\n ", e.message);
   ok("run completed without throwing", false);

@@ -10,6 +10,7 @@ import { runStressTest, type StressEraResult } from "@/lib/au/stresstest";
 import { fmtCurrency } from "@/lib/au/format";
 import { track } from "@/lib/analytics";
 import StressChart from "@/components/StressChart";
+import AssumptionsModal from "@/components/AssumptionsModal";
 
 const PLAN_KEY = "au-retirement-plan";
 const SAVED_ID_KEY = "au-retirement-saved-id";
@@ -94,6 +95,7 @@ export default function StressTestView({
   const [plan, setPlan] = useState<RetirementPlan | null>(null);
   const [savedName, setSavedName] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [assumptionsOpen, setAssumptionsOpen] = useState(false);
 
   useEffect(() => {
     try {
@@ -229,10 +231,19 @@ export default function StressTestView({
 
           <p className="mt-4 text-xs text-muted">
             Each era replays its actual year-by-year real returns from the moment you retire, at full historical
-            severity, then reverts to your assumed return once the era&apos;s data runs out. Past performance isn&apos;t a
-            guarantee of the future; US market history is used as a proxy. General information only — not financial advice.
+            severity, then reverts to your assumed return once the era&apos;s data runs out (1928–2025 US market history,
+            used as a proxy for a globally-diversified portfolio). It stresses the SEQUENCE of returns, not your
+            long-run return assumption. Past performance is not a guarantee of future performance. General information
+            only — not financial advice.{" "}
+            <button onClick={() => setAssumptionsOpen(true)} className="font-medium text-accent hover:underline">
+              Assumptions &amp; limitations →
+            </button>
           </p>
         </>
+      )}
+
+      {plan && (
+        <AssumptionsModal open={assumptionsOpen} onClose={() => setAssumptionsOpen(false)} config={config} plan={plan} />
       )}
     </div>
   );
