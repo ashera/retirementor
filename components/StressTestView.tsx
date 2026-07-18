@@ -47,7 +47,7 @@ function Row({
           </span>
           <div className="min-w-0">
             <div className="font-semibold text-white">{era.label}</div>
-            <div className="truncate text-xs text-muted">{era.blurb}</div>
+            <div className={`text-xs text-muted ${selected ? "" : "truncate"}`}>{era.blurb}</div>
           </div>
         </div>
         <div className="shrink-0 text-right">
@@ -238,17 +238,21 @@ export default function StressTestView({
               )}
 
               <StressChart result={result} selectedId={selectedId} />
-              <p className="text-xs text-muted">
-                Each era replays its actual year-by-year real returns from the moment you retire, at full historical
-                severity, then reverts to your assumed return once the era&apos;s data runs out (1928–2025 US market
-                history, used as a proxy for a globally-diversified portfolio). It stresses the SEQUENCE of returns, not
-                your long-run return assumption. Past performance is not a guarantee of future performance. General
-                information only — not financial advice.{" "}
-                <button onClick={() => setAssumptionsOpen(true)} className="font-medium text-accent hover:underline">
-                  Assumptions &amp; limitations →
-                </button>
-              </p>
             </div>
+          </div>
+
+          {/* Methodology / disclosure — spans both columns. */}
+          <div className="mt-5 rounded-2xl border border-line bg-panel p-4">
+            <p className="text-xs text-muted">
+              Each era replays its actual year-by-year real returns from the moment you retire, at full historical
+              severity, then reverts to your assumed return once the era&apos;s data runs out (1928–2025 US market
+              history, used as a proxy for a globally-diversified portfolio). It stresses the SEQUENCE of returns, not
+              your long-run return assumption. Past performance is not a guarantee of future performance. General
+              information only — not financial advice.{" "}
+              <button onClick={() => setAssumptionsOpen(true)} className="font-medium text-accent hover:underline">
+                Assumptions &amp; limitations →
+              </button>
+            </p>
           </div>
         </>
       )}
