@@ -250,7 +250,7 @@ export default function StressTestView({
         <>
           <div className="grid gap-5 lg:grid-cols-2 lg:items-start">
             {/* Left: headline + ranked list */}
-            <div className="space-y-4">
+            <div className="min-w-0 space-y-4">
               <div className={`rounded-2xl border ${running ? "border-line" : toneRing} bg-panel p-5`}>
                 <div className="text-xs font-semibold uppercase tracking-wide text-muted">Survival scorecard</div>
                 {running ? (
@@ -296,7 +296,7 @@ export default function StressTestView({
             </div>
 
             {/* Right: spending strategy + chart + disclosure, sticky on wide screens */}
-            <div className="space-y-4 lg:sticky lg:top-6">
+            <div className="min-w-0 space-y-4 lg:sticky lg:top-6">
               {/* Fixed vs flexible spending — same card size as the scorecard.
                   Hidden until the run finishes (its counts summarise every era). */}
               {!running && fixed && flex && (
