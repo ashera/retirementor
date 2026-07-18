@@ -12,7 +12,7 @@ import { fmtCurrency } from "@/lib/au/format";
 import { rowNetWorth } from "@/lib/au/networth";
 import { track } from "@/lib/analytics";
 import type { SavedPlan } from "@/app/actions/plans";
-import { savePlan } from "@/app/actions/plans";
+import { savePlan, updatePlan } from "@/app/actions/plans";
 import {
   buildStrategyCatalog,
   applyStrategies,
@@ -40,6 +40,7 @@ import Field from "@/components/Field";
 
 const PLAN_KEY = "au-retirement-plan";
 const PLAN_TS_KEY = "au-retirement-plan-ts";
+const SAVED_ID_KEY = "au-retirement-saved-id"; // the plans-row id the active scenario is (for in-place Save)
 const GROUP_ORDER: StrategyGroup[] = ["home", "mortgage", "property", "timing", "work"];
 
 const annualSpend = (p: RetirementPlan) =>
@@ -132,6 +133,7 @@ export default function WhatIfView({
   const [active, setActive] = useState<Set<string>>(new Set());
   const [values, setValues] = useState<Record<string, Record<string, number>>>({});
   const [savedName, setSavedName] = useState<string | null>(null); // name if the active scenario is a saved plan
+  const [savedId, setSavedId] = useState<string | null>(null); // plans-row id the active scenario is (in-place Save)
   const [saveName, setSaveName] = useState("");
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -160,20 +162,25 @@ export default function WhatIfView({
     }
     let stored: RetirementPlan = DEFAULT_PLAN;
     let name: string | null = null;
+    let id: string | null = null;
     try {
       const editId = new URLSearchParams(window.location.search).get("edit");
       const editPlan = editId ? initialSavedPlans.find((s) => s.id === editId) : undefined;
       if (editPlan) {
         stored = { ...DEFAULT_PLAN, ...editPlan.data };
         name = editPlan.name;
+        id = editPlan.id;
         // Adopt this saved scenario as the working plan straight away, so heading
         // back to the planner (even without a change) opens on it too.
         localStorage.setItem(PLAN_KEY, JSON.stringify(stored));
         localStorage.setItem(PLAN_TS_KEY, String(Date.now()));
+        localStorage.setItem(SAVED_ID_KEY, editPlan.id);
         window.history.replaceState(null, "", "/what-if"); // don't re-trigger on refresh
       } else {
         const raw = localStorage.getItem(PLAN_KEY);
         if (raw) stored = { ...DEFAULT_PLAN, ...JSON.parse(raw) };
+        id = localStorage.getItem(SAVED_ID_KEY);
+        if (id) name = initialSavedPlans.find((s) => s.id === id)?.name ?? null;
       }
     } catch {}
     const sc = toActiveScenario(stored);
@@ -181,6 +188,7 @@ export default function WhatIfView({
     setActive(new Set(sc.strategies.active));
     setValues(sc.strategies.values);
     setSavedName(name);
+    setSavedId(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -494,26 +502,30 @@ export default function WhatIfView({
   const setParam = (cardId: string, key: string, v: number) =>
     setValues((prev) => ({ ...prev, [cardId]: { ...prev[cardId], [key]: v } }));
 
-  const doSave = async () => {
+  // Save the active scenario in its storable form (composed + the strategy layer).
+  // `asNew` (or no saved id yet) makes a fresh copy; otherwise it updates the plan
+  // the scenario already IS, in place. The working plan is already synced to storage,
+  // so the dashboard shows this scenario the moment you head back.
+  const doSave = async (asNew: boolean) => {
+    if (!baseline) return;
     setSaving(true);
     setSaveMsg(null);
-    if (!baseline) {
-      setSaving(false);
-      return;
-    }
-    const name = saveName.trim() || savedName || "What-if scenario";
-    // Save the active scenario in its storable form (composed + the strategy layer),
-    // so it can be reopened and tweaked later. The working plan is already synced to
-    // storage, so the dashboard shows this scenario the moment you head back.
+    const name = saveName.trim() || (!asNew && savedName) || "What-if scenario";
     const storable = fromActiveScenario(
       { base: baseline, strategies: { active: [...active], values }, name, savedId: null, dirty: false },
       config,
     );
-    const res = await savePlan(name, storable);
+    const res = !asNew && savedId ? await updatePlan(savedId, name, storable) : await savePlan(name, storable);
     setSaving(false);
     if (res.error) {
       setSaveMsg(res.error);
       return;
+    }
+    if (res.id) {
+      setSavedId(res.id);
+      try {
+        localStorage.setItem(SAVED_ID_KEY, res.id);
+      } catch {}
     }
     setSavedName(name);
     setSaveMsg(`Saved “${name}” — it’s on your dashboard too.`);
@@ -855,25 +867,60 @@ export default function WhatIfView({
         </div>
       ) : (
       <div className="mt-8 rounded-2xl border border-line bg-panel p-4">
-        <div className="flex flex-wrap items-center gap-3">
-          <span className="text-sm font-medium text-slate-200">Like this combination?</span>
-          <input
-            value={saveName}
-            onChange={(e) => setSaveName(e.target.value)}
-            placeholder="Name this scenario"
-            className="min-w-[12rem] flex-1 rounded-lg border border-line bg-panel-2 px-3 py-2 text-sm text-white outline-none focus:border-accent"
-          />
-          <button
-            onClick={doSave}
-            disabled={saving || !changed}
-            className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-ink transition hover:bg-accent-soft disabled:opacity-50"
-          >
-            {saving ? "Saving…" : "Save as scenario"}
-          </button>
-        </div>
-        <p className="mt-2 text-xs text-muted">
-          Saves a separate copy — your dashboard plan stays exactly as it is.
-        </p>
+        {savedId ? (
+          <>
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="text-sm font-medium text-slate-200">
+                Editing <span className="font-semibold">{savedName ?? "a saved scenario"}</span>
+              </span>
+              <button
+                onClick={() => doSave(false)}
+                disabled={saving}
+                className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-ink transition hover:bg-accent-soft disabled:opacity-50"
+              >
+                {saving ? "Saving…" : "✓ Save changes"}
+              </button>
+              <input
+                value={saveName}
+                onChange={(e) => setSaveName(e.target.value)}
+                placeholder="New name for a copy"
+                className="min-w-[10rem] flex-1 rounded-lg border border-line bg-panel-2 px-3 py-2 text-sm text-white outline-none focus:border-accent"
+              />
+              <button
+                onClick={() => doSave(true)}
+                disabled={saving}
+                className="rounded-lg border border-line bg-panel-2 px-4 py-2 text-sm font-medium text-slate-200 transition hover:border-accent/50 hover:text-white disabled:opacity-50"
+              >
+                + Save as a copy
+              </button>
+            </div>
+            <p className="mt-2 text-xs text-muted">
+              “Save changes” updates this scenario everywhere; “Save as a copy” keeps a separate one.
+            </p>
+          </>
+        ) : (
+          <>
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="text-sm font-medium text-slate-200">Like this combination?</span>
+              <input
+                value={saveName}
+                onChange={(e) => setSaveName(e.target.value)}
+                placeholder="Name this scenario"
+                className="min-w-[12rem] flex-1 rounded-lg border border-line bg-panel-2 px-3 py-2 text-sm text-white outline-none focus:border-accent"
+              />
+              <button
+                onClick={() => doSave(true)}
+                disabled={saving || !changed}
+                className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-ink transition hover:bg-accent-soft disabled:opacity-50"
+              >
+                {saving ? "Saving…" : "Save as scenario"}
+              </button>
+            </div>
+            <p className="mt-2 text-xs text-muted">
+              Saves it as a scenario you can reload, share or run a report on — your dashboard opens on it too.
+            </p>
+          </>
+        )}
         {!signedIn && <p className="mt-2 text-xs text-muted">Sign in to save scenarios to your account.</p>}
         {saveMsg && <p className="mt-2 text-xs text-accent">{saveMsg}</p>}
       </div>

@@ -42,6 +42,7 @@ import { logout } from "@/app/actions/auth";
 import {
   deletePlan,
   savePlan,
+  updatePlan,
   saveDraft,
   createShareLink,
   revokeShareLink,
@@ -66,6 +67,7 @@ const STORAGE_KEY = "au-retirement-plan";
 const BASELINE_KEY = "au-retirement-baseline";
 const BASELINE_NAME_KEY = "au-retirement-baseline-name"; // label for the ghost line
 const WORKING_TS_KEY = "au-retirement-plan-ts"; // when the local working plan was last saved
+const SAVED_ID_KEY = "au-retirement-saved-id"; // the plans-row id the active scenario is (for in-place Save)
 const NUDGE_KEY = "au-retirement-nudge-dismissed"; // signed-out "save your work" banner dismissed
 
 /** Deep structural equality (order-insensitive for object keys) — tells whether the
@@ -301,6 +303,19 @@ export default function PlannerApp({
   const [fanAge, setFanAge] = useState<number | null>(null);
   const [showReturnSeries, setShowReturnSeries] = useState(false);
   const [saveName, setSaveName] = useState("");
+  // The plans-row id the active scenario IS (loaded or saved) — so "Save" updates it
+  // in place rather than making a copy. Null → an unsaved working scenario. Persisted
+  // in localStorage so it survives reload and the hop to/from What-If.
+  const [savedId, setSavedId] = useState<string | null>(null);
+  const persistSavedId = (id: string | null) => {
+    if (shared) return;
+    try {
+      if (id) localStorage.setItem(SAVED_ID_KEY, id);
+      else localStorage.removeItem(SAVED_ID_KEY);
+    } catch {
+      /* ignore */
+    }
+  };
   // Which saved scenario the dropdown has selected (the Run report / Share / View
   // buttons act on it). Falls back to the first saved plan when unset or stale.
   const [selectedPlanId, setSelectedPlanId] = useState<string>("");
@@ -337,6 +352,7 @@ export default function PlannerApp({
         splitInto(working);
         setBaseline(working);
         setBaselineName(null);
+        setSavedId(localStorage.getItem(SAVED_ID_KEY));
         setConfigured(true);
         localStorage.setItem(STORAGE_KEY, JSON.stringify(working));
         localStorage.setItem(WORKING_TS_KEY, String(draftTs));
@@ -347,6 +363,7 @@ export default function PlannerApp({
         splitInto(working);
         setBaseline(rawBase ? { ...DEFAULT_PLAN, ...JSON.parse(rawBase) } : working);
         setBaselineName(localStorage.getItem(BASELINE_NAME_KEY) || null);
+        setSavedId(localStorage.getItem(SAVED_ID_KEY));
         setConfigured(true);
       } else if (savedPlans.length > 0) {
         // No working copy anywhere, but there are saved scenarios → open the most
@@ -356,10 +373,12 @@ export default function PlannerApp({
         splitInto(working);
         setBaseline(working);
         setBaselineName(sp.name);
+        setSavedId(sp.id);
         setConfigured(true);
         localStorage.setItem(STORAGE_KEY, JSON.stringify(working));
         localStorage.setItem(BASELINE_KEY, JSON.stringify(working));
         localStorage.setItem(BASELINE_NAME_KEY, sp.name);
+        localStorage.setItem(SAVED_ID_KEY, sp.id);
         setNotice(`Loaded your most recent scenario “${sp.name}”.`);
       }
       if (localStorage.getItem(NUDGE_KEY)) setNudgeDismissed(true);
@@ -609,6 +628,8 @@ export default function PlannerApp({
 
   const handleLoad = (sp: SavedPlan) => {
     commit({ ...DEFAULT_PLAN, ...sp.data }, sp.name);
+    setSavedId(sp.id);
+    persistSavedId(sp.id);
     setConfigured(true);
     setNotice(`Loaded “${sp.name}”.`);
   };
@@ -623,24 +644,50 @@ export default function PlannerApp({
     } catch {
       /* ignore */
     }
+    try {
+      localStorage.removeItem(SAVED_ID_KEY);
+    } catch {
+      /* ignore */
+    }
     splitInto(DEFAULT_PLAN);
     setBaseline(DEFAULT_PLAN);
     setBaselineName(null);
+    setSavedId(null);
     setConfigured(false);
     setShowGuide(false);
     setSaveName("");
     setNotice(null);
   };
 
-  const handleSave = () => {
-    const name = saveName.trim() || `Plan ${savedPlans.length + 1}`;
+  // Save the active scenario. `asNew` (or no saved id yet) inserts a fresh plan;
+  // otherwise it updates the plan the scenario already IS, in place.
+  const saveScenario = (asNew: boolean) => {
+    const name =
+      saveName.trim() || (!asNew && baselineName) || `Plan ${savedPlans.length + 1}`;
     startTransition(async () => {
-      const res = await savePlan(name, storable);
-      if (res.error) setNotice(res.error);
-      else {
-        // The current scenario is now this named plan — make it the baseline so
-        // any further quick-adjusts show a ghost line labelled with its name.
-        commit(storable, name);
+      if (!asNew && savedId) {
+        const res = await updatePlan(savedId, name, storable);
+        if (res.error) {
+          setNotice(res.error);
+          return;
+        }
+        // Re-baseline to the saved state so "unsaved changes" clears.
+        setBaseline(storable);
+        setBaselineName(name);
+        persistBaseline(storable, name);
+        setSaveName("");
+        setNotice(`Saved changes to “${name}”.`);
+        track("Plan updated");
+        router.refresh();
+      } else {
+        const res = await savePlan(name, storable);
+        if (res.error) {
+          setNotice(res.error);
+          return;
+        }
+        setSavedId(res.id ?? null);
+        persistSavedId(res.id ?? null);
+        commit(storable, name); // adopt as baseline, labelled with its name
         setSaveName("");
         setNotice(`Saved “${name}”.`);
         track("Plan saved");
@@ -648,6 +695,8 @@ export default function PlannerApp({
       }
     });
   };
+  const handleSave = () => saveScenario(false);
+  const handleSaveAsNew = () => saveScenario(true);
 
   const handleDelete = (sp: SavedPlan) => {
     startTransition(async () => {
@@ -665,17 +714,13 @@ export default function PlannerApp({
   // or empty selection still resolves to something valid.
   const selectedPlan = savedPlans.find((sp) => sp.id === selectedPlanId) ?? savedPlans[0] ?? null;
 
-  // The saved scenario CURRENTLY ON SCREEN: the live plan matches a saved plan's data
-  // exactly. Any edit makes it stop matching → an unsaved working scenario. (Distinct
-  // from `selectedPlan`, which is just the dropdown's target for the action buttons.)
-  const currentSaved = useMemo(
-    // Compare composed plans without their bookmarks — the live plan carries none.
-    () =>
-      savedPlans.find((sp) =>
-        deepEqual({ ...plan, whatIf: undefined }, { ...DEFAULT_PLAN, ...sp.data, whatIf: undefined }),
-      ) ?? null,
-    [plan, savedPlans],
-  );
+  // The active scenario's identity for the save/load UI:
+  //  - `activeName`  — the loaded/saved scenario's name (null = never-named working plan);
+  //  - `neverSaved`  — configured but not yet a saved plan (needs a first Save);
+  //  - `dirty`       — a saved scenario with unsaved edits vs its committed baseline.
+  const activeName = baselineName;
+  const neverSaved = configured && savedId == null;
+  const dirty = configured && savedId != null && tweaked;
 
   const isCouple = plan.household === "couple";
   const comfortable = isCouple
@@ -931,14 +976,23 @@ export default function PlannerApp({
       {/* Saved-scenarios card — signed-in users only. */}
       {user && (configured || savedPlans.length > 0) && (
       <div className="mb-6 rounded-2xl border border-line bg-panel px-5 py-4">
-        {/* What's on screen right now — a saved scenario (matched exactly) or an
-            unsaved working plan. Distinct from the dropdown, which just targets the
-            action buttons below. */}
+        {/* The active scenario: its name + whether it has unsaved changes. Distinct
+            from the dropdown below, which just targets the action buttons. */}
         <div className="mb-3 flex flex-wrap items-baseline gap-x-2 gap-y-1 border-b border-line pb-3">
-          <span className="text-[11px] font-medium uppercase tracking-wide text-muted">Currently viewing</span>
-          <span className={`text-sm font-semibold ${currentSaved ? "text-white" : "text-amber-300"}`}>
-            {currentSaved ? currentSaved.name : "Working Scenario (Not Yet Saved)"}
+          <span className="text-[11px] font-medium uppercase tracking-wide text-muted">Currently editing</span>
+          <span className={`text-sm font-semibold ${activeName && !dirty ? "text-white" : "text-amber-300"}`}>
+            {activeName ?? "Working scenario"}
           </span>
+          {dirty && (
+            <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-semibold text-amber-300">
+              Unsaved changes
+            </span>
+          )}
+          {neverSaved && (
+            <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-semibold text-amber-300">
+              Not saved yet
+            </span>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <span className="text-xs font-semibold uppercase tracking-wide text-muted">
@@ -999,35 +1053,71 @@ export default function PlannerApp({
             )}
         </div>
 
-        {/* Save the plan currently on the dashboard as a new named scenario — its
-            own clearly-labelled block so it isn't confused with loading a saved one. */}
+        {/* Save the active scenario. A saved scenario gets "Save changes" (updates
+            it in place) plus "Save as a copy"; a never-saved one just gets a named
+            first save. */}
         {configured && (
           <div className="mt-3 border-t border-line pt-3">
-            <label htmlFor="save-scenario-name" className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted">
-              Save the plan you&apos;re viewing
-            </label>
-            <div className="flex flex-wrap items-center gap-2">
-              <input
-                id="save-scenario-name"
-                value={saveName}
-                onChange={(e) => setSaveName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !pending) handleSave();
-                }}
-                placeholder="Name it — e.g. “Retire at 60”"
-                className="w-full max-w-xs rounded-lg border border-line bg-panel-2 px-3 py-1.5 text-sm text-white outline-none focus:border-accent"
-              />
-              <button
-                onClick={handleSave}
-                disabled={pending}
-                className="rounded-lg bg-accent px-3 py-1.5 text-sm font-semibold text-ink transition hover:bg-accent-soft disabled:opacity-60"
-              >
-                + Save as new scenario
-              </button>
-              <span className="text-xs text-muted">
-                Keeps a copy you can reload, share or run a report on later.
-              </span>
-            </div>
+            {savedId ? (
+              <>
+                <div className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted">
+                  {dirty ? "You have unsaved changes" : "This scenario is saved"}
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    onClick={handleSave}
+                    disabled={pending || !dirty}
+                    className="rounded-lg bg-accent px-3 py-1.5 text-sm font-semibold text-ink transition hover:bg-accent-soft disabled:opacity-40"
+                  >
+                    ✓ Save changes{activeName ? ` to “${activeName}”` : ""}
+                  </button>
+                  <input
+                    value={saveName}
+                    onChange={(e) => setSaveName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !pending) handleSaveAsNew();
+                    }}
+                    placeholder="New name — e.g. “Retire at 60”"
+                    className="w-full max-w-[14rem] rounded-lg border border-line bg-panel-2 px-3 py-1.5 text-sm text-white outline-none focus:border-accent"
+                  />
+                  <button
+                    onClick={handleSaveAsNew}
+                    disabled={pending}
+                    className="rounded-lg border border-line bg-panel-2 px-3 py-1.5 text-sm font-medium text-slate-200 transition hover:border-accent/50 hover:text-white disabled:opacity-60"
+                  >
+                    + Save as a copy
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <label htmlFor="save-scenario-name" className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted">
+                  Save the plan you&apos;re viewing
+                </label>
+                <div className="flex flex-wrap items-center gap-2">
+                  <input
+                    id="save-scenario-name"
+                    value={saveName}
+                    onChange={(e) => setSaveName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !pending) handleSave();
+                    }}
+                    placeholder="Name it — e.g. “Retire at 60”"
+                    className="w-full max-w-xs rounded-lg border border-line bg-panel-2 px-3 py-1.5 text-sm text-white outline-none focus:border-accent"
+                  />
+                  <button
+                    onClick={handleSave}
+                    disabled={pending}
+                    className="rounded-lg bg-accent px-3 py-1.5 text-sm font-semibold text-ink transition hover:bg-accent-soft disabled:opacity-60"
+                  >
+                    + Save scenario
+                  </button>
+                  <span className="text-xs text-muted">
+                    Keeps a copy you can reload, share or run a report on later.
+                  </span>
+                </div>
+              </>
+            )}
           </div>
         )}
         <div className="mt-3 flex flex-wrap gap-2 border-t border-line pt-3">

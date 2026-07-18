@@ -104,6 +104,26 @@ export async function savePlan(
   return { ok: true, id: r.rows[0]?.id };
 }
 
+/** Update an existing saved scenario in place (owner-scoped) — for "Save changes"
+ *  when the active scenario is already a saved plan. */
+export async function updatePlan(
+  id: string,
+  name: string,
+  data: RetirementPlan,
+): Promise<ActionResult> {
+  const user = await getCurrentUser();
+  if (!user) return { error: "You need to be signed in to save plans." };
+  const trimmed = name.trim();
+  if (!trimmed) return { error: "Give your plan a name." };
+  const r = await query(
+    "update plans set name = $1, data = $2, updated_at = now() where id = $3 and user_id = $4",
+    [trimmed, JSON.stringify(data), id, user.id],
+  );
+  if (!r.rowCount) return { error: "Scenario not found." };
+  revalidatePath("/");
+  return { ok: true, id };
+}
+
 export async function deletePlan(id: string): Promise<ActionResult> {
   const user = await getCurrentUser();
   if (!user) return { error: "You need to be signed in." };
