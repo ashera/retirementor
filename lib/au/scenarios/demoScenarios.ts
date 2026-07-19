@@ -159,6 +159,33 @@ const swrGuardrailsGoodSaver: RetirementPlan = {
   lifeExpectancy: 90,
 };
 
+// A stretched early retiree for the historical stress test: retire at 52 on $1.05M
+// ($600k super + $450k outside), $50k/yr (4.8%). The smooth projection LASTS — so it
+// looks fine — but replaying ACTUAL historical returns, retiring straight into most
+// major downturns on FIXED spending fails (only 2/7 eras survive); flexible spending
+// rescues it to 5/7, and the flexibility ladder shows the cliff (6/3/3/2 as you go
+// from cutting to the bone to refusing to cut). The point is sequence risk + how
+// flexible you'd really be — which a single Monte Carlo number hides. 38-yr horizon
+// to 90, 8-year bridge to preservation age 60.
+const retire52SequenceRisk: RetirementPlan = {
+  ...DEFAULT_PLAN,
+  household: "single",
+  people: [
+    { ...DEFAULT_PLAN.people[0], currentAge: 52, superBalance: 600_000, salary: 0, voluntaryConcessional: 0, voluntaryNonConcessional: 0 },
+  ],
+  superMode: "individual",
+  homeowner: true,
+  outsideSuper: 450_000,
+  annualOutsideSavings: 0,
+  retirementAge: 52,
+  spendingMode: "flat",
+  targetSpending: 50_000,
+  investmentReturn: 7,
+  returnVolatility: 11,
+  inflation: 2.5,
+  lifeExpectancy: 90,
+};
+
 export const DEMO_SCENARIOS: DemoScenario[] = [
   {
     slug: "fire-at-45",
@@ -225,5 +252,16 @@ export const DEMO_SCENARIOS: DemoScenario[] = [
     threadUrl: "",
     sortOrder: 60,
     data: swrGuardrailsGoodSaver,
+  },
+  {
+    slug: "retire-52-sequence-risk",
+    title: "Retire @52 · $50k · sequence risk",
+    blurb:
+      "Retire at 52 on $1.05M ($600k super + $450k outside), $50k/yr (4.8%). The smooth projection lasts — but retire straight into most historical downturns on fixed spending and it fails. Run the stress test: how many you survive depends on how far you'd actually cut.",
+    context:
+      "Stress-test demo for the flexible-spending / sequence-risk Reddit thread. Retire 52, $1.05M ($600k super + $450k outside), $50k (4.8%), 38-yr horizon to 90. The central projection LASTS, so a single 'you're fine' number hides the risk. Historical stress test (ACTUAL 1928–2025 US returns as a proxy): FIXED spending survives only 2/7 eras; FLEXIBLE (guardrails) rescues to 5/7; and the flexibility ladder shows the cliff — 6/7 cutting to the bone, 3/7 at −10%, 2/7 if you won't cut. Directly answers the 'flexibility is easier said than done' point: your safety rests on how deep a cut you'd actually accept, which the MC just assumes. Open 'Stress-test against history' → Flexible.",
+    threadUrl: "",
+    sortOrder: 70,
+    data: retire52SequenceRisk,
   },
 ];
