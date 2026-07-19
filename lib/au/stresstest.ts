@@ -49,6 +49,7 @@ export interface StressEraResult extends StressEra {
   lasts: boolean; // spending was fully funded every year to life expectancy
   depletionAge: number | null; // first age spending couldn't be met, when it doesn't last
   unfundedYears: number; // count of retirement years spending couldn't be fully met
+  gapAges: number[]; // the specific retirement ages spending couldn't be fully met (for chart markers) — often a liquidity gap: the wealth is there but locked in super
   recovered: boolean; // had unfunded years BUT the plan recovered (funded again by the end, positive balance) — a temporary gap, not permanent depletion
   finalBalance: number; // balance at life expectancy (today's $)
   minBalance: number; // lowest total balance during retirement
@@ -133,7 +134,8 @@ function summarise(era: StressEra, res: SimResult, retireStartAge: number, plan:
   }
   if (!Number.isFinite(minBalance)) minBalance = finalBalance;
   if (!Number.isFinite(minLivingSpend)) minLivingSpend = 0;
-  const unfundedYears = retRows.filter((r) => !r.funded).length;
+  const gapAges = retRows.filter((r) => !r.funded).map((r) => r.age);
+  const unfundedYears = gapAges.length;
   const lastFunded = retRows.length ? retRows[retRows.length - 1].funded : true;
   // Recovered = it had lean/unfunded years but was funding again by the end with money
   // left (e.g. an early-retirement bridge that ran dry before super unlocked, then
@@ -144,6 +146,7 @@ function summarise(era: StressEra, res: SimResult, retireStartAge: number, plan:
     lasts: res.lastsToLifeExpectancy,
     depletionAge: res.depletedAge,
     unfundedYears,
+    gapAges,
     recovered,
     finalBalance,
     minBalance,

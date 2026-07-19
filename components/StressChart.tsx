@@ -1,6 +1,6 @@
 "use client";
 
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, ReferenceLine, ResponsiveContainer, Tooltip } from "recharts";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, ReferenceLine, ReferenceDot, ResponsiveContainer, Tooltip } from "recharts";
 import { fmtCompact, fmtCurrency } from "@/lib/au/format";
 import type { StressTestResult } from "@/lib/au/stresstest";
 
@@ -26,13 +26,22 @@ export default function StressChart({
     for (const e of result.eras) row[e.id] = Math.round(byId.get(e.id)?.get(age) ?? 0);
     return row;
   });
+  // Mark the funding-gap years on the selected era — the years spending couldn't be
+  // met even though the balance can look healthy (the wealth is locked in super).
+  const selEra = selectedId ? result.eras.find((e) => e.id === selectedId) : null;
+  const gapMarks = selEra?.gapAges.map((age) => ({ age, total: Math.round(byId.get(selEra.id)?.get(age) ?? 0) })) ?? [];
 
   return (
     <div className="rounded-2xl border border-line bg-panel p-4">
       <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted">Balance through each downturn</div>
       <p className="mb-3 text-xs text-muted">
         Today&apos;s dollars. The bright line is your smooth projection; each faint line is one era&apos;s actual path —
-        {" "}amber dips then recovers, red runs dry. {selectedId ? "Selected era highlighted." : "Tap a row above to highlight one."}
+        {" "}amber dips then recovers, red runs dry.{" "}
+        {gapMarks.length > 0
+          ? "The amber dots mark years spending couldn't be fully met — the balance can look healthy here because that wealth is still preserved in super and can't be drawn yet."
+          : selectedId
+            ? "Selected era highlighted."
+            : "Tap a row above to highlight one."}
       </p>
       <ResponsiveContainer width="100%" height={260}>
         <LineChart data={data} margin={{ top: 6, right: 8, bottom: 4, left: 8 }}>
@@ -71,6 +80,18 @@ export default function StressChart({
             dot={false}
             isAnimationActive={false}
           />
+          {gapMarks.map((m) => (
+            <ReferenceDot
+              key={m.age}
+              x={m.age}
+              y={m.total}
+              r={4}
+              fill="#fbbf24"
+              stroke="#0f1523"
+              strokeWidth={1.5}
+              ifOverflow="extendDomain"
+            />
+          ))}
         </LineChart>
       </ResponsiveContainer>
     </div>
