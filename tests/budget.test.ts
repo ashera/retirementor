@@ -7,7 +7,9 @@ import {
   budgetSplit,
   budgetToStages,
   isEssential,
+  spendBreakdownAtFloor,
 } from "../lib/au/budget";
+import { DEFAULT_PLAN } from "../lib/au/types";
 
 describe("Budget planner", () => {
   it("has metadata for every configured category (and vice-versa)", () => {
@@ -49,6 +51,33 @@ describe("Budget planner", () => {
     expect(essential + discretionary).toBe(budgetTotal(cats));
     expect(isEssential("housing")).toBe(true);
     expect(isEssential("travel")).toBe(false);
+  });
+
+  it("decomposes a target spend: essentials held, cut falls on discretionary", () => {
+    // No-budget plan → ASFA-estimated split. $50k flat, single homeowner.
+    const plan = { ...DEFAULT_PLAN, household: "single" as const, homeowner: true, spendingMode: "flat" as const, targetSpending: 50_000 };
+    const full = spendBreakdownAtFloor(plan, cfg, 50_000);
+    expect(full.estimated).toBe(true);
+    expect(full.keptFraction).toBeCloseTo(1, 5);
+    // At full spend, every category is at its baseline.
+    for (const r of full.rows) expect(r.annual).toBe(r.baselineAnnual);
+
+    const ess = full.essential;
+    // Cutting to the essentials floor zeroes all discretionary, holds essentials.
+    const bone = spendBreakdownAtFloor(plan, cfg, ess);
+    expect(bone.keptFraction).toBeCloseTo(0, 5);
+    for (const r of bone.rows) {
+      if (r.essential) expect(r.annual).toBe(r.baselineAnnual);
+      else expect(r.annual).toBe(0);
+    }
+    // A 10% total cut is a larger cut to discretionary alone.
+    const floor = 45_000;
+    const cut = spendBreakdownAtFloor(plan, cfg, floor);
+    const discCutPct = 1 - cut.discretionaryKept / cut.discretionaryFull;
+    expect(discCutPct).toBeGreaterThan(0.1); // discretionary bears more than the 10% headline
+    // Rows sum to the target (within rounding).
+    const sum = cut.rows.reduce((s, r) => s + r.annual, 0);
+    expect(Math.abs(sum - floor)).toBeLessThan(20);
   });
 
   it("seeds stages via the smile — essentials flat, discretionary declining", () => {

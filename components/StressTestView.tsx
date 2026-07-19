@@ -12,6 +12,7 @@ import { fmtCurrency } from "@/lib/au/format";
 import { track } from "@/lib/analytics";
 import StressChart from "@/components/StressChart";
 import AssumptionsModal from "@/components/AssumptionsModal";
+import CutDetailModal from "@/components/CutDetailModal";
 
 // Tongue-in-cheek "the machine is doing something" lines, one per era, shown while
 // each stress test "runs". Purely theatrical.
@@ -141,6 +142,7 @@ export default function StressTestView({
   const [savedName, setSavedName] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [assumptionsOpen, setAssumptionsOpen] = useState(false);
+  const [cutDetail, setCutDetail] = useState<{ floor: number; survived: number; kind: "fixed" | "essentials" | "cut" } | null>(null);
 
   useEffect(() => {
     if (sharedPlan) {
@@ -380,8 +382,17 @@ export default function StressTestView({
                 {ladder.rows.map((r, i) => {
                   const tone =
                     r.survived === ladder.total ? "text-emerald-400" : r.survived >= Math.ceil(ladder.total * 0.6) ? "text-amber-400" : "text-red-400";
+                  const kind = "fixed" in r && r.fixed ? "fixed" : "essentials" in r && r.essentials ? "essentials" : "cut";
                   return (
-                    <div key={i} className="rounded-xl border border-line bg-panel-2 p-3 text-center">
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => {
+                        setCutDetail({ floor: r.floor, survived: r.survived, kind });
+                        track("stress_cut_detail_open", { floor: r.floor, kind });
+                      }}
+                      className="group rounded-xl border border-line bg-panel-2 p-3 text-center transition hover:border-accent/40 hover:bg-panel"
+                    >
                       <div className={`text-2xl font-bold ${tone}`}>
                         {r.survived}
                         <span className="text-base font-medium text-muted">/{ladder.total}</span>
@@ -391,9 +402,12 @@ export default function StressTestView({
                         <span className="text-xs font-normal text-muted">/yr</span>
                       </div>
                       <div className="text-[11px] text-muted">
-                        {"fixed" in r && r.fixed ? "won't cut" : "essentials" in r && r.essentials ? `to the bone (−${r.cutPct}%)` : `cut to −${r.cutPct}%`}
+                        {kind === "fixed" ? "won't cut" : kind === "essentials" ? `to the bone (−${r.cutPct}%)` : `cut to −${r.cutPct}%`}
                       </div>
-                    </div>
+                      <div className="mt-1 text-[10px] font-medium text-accent opacity-0 transition group-hover:opacity-100">
+                        See the monthly budget →
+                      </div>
+                    </button>
                   );
                 })}
               </div>
@@ -460,6 +474,17 @@ export default function StressTestView({
 
       {plan && (
         <AssumptionsModal open={assumptionsOpen} onClose={() => setAssumptionsOpen(false)} config={config} plan={plan} />
+      )}
+      {plan && cutDetail && (
+        <CutDetailModal
+          plan={plan}
+          config={config}
+          floor={cutDetail.floor}
+          survived={cutDetail.survived}
+          total={ladder?.total ?? STRESS_ERAS.length}
+          kind={cutDetail.kind}
+          onClose={() => setCutDetail(null)}
+        />
       )}
     </div>
   );

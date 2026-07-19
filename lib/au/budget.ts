@@ -4,7 +4,7 @@
 // affordance) lives here in code and joins to the figures by category `key`.
 
 import type { EngineConfig } from "./config";
-import type { BudgetLifestyle, Household, SpendingStages } from "./types";
+import type { BudgetLifestyle, Household, RetirementPlan, SpendingStages } from "./types";
 
 export interface BudgetCategoryMeta {
   key: string;
@@ -149,6 +149,61 @@ export function budgetSplit(categories: Record<string, number>): {
     else discretionary += amt;
   }
   return { essential, discretionary };
+}
+
+export interface CategorySpendRow {
+  key: string;
+  label: string;
+  hint: string;
+  essential: boolean;
+  baselineAnnual: number; // household $/yr at full spend (no cut)
+  annual: number; // household $/yr at this spend level (essentials held; discretionary scaled)
+}
+
+export interface SpendBreakdown {
+  rows: CategorySpendRow[];
+  fullSpend: number; // the plan's uncut annual spend
+  essential: number; // essentials $/yr (held flat through cuts)
+  discretionaryFull: number; // discretionary $/yr at full spend
+  discretionaryKept: number; // discretionary $/yr remaining at this level
+  keptFraction: number; // 0..1 of discretionary retained
+  estimated: boolean; // true when derived from ASFA averages (no user budget)
+}
+
+/**
+ * Decompose a target annual spend into per-category amounts the way the guardrails
+ * flex it: essentials are held flat and the cut comes entirely out of discretionary.
+ * Uses the user's own budget categories when present, otherwise an ASFA modest mix
+ * scaled so essentials match the essentials floor and the rest is discretionary
+ * (the same split `essentialsFloor` uses, so it lines up with the flexibility ladder).
+ */
+export function spendBreakdownAtFloor(plan: RetirementPlan, config: EngineConfig, floor: number): SpendBreakdown {
+  const hasBudget = !!plan.budget;
+  const baseCats = plan.budget?.categories ?? presetCategories(config, plan.household, plan.homeowner, "modest");
+  const { essential: baseEss, discretionary: baseDisc } = budgetSplit(baseCats);
+  const fullSpend = Math.round(plan.spendingMode === "stages" ? plan.spendingStages.goGo : plan.targetSpending);
+  // Essentials floor never exceeds current spend (matches strategies.essentialsFloor).
+  const essential = Math.min(Math.round(baseEss), fullSpend);
+  const discretionaryFull = Math.max(0, fullSpend - essential);
+  // Scale the base mix so essentials sum to `essential` and discretionary to `discretionaryFull`.
+  const essScale = baseEss > 0 ? essential / baseEss : 0;
+  const discScale = baseDisc > 0 ? discretionaryFull / baseDisc : 0;
+  const keptFraction = discretionaryFull > 0 ? Math.min(1, Math.max(0, (floor - essential) / discretionaryFull)) : 0;
+  const rows: CategorySpendRow[] = BUDGET_CATEGORY_META.filter((m) => (baseCats[m.key] ?? 0) > 0).map((m) => {
+    const scaled = (baseCats[m.key] ?? 0) * (m.essential ? essScale : discScale);
+    const baselineAnnual = Math.round(scaled);
+    const annual = m.essential ? baselineAnnual : Math.round(scaled * keptFraction);
+    return { key: m.key, label: m.label, hint: m.hint, essential: m.essential, baselineAnnual, annual };
+  });
+  return {
+    rows,
+    fullSpend,
+    essential,
+    discretionaryFull,
+    discretionaryKept: Math.round(discretionaryFull * keptFraction),
+    keptFraction,
+    estimated: !hasBudget,
+  };
 }
 
 const round100 = (x: number) => Math.round(x / 100) * 100;
