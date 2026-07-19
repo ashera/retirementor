@@ -159,6 +159,40 @@ describe("Guyton-Klinger guardrails", () => {
     expect(firstCut!.age).toBeLessThanOrEqual(tl.points[0].age + 6);
   });
 
+  it("staggered retirement: doesn't anchor the rate on a still-working partner's masked draw", () => {
+    // The household 'retires' when the younger partner stops at 60, but the older
+    // partner keeps earning to 65. The bug anchored guardWr0 during those working
+    // years — where the salary covers most of the spend, so the portfolio's apparent
+    // draw is a fraction of the real one (~1% vs ~4%). That pegged the rails far too
+    // low, so once BOTH retired the true rate read as way above the upper rail and
+    // spending was cut to the floor and stranded there for decades — even though
+    // FIXED spending comfortably lasts. The anchor must wait for the first fully
+    // retired year.
+    const staggered: RetirementPlan = {
+      ...base,
+      household: "couple",
+      // Person 0 works to 65 (plan.retirementAge); person 1 retires at 60, so the
+      // household enters retirement at 60 with person 0's salary still coming in.
+      people: [
+        { ...DEFAULT_PLAN.people[0], currentAge: 60, superBalance: 1_200_000, salary: 120_000 },
+        { ...DEFAULT_PLAN.people[1], currentAge: 60, superBalance: 1_200_000, salary: 0, retirementAge: 60 },
+      ],
+      superMode: "individual",
+      outsideSuper: 0,
+      retirementAge: 65,
+      spendingMode: "flat",
+      targetSpending: 110_000,
+      guardrails: {},
+    };
+    // Premise: fixed spending comfortably lasts, so flexing shouldn't need to cut.
+    expect(simulate({ ...staggered, guardrails: undefined }, cfg).lastsToLifeExpectancy).toBe(true);
+    const path = livingPath(staggered); // steady 7% returns
+    // With the fix, spending holds at (or rises above) plan; the bug stranded it near
+    // the 70% floor (~$77k) for most of retirement.
+    const late = path.slice(-8);
+    expect(Math.min(...late)).toBeGreaterThanOrEqual(110_000 - 1);
+  });
+
   it("offers a What-If lever that enables guardrails, once", () => {
     const card = buildStrategyCatalog(base).find((c) => c.id === "guardrails");
     expect(card).toBeTruthy();

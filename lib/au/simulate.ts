@@ -906,7 +906,13 @@ export function simulate(
       // from nothing) — that must read as ABOVE the upper rail, never a "0%".
       const rate = portfolio > EPS ? privateNeed / portfolio : Infinity;
       if (guardWr0 == null) {
-        guardWr0 = Number.isFinite(rate) ? rate : 0;
+        // Don't anchor the reference rate while a still-working partner's salary is
+        // masking the true draw (staggered retirement): the household "retires" when
+        // the FIRST partner does, but until the other stops earning, privateNeed is a
+        // fraction of the real post-retirement draw — anchoring there pegs the rails
+        // far too low and strands spending at the floor for decades. Wait for the
+        // first year the household actually funds the full spend itself.
+        if (workTakeHome <= EPS) guardWr0 = Number.isFinite(rate) ? rate : 0;
       } else if (rate > guardWr0 * (1 + guardWidth) && guardSpend > guardFloor + EPS) {
         guardSpend = Math.max(guardFloor, guardSpend * (1 - guardStep)); // pay cut
       } else if (Number.isFinite(rate) && rate < guardWr0 * (1 - guardWidth)) {
