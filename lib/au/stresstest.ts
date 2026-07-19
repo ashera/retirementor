@@ -46,8 +46,10 @@ export interface BalancePoint {
 }
 
 export interface StressEraResult extends StressEra {
-  lasts: boolean; // money still lasts to life expectancy
-  depletionAge: number | null; // age it runs out, when it doesn't last
+  lasts: boolean; // spending was fully funded every year to life expectancy
+  depletionAge: number | null; // first age spending couldn't be met, when it doesn't last
+  unfundedYears: number; // count of retirement years spending couldn't be fully met
+  recovered: boolean; // had unfunded years BUT the plan recovered (funded again by the end, positive balance) — a temporary gap, not permanent depletion
   finalBalance: number; // balance at life expectancy (today's $)
   minBalance: number; // lowest total balance during retirement
   minAge: number; // age at that trough
@@ -131,10 +133,18 @@ function summarise(era: StressEra, res: SimResult, retireStartAge: number, plan:
   }
   if (!Number.isFinite(minBalance)) minBalance = finalBalance;
   if (!Number.isFinite(minLivingSpend)) minLivingSpend = 0;
+  const unfundedYears = retRows.filter((r) => !r.funded).length;
+  const lastFunded = retRows.length ? retRows[retRows.length - 1].funded : true;
+  // Recovered = it had lean/unfunded years but was funding again by the end with money
+  // left (e.g. an early-retirement bridge that ran dry before super unlocked, then
+  // recovered) — NOT a permanent run-out.
+  const recovered = !res.lastsToLifeExpectancy && lastFunded && finalBalance > 1000;
   return {
     ...era,
     lasts: res.lastsToLifeExpectancy,
     depletionAge: res.depletedAge,
+    unfundedYears,
+    recovered,
     finalBalance,
     minBalance,
     minAge,
@@ -158,7 +168,11 @@ export function runStressTest(plan: RetirementPlan, config: EngineConfig): Stres
   });
   results.sort((a, b) => {
     if (a.lasts !== b.lasts) return a.lasts ? 1 : -1; // failures first
-    if (!a.lasts && !b.lasts) return (a.depletionAge ?? 0) - (b.depletionAge ?? 0); // earliest depletion worst
+    if (!a.lasts && !b.lasts) {
+      // A permanent run-out is worse than a plan that recovered from a lean patch.
+      if (a.recovered !== b.recovered) return a.recovered ? 1 : -1;
+      return (a.depletionAge ?? 0) - (b.depletionAge ?? 0); // then earliest shortfall worst
+    }
     return a.finalBalance - b.finalBalance; // survivors: closest calls first
   });
   const survived = results.filter((r) => r.lasts).length;

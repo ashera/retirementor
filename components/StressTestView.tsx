@@ -40,8 +40,18 @@ function Row({
   onSelect: () => void;
 }) {
   const yrsShort = life - (era.depletionAge ?? life);
+  // Three outcomes: lasts (funded every year), recovered (a temporary funding gap —
+  // e.g. the bridge to super ran dry — then back on its feet), or ran dry (permanent).
+  const state = era.lasts ? "lasts" : era.recovered ? "recovered" : "dry";
+  const badge = { lasts: "✓", recovered: "!", dry: "✕" }[state];
+  const badgeClass = {
+    lasts: "bg-emerald-500/15 text-emerald-400",
+    recovered: "bg-amber-500/15 text-amber-400",
+    dry: "bg-red-500/15 text-red-400",
+  }[state];
+  const rowBg = { lasts: "", recovered: "bg-amber-500/[0.04]", dry: "bg-red-500/[0.04]" }[state];
   return (
-    <li className={era.lasts ? "" : "bg-red-500/[0.04]"}>
+    <li className={rowBg}>
       <button
         onClick={onSelect}
         aria-expanded={selected}
@@ -51,12 +61,10 @@ function Row({
       >
         <div className="flex min-w-0 flex-1 items-center gap-3">
           <span
-            className={`grid h-6 w-6 shrink-0 place-items-center rounded-full text-xs font-bold ${
-              era.lasts ? "bg-emerald-500/15 text-emerald-400" : "bg-red-500/15 text-red-400"
-            }`}
+            className={`grid h-6 w-6 shrink-0 place-items-center rounded-full text-xs font-bold ${badgeClass}`}
             aria-hidden
           >
-            {era.lasts ? "✓" : "✕"}
+            {badge}
           </span>
           <div className="min-w-0">
             <div className="font-semibold text-white">{era.label}</div>
@@ -64,17 +72,21 @@ function Row({
           </div>
         </div>
         <div className="shrink-0 text-right">
-          {era.lasts ? (
+          {state === "lasts" ? (
             <div className="font-semibold text-emerald-400">lasts to {life}+</div>
+          ) : state === "recovered" ? (
+            <div className="font-semibold text-amber-400">short at {era.depletionAge}</div>
           ) : (
             <div className="font-semibold text-red-400">runs out at {era.depletionAge}</div>
           )}
           <div className="text-xs text-muted">
-            {era.lasts
+            {state === "lasts"
               ? era.cutYears > 0
                 ? `${era.cutYears} yr${era.cutYears === 1 ? "" : "s"} below plan (low ${fmtCurrency(Math.round(era.minLivingSpend))})`
                 : `dips to ${fmtCurrency(Math.max(0, Math.round(era.minBalance)))} at ${era.minAge}`
-              : `${yrsShort} yr${yrsShort === 1 ? "" : "s"} short of ${life}`}
+              : state === "recovered"
+                ? `${era.unfundedYears} lean yr${era.unfundedYears === 1 ? "" : "s"}, then recovers`
+                : `${yrsShort} yr${yrsShort === 1 ? "" : "s"} short of ${life}`}
           </div>
         </div>
       </button>
@@ -96,6 +108,11 @@ function Row({
               <dd className="mt-0.5 font-semibold text-white">{fmtCurrency(Math.max(0, Math.round(era.finalBalance)))}</dd>
             </div>
           </dl>
+          {era.recovered && (
+            <div className="border-t border-line bg-amber-500/[0.06] px-4 py-2 text-center text-xs text-amber-300/90">
+              A {era.unfundedYears}-year funding gap at age {era.depletionAge}: your accessible savings ran dry before super unlocked, so those years couldn&apos;t be fully funded — but the plan recovered and ended with money left.
+            </div>
+          )}
           {era.cutYears > 0 && (
             <div className="border-t border-line bg-amber-500/[0.06] px-4 py-2 text-center text-xs text-amber-300/90">
               The cost of flexing: spending stayed below plan for {era.cutYears} year{era.cutYears === 1 ? "" : "s"}, bottoming at {fmtCurrency(Math.round(era.minLivingSpend))} (−{Math.round(era.deepestCutPct)}%).
@@ -269,7 +286,9 @@ export default function StressTestView({
                       {result.survived === result.total
                         ? "Your plan lasts to life expectancy through every downturn on record — a resilient plan."
                         : result.worst
-                          ? `${result.worst.label} is the one that breaks it — your money runs out at age ${result.worst.depletionAge}.`
+                          ? result.worst.recovered
+                            ? `No downturn wipes you out — but ${result.worst.label} leaves ${result.worst.unfundedYears} year${result.worst.unfundedYears === 1 ? "" : "s"} around age ${result.worst.depletionAge} you couldn't fully fund before the plan recovers.`
+                            : `${result.worst.label} is the one that breaks it — your money runs out at age ${result.worst.depletionAge}.`
                           : ""}
                     </p>
                   </>

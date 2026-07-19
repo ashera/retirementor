@@ -5,7 +5,8 @@ import { fmtCompact, fmtCurrency } from "@/lib/au/format";
 import type { StressTestResult } from "@/lib/au/stresstest";
 
 // Overlaid balance-over-time: the smooth (no-shock) projection plus each era's path.
-// Survivors emerald, failures red; the selected era is highlighted, the rest faded.
+// Survivors emerald, a recovered funding gap amber, permanent run-outs red; the
+// selected era is highlighted, the rest faded.
 export default function StressChart({
   result,
   selectedId,
@@ -31,7 +32,7 @@ export default function StressChart({
       <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted">Balance through each downturn</div>
       <p className="mb-3 text-xs text-muted">
         Today&apos;s dollars. The bright line is your smooth projection; each faint line is one era&apos;s actual path —
-        {" "}red ones run dry. {selectedId ? "Selected era highlighted." : "Tap a row above to highlight one."}
+        {" "}amber dips then recovers, red runs dry. {selectedId ? "Selected era highlighted." : "Tap a row above to highlight one."}
       </p>
       <ResponsiveContainer width="100%" height={260}>
         <LineChart data={data} margin={{ top: 6, right: 8, bottom: 4, left: 8 }}>
@@ -54,7 +55,7 @@ export default function StressChart({
                 key={e.id}
                 type="monotone"
                 dataKey={e.id}
-                stroke={e.lasts ? "#34d399" : "#ef4444"}
+                stroke={e.lasts ? "#34d399" : e.recovered ? "#fbbf24" : "#ef4444"}
                 strokeWidth={sel ? 2.5 : 1}
                 strokeOpacity={dim ? 0.12 : sel ? 1 : 0.45}
                 dot={false}
