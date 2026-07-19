@@ -196,7 +196,7 @@ export default function StressTestView({
   const current = step < STRESS_ERAS.length ? STRESS_ERAS[step] : null;
   useEffect(() => {
     if (!result || step >= STRESS_ERAS.length) return;
-    const delay = 3000 + Math.floor(Math.random() * 2000); // 3–5s per test
+    const delay = 2000; // 2s per test
     const t = setTimeout(() => setStep((s) => s + 1), delay);
     return () => clearTimeout(t);
   }, [step, result]);
