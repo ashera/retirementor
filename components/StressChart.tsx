@@ -57,7 +57,7 @@ export default function StressChart({
     <div className="rounded-2xl border border-line bg-panel p-4">
       <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted">Balance through each downturn</div>
       <p className="mb-2 text-xs text-muted">
-        Today&apos;s dollars. The bright line is your smooth projection; each faint line is one era&apos;s actual path —
+        Today&apos;s dollars. Each faint line is one era&apos;s actual path —
         {" "}amber dips then recovers, red runs dry.{" "}
         {showBands
           ? `Selected era split into what you could actually spend vs super still locked away${
@@ -67,12 +67,18 @@ export default function StressChart({
             ? "Selected era highlighted."
             : "Tap a row above to highlight one."}
       </p>
-      {showBands && (
-        <div className="mb-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted">
+      <div className="mb-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted">
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block h-[3px] w-4 rounded-full" style={{ background: "#38bdf8" }} aria-hidden />
+          Your projection (no downturn)
+        </span>
+        {showBands && (
           <span className="flex items-center gap-1.5">
             <span className="inline-block h-2.5 w-3.5 rounded-sm" style={{ background: selColor, opacity: 0.5 }} aria-hidden />
             Spendable (outside super)
           </span>
+        )}
+        {showBands && (
           <span className="flex items-center gap-1.5">
             <span
               className="inline-block h-2.5 w-3.5 rounded-sm border border-slate-500/50"
@@ -81,8 +87,8 @@ export default function StressChart({
             />
             Locked in super
           </span>
-        </div>
-      )}
+        )}
+      </div>
       <ResponsiveContainer width="100%" height={260}>
         <ComposedChart data={data} margin={{ top: 6, right: 8, bottom: 4, left: 8 }}>
           <defs>
