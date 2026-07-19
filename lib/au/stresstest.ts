@@ -43,6 +43,10 @@ export const STRESS_ERAS: readonly StressEra[] = [
 export interface BalancePoint {
   age: number;
   total: number;
+  // What's actually spendable this year: outside-super plus super only once it has
+  // unlocked (preservation age). Before an early retiree's super unlocks, the locked
+  // super (total − spendable) is wealth you hold but legally can't draw — the bridge.
+  spendable: number;
 }
 
 export interface StressEraResult extends StressEra {
@@ -71,6 +75,7 @@ export interface StressTestResult {
   worst: StressEraResult | null;
   central: BalancePoint[]; // the smooth, no-shock projection (reference line)
   retireAge: number; // age the household begins retirement (chart marker)
+  superUnlockAge: number | null; // age preserved super unlocks after an early retirement begins (null if super is already accessible at retirement) — the end of the locked bridge
 }
 
 /** Build the nominal return path (percent per year) for one era: the plan's assumed
@@ -152,7 +157,13 @@ function summarise(era: StressEra, res: SimResult, retireStartAge: number, plan:
     minBalance,
     minAge,
     maxDrawdownPct: maxDD * 100,
-    path: res.rows.map((r) => ({ age: r.age, total: r.total })),
+    path: res.rows.map((r) => ({
+      age: r.age,
+      total: r.total,
+      // Super is locked until it unlocks (preservation age for an early retiree);
+      // before then only the outside pool is spendable.
+      spendable: res.superUnlockAge != null && r.age < res.superUnlockAge ? r.outside : r.total,
+    })),
     minLivingSpend,
     deepestCutPct: deepestCut * 100,
     cutYears,
@@ -179,6 +190,11 @@ export function runStressTest(plan: RetirementPlan, config: EngineConfig): Stres
     return a.finalBalance - b.finalBalance; // survivors: closest calls first
   });
   const survived = results.filter((r) => r.lasts).length;
-  const central = simulate(plan, config).rows.map((r) => ({ age: r.age, total: r.total }));
-  return { eras: results, survived, total: results.length, worst: results[0] ?? null, central, retireAge };
+  const centralRes = simulate(plan, config);
+  const central = centralRes.rows.map((r) => ({
+    age: r.age,
+    total: r.total,
+    spendable: centralRes.superUnlockAge != null && r.age < centralRes.superUnlockAge ? r.outside : r.total,
+  }));
+  return { eras: results, survived, total: results.length, worst: results[0] ?? null, central, retireAge, superUnlockAge: centralRes.superUnlockAge };
 }
