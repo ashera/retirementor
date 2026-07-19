@@ -326,12 +326,19 @@ export default function StressTestView({
                       <span aria-hidden>💡</span> Flexing spending survives {uplift} more of these downturn{uplift === 1 ? "" : "s"}.
                     </p>
                   )}
-                  {mode === "flex" && worstFlexCut && (
+                  {mode === "flex" && worstFlexCut && uplift > 0 && (
                     <p className="mt-2 text-sm text-amber-300/90">
                       <span aria-hidden>⚠</span> The catch: it only works if you actually make the cuts. In the toughest run
                       ({worstFlexCut.label}) that meant {worstFlexCut.cutYears} year
                       {worstFlexCut.cutYears === 1 ? "" : "s"} below plan, bottoming at{" "}
                       {fmtCurrency(Math.round(worstFlexCut.minLivingSpend))} (−{Math.round(worstFlexCut.deepestCutPct)}%).
+                    </p>
+                  )}
+                  {mode === "flex" && worstFlexCut && uplift === 0 && fixed && (
+                    <p className="mt-2 text-sm text-muted">
+                      Fixed spending already lasts through all {fixed.total} here, so flexing doesn&apos;t add safety — it
+                      just trims your spending in the downturns anyway (up to {worstFlexCut.cutYears} years below plan,
+                      down to {fmtCurrency(Math.round(worstFlexCut.minLivingSpend))}).
                     </p>
                   )}
                 </div>
@@ -371,22 +378,29 @@ export default function StressTestView({
                   );
                 })}
               </div>
-              <p className="mt-3 text-sm text-amber-300/90">
-                <span aria-hidden>⚠</span> The gap from {ladder.rows[0].survived}/{ladder.total} to {ladder.rows[3].survived}/
-                {ladder.total} is how much of your safety rests on cutting hard in a downturn — the part a Monte Carlo
-                just assumes you&apos;ll do.
-              </p>
+              {ladder.rows[0].survived > ladder.rows[3].survived ? (
+                <p className="mt-3 text-sm text-amber-300/90">
+                  <span aria-hidden>⚠</span> The gap from {ladder.rows[0].survived}/{ladder.total} to{" "}
+                  {ladder.rows[3].survived}/{ladder.total} is how much of your safety rests on cutting hard in a downturn —
+                  the part a Monte Carlo just assumes you&apos;ll do.
+                </p>
+              ) : (
+                <p className="mt-3 text-sm text-emerald-400/90">
+                  <span aria-hidden>✓</span> This plan lasts through every downturn even without cutting — its safety
+                  doesn&apos;t hinge on how flexible you&apos;d be.
+                </p>
+              )}
             </div>
           )}
 
           {/* Methodology / disclosure — spans both columns. */}
           <div className="mt-5 rounded-2xl border border-line bg-panel p-4">
             <p className="text-xs text-muted">
-              Each era replays its actual year-by-year real returns from the moment you retire, at full historical
-              severity, then reverts to your assumed return once the era&apos;s data runs out (1928–2025 US market
-              history, used as a proxy for a globally-diversified portfolio). It stresses the SEQUENCE of returns, not
-              your long-run return assumption. Past performance is not a guarantee of future performance. General
-              information only — not financial advice.{" "}
+              Each era replays its actual year-by-year real returns from the moment you retire — the crashes and the
+              recoveries as they happened — then reverts to your assumed return once the era&apos;s data runs out
+              (1928–2025 US market history, used as a proxy for a globally-diversified portfolio, so the era years use
+              history&apos;s return level rather than your dashboard assumption). Past performance is not a guarantee of
+              future performance. General information only — not financial advice.{" "}
               <button onClick={() => setAssumptionsOpen(true)} className="font-medium text-accent hover:underline">
                 Assumptions &amp; limitations →
               </button>

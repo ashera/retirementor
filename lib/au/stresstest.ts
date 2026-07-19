@@ -3,24 +3,21 @@
 // sequence-of-returns worst case (a crash just as drawdown begins).
 //
 // Methodology (see also historicalReturns.ts):
-//  - We overlay each era's real-return DEVIATIONS from history's own mean onto the
-//    plan's ASSUMED return, so the long-run drift stays the user's while the crash
-//    SHAPE is history's — not the US market's ~7% real level.
-//  - At FULL historical severity: a real −40% year stays −40% (not shrunk to the
-//    plan's volatility). That's deliberate — a stress test should use history's
-//    actual severity, which is harsher than the vol-scaled bootstrap Monte Carlo.
+//  - Each era replays its ACTUAL year-by-year real returns — crashes AND recoveries
+//    exactly as they happened (1928–2025 US market history, a proxy for a globally
+//    diversified portfolio). "Retire in 2008" runs the real 2008 sequence, so the
+//    strong 2009–21 recovery is fully reflected — not a weakened version.
 //  - Accumulation years (before retirement) run at the plan's normal return; the
 //    era hits at the retirement year. When an era's data runs out (e.g. 2008→2025),
-//    remaining years revert to the assumed return — so recent eras still test the
-//    crash + partial recovery, then normal.
-//  - The outside-super pool moves with the equity shock scaled by its own volatility
-//    (a cash-like pool doesn't crash as hard) — the same correlation model the MC uses.
+//    remaining years revert to the plan's assumed return.
+//  - The outside-super pool moves with the same real move scaled by its own
+//    volatility (a cash-like pool doesn't swing as hard) — the MC's correlation model.
 
 import type { RetirementPlan, SimResult } from "./types";
 import { householdRetirementOffset, spendingForAge } from "./types";
 import type { EngineConfig } from "./config";
 import { simulate } from "./simulate";
-import { HISTORICAL_REAL_EQUITY, HIST_START_YEAR, HISTORICAL_REAL_MEAN } from "./historicalReturns";
+import { HISTORICAL_REAL_EQUITY, HIST_START_YEAR } from "./historicalReturns";
 import { returnParams } from "./montecarlo";
 
 export interface StressEra {
@@ -73,8 +70,10 @@ export interface StressTestResult {
   retireAge: number; // age the household begins retirement (chart marker)
 }
 
-/** Build the nominal return path (percent per year) for one era: normal returns up
- *  to retirement, then the era's real deviations at full severity, then mean-revert. */
+/** Build the nominal return path (percent per year) for one era: the plan's assumed
+ *  return up to retirement, then the era's ACTUAL historical real returns, then the
+ *  assumed return again once the era's data runs out. Returns are nominal because the
+ *  engine deflates by the plan's inflation — so we gross each real figure up by it. */
 function eraReturnPath(
   plan: RetirementPlan,
   config: EngineConfig,
@@ -84,19 +83,23 @@ function eraReturnPath(
   const oldest = Math.max(...plan.people.map((x) => x.currentAge));
   const horizon = Math.max(0, plan.lifeExpectancy - oldest);
   const retireOffset = householdRetirementOffset(plan);
-  const scale = p.sd > 0 ? p.outsideSd / p.sd : 0; // outside pool's share of the equity shock
+  const infl = plan.inflation / 100;
+  const toNominal = (real: number) => 100 * ((1 + real) * (1 + infl) - 1); // deflates back to `real`
+  const scale = p.sd > 0 ? p.outsideSd / p.sd : 0; // outside pool's share of the market move
+  const superRealMean = (1 + p.mean / 100) / (1 + infl) - 1;
+  const outsideRealMean = (1 + p.outsideMean / 100) / (1 + infl) - 1;
   const returns = new Array<number>(horizon + 1);
   const outsideReturns = p.splitPools ? new Array<number>(horizon + 1) : undefined;
   for (let t = 0; t <= horizon; t++) {
-    let devPct = 0; // percentage-point real deviation from history's mean
-    if (t >= retireOffset) {
-      const idx = era.startYear - HIST_START_YEAR + (t - retireOffset);
-      if (idx >= 0 && idx < HISTORICAL_REAL_EQUITY.length) {
-        devPct = 100 * (HISTORICAL_REAL_EQUITY[idx] - HISTORICAL_REAL_MEAN);
-      }
+    const idx = t >= retireOffset ? era.startYear - HIST_START_YEAR + (t - retireOffset) : -1;
+    if (idx >= 0 && idx < HISTORICAL_REAL_EQUITY.length) {
+      const histReal = HISTORICAL_REAL_EQUITY[idx];
+      returns[t] = toNominal(histReal); // super pool: the actual historical real return
+      if (outsideReturns) outsideReturns[t] = toNominal(outsideRealMean + (histReal - superRealMean) * scale);
+    } else {
+      returns[t] = p.mean; // accumulation + post-era: the plan's assumed return
+      if (outsideReturns) outsideReturns[t] = p.outsideMean;
     }
-    returns[t] = p.mean + devPct;
-    if (outsideReturns) outsideReturns[t] = p.outsideMean + devPct * scale;
   }
   return { returns, outsideReturns, retireOffset };
 }
