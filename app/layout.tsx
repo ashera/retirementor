@@ -3,7 +3,9 @@ import "./globals.css";
 import Analytics from "@/components/Analytics";
 import FeedbackButton from "@/components/FeedbackButton";
 import FooterNav from "@/components/FooterNav";
+import Link from "next/link";
 import { SITE_URL, SITE_NAME, SITE_TAGLINE, SITE_DESCRIPTION } from "@/lib/site";
+import { APP_VERSION, GIT_SHA, BUILD_DATE } from "@/lib/version";
 
 const title = `${SITE_NAME} — ${SITE_TAGLINE}`;
 
@@ -76,6 +78,11 @@ export default function RootLayout({
             today&apos;s dollars using ASIC&apos;s default economic assumptions,
             and are not a guarantee of future outcomes. Consider obtaining
             advice from an AFS licensee before making any financial decision.
+          </p>
+          <p className="mx-auto mt-3 flex items-center justify-center gap-2 text-[11px] text-muted">
+            <Link href="/compliance" className="hover:text-slate-300">Compliance &amp; regulations</Link>
+            <span aria-hidden>·</span>
+            <span title={`${GIT_SHA} · ${BUILD_DATE}`}>v{APP_VERSION}</span>
           </p>
         </footer>
         <FeedbackButton />
