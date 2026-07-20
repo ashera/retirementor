@@ -14,6 +14,14 @@ export interface CaseStudyMeta {
 
 export const CASE_STUDIES: CaseStudyMeta[] = [
   {
+    slug: "retiring-into-a-market-crash",
+    title: "Retiring straight into a market crash — would your money survive?",
+    dek: "We replayed one $1.05M early-retirement plan against every major market crash of the last century. On fixed spending it survives just 2 of 7. Flexible spending lifts that to 5 — but only if you'd actually make the cuts.",
+    date: "2026-07-20",
+    readMinutes: 5,
+    published: true,
+  },
+  {
     slug: "will-the-cgt-changes-hurt-your-retirement",
     title: "Will the 2027 CGT changes hurt your retirement?",
     dek: "From 1 July 2027 the 50% capital gains tax discount is abolished. We modelled it: for whether your money lasts, the effect is minimal — though a large estate does take a real trim.",
