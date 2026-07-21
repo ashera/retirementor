@@ -8,6 +8,7 @@ import { retirementGoal } from "@/lib/au/goal";
 import { fmtCurrency } from "@/lib/au/format";
 import { track } from "@/lib/analytics";
 import RetirementChart, { type SpendingBand } from "@/components/RetirementChart";
+import { ageGapInfo } from "@/components/ageAxis";
 import IncomeChart from "@/components/IncomeChart";
 import FanChart from "@/components/FanChart";
 import ReportExplainers from "@/components/ReportExplainers";
@@ -289,7 +290,7 @@ export default function ReportView({
               : ` The “Depletes” marker is where savings run out (${result.depletedAge}).`}
           </Lead>
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-2">
-            <RetirementChart result={result} bands={bands} animate={false} height={200} wageInflationPct={wageInfl} cpiPct={plan.inflation} />
+            <RetirementChart result={result} bands={bands} animate={false} height={200} wageInflationPct={wageInfl} cpiPct={plan.inflation} ages={ageGapInfo(plan)} />
           </div>
         </Section>
 
@@ -308,7 +309,7 @@ export default function ReportView({
               down, the pension typically grows to fill the gap.
             </Lead>
             <div className="rounded-lg border border-slate-200 bg-slate-50 p-2">
-              <IncomeChart result={result} animate={false} height={175} />
+              <IncomeChart result={result} animate={false} height={175} ages={ageGapInfo(plan)} />
             </div>
           </Section>
 
@@ -444,7 +445,7 @@ export default function ReportView({
               the median outcome and the band the 10th–90th percentile.
             </Lead>
             <div className="rounded-lg border border-slate-200 bg-slate-50 p-2">
-              <FanChart fan={mc.fan} retirementAge={result.retirementAge} agePensionAge={result.agePensionAge} height={108} />
+              <FanChart fan={mc.fan} retirementAge={result.retirementAge} agePensionAge={result.agePensionAge} height={108} ages={ageGapInfo(plan)} />
             </div>
           </Section>
 

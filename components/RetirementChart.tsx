@@ -15,6 +15,7 @@ import type { SimResult, YearRow } from "@/lib/au/types";
 import { fmtCompact, fmtCurrency } from "@/lib/au/format";
 import { breakSpans, breakSpanLabel } from "@/lib/au/breakSpans";
 import { rowNetWorth } from "@/lib/au/networth";
+import { DualAgeTick, dualAgeLabel, type AgeGapInfo } from "@/components/ageAxis";
 
 export interface SpendingBand {
   x1: number;
@@ -63,11 +64,13 @@ function AssetsTooltip({
   payload,
   baselineLabel = "Saved plan",
   showHome = false,
+  ages = null,
 }: {
   active?: boolean;
   payload?: { payload: ChartRow }[];
   baselineLabel?: string;
   showHome?: boolean;
+  ages?: AgeGapInfo | null;
 }) {
   if (!active || !payload?.length) return null;
   const r = payload[0].payload;
@@ -75,7 +78,7 @@ function AssetsTooltip({
   const property = showHome ? Math.max(0, r.propertyNW ?? 0) : 0;
   return (
     <div className="rounded-lg border border-line bg-panel px-3 py-2 text-sm shadow-xl">
-      <div className="font-semibold text-white">Age {r.age}</div>
+      <div className="font-semibold text-white">{ages ? dualAgeLabel(ages, r.age) : `Age ${r.age}`}</div>
       {r.total !== undefined && (
         <div className="tabular-nums text-slate-200">
           {showHome ? "Net worth" : "Total"} {fmtCurrency(r.total + home + property)}
@@ -138,6 +141,7 @@ export default function RetirementChart({
   showHome = false,
   wageInflationPct,
   cpiPct,
+  ages = null,
 }: {
   result: SimResult;
   bands?: SpendingBand[];
@@ -152,6 +156,8 @@ export default function RetirementChart({
   // line is drawn on a single CPI basis so it stays continuous through retirement.
   wageInflationPct?: number;
   cpiPct?: number;
+  // Couple with an age gap → label the x-axis with both partners' ages.
+  ages?: AgeGapInfo | null;
 }) {
   const { retirementAge, partnerRetirementAge, depletedAge } = result;
 
@@ -284,6 +290,8 @@ export default function RetirementChart({
           fontSize={12}
           tickLine={false}
           axisLine={{ stroke: "#232c40" }}
+          height={ages ? 36 : undefined}
+          tick={ages ? <DualAgeTick gap={ages} /> : undefined}
         />
         <YAxis
           stroke="#8b97ad"
@@ -293,7 +301,7 @@ export default function RetirementChart({
           width={54}
           tickFormatter={fmtCompact}
         />
-        <Tooltip content={<AssetsTooltip baselineLabel={baselineLabel} showHome={showHome} />} />
+        <Tooltip content={<AssetsTooltip baselineLabel={baselineLabel} showHome={showHome} ages={ages} />} />
         {/* Both labels are CENTERED on their own line (insideTop → textAnchor
             middle at the line's x) so it's obvious which line each names, and
             they're staggered vertically (Retire on top, Pension a row lower) so

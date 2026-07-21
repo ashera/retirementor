@@ -11,6 +11,7 @@ import { essentialsFloor } from "@/lib/au/strategies";
 import { fmtCurrency } from "@/lib/au/format";
 import { track } from "@/lib/analytics";
 import StressChart from "@/components/StressChart";
+import { ageGapInfo } from "@/components/ageAxis";
 import AssumptionsModal from "@/components/AssumptionsModal";
 import CutDetailModal from "@/components/CutDetailModal";
 
@@ -365,7 +366,7 @@ export default function StressTestView({
                 </div>
               )}
 
-              <StressChart result={result} selectedId={selectedId} revealed={revealedIds} />
+              <StressChart result={result} selectedId={selectedId} revealed={revealedIds} ages={plan ? ageGapInfo(plan) : null} />
             </div>
           </div>
 

@@ -3,6 +3,7 @@
 import { ComposedChart, Line, Area, XAxis, YAxis, CartesianGrid, ReferenceLine, ReferenceDot, ResponsiveContainer, Tooltip } from "recharts";
 import { fmtCompact, fmtCurrency } from "@/lib/au/format";
 import type { StressTestResult } from "@/lib/au/stresstest";
+import { DualAgeTick, dualAgeLabel, type AgeGapInfo } from "@/components/ageAxis";
 
 // Overlaid balance-over-time: the smooth (no-shock) projection plus each era's path.
 // Survivors emerald, a recovered funding gap amber, permanent run-outs red; the
@@ -17,10 +18,12 @@ export default function StressChart({
   result,
   selectedId,
   revealed,
+  ages = null,
 }: {
   result: StressTestResult;
   selectedId: string | null;
   revealed?: Set<string>; // when set, only draw these eras' lines (progressive reveal)
+  ages?: AgeGapInfo | null; // couple with an age gap → dual-age x-axis
 }) {
   const eras = revealed ? result.eras.filter((e) => revealed.has(e.id)) : result.eras;
   const selEra = selectedId ? result.eras.find((e) => e.id === selectedId) : null;
@@ -31,10 +34,10 @@ export default function StressChart({
   const selColor = selEra ? (selEra.lasts ? "#34d399" : selEra.recovered ? "#fbbf24" : "#ef4444") : "#fbbf24";
 
   // Merge all series onto one row per age.
-  const ages = result.central.map((p) => p.age);
+  const rowAges = result.central.map((p) => p.age);
   const byId = new Map(result.eras.map((e) => [e.id, new Map(e.path.map((p) => [p.age, p.total]))]));
   const centralByAge = new Map(result.central.map((p) => [p.age, p.total]));
-  const data = ages.map((age) => {
+  const data = rowAges.map((age) => {
     const row: Record<string, number> = { age, central: Math.round(centralByAge.get(age) ?? 0) };
     for (const e of result.eras) row[e.id] = Math.round(byId.get(e.id)?.get(age) ?? 0);
     if (showBands && selByAge) {
@@ -98,12 +101,12 @@ export default function StressChart({
             </pattern>
           </defs>
           <CartesianGrid strokeDasharray="3 3" stroke="#232c40" vertical={false} />
-          <XAxis dataKey="age" stroke="#8b97ad" tick={{ fontSize: 11 }} tickMargin={6} />
+          <XAxis dataKey="age" stroke="#8b97ad" tick={ages ? <DualAgeTick gap={ages} /> : { fontSize: 11 }} tickMargin={6} height={ages ? 36 : undefined} />
           <YAxis stroke="#8b97ad" tick={{ fontSize: 11 }} width={44} tickFormatter={fmtCompact} />
           <Tooltip
             contentStyle={{ background: "#0f1523", border: "1px solid #232c40", borderRadius: 8, fontSize: 12 }}
             labelStyle={{ color: "#e2e8f0" }}
-            labelFormatter={(a) => `Age ${a}`}
+            labelFormatter={(a) => (ages ? dualAgeLabel(ages, Number(a)) : `Age ${a}`)}
             formatter={(v: number, name: string) => {
               if (name === "sel_spend") return [fmtCurrency(v), "Spendable"];
               if (name === "sel_lock") return [fmtCurrency(v), "Locked in super"];

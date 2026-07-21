@@ -14,6 +14,7 @@ import {
 } from "recharts";
 import type { SimResult, YearRow } from "@/lib/au/types";
 import { fmtCompact, fmtCurrency } from "@/lib/au/format";
+import { DualAgeTick, dualAgeLabel, type AgeGapInfo } from "@/components/ageAxis";
 import { breakSpans, breakSpanLabel } from "@/lib/au/breakSpans";
 
 // The tax the projection charges each year, re-sliced into non-overlapping types.
@@ -34,21 +35,22 @@ const catValue = (r: YearRow, key: string): number => {
 };
 const rowTotal = (r: YearRow): number => CATS.reduce((s, c) => s + catValue(r, c.key), 0);
 
-function TaxTooltip({ active, payload }: { active?: boolean; payload?: { payload: YearRow }[] }) {
+function TaxTooltip({ active, payload, ages = null }: { active?: boolean; payload?: { payload: YearRow }[]; ages?: AgeGapInfo | null }) {
   if (!active || !payload?.length) return null;
   const r = payload[0].payload;
+  const ageLabel = ages ? dualAgeLabel(ages, r.age) : `Age ${r.age}`;
   const total = rowTotal(r);
   if (total < 1) {
     return (
       <div className="rounded-lg border border-line bg-panel px-3 py-2 text-sm shadow-xl">
-        <div className="font-semibold text-white">Age {r.age}</div>
+        <div className="font-semibold text-white">{ageLabel}</div>
         <div className="text-muted">No tax this year</div>
       </div>
     );
   }
   return (
     <div className="rounded-lg border border-line bg-panel px-3 py-2 text-sm shadow-xl">
-      <div className="mb-0.5 font-semibold text-white">Age {r.age}</div>
+      <div className="mb-0.5 font-semibold text-white">{ageLabel}</div>
       {CATS.map((c) => {
         const v = catValue(r, c.key);
         return v < 1 ? null : (
@@ -70,11 +72,13 @@ export default function TaxChart({
   height = 200,
   animate = true,
   onSelectYear,
+  ages = null,
 }: {
   result: SimResult;
   height?: number;
   animate?: boolean;
   onSelectYear?: (age: number) => void;
+  ages?: AgeGapInfo | null;
 }) {
   const rows = result.rows;
   if (rows.length === 0 || rows.every((r) => rowTotal(r) < 1)) {
@@ -96,9 +100,9 @@ export default function TaxChart({
         style={onSelectYear ? { cursor: "pointer" } : undefined}
       >
         <CartesianGrid strokeDasharray="3 3" stroke="#232c40" vertical={false} />
-        <XAxis dataKey="age" stroke="#8b97ad" fontSize={12} tickLine={false} axisLine={{ stroke: "#232c40" }} />
+        <XAxis dataKey="age" stroke="#8b97ad" fontSize={12} tickLine={false} axisLine={{ stroke: "#232c40" }} height={ages ? 36 : undefined} tick={ages ? <DualAgeTick gap={ages} /> : undefined} />
         <YAxis stroke="#8b97ad" fontSize={12} tickLine={false} axisLine={false} width={54} tickFormatter={fmtCompact} />
-        <Tooltip content={<TaxTooltip />} />
+        <Tooltip content={<TaxTooltip ages={ages} />} />
         {breakSpans(rows).map((s) => (
           <ReferenceArea key={`brk-${s.from}`} x1={s.from} x2={s.to + 1} fill="#f59e0b" fillOpacity={0.08} stroke="#f59e0b" strokeOpacity={0.25} strokeDasharray="3 3"
             label={{ value: breakSpanLabel(s), position: "insideTop", fill: "#fbbf24", fontSize: 10 }} />

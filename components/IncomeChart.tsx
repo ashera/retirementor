@@ -13,14 +13,17 @@ import {
 } from "recharts";
 import type { SimResult, YearRow } from "@/lib/au/types";
 import { fmtCompact, fmtCurrency } from "@/lib/au/format";
+import { DualAgeTick, dualAgeLabel, type AgeGapInfo } from "@/components/ageAxis";
 import { breakSpans, breakSpanLabel } from "@/lib/au/breakSpans";
 
 function IncomeTooltip({
   active,
   payload,
+  ages = null,
 }: {
   active?: boolean;
   payload?: { payload: YearRow }[];
+  ages?: AgeGapInfo | null;
 }) {
   if (!active || !payload?.length) return null;
   const r = payload[0].payload;
@@ -38,7 +41,7 @@ function IncomeTooltip({
   const total = takeHome + work + r.agePension + r.superDrawn + r.outsideDrawn + rentRaw;
   return (
     <div className="rounded-lg border border-line bg-panel px-3 py-2 text-sm shadow-xl">
-      <div className="font-semibold text-white">Age {r.age}</div>
+      <div className="font-semibold text-white">{ages ? dualAgeLabel(ages, r.age) : `Age ${r.age}`}</div>
       {takeHome > 0 && (
         <div className="tabular-nums text-yellow-400">
           Take-home pay {fmtCurrency(takeHome)}
@@ -99,12 +102,14 @@ export default function IncomeChart({
   height = 220,
   onSelectYear,
   minDrawdownBands,
+  ages = null,
 }: {
   result: SimResult;
   animate?: boolean;
   height?: number;
   onSelectYear?: (age: number) => void;
   minDrawdownBands?: readonly { minAge: number; rate: number }[];
+  ages?: AgeGapInfo | null;
 }) {
   // Show the full timeline (income is $0 through the accumulation years) so this
   // chart's x-axis lines up with the balance chart above it.
@@ -138,6 +143,8 @@ export default function IncomeChart({
           fontSize={12}
           tickLine={false}
           axisLine={{ stroke: "#232c40" }}
+          height={ages ? 36 : undefined}
+          tick={ages ? <DualAgeTick gap={ages} /> : undefined}
         />
         <YAxis
           stroke="#8b97ad"
@@ -147,7 +154,7 @@ export default function IncomeChart({
           width={54}
           tickFormatter={fmtCompact}
         />
-        <Tooltip content={<IncomeTooltip />} />
+        <Tooltip content={<IncomeTooltip ages={ages} />} />
         {/* Career-break ("gap year") spans — shaded so a multi-year break reads as its
             full length (the stepped income bands sit half a column off their ticks). */}
         {breakSpans(rows).map((s) => (

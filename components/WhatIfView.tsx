@@ -27,6 +27,7 @@ import {
 } from "@/lib/au/strategies";
 import { toActiveScenario, fromActiveScenario } from "@/lib/au/scenario";
 import RetirementChart from "@/components/RetirementChart";
+import { ageGapInfo } from "@/components/ageAxis";
 import IncomeChart from "@/components/IncomeChart";
 import YearDetailModal from "@/components/YearDetailModal";
 import IncomeYearModal from "@/components/IncomeYearModal";
@@ -768,7 +769,7 @@ export default function WhatIfView({
 
         {chartView === "income" ? (
           <>
-            <IncomeChart result={compRes} height={300} animate={false} minDrawdownBands={config.minDrawdownBands} onSelectYear={setSelectedYear} />
+            <IncomeChart result={compRes} height={300} animate={false} minDrawdownBands={config.minDrawdownBands} onSelectYear={setSelectedYear} ages={ageGapInfo(composed)} />
             <div className="mt-3 flex flex-wrap gap-4">
               {incomeLegend.map((it) => (
                 <span key={it.l} className="flex items-center gap-1.5 text-xs text-muted">
@@ -796,6 +797,7 @@ export default function WhatIfView({
               height={300}
               wageInflationPct={composed.inflation + (config.livingStandardsGrowthPct ?? 0)}
               cpiPct={composed.inflation}
+              ages={ageGapInfo(composed)}
             />
             <div className="mt-3 flex flex-wrap gap-4">
               {[

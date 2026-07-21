@@ -17,7 +17,9 @@ import {
   getCareerBreaks,
   getInvestmentProperties,
   hasStaggeredRetirement,
+  householdHorizon,
   householdRetirementOffset,
+  oldestCurrentAge,
   personRetirementAge,
   personRetirementOffset,
   spendingForAge,
@@ -155,8 +157,10 @@ export function simulate(
     };
   };
 
-  const startOldest = Math.max(...plan.people.map((p) => p.currentAge));
-  const horizon = Math.max(0, Math.round(plan.lifeExpectancy - startOldest));
+  const startOldest = oldestCurrentAge(plan);
+  // Run until the YOUNGEST reaches life expectancy (the timeline is still indexed by
+  // the oldest's age, which therefore runs past LE in the tail — the survivor's years).
+  const horizon = householdHorizon(plan);
   // Per-person retirement offsets (years from now). The household enters the
   // retirement/spending phase at the EARLIEST of them; a partner retiring later
   // keeps earning and contributing through the gap (their salary offsets the

@@ -14,7 +14,7 @@
 //    volatility (a cash-like pool doesn't swing as hard) — the MC's correlation model.
 
 import type { RetirementPlan, SimResult } from "./types";
-import { householdRetirementOffset, spendingForAge } from "./types";
+import { householdHorizon, householdRetirementOffset, spendingForAge } from "./types";
 import type { EngineConfig } from "./config";
 import { simulate } from "./simulate";
 import { HISTORICAL_REAL_EQUITY, HIST_START_YEAR } from "./historicalReturns";
@@ -88,8 +88,7 @@ function eraReturnPath(
   era: StressEra,
 ): { returns: number[]; outsideReturns?: number[]; retireOffset: number } {
   const p = returnParams(plan, config);
-  const oldest = Math.max(...plan.people.map((x) => x.currentAge));
-  const horizon = Math.max(0, plan.lifeExpectancy - oldest);
+  const horizon = householdHorizon(plan);
   const retireOffset = householdRetirementOffset(plan);
   const infl = plan.inflation / 100;
   const toNominal = (real: number) => 100 * ((1 + real) * (1 + infl) - 1); // deflates back to `real`

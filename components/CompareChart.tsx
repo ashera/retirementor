@@ -3,6 +3,7 @@
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { SimResult } from "@/lib/au/types";
 import { fmtCompact, fmtCurrency } from "@/lib/au/format";
+import { DualAgeTick, dualAgeLabel, type AgeGapInfo } from "@/components/ageAxis";
 
 export interface CompareSeries {
   id: string;
@@ -16,16 +17,18 @@ function CompareTooltip({
   payload,
   label,
   series,
+  ages = null,
 }: {
   active?: boolean;
   payload?: { dataKey: string; value: number }[];
   label?: number;
   series: CompareSeries[];
+  ages?: AgeGapInfo | null;
 }) {
   if (!active || !payload?.length) return null;
   return (
     <div className="rounded-lg border border-line bg-panel px-3 py-2 text-xs shadow-xl">
-      <div className="font-semibold text-white">Age {label}</div>
+      <div className="font-semibold text-white">{ages && label != null ? dualAgeLabel(ages, label) : `Age ${label}`}</div>
       {series.map((s) => {
         const p = payload.find((x) => x.dataKey === s.id);
         if (p?.value === undefined) return null;
@@ -45,10 +48,12 @@ export default function CompareChart({
   series,
   height = 300,
   onSelectYear,
+  ages = null,
 }: {
   series: CompareSeries[];
   height?: number;
   onSelectYear?: (age: number) => void;
+  ages?: AgeGapInfo | null;
 }) {
   // Merge all scenarios' totals into one row per age.
   const byAge = new Map<number, Record<string, number>>();
@@ -73,9 +78,9 @@ export default function CompareChart({
         style={onSelectYear ? { cursor: "pointer" } : undefined}
       >
         <CartesianGrid strokeDasharray="3 3" stroke="#232c40" vertical={false} />
-        <XAxis dataKey="age" stroke="#8b97ad" fontSize={12} tickLine={false} axisLine={{ stroke: "#232c40" }} />
+        <XAxis dataKey="age" stroke="#8b97ad" fontSize={12} tickLine={false} axisLine={{ stroke: "#232c40" }} height={ages ? 36 : undefined} tick={ages ? <DualAgeTick gap={ages} /> : undefined} />
         <YAxis stroke="#8b97ad" fontSize={12} tickLine={false} axisLine={false} width={54} tickFormatter={fmtCompact} />
-        <Tooltip content={<CompareTooltip series={series} />} />
+        <Tooltip content={<CompareTooltip series={series} ages={ages} />} />
         {series.map((s) => (
           <Line
             key={s.id}

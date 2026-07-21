@@ -7,7 +7,7 @@
 import { simulate } from "./simulate";
 import { mulberry32, returnParams, sampleReturnPath } from "./montecarlo";
 import { budgetSplit, presetCategories } from "./budget";
-import { householdRetirementOffset } from "./types";
+import { householdHorizon, householdRetirementOffset } from "./types";
 import type { EngineConfig } from "./config";
 import type { RetirementPlan } from "./types";
 
@@ -48,8 +48,7 @@ export function guardrailsOutlook(
   // — bootstrap by default), so the guardrails outlook is consistent with the success
   // rate shown beside it rather than silently running its own Gaussian.
   const params = returnParams(plan, config);
-  const startOldest = Math.max(...plan.people.map((p) => p.currentAge));
-  const horizon = Math.max(0, Math.round(plan.lifeExpectancy - startOldest));
+  const horizon = householdHorizon(plan);
 
   const minSpends: number[] = [];
   const yearsBelow: number[] = [];
@@ -124,8 +123,7 @@ export function guardrailsTimeline(
 ): GuardrailsTimeline {
   const dip = opts?.dip ?? -12; // annual return through the downturn
   const dipYears = opts?.dipYears ?? 3;
-  const startOldest = Math.max(...plan.people.map((p) => p.currentAge));
-  const horizon = Math.max(0, Math.round(plan.lifeExpectancy - startOldest));
+  const horizon = householdHorizon(plan);
   // Anchor the downturn to RETIREMENT (not the sim start) — the story is "retire
   // straight into a crash", so it must bite the first years of drawdown even when
   // the plan still has accumulation years to run.

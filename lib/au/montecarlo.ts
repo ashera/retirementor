@@ -5,7 +5,7 @@
 
 import { simulate } from "./simulate";
 import { bootstrapShockPath } from "./historicalReturns";
-import { householdRetirementOffset } from "./types";
+import { householdHorizon, householdRetirementOffset, oldestCurrentAge } from "./types";
 import type { EngineConfig } from "./config";
 import type { RetirementPlan } from "./types";
 
@@ -126,8 +126,8 @@ export function runMonteCarlo(
   const rand = mulberry32(opts?.seed ?? 0x9e3779b9);
   const params = returnParams(plan, config, opts);
 
-  const startOldest = Math.max(...plan.people.map((p) => p.currentAge));
-  const horizon = Math.max(0, Math.round(plan.lifeExpectancy - startOldest));
+  const startOldest = oldestCurrentAge(plan); // rows are indexed by the oldest's age
+  const horizon = householdHorizon(plan); // …but we simulate until the youngest reaches LE
 
   // totalsByYear[t] collects the total balance at each age across all runs.
   const totalsByYear: number[][] = Array.from({ length: horizon + 1 }, () => []);

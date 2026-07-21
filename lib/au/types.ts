@@ -261,6 +261,22 @@ export function hasStaggeredRetirement(plan: RetirementPlan): boolean {
   return plan.people.some((_, i) => personRetirementOffset(plan, i) !== first);
 }
 
+/** The oldest member's current age — the projection's timeline is indexed by this,
+ *  so `YearRow.age` and every chart's x-axis run in the oldest person's age. */
+export function oldestCurrentAge(plan: RetirementPlan): number {
+  return Math.max(...plan.people.map((p) => p.currentAge));
+}
+
+/** Number of years to simulate: run until the YOUNGEST member reaches life
+ *  expectancy, so a couple with an age gap is projected long enough to fund the
+ *  longer-lived partner. The timeline is still indexed by the oldest person's age
+ *  (which therefore exceeds `lifeExpectancy` in the tail — the survivor's years).
+ *  For a single, or a couple of the same age, this equals the old LE − age. */
+export function householdHorizon(plan: RetirementPlan): number {
+  const youngest = Math.min(...plan.people.map((p) => p.currentAge));
+  return Math.max(0, Math.round(plan.lifeExpectancy - youngest));
+}
+
 /** Household spending for a given age, honouring the flat/staged mode. */
 export function spendingForAge(plan: RetirementPlan, age: number): number {
   if (plan.spendingMode !== "stages") return plan.targetSpending;

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import StatCard from "@/components/StatCard";
 import RetirementChart from "@/components/RetirementChart";
+import { ageGapInfo } from "@/components/ageAxis";
 import YearDetailModal from "@/components/YearDetailModal";
 import IncomeYearModal from "@/components/IncomeYearModal";
 import IncomeChart from "@/components/IncomeChart";
@@ -1326,6 +1327,7 @@ export default function PlannerApp({
           selectedAge={selectedAge}
           wageInflationPct={plan.inflation + (config.livingStandardsGrowthPct ?? 0)}
           cpiPct={plan.inflation}
+          ages={ageGapInfo(plan)}
         />
         <p className="mt-2 text-center text-xs text-muted">
           Tip: click any year for a full breakdown of income, tax and spending.
@@ -1506,6 +1508,7 @@ export default function PlannerApp({
             track("Year breakdown opened", { chart: "income" });
             setIncomeAge(age);
           }}
+          ages={ageGapInfo(plan)}
         />
         <p className="mt-2 text-center text-xs text-muted">
           Dotted lines mark where super&apos;s <strong>minimum drawdown</strong> rate steps up (5% → 6% → 7%…) — the law
@@ -1534,6 +1537,7 @@ export default function PlannerApp({
               track("Year breakdown opened", { chart: "tax" });
               setTaxAge(age);
             }}
+            ages={ageGapInfo(plan)}
           />
           <p className="mt-2 text-center text-xs text-muted">
             Every tax the projection charges, by type. Super pension drawdowns and the Age Pension are tax-free, so tax
@@ -1693,6 +1697,7 @@ export default function PlannerApp({
           retirementAge={result.retirementAge}
           agePensionAge={result.agePensionAge}
           onSelectAge={setFanAge}
+          ages={ageGapInfo(plan)}
         />
         <p className="mt-1 text-center text-xs text-muted">
           Click a year to see the range of possible outcomes — and why they spread.

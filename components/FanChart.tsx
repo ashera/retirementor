@@ -12,6 +12,7 @@ import {
 } from "recharts";
 import type { FanPoint } from "@/lib/au/montecarlo";
 import { fmtCompact, fmtCurrency } from "@/lib/au/format";
+import { DualAgeTick, dualAgeLabel, type AgeGapInfo } from "@/components/ageAxis";
 
 interface FanRow {
   age: number;
@@ -23,15 +24,17 @@ interface FanRow {
 function FanTooltip({
   active,
   payload,
+  ages = null,
 }: {
   active?: boolean;
   payload?: { payload: FanRow }[];
+  ages?: AgeGapInfo | null;
 }) {
   if (!active || !payload?.length) return null;
   const r = payload[0].payload;
   return (
     <div className="rounded-lg border border-line bg-panel px-3 py-2 text-sm shadow-xl">
-      <div className="font-semibold text-white">Age {r.age}</div>
+      <div className="font-semibold text-white">{ages ? dualAgeLabel(ages, r.age) : `Age ${r.age}`}</div>
       <div className="tabular-nums text-emerald-400">
         Median {fmtCurrency(r.p50)}
       </div>
@@ -48,12 +51,14 @@ export default function FanChart({
   agePensionAge,
   height = 280,
   onSelectAge,
+  ages = null,
 }: {
   fan: FanPoint[];
   retirementAge: number;
   agePensionAge: number;
   height?: number;
   onSelectAge?: (age: number) => void;
+  ages?: AgeGapInfo | null;
 }) {
   const data: FanRow[] = fan.map((f) => ({
     age: f.age,
@@ -86,6 +91,8 @@ export default function FanChart({
           fontSize={12}
           tickLine={false}
           axisLine={{ stroke: "#232c40" }}
+          height={ages ? 36 : undefined}
+          tick={ages ? <DualAgeTick gap={ages} /> : undefined}
         />
         <YAxis
           stroke="#8b97ad"
@@ -95,7 +102,7 @@ export default function FanChart({
           width={54}
           tickFormatter={fmtCompact}
         />
-        <Tooltip content={<FanTooltip />} />
+        <Tooltip content={<FanTooltip ages={ages} />} />
         <ReferenceLine
           x={retirementAge}
           stroke="#f59e0b"

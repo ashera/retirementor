@@ -15,6 +15,7 @@ import { runMonteCarlo, MC_CONFIDENCE_TARGET } from "@/lib/au/montecarlo";
 import { fmtCurrency } from "@/lib/au/format";
 import { averageSuperForAge } from "@/lib/au/averageSuper";
 import RetirementChart from "@/components/RetirementChart";
+import { ageGapInfo } from "@/components/ageAxis";
 import IncomeChart from "@/components/IncomeChart";
 import FanChart from "@/components/FanChart";
 import Field from "@/components/Field";
@@ -348,7 +349,7 @@ export default function GuidedIntro({
           {salaryReady ? (
             <>
               <div className="mt-3">
-                <RetirementChart result={result} animate height={230} wageInflationPct={plan.inflation + (config.livingStandardsGrowthPct ?? 0)} cpiPct={plan.inflation} />
+                <RetirementChart result={result} animate height={230} wageInflationPct={plan.inflation + (config.livingStandardsGrowthPct ?? 0)} cpiPct={plan.inflation} ages={ageGapInfo(plan)} />
               </div>
               <p className="mt-2 text-center text-sm">
                 Projected super at retirement: <strong className="text-accent">{money(result.superAtRetirement)}</strong> at age {result.retirementAge}
@@ -428,7 +429,7 @@ export default function GuidedIntro({
             </div>
           </div>
           <div className="mt-4">
-            <IncomeChart result={result} animate height={190} />
+            <IncomeChart result={result} animate height={190} ages={ageGapInfo(plan)} />
           </div>
           <p className={`mt-3 rounded-xl border border-line bg-panel-2 px-4 py-3 text-sm ${tone}`}>
             {lasts
@@ -454,7 +455,7 @@ export default function GuidedIntro({
             and bad.
           </p>
           <div className="mt-3">
-            <FanChart fan={mc.fan} retirementAge={result.retirementAge} agePensionAge={result.agePensionAge} height={200} />
+            <FanChart fan={mc.fan} retirementAge={result.retirementAge} agePensionAge={result.agePensionAge} height={200} ages={ageGapInfo(plan)} />
           </div>
           <p className={`mt-2 text-center text-sm ${mcTone}`}>
             Your target is fully covered in about <strong>{successPct} of every 100</strong> of them.

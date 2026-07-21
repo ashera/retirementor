@@ -13,6 +13,7 @@ import { fmtCurrency } from "@/lib/au/format";
 import { track } from "@/lib/analytics";
 import type { SavedPlan } from "@/app/actions/plans";
 import CompareChart, { type CompareSeries } from "@/components/CompareChart";
+import { ageGapInfo } from "@/components/ageAxis";
 import VariantEditor, { type CompareColumn } from "@/components/VariantEditor";
 
 const COLORS = ["#34d399", "#38bdf8", "#f59e0b", "#a78bfa", "#f472b6", "#22d3ee"];
@@ -196,7 +197,7 @@ export default function CompareView({ config, savedPlans }: { config: EngineConf
       {/* Overlaid balance chart */}
       <div className="rounded-2xl border border-line bg-panel p-6">
         <h2 className="mb-4 font-semibold text-white">Balance over time (today&apos;s dollars)</h2>
-        <CompareChart series={series} />
+        <CompareChart series={series} ages={current ? ageGapInfo(current) : null} />
         <div className="mt-3 flex flex-wrap gap-4">
           {computed.map((c) => (
             <span key={c.id} className="flex items-center gap-1.5 text-xs text-muted">
