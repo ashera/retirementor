@@ -294,7 +294,7 @@ export default function RetirementChart({
           fontSize={12}
           tickLine={false}
           axisLine={{ stroke: "#232c40" }}
-          height={ages ? 36 : undefined}
+          height={ages ? 36 : 24}
           tick={ages ? <DualAgeTick gap={ages} /> : undefined}
         />
         <YAxis

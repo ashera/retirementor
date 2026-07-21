@@ -101,7 +101,7 @@ export default function StressChart({
             </pattern>
           </defs>
           <CartesianGrid strokeDasharray="3 3" stroke="#232c40" vertical={false} />
-          <XAxis dataKey="age" stroke="#8b97ad" tick={ages ? <DualAgeTick gap={ages} /> : { fontSize: 11 }} tickMargin={6} height={ages ? 36 : undefined} />
+          <XAxis dataKey="age" stroke="#8b97ad" tick={ages ? <DualAgeTick gap={ages} /> : { fontSize: 11 }} tickMargin={6} height={ages ? 36 : 24} />
           <YAxis stroke="#8b97ad" tick={{ fontSize: 11 }} width={44} tickFormatter={fmtCompact} />
           <Tooltip
             contentStyle={{ background: "#0f1523", border: "1px solid #232c40", borderRadius: 8, fontSize: 12 }}

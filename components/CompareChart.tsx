@@ -78,7 +78,7 @@ export default function CompareChart({
         style={onSelectYear ? { cursor: "pointer" } : undefined}
       >
         <CartesianGrid strokeDasharray="3 3" stroke="#232c40" vertical={false} />
-        <XAxis dataKey="age" stroke="#8b97ad" fontSize={12} tickLine={false} axisLine={{ stroke: "#232c40" }} height={ages ? 36 : undefined} tick={ages ? <DualAgeTick gap={ages} /> : undefined} />
+        <XAxis dataKey="age" stroke="#8b97ad" fontSize={12} tickLine={false} axisLine={{ stroke: "#232c40" }} height={ages ? 36 : 24} tick={ages ? <DualAgeTick gap={ages} /> : undefined} />
         <YAxis stroke="#8b97ad" fontSize={12} tickLine={false} axisLine={false} width={54} tickFormatter={fmtCompact} />
         <Tooltip content={<CompareTooltip series={series} ages={ages} />} />
         {series.map((s) => (
