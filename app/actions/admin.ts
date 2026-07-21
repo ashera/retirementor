@@ -1,5 +1,6 @@
 "use server";
 
+import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { query, withTransaction } from "@/lib/db";
 import { getAdmin } from "@/lib/auth";
@@ -33,6 +34,25 @@ export async function adminGetPlanData(
   const row = r.rows[0];
   if (!row) return { error: "Plan not found." };
   return { ok: true, name: row.name, data: row.data };
+}
+
+/** Get (or mint) a read-only share token for any user's saved scenario (admin only)
+ *  — so support can hand the scenario to Claude via GET /api/s/<token>. Idempotent:
+ *  reuses an existing token. The token is a revocable capability (owner or admin can
+ *  clear it); it exposes nothing the /s/<token> page doesn't. */
+export async function adminShareLink(planId: string): Promise<{ ok?: boolean; token?: string; error?: string }> {
+  const admin = await getAdmin();
+  if (!admin) return { error: "Not authorised." };
+  const existing = await query<{ share_token: string | null }>(
+    "select share_token from plans where id = $1",
+    [planId],
+  );
+  if (!existing.rows[0]) return { error: "Plan not found." };
+  const current = existing.rows[0].share_token;
+  if (current) return { ok: true, token: current };
+  const token = randomBytes(24).toString("base64url");
+  await query("update plans set share_token = $1 where id = $2", [token, planId]);
+  return { ok: true, token };
 }
 
 /** Delete any user's saved scenario by id (admin only). */
