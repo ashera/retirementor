@@ -24,6 +24,25 @@ export interface SpendingBand {
   fill: string;
 }
 
+// A multi-line, centred reference-line label (Recharts calls this render fn with the
+// line's viewBox). Used to wrap longer marker text ("You Age" / "Pension") so it
+// doesn't sprawl across the axis.
+function stackedLabel(lines: string[], fill: string, topOffset = 16) {
+  return function RefLabel(props: { viewBox?: { x?: number; y?: number } }) {
+    const x = props.viewBox?.x ?? 0;
+    const y = (props.viewBox?.y ?? 0) + topOffset;
+    return (
+      <text x={x} y={y} fill={fill} fontSize={11} textAnchor="middle">
+        {lines.map((ln, i) => (
+          <tspan key={ln} x={x} dy={i === 0 ? 0 : 12}>
+            {ln}
+          </tspan>
+        ))}
+      </text>
+    );
+  };
+}
+
 type ChartRow = Partial<YearRow> & {
   age: number;
   baselineTotal?: number;
@@ -314,7 +333,7 @@ export default function RetirementChart({
               position: "insideTop",
               fill: "#38bdf8",
               fontSize: 11,
-              dy: 40,
+              dy: 52,
             }}
           />
         )}
@@ -334,7 +353,7 @@ export default function RetirementChart({
             x={youPensionX}
             stroke="#a78bfa"
             strokeDasharray="6 4"
-            label={{ value: "You pension", position: "insideTop", fill: "#a78bfa", fontSize: 11, dy: 22 }}
+            label={stackedLabel(["You Age", "Pension"], "#a78bfa", 26)}
           />
         )}
         {ages && partnerPensionX != null && (
@@ -342,7 +361,7 @@ export default function RetirementChart({
             x={partnerPensionX}
             stroke="#a78bfa"
             strokeDasharray="6 4"
-            label={{ value: "Partner pension", position: "insideTop", fill: "#a78bfa", fontSize: 11, dy: 22 }}
+            label={stackedLabel(["Partner Age", "Pension"], "#a78bfa", 26)}
           />
         )}
         {depletedAge !== null && (
