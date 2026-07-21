@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { EngineConfig } from "@/lib/au/config";
-import { getInvestmentProperties, hasStaggeredRetirement, personRetirementAge, type RetirementPlan, type SimResult } from "@/lib/au/types";
+import { getInvestmentProperties, hasStaggeredRetirement, householdHorizon, householdRetirementOffset, oldestCurrentAge, personRetirementAge, type RetirementPlan, type SimResult } from "@/lib/au/types";
 import type { MonteCarloResult } from "@/lib/au/montecarlo";
 import { retirementGoal } from "@/lib/au/goal";
 import { fmtCurrency } from "@/lib/au/format";
@@ -110,11 +110,13 @@ export default function ReportView({
   const staged = plan.spendingMode === "stages";
   const stg = plan.spendingStages;
   const stageColor: Record<string, string> = { "Go-go": "#0d9488", "Slow-go": "#d97706", "No-go": "#7c3aed", Retirement: "#0d9488" };
+  const bandRetireStart = oldestCurrentAge(plan) + householdRetirementOffset(plan);
+  const bandAxisEnd = oldestCurrentAge(plan) + householdHorizon(plan);
   const bands: SpendingBand[] | undefined = staged
     ? [
-        { x1: plan.retirementAge, x2: stg.slowGoAge, label: "Go-go Years", fill: "#0d9488" },
+        { x1: bandRetireStart, x2: stg.slowGoAge, label: "Go-go Years", fill: "#0d9488" },
         { x1: stg.slowGoAge, x2: stg.noGoAge, label: "Slow-go Years", fill: "#d97706" },
-        { x1: stg.noGoAge, x2: plan.lifeExpectancy, label: "No-go Years", fill: "#7c3aed" },
+        { x1: stg.noGoAge, x2: bandAxisEnd, label: "No-go Years", fill: "#7c3aed" },
       ].filter((b) => b.x2 > b.x1)
     : undefined;
   const ls = lifestageBreakdown(plan, config);

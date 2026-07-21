@@ -160,6 +160,13 @@ export default function RetirementChart({
   ages?: AgeGapInfo | null;
 }) {
   const { retirementAge, partnerRetirementAge, depletedAge } = result;
+  // Markers sit on the OLDEST-person age axis, but each partner's OWN retirement age
+  // must be shifted by the age gap to land on the right year (a person retires when
+  // the oldest is `anchor + their offset-from-now`). For singles / same-age couples
+  // `ages` is null and these equal the raw ages.
+  const retireX = ages ? ages.anchor + (retirementAge - ages.you0) : retirementAge;
+  const partnerRetireX =
+    ages && partnerRetirementAge != null ? ages.anchor + (partnerRetirementAge - ages.partner0) : partnerRetirementAge;
 
   // The engine expresses accumulation in wage-indexed dollars and re-bases the
   // stock to CPI dollars at retirement (retiree spending and the Age Pension both
@@ -308,11 +315,11 @@ export default function RetirementChart({
             they never overlap even when the ages coincide (e.g. retire 65 vs
             pension 67, or identical). */}
         <ReferenceLine
-          x={retirementAge}
+          x={retireX}
           stroke="#f59e0b"
           strokeDasharray="6 4"
           label={{
-            value: partnerRetirementAge != null ? `You ${retirementAge}` : `Retire ${retirementAge}`,
+            value: partnerRetirementAge != null ? "You retire" : "Retire",
             position: "insideTop",
             fill: "#f59e0b",
             fontSize: 11,
@@ -321,11 +328,11 @@ export default function RetirementChart({
         />
         {partnerRetirementAge != null && (
           <ReferenceLine
-            x={partnerRetirementAge}
+            x={partnerRetireX ?? undefined}
             stroke="#38bdf8"
             strokeDasharray="6 4"
             label={{
-              value: `Partner ${partnerRetirementAge}`,
+              value: "Partner retires",
               position: "insideTop",
               fill: "#38bdf8",
               fontSize: 11,
@@ -338,7 +345,7 @@ export default function RetirementChart({
           stroke="#a78bfa"
           strokeDasharray="6 4"
           label={{
-            value: `Age Pension ${result.agePensionAge}`,
+            value: "Age Pension",
             position: "insideTop",
             fill: "#a78bfa",
             fontSize: 11,
@@ -358,11 +365,7 @@ export default function RetirementChart({
               <WrappedLabel
                 viewBox={props.viewBox}
                 fill="#facc15"
-                lines={
-                  result.superUnlockIsPartner
-                    ? ["Partner super", `unlocks ${result.superUnlockAge}`]
-                    : ["Super unlocks", `${result.superUnlockAge}`]
-                }
+                lines={result.superUnlockIsPartner ? ["Partner super", "unlocks"] : ["Super unlocks"]}
               />
             )}
           />

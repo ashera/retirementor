@@ -60,6 +60,9 @@ import WithdrawalRateCard from "@/components/WithdrawalRateCard";
 import {
   DEFAULT_PLAN,
   hasInvestmentProperty,
+  householdHorizon,
+  householdRetirementOffset,
+  oldestCurrentAge,
   spendingRange,
   type RetirementPlan,
 } from "@/lib/au/types";
@@ -794,11 +797,17 @@ export default function PlannerApp({
         ? "between the ASFA ‘modest’ and ‘comfortable’ standards"
         : "below the ASFA ‘modest’ standard";
 
+  // Bands live on the OLDEST-person age axis: the go-go phase starts at household
+  // retirement (first to retire), and no-go runs to the axis end (the younger
+  // partner's life expectancy). The slow/no-go boundaries are already oldest-age
+  // (spendingForAge keys off the oldest's age).
+  const bandRetireStart = oldestCurrentAge(plan) + householdRetirementOffset(plan);
+  const bandAxisEnd = oldestCurrentAge(plan) + householdHorizon(plan);
   const stageBands = isStaged
     ? [
-        { x1: plan.retirementAge, x2: stages.slowGoAge, label: "Go-go Years", fill: "#34d399" },
+        { x1: bandRetireStart, x2: stages.slowGoAge, label: "Go-go Years", fill: "#34d399" },
         { x1: stages.slowGoAge, x2: stages.noGoAge, label: "Slow-go Years", fill: "#f59e0b" },
-        { x1: stages.noGoAge, x2: plan.lifeExpectancy, label: "No-go Years", fill: "#a78bfa" },
+        { x1: stages.noGoAge, x2: bandAxisEnd, label: "No-go Years", fill: "#a78bfa" },
       ].filter((b) => b.x2 > b.x1)
     : undefined;
 

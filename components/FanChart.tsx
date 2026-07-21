@@ -104,7 +104,7 @@ export default function FanChart({
         />
         <Tooltip content={<FanTooltip ages={ages} />} />
         <ReferenceLine
-          x={retirementAge}
+          x={ages ? ages.anchor + (retirementAge - ages.you0) : retirementAge}
           stroke="#f59e0b"
           strokeDasharray="6 4"
           strokeOpacity={0.6}
