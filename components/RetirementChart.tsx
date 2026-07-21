@@ -24,6 +24,25 @@ export interface SpendingBand {
   fill: string;
 }
 
+// A multi-line, centred reference-line label (Recharts calls this render fn with the
+// line's viewBox). Used to wrap longer marker text ("You Age" / "Pension") so it
+// doesn't sprawl across the axis.
+function stackedLabel(lines: string[], fill: string, topOffset = 16) {
+  return function RefLabel(props: { viewBox?: { x?: number; y?: number } }) {
+    const x = props.viewBox?.x ?? 0;
+    const y = (props.viewBox?.y ?? 0) + topOffset;
+    return (
+      <text x={x} y={y} fill={fill} fontSize={11} textAnchor="middle">
+        {lines.map((ln, i) => (
+          <tspan key={ln} x={x} dy={i === 0 ? 0 : 12}>
+            {ln}
+          </tspan>
+        ))}
+      </text>
+    );
+  };
+}
+
 type ChartRow = Partial<YearRow> & {
   age: number;
   baselineTotal?: number;
@@ -199,23 +218,7 @@ export default function RetirementChart({
   // over the Transfer Balance Cap); otherwise it's one clean super band as before.
   const hasSplit = result.rows.some((r) => (r.breakdown?.accumSuper ?? 0) > 1);
 
-  // Life-event markers. Inline labels collide with each other and the balance line
-  // when events cluster (small age gaps, a high line), so the chart draws the coloured
-  // dashed lines and a key below names them — collision-proof at any chart size.
-  const markers: { key: string; x: number; color: string; name: string }[] = [];
-  markers.push({ key: "retire", x: retireX, color: "#f59e0b", name: partnerRetirementAge != null ? "You retire" : "Retire" });
-  if (partnerRetirementAge != null && partnerRetireX != null) {
-    markers.push({ key: "pretire", x: partnerRetireX, color: "#38bdf8", name: "Partner retires" });
-  }
-  if (ages && partnerPensionX != null) {
-    markers.push({ key: "ap-you", x: youPensionX, color: "#a78bfa", name: "You Age Pension" });
-    markers.push({ key: "ap-partner", x: partnerPensionX, color: "#f472b6", name: "Partner Age Pension" });
-  } else {
-    markers.push({ key: "ap", x: pensionAge, color: "#a78bfa", name: "Age Pension" });
-  }
-
   return (
-    <div>
     <ResponsiveContainer width="100%" height={height}>
       <AreaChart
         data={data}
@@ -303,13 +306,76 @@ export default function RetirementChart({
           tickFormatter={fmtCompact}
         />
         <Tooltip content={<AssetsTooltip baselineLabel={baselineLabel} showHome={showHome} ages={ages} />} />
-        {/* Life-event lines only — no inline text (it collides with the balance line
-            and with neighbouring markers when events cluster). The key below names them. */}
-        {markers.map((m) => (
-          <ReferenceLine key={m.key} x={m.x} stroke={m.color} strokeDasharray="6 4" />
-        ))}
+        {/* Both labels are CENTERED on their own line (insideTop → textAnchor
+            middle at the line's x) so it's obvious which line each names, and
+            they're staggered vertically (Retire on top, Pension a row lower) so
+            they never overlap even when the ages coincide (e.g. retire 65 vs
+            pension 67, or identical). */}
+        <ReferenceLine
+          x={retireX}
+          stroke="#f59e0b"
+          strokeDasharray="6 4"
+          label={{
+            value: partnerRetirementAge != null ? "You retire" : "Retire",
+            position: "insideTop",
+            fill: "#f59e0b",
+            fontSize: 11,
+            dy: 4,
+          }}
+        />
+        {partnerRetirementAge != null && (
+          <ReferenceLine
+            x={partnerRetireX ?? undefined}
+            stroke="#38bdf8"
+            strokeDasharray="6 4"
+            label={{
+              value: "Partner retires",
+              position: "insideTop",
+              fill: "#38bdf8",
+              fontSize: 11,
+              dy: 52,
+            }}
+          />
+        )}
+        {/* Age Pension: one marker per partner (they qualify at their own age 67),
+            since a couple's pension steps up twice. Rendered as separate children —
+            Recharts drops reference lines wrapped in a Fragment. */}
+        {!ages && (
+          <ReferenceLine
+            x={pensionAge}
+            stroke="#a78bfa"
+            strokeDasharray="6 4"
+            label={{ value: "Age Pension", position: "insideTop", fill: "#a78bfa", fontSize: 11, dy: 22 }}
+          />
+        )}
+        {ages && (
+          <ReferenceLine
+            x={youPensionX}
+            stroke="#a78bfa"
+            strokeDasharray="6 4"
+            label={stackedLabel(["You Age", "Pension"], "#a78bfa", 26)}
+          />
+        )}
+        {ages && partnerPensionX != null && (
+          <ReferenceLine
+            x={partnerPensionX}
+            stroke="#a78bfa"
+            strokeDasharray="6 4"
+            label={stackedLabel(["Partner Age", "Pension"], "#a78bfa", 26)}
+          />
+        )}
         {depletedAge !== null && (
-          <ReferenceLine x={depletedAge} stroke="#ef4444" strokeDasharray="2 2" />
+          <ReferenceLine
+            x={depletedAge}
+            stroke="#ef4444"
+            strokeDasharray="2 2"
+            label={{
+              value: `Depletes ${depletedAge}`,
+              position: "center",
+              fill: "#ef4444",
+              fontSize: 11,
+            }}
+          />
         )}
         {showHome && (
           <Area
@@ -396,22 +462,5 @@ export default function RetirementChart({
         )}
       </AreaChart>
     </ResponsiveContainer>
-      {markers.length > 0 && (
-        <div className="mt-1 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 px-2 text-[11px] text-muted">
-          {markers.map((m) => (
-            <span key={m.key} className="inline-flex items-center gap-1.5">
-              <span className="inline-block h-0 w-3.5" style={{ borderTop: `2px dashed ${m.color}` }} aria-hidden />
-              {m.name}
-            </span>
-          ))}
-          {depletedAge !== null && (
-            <span className="inline-flex items-center gap-1.5">
-              <span className="inline-block h-0 w-3.5" style={{ borderTop: `2px dashed #ef4444` }} aria-hidden />
-              Money runs out
-            </span>
-          )}
-        </div>
-      )}
-    </div>
   );
 }
