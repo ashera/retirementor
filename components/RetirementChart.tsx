@@ -16,7 +16,6 @@ import { fmtCompact, fmtCurrency } from "@/lib/au/format";
 import { breakSpans, breakSpanLabel } from "@/lib/au/breakSpans";
 import { rowNetWorth } from "@/lib/au/networth";
 import { DualAgeTick, dualAgeLabel, type AgeGapInfo } from "@/components/ageAxis";
-import { placeMarkers, type MarkerInput } from "@/components/markerPlacement";
 
 export interface SpendingBand {
   x1: number;
@@ -25,15 +24,20 @@ export interface SpendingBand {
   fill: string;
 }
 
-// A single-line, centred reference-line label at a given row height in the top
-// headroom band (Recharts calls this render fn with the line's viewBox).
-function markerLabel(text: string, fill: string, topOffset: number) {
+// A multi-line, centred reference-line label (Recharts calls this render fn with the
+// line's viewBox). Used to wrap longer marker text ("You Age" / "Pension") so it
+// doesn't sprawl across the axis.
+function stackedLabel(lines: string[], fill: string, topOffset = 16) {
   return function RefLabel(props: { viewBox?: { x?: number; y?: number } }) {
     const x = props.viewBox?.x ?? 0;
     const y = (props.viewBox?.y ?? 0) + topOffset;
     return (
       <text x={x} y={y} fill={fill} fontSize={11} textAnchor="middle">
-        {text}
+        {lines.map((ln, i) => (
+          <tspan key={ln} x={x} dy={i === 0 ? 0 : 12}>
+            {ln}
+          </tspan>
+        ))}
       </text>
     );
   };
@@ -214,36 +218,6 @@ export default function RetirementChart({
   // over the Transfer Balance Cap); otherwise it's one clean super band as before.
   const hasSplit = result.rows.some((r) => (r.breakdown?.accumSuper ?? 0) > 1);
 
-  // Life-event markers, positioned by the lane solver so labels never overlap each
-  // other, then reserve headroom at the top so they clear the balance line too.
-  const markerInputs: MarkerInput[] = [];
-  markerInputs.push({ key: "retire", x: retireX, color: "#f59e0b", name: partnerRetirementAge != null ? "You retire" : "Retire" });
-  if (partnerRetirementAge != null && partnerRetireX != null) {
-    markerInputs.push({ key: "pretire", x: partnerRetireX, color: "#38bdf8", name: "Partner retires" });
-  }
-  if (ages && partnerPensionX != null) {
-    markerInputs.push({ key: "ap-you", x: youPensionX, color: "#a78bfa", name: "You Age Pension" });
-    markerInputs.push({ key: "ap-partner", x: partnerPensionX, color: "#a78bfa", name: "Partner Age Pension" });
-  } else {
-    markerInputs.push({ key: "ap", x: pensionAge, color: "#a78bfa", name: "Age Pension" });
-  }
-  if (depletedAge !== null) {
-    markerInputs.push({ key: "deplete", x: depletedAge, color: "#ef4444", name: `Depletes ${depletedAge}`, dash: "2 2" });
-  }
-  const { placed, rows: markerRows } = placeMarkers(markerInputs);
-  const rowStepPx = 14;
-  const rowTopPx = 6;
-  // Reserve enough of the plot height at the top for the label rows, then inflate the
-  // y-domain so the data sits below that band (capped so it never dominates the chart).
-  const headroomFrac = markerRows > 0 ? Math.min(0.4, (rowTopPx + markerRows * rowStepPx + 4) / height) : 0;
-  const stackTop = (d: ChartRow) => {
-    const sup = hasSplit ? (d.accumSuper ?? 0) + (d.pensionSuper ?? 0) : d.totalSuper ?? 0;
-    const extra = showHome ? Math.max(0, d.homeEquity ?? 0) + Math.max(0, d.propertyNW ?? 0) : 0;
-    return Math.max(sup + (d.outside ?? 0) + extra, d.baselineTotal ?? 0);
-  };
-  const dataMax = Math.max(1, ...data.map(stackTop));
-  const yDomainMax = headroomFrac > 0 ? Math.ceil(dataMax / (1 - headroomFrac)) : undefined;
-
   return (
     <ResponsiveContainer width="100%" height={height}>
       <AreaChart
@@ -330,21 +304,79 @@ export default function RetirementChart({
           axisLine={false}
           width={54}
           tickFormatter={fmtCompact}
-          domain={yDomainMax != null ? [0, yDomainMax] : undefined}
-          allowDataOverflow={yDomainMax != null}
         />
         <Tooltip content={<AssetsTooltip baselineLabel={baselineLabel} showHome={showHome} ages={ages} />} />
-        {/* Life-event markers — the lane solver assigns each label a row so they
-            never overlap, and the reserved top headroom keeps them off the line. */}
-        {placed.map((m) => (
+        {/* Both labels are CENTERED on their own line (insideTop → textAnchor
+            middle at the line's x) so it's obvious which line each names, and
+            they're staggered vertically (Retire on top, Pension a row lower) so
+            they never overlap even when the ages coincide (e.g. retire 65 vs
+            pension 67, or identical). */}
+        <ReferenceLine
+          x={retireX}
+          stroke="#f59e0b"
+          strokeDasharray="6 4"
+          label={{
+            value: partnerRetirementAge != null ? "You retire" : "Retire",
+            position: "insideTop",
+            fill: "#f59e0b",
+            fontSize: 11,
+            dy: 4,
+          }}
+        />
+        {partnerRetirementAge != null && (
           <ReferenceLine
-            key={m.key}
-            x={m.x}
-            stroke={m.color}
-            strokeDasharray={m.dash ?? "6 4"}
-            label={markerLabel(m.name, m.color, rowTopPx + m.row * rowStepPx)}
+            x={partnerRetireX ?? undefined}
+            stroke="#38bdf8"
+            strokeDasharray="6 4"
+            label={{
+              value: "Partner retires",
+              position: "insideTop",
+              fill: "#38bdf8",
+              fontSize: 11,
+              dy: 52,
+            }}
           />
-        ))}
+        )}
+        {/* Age Pension: one marker per partner (they qualify at their own age 67),
+            since a couple's pension steps up twice. Rendered as separate children —
+            Recharts drops reference lines wrapped in a Fragment. */}
+        {!ages && (
+          <ReferenceLine
+            x={pensionAge}
+            stroke="#a78bfa"
+            strokeDasharray="6 4"
+            label={{ value: "Age Pension", position: "insideTop", fill: "#a78bfa", fontSize: 11, dy: 22 }}
+          />
+        )}
+        {ages && (
+          <ReferenceLine
+            x={youPensionX}
+            stroke="#a78bfa"
+            strokeDasharray="6 4"
+            label={stackedLabel(["You Age", "Pension"], "#a78bfa", 26)}
+          />
+        )}
+        {ages && partnerPensionX != null && (
+          <ReferenceLine
+            x={partnerPensionX}
+            stroke="#a78bfa"
+            strokeDasharray="6 4"
+            label={stackedLabel(["Partner Age", "Pension"], "#a78bfa", 26)}
+          />
+        )}
+        {depletedAge !== null && (
+          <ReferenceLine
+            x={depletedAge}
+            stroke="#ef4444"
+            strokeDasharray="2 2"
+            label={{
+              value: `Depletes ${depletedAge}`,
+              position: "center",
+              fill: "#ef4444",
+              fontSize: 11,
+            }}
+          />
+        )}
         {showHome && (
           <Area
             type="monotone"
