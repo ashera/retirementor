@@ -24,33 +24,6 @@ export interface SpendingBand {
   fill: string;
 }
 
-// A reference-line label wrapped onto multiple centred lines and anchored near the
-// BOTTOM of the chart — so a longer marker (e.g. "Partner super unlocks 66") neither
-// sprawls across several years of the axis nor collides with the Retire / Partner /
-// Age Pension labels clustered along the top.
-function WrappedLabel({
-  viewBox,
-  lines,
-  fill,
-}: {
-  viewBox?: { x?: number; y?: number; height?: number };
-  lines: string[];
-  fill: string;
-}) {
-  const x = viewBox?.x ?? 0;
-  const bottom = (viewBox?.y ?? 0) + (viewBox?.height ?? 0);
-  const y = bottom - 12 * lines.length - 6; // keep both lines clear of the axis
-  return (
-    <text x={x} y={y} fill={fill} fontSize={11} textAnchor="middle">
-      {lines.map((ln, i) => (
-        <tspan key={ln} x={x} dy={i === 0 ? 0 : 12}>
-          {ln}
-        </tspan>
-      ))}
-    </text>
-  );
-}
-
 type ChartRow = Partial<YearRow> & {
   age: number;
   baselineTotal?: number;
@@ -167,6 +140,11 @@ export default function RetirementChart({
   const retireX = ages ? ages.anchor + (retirementAge - ages.you0) : retirementAge;
   const partnerRetireX =
     ages && partnerRetirementAge != null ? ages.anchor + (partnerRetirementAge - ages.partner0) : partnerRetirementAge;
+  // Each partner reaches Age-Pension age in a different year — shift the statutory age
+  // into oldest-age axis units per person (a couple's pension phases in twice).
+  const pensionAge = result.agePensionAge;
+  const youPensionX = ages ? ages.anchor + (pensionAge - ages.you0) : pensionAge;
+  const partnerPensionX = ages ? ages.anchor + (pensionAge - ages.partner0) : null;
 
   // The engine expresses accumulation in wage-indexed dollars and re-bases the
   // stock to CPI dollars at retirement (retiree spending and the Age Pension both
@@ -340,34 +318,31 @@ export default function RetirementChart({
             }}
           />
         )}
-        <ReferenceLine
-          x={result.agePensionAge}
-          stroke="#a78bfa"
-          strokeDasharray="6 4"
-          label={{
-            value: "Age Pension",
-            position: "insideTop",
-            fill: "#a78bfa",
-            fontSize: 11,
-            dy: 22,
-          }}
-        />
-        {/* An early retiree's preserved super unlocking at 60 mid-retirement: the
-            accumulation (yellow) balance moves into the tax-free pension (green)
-            pool. Coloured to the accumulation band it's leaving; labelled lower so
-            it clears the Retire/Pension labels. */}
-        {result.superUnlockAge != null && (
+        {/* Age Pension: one marker per partner (they qualify at their own age 67),
+            since a couple's pension steps up twice. Rendered as separate children —
+            Recharts drops reference lines wrapped in a Fragment. */}
+        {!ages && (
           <ReferenceLine
-            x={result.superUnlockAge}
-            stroke="#eab308"
+            x={pensionAge}
+            stroke="#a78bfa"
             strokeDasharray="6 4"
-            label={(props: { viewBox?: { x?: number; y?: number; height?: number } }) => (
-              <WrappedLabel
-                viewBox={props.viewBox}
-                fill="#facc15"
-                lines={result.superUnlockIsPartner ? ["Partner super", "unlocks"] : ["Super unlocks"]}
-              />
-            )}
+            label={{ value: "Age Pension", position: "insideTop", fill: "#a78bfa", fontSize: 11, dy: 22 }}
+          />
+        )}
+        {ages && (
+          <ReferenceLine
+            x={youPensionX}
+            stroke="#a78bfa"
+            strokeDasharray="6 4"
+            label={{ value: "You pension", position: "insideTop", fill: "#a78bfa", fontSize: 11, dy: 22 }}
+          />
+        )}
+        {ages && partnerPensionX != null && (
+          <ReferenceLine
+            x={partnerPensionX}
+            stroke="#a78bfa"
+            strokeDasharray="6 4"
+            label={{ value: "Partner pension", position: "insideTop", fill: "#a78bfa", fontSize: 11, dy: 22 }}
           />
         )}
         {depletedAge !== null && (

@@ -109,12 +109,15 @@ export default function FanChart({
           strokeDasharray="6 4"
           strokeOpacity={0.6}
         />
-        <ReferenceLine
-          x={agePensionAge}
-          stroke="#a78bfa"
-          strokeDasharray="6 4"
-          strokeOpacity={0.6}
-        />
+        {!ages && (
+          <ReferenceLine x={agePensionAge} stroke="#a78bfa" strokeDasharray="6 4" strokeOpacity={0.6} />
+        )}
+        {ages && (
+          <ReferenceLine x={ages.anchor + (agePensionAge - ages.you0)} stroke="#a78bfa" strokeDasharray="6 4" strokeOpacity={0.6} />
+        )}
+        {ages && (
+          <ReferenceLine x={ages.anchor + (agePensionAge - ages.partner0)} stroke="#a78bfa" strokeDasharray="6 4" strokeOpacity={0.6} />
+        )}
         {/* p10 baseline (invisible) + band stacked on top = 10th–90th percentile range */}
         <Area
           type="monotone"
