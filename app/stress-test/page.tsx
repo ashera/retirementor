@@ -1,4 +1,5 @@
 import StressTestView from "@/components/StressTestView";
+import VisitorPing from "@/components/VisitorPing";
 import { getCurrentUser } from "@/lib/auth";
 import { listPlans } from "@/app/actions/plans";
 import { getActiveConfig } from "@/lib/refdata";
@@ -12,5 +13,10 @@ export default async function StressTestPage() {
     user ? listPlans() : Promise.resolve([]),
     getActiveConfig(),
   ]);
-  return <StressTestView config={config} savedPlans={savedPlans} />;
+  return (
+    <>
+      {!user && <VisitorPing event="stress" />}
+      <StressTestView config={config} savedPlans={savedPlans} />
+    </>
+  );
 }

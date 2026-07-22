@@ -1,4 +1,5 @@
 import WhatIfView from "@/components/WhatIfView";
+import VisitorPing from "@/components/VisitorPing";
 import { getCurrentUser } from "@/lib/auth";
 import { listPlans } from "@/app/actions/plans";
 import { getActiveConfig } from "@/lib/refdata";
@@ -12,5 +13,10 @@ export default async function WhatIfPage() {
     user ? listPlans() : Promise.resolve([]),
     getActiveConfig(),
   ]);
-  return <WhatIfView config={config} savedPlans={savedPlans} signedIn={!!user} />;
+  return (
+    <>
+      {!user && <VisitorPing event="whatif" />}
+      <WhatIfView config={config} savedPlans={savedPlans} signedIn={!!user} />
+    </>
+  );
 }

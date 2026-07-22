@@ -214,6 +214,34 @@ create table if not exists test_results (
   created_at timestamptz not null default now()
 );
 
+-- Anonymous (not-signed-in) visitor analytics. One row per browser, keyed by a
+-- long-lived rw_visitor cookie. Captures the funnel we can't see in the users
+-- table: who looked around without signing up, how far they got (set a super
+-- balance / budget income, opened What-If / Stress test), and best-effort location
+-- from the proxy's geo headers. signed_up flips true if that browser later
+-- authenticates (conversion), after which we stop tracking it.
+create table if not exists visitors (
+  id uuid primary key default gen_random_uuid(),
+  visitor_key text unique not null,
+  first_seen_at timestamptz not null default now(),
+  last_seen_at timestamptz not null default now(),
+  visits int not null default 1,
+  set_super_balance boolean not null default false,
+  super_balance numeric,
+  set_budget_income boolean not null default false,
+  budget_income numeric,
+  visited_what_if boolean not null default false,
+  visited_stress_test boolean not null default false,
+  signed_up boolean not null default false,
+  country text,
+  region text,
+  city text,
+  ip text,
+  locale text,
+  user_agent text
+);
+create index if not exists visitors_last_seen_idx on visitors (last_seen_at desc);
+
 create index if not exists sessions_token_idx on sessions(token);
 create index if not exists plans_user_idx on plans(user_id);
 create index if not exists demo_scenarios_pub_idx on demo_scenarios(published, sort_order);

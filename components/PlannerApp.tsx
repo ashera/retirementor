@@ -54,6 +54,7 @@ import { simulate } from "@/lib/au/simulate";
 import type { EngineConfig } from "@/lib/au/config";
 import { fmtCurrency } from "@/lib/au/format";
 import { track, trackPlanBuiltConversion } from "@/lib/analytics";
+import { trackVisit } from "@/app/actions/track";
 import { planCompleteness } from "@/lib/au/completeness";
 import CompletenessRing from "@/components/CompletenessRing";
 import WithdrawalRateCard from "@/components/WithdrawalRateCard";
@@ -447,7 +448,26 @@ export default function PlannerApp({
     if (!ready || landingTracked.current) return;
     landingTracked.current = true;
     track(configured ? "Results viewed" : "Get started shown", { signed_in: !!user });
+    // Server-side anonymous-visitor funnel (persisted, admin-visible). No-op for
+    // signed-in users; fires once per mount for a signed-out visit.
+    if (!user) void trackVisit({ event: "visit" });
   }, [ready, configured, user]);
+
+  // Record when a signed-out visitor has entered a super balance (a key funnel
+  // step), once, with the value. Watches the plan so it also fires if they set it
+  // mid-session via the guide/wizard rather than arriving already-configured.
+  const superTracked = useRef(false);
+  useEffect(() => {
+    if (!ready || user || superTracked.current || !configured) return;
+    const totalSuper = plan.people.reduce(
+      (s, p) => s + (Number.isFinite(p.superBalance) ? p.superBalance : 0),
+      0,
+    );
+    if (totalSuper > 0) {
+      superTracked.current = true;
+      void trackVisit({ event: "super", value: totalSuper });
+    }
+  }, [ready, user, configured, plan]);
 
   const result = useMemo(() => simulate(plan, config), [plan, config]);
   // The active scenario's strategy layer, for the chips (all baked into the numbers).
@@ -628,6 +648,10 @@ export default function PlannerApp({
     quickAdjust(update);
     setBudgetOpen(false);
     setNotice("Budget applied — this is now your income goal.");
+    if (!user) {
+      const goal = update.targetSpending ?? plan.targetSpending;
+      void trackVisit({ event: "budget", value: Number.isFinite(goal) ? goal : undefined });
+    }
   };
 
   const handleLoad = (sp: SavedPlan) => {

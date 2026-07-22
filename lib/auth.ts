@@ -70,6 +70,19 @@ export async function createSession(userId: string): Promise<void> {
     path: "/",
     expires,
   });
+
+  // Conversion: if this browser was tracked as an anonymous visitor, flag that row
+  // as signed-up and drop the visitor cookie so we stop tracking it. Best-effort —
+  // never let analytics bookkeeping break sign-in.
+  try {
+    const visitorKey = store.get("rw_visitor")?.value;
+    if (visitorKey) {
+      await query("update visitors set signed_up = true, last_seen_at = now() where visitor_key = $1", [visitorKey]);
+      store.delete("rw_visitor");
+    }
+  } catch {
+    /* ignore */
+  }
 }
 
 export async function destroySession(): Promise<void> {
