@@ -4,6 +4,7 @@ import { randomBytes } from "node:crypto";
 import { cookies, headers } from "next/headers";
 import { query } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
+import { lookupGeo } from "@/lib/geo";
 
 const VISITOR_COOKIE = "rw_visitor";
 const VISITOR_TTL_MS = 365 * 24 * 60 * 60 * 1000; // 1 year
@@ -27,16 +28,23 @@ async function readContext() {
     h.get("x-real-ip") ||
     h.get("cf-connecting-ip") ||
     null;
-  const country = h.get("cf-ipcountry") || h.get("x-vercel-ip-country") || null;
-  const region = h.get("x-vercel-ip-country-region") || h.get("cf-region") || null;
-  const city = h.get("cf-ipcity") || h.get("x-vercel-ip-city") || null;
+  // Prefer a proxy-provided geo header when present (Cloudflare/Vercel); otherwise
+  // resolve the country/region/city from the IP with the offline GeoLite database —
+  // this is what actually populates on Railway, whose edge doesn't tag geo.
+  const geo = lookupGeo(ip);
+  const hdrCountry = h.get("cf-ipcountry") || h.get("x-vercel-ip-country") || null;
+  const hdrRegion = h.get("x-vercel-ip-country-region") || h.get("cf-region") || null;
+  const hdrCity = h.get("cf-ipcity") || h.get("x-vercel-ip-city") || null;
+  const country = hdrCountry || geo?.country || null;
+  const region = hdrRegion ? decodeURIComponent(hdrRegion) : geo?.region || null;
+  const city = hdrCity ? decodeURIComponent(hdrCity) : geo?.city || null;
   const locale = first(h.get("accept-language"));
   const ua = h.get("user-agent");
   return {
     ip: ip?.slice(0, 60) ?? null,
     country: country?.slice(0, 4) ?? null,
-    region: region?.slice(0, 80) ? decodeURIComponent(region).slice(0, 80) : null,
-    city: city ? decodeURIComponent(city).slice(0, 120) : null,
+    region: region?.slice(0, 80) ?? null,
+    city: city?.slice(0, 120) ?? null,
     locale: locale?.slice(0, 40) ?? null,
     user_agent: ua?.slice(0, 400) ?? null,
   };

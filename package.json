@@ -18,6 +18,7 @@
   },
   "dependencies": {
     "@types/pg": "^8.20.0",
+    "geoip-lite": "^1.4.10",
     "next": "^15.5.20",
     "pg": "^8.22.0",
     "react": "19.0.0",
@@ -33,6 +34,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.2",
+    "@types/geoip-lite": "^1.4.4",
     "@types/node": "22.10.7",
     "@types/react": "19.0.7",
     "@types/react-dom": "19.0.3",

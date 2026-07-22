@@ -2,11 +2,13 @@
 
 import { useMemo, useState } from "react";
 import { fmtDate, fmtDateTime, fmtCompact } from "@/lib/au/format";
+import CountryFlag from "@/components/CountryFlag";
 import type { AdminVisitorRow } from "@/lib/adminVisitors";
 
-function locationOf(v: AdminVisitorRow): string {
-  const parts = [v.city, v.region, v.country].filter(Boolean);
-  return parts.length ? parts.join(", ") : "—";
+/** City/region (the country is shown as the flag alongside). */
+function placeOf(v: AdminVisitorRow): string {
+  const parts = [v.city, v.region].filter(Boolean);
+  return parts.length ? parts.join(", ") : "";
 }
 
 /** A short, readable device string from the user-agent (best-effort). */
@@ -99,8 +101,9 @@ export default function VisitorsTable({ visitors }: { visitors: AdminVisitorRow[
                 <td className="px-4 py-2.5 whitespace-nowrap text-muted">{fmtDateTime(v.last_seen_at)}</td>
                 <td className="px-4 py-2.5 text-right tabular-nums text-slate-200">{v.visits}</td>
                 <td className="px-4 py-2.5 text-slate-200">
-                  {locationOf(v)}
-                  {v.ip && <div className="text-xs text-muted">{v.ip}</div>}
+                  <CountryFlag code={v.country} showName />
+                  {placeOf(v) && <div className="text-xs text-muted">{placeOf(v)}</div>}
+                  {v.ip && <div className="text-xs text-muted/70">{v.ip}</div>}
                 </td>
                 <td className="px-4 py-2.5">
                   <div className="flex flex-wrap gap-1">

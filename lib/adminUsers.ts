@@ -8,6 +8,7 @@ export interface AdminUserRow {
   suspended: boolean;
   created_at: string;
   last_login_at: string | null;
+  country: string | null;
   plan_count: number;
 }
 
@@ -17,7 +18,7 @@ export interface AdminUserDetail extends AdminUserRow {
 }
 
 const ROW_SELECT = `
-  select u.id, u.email, u.is_admin, u.suspended, u.created_at, u.last_login_at,
+  select u.id, u.email, u.is_admin, u.suspended, u.created_at, u.last_login_at, u.country,
          (select count(*)::int from plans p where p.user_id = u.id) as plan_count
     from users u`;
 

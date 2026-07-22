@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { fmtDate, fmtDateTime } from "@/lib/au/format";
+import CountryFlag from "@/components/CountryFlag";
 import type { AdminUserRow } from "@/lib/adminUsers";
 
 export default function UsersTable({ users }: { users: AdminUserRow[] }) {
@@ -36,6 +37,7 @@ export default function UsersTable({ users }: { users: AdminUserRow[] }) {
               <th className="px-4 py-3">Email</th>
               <th className="px-4 py-3">Role</th>
               <th className="px-4 py-3">Status</th>
+              <th className="px-4 py-3">Country</th>
               <th className="px-4 py-3 text-right">Plans</th>
               <th className="px-4 py-3">Last login</th>
               <th className="px-4 py-3">Joined</th>
@@ -63,6 +65,7 @@ export default function UsersTable({ users }: { users: AdminUserRow[] }) {
                     <span className="text-xs text-emerald-400">Active</span>
                   )}
                 </td>
+                <td className="px-4 py-2.5"><CountryFlag code={u.country} /></td>
                 <td className="px-4 py-2.5 text-right tabular-nums text-slate-200">{u.plan_count}</td>
                 <td className="px-4 py-2.5 text-muted">{fmtDateTime(u.last_login_at)}</td>
                 <td className="px-4 py-2.5 text-muted">{fmtDate(u.created_at)}</td>
@@ -70,7 +73,7 @@ export default function UsersTable({ users }: { users: AdminUserRow[] }) {
             ))}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-muted">
+                <td colSpan={7} className="px-4 py-8 text-center text-muted">
                   No users match &ldquo;{q}&rdquo;.
                 </td>
               </tr>

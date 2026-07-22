@@ -1,8 +1,9 @@
 import "server-only";
 import { randomBytes, scrypt, timingSafeEqual, createHash } from "crypto";
 import { promisify } from "util";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { query } from "./db";
+import { countryFromIp } from "./geo";
 
 const scryptAsync = promisify(scrypt);
 const COOKIE = "session";
@@ -61,7 +62,20 @@ export async function createSession(userId: string): Promise<void> {
     "insert into sessions (user_id, token, expires_at) values ($1, $2, $3)",
     [userId, token, expires],
   );
-  await query("update users set last_login_at = now() where id = $1", [userId]);
+  // Best-effort country from the sign-in IP (keep the prior value if we can't
+  // resolve this time — e.g. a private/unknown IP). We don't store the raw IP.
+  let country: string | null = null;
+  try {
+    const h = await headers();
+    const ip = (h.get("x-forwarded-for") || "").split(",")[0].trim() || h.get("x-real-ip");
+    country = countryFromIp(ip);
+  } catch {
+    /* ignore */
+  }
+  await query(
+    "update users set last_login_at = now(), country = coalesce($2, country) where id = $1",
+    [userId, country],
+  );
   const store = await cookies();
   store.set(COOKIE, token, {
     httpOnly: true,
