@@ -3,6 +3,7 @@
 // Idempotent: applies the schema and seeds reference data / sources.
 import { Client } from "pg";
 import { migrate } from "../lib/migrations";
+import { backfillVisitorGeo } from "../lib/backfillGeo";
 import { sslFor } from "../lib/db";
 
 const url =
@@ -15,6 +16,14 @@ async function main() {
   await c.connect();
   try {
     await migrate(c);
+    // Backfill country for visitor rows captured before IP→geo existed. Best-effort:
+    // a geo hiccup must never abort a deploy, so it's caught here (unlike migrate).
+    try {
+      const { updated, scanned } = await backfillVisitorGeo(c);
+      console.log(`  visitor-geo: backfilled ${updated} of ${scanned} row(s) needing a country.`);
+    } catch (e) {
+      console.warn("  visitor-geo: backfill skipped —", (e as Error).message);
+    }
     const t = await c.query(
       "select tablename from pg_tables where schemaname='public' order by tablename",
     );
