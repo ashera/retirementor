@@ -32,12 +32,20 @@ async function readContext() {
   // resolve the country/region/city from the IP with the offline GeoLite database —
   // this is what actually populates on Railway, whose edge doesn't tag geo.
   const geo = lookupGeo(ip);
-  const hdrCountry = h.get("cf-ipcountry") || h.get("x-vercel-ip-country") || null;
+  const cfCountry = h.get("cf-ipcountry");
+  const vercelCountry = h.get("x-vercel-ip-country");
+  const hdrCountry = cfCountry || vercelCountry || null;
   const hdrRegion = h.get("x-vercel-ip-country-region") || h.get("cf-region") || null;
   const hdrCity = h.get("cf-ipcity") || h.get("x-vercel-ip-city") || null;
   const country = hdrCountry || geo?.country || null;
   const region = hdrRegion ? decodeURIComponent(hdrRegion) : geo?.region || null;
   const city = hdrCity ? decodeURIComponent(hdrCity) : geo?.city || null;
+  // Record how `country` was determined so the admin can see the basis.
+  const geoSource = !country
+    ? null
+    : hdrCountry
+      ? `header:${cfCountry ? "cf-ipcountry" : "x-vercel-ip-country"}`
+      : "geoip";
   const locale = first(h.get("accept-language"));
   const ua = h.get("user-agent");
   return {
@@ -45,6 +53,7 @@ async function readContext() {
     country: country?.slice(0, 4) ?? null,
     region: region?.slice(0, 80) ?? null,
     city: city?.slice(0, 120) ?? null,
+    geo_source: geoSource,
     locale: locale?.slice(0, 40) ?? null,
     user_agent: ua?.slice(0, 400) ?? null,
   };
@@ -94,16 +103,16 @@ export async function trackVisit(input: TrackInput): Promise<void> {
          visitor_key, first_seen_at, last_seen_at, visits,
          set_super_balance, super_balance, set_budget_income, budget_income,
          visited_what_if, visited_stress_test,
-         country, region, city, ip, locale, user_agent
+         country, region, city, ip, locale, user_agent, geo_source
        ) values (
          $1, now(), now(), 1,
          $2, $3, $4, $5,
          $6, $7,
-         $8, $9, $10, $11, $12, $13
+         $8, $9, $10, $11, $12, $13, $14
        )
        on conflict (visitor_key) do update set
          last_seen_at = now(),
-         visits = visitors.visits + $14,
+         visits = visitors.visits + $15,
          set_super_balance = visitors.set_super_balance or excluded.set_super_balance,
          super_balance = coalesce(excluded.super_balance, visitors.super_balance),
          set_budget_income = visitors.set_budget_income or excluded.set_budget_income,
@@ -115,7 +124,8 @@ export async function trackVisit(input: TrackInput): Promise<void> {
          city = coalesce(excluded.city, visitors.city),
          ip = coalesce(excluded.ip, visitors.ip),
          locale = coalesce(excluded.locale, visitors.locale),
-         user_agent = coalesce(excluded.user_agent, visitors.user_agent)`,
+         user_agent = coalesce(excluded.user_agent, visitors.user_agent),
+         geo_source = coalesce(excluded.geo_source, visitors.geo_source)`,
       [
         visitorKey,
         input.event === "super",
@@ -130,6 +140,7 @@ export async function trackVisit(input: TrackInput): Promise<void> {
         ctx.ip,
         ctx.locale,
         ctx.user_agent,
+        ctx.geo_source,
         isVisit ? 1 : 0,
       ],
     );

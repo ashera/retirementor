@@ -91,7 +91,10 @@ export async function createSession(userId: string): Promise<void> {
   try {
     const visitorKey = store.get("rw_visitor")?.value;
     if (visitorKey) {
-      await query("update visitors set signed_up = true, last_seen_at = now() where visitor_key = $1", [visitorKey]);
+      await query(
+        "update visitors set signed_up = true, converted_user_id = $2, last_seen_at = now() where visitor_key = $1",
+        [visitorKey, userId],
+      );
       store.delete("rw_visitor");
     }
   } catch {

@@ -244,6 +244,12 @@ create table if not exists visitors (
   user_agent text
 );
 create index if not exists visitors_last_seen_idx on visitors (last_seen_at desc);
+-- How the country was determined: 'geoip' (offline IP lookup) or 'header:<name>'
+-- (a proxy geo header). Drives the "on what basis" explainer in the admin.
+alter table visitors add column if not exists geo_source text;
+-- The account this browser converted into (set at sign-in alongside signed_up), so
+-- the admin can see which email a tracked visitor signed up under.
+alter table visitors add column if not exists converted_user_id uuid references users(id) on delete set null;
 
 create index if not exists sessions_token_idx on sessions(token);
 create index if not exists plans_user_idx on plans(user_id);

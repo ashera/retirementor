@@ -1,8 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { fmtDate, fmtDateTime, fmtCompact } from "@/lib/au/format";
-import CountryFlag from "@/components/CountryFlag";
+import FlagWithBasis from "@/components/FlagWithBasis";
 import type { AdminVisitorRow } from "@/lib/adminVisitors";
 
 /** City/region (the country is shown as the flag alongside). */
@@ -58,7 +59,10 @@ export default function VisitorsTable({ visitors }: { visitors: AdminVisitorRow[
         return false;
       }
       if (!query) return true;
-      const hay = [v.city, v.region, v.country, v.ip, v.locale, v.user_agent].filter(Boolean).join(" ").toLowerCase();
+      const hay = [v.city, v.region, v.country, v.ip, v.locale, v.user_agent, v.converted_email]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
       return hay.includes(query);
     });
   }, [visitors, query, engagedOnly]);
@@ -101,7 +105,7 @@ export default function VisitorsTable({ visitors }: { visitors: AdminVisitorRow[
                 <td className="px-4 py-2.5 whitespace-nowrap text-muted">{fmtDateTime(v.last_seen_at)}</td>
                 <td className="px-4 py-2.5 text-right tabular-nums text-slate-200">{v.visits}</td>
                 <td className="px-4 py-2.5 text-slate-200">
-                  <CountryFlag code={v.country} showName />
+                  <FlagWithBasis kind="visitor" id={v.id} code={v.country} showName />
                   {placeOf(v) && <div className="text-xs text-muted">{placeOf(v)}</div>}
                   {v.ip && <div className="text-xs text-muted/70">{v.ip}</div>}
                 </td>
@@ -121,8 +125,18 @@ export default function VisitorsTable({ visitors }: { visitors: AdminVisitorRow[
                   </div>
                 </td>
                 <td className="px-4 py-2.5">
-                  {v.signed_up ? (
-                    <span className="rounded-full bg-accent/15 px-2 py-0.5 text-xs font-semibold text-accent">Converted</span>
+                  {v.converted_email ? (
+                    <Link
+                      href={`/admin/users/${v.converted_user_id}`}
+                      className="text-xs font-medium text-accent hover:underline"
+                      title={`Signed up as ${v.converted_email}`}
+                    >
+                      {v.converted_email}
+                    </Link>
+                  ) : v.signed_up ? (
+                    <span className="rounded-full bg-accent/15 px-2 py-0.5 text-xs font-semibold text-accent" title="Converted (account since deleted)">
+                      Converted
+                    </span>
                   ) : (
                     <span className="text-xs text-muted">—</span>
                   )}

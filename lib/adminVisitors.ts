@@ -13,6 +13,8 @@ export interface AdminVisitorRow {
   visited_what_if: boolean;
   visited_stress_test: boolean;
   signed_up: boolean;
+  converted_user_id: string | null;
+  converted_email: string | null;
   country: string | null;
   region: string | null;
   city: string | null;
@@ -22,15 +24,17 @@ export interface AdminVisitorRow {
 }
 
 const VISITOR_SELECT = `
-  select id, first_seen_at, last_seen_at, visits,
-         set_super_balance, super_balance, set_budget_income, budget_income,
-         visited_what_if, visited_stress_test, signed_up,
-         country, region, city, ip, locale, user_agent
-    from visitors`;
+  select v.id, v.first_seen_at, v.last_seen_at, v.visits,
+         v.set_super_balance, v.super_balance, v.set_budget_income, v.budget_income,
+         v.visited_what_if, v.visited_stress_test, v.signed_up,
+         v.converted_user_id, u.email as converted_email,
+         v.country, v.region, v.city, v.ip, v.locale, v.user_agent
+    from visitors v
+    left join users u on u.id = v.converted_user_id`;
 
 export async function listVisitors(limit = 500): Promise<AdminVisitorRow[]> {
   const r = await query<AdminVisitorRow>(
-    `${VISITOR_SELECT} order by last_seen_at desc limit $1`,
+    `${VISITOR_SELECT} order by v.last_seen_at desc limit $1`,
     [limit],
   );
   return r.rows;
