@@ -3,9 +3,11 @@ import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth";
 import { listUsers } from "@/lib/adminUsers";
 import { listVisitors, getVisitorStats } from "@/lib/adminVisitors";
+import { getLocationCounts } from "@/lib/adminGeoCounts";
 import AdminTabs from "@/components/AdminTabs";
 import UsersTable from "@/components/UsersTable";
 import VisitorsTable from "@/components/VisitorsTable";
+import GeoMapView from "@/components/GeoMapView";
 
 export const metadata = { title: "Backoffice — Users", robots: { index: false } };
 export const dynamic = "force-dynamic";
@@ -19,11 +21,14 @@ export default async function UsersPage({
   if (!user) redirect("/login");
   if (!user.is_admin) redirect("/");
 
-  const view = (await searchParams).view === "visitors" ? "visitors" : "accounts";
+  const raw = (await searchParams).view;
+  const view: "accounts" | "visitors" | "map" =
+    raw === "visitors" ? "visitors" : raw === "map" ? "map" : "accounts";
 
-  const seg = (key: "accounts" | "visitors", label: string) => (
+  const hrefFor = { accounts: "/admin/users", visitors: "/admin/users?view=visitors", map: "/admin/users?view=map" };
+  const seg = (key: "accounts" | "visitors" | "map", label: string) => (
     <Link
-      href={key === "accounts" ? "/admin/users" : "/admin/users?view=visitors"}
+      href={hrefFor[key]}
       className={`rounded-md px-3 py-1.5 text-sm transition ${
         view === key ? "bg-accent font-semibold text-ink" : "font-medium text-muted hover:text-white"
       }`}
@@ -44,9 +49,10 @@ export default async function UsersPage({
       <div className="mb-6 inline-flex gap-1 rounded-lg border border-line bg-panel-2 p-1">
         {seg("accounts", "Accounts")}
         {seg("visitors", "Anonymous visitors")}
+        {seg("map", "Map")}
       </div>
 
-      {view === "accounts" ? <AccountsView /> : <VisitorsView />}
+      {view === "accounts" ? <AccountsView /> : view === "visitors" ? <VisitorsView /> : <MapView />}
     </main>
   );
 }
@@ -87,6 +93,27 @@ async function VisitorsView() {
         </p>
       </header>
       <VisitorsTable visitors={visitors} />
+    </>
+  );
+}
+
+async function MapView() {
+  const counts = await getLocationCounts();
+  const countries = counts.length;
+  const users = counts.reduce((s, c) => s + c.users, 0);
+  const visitors = counts.reduce((s, c) => s + c.visitors, 0);
+
+  return (
+    <>
+      <header className="mb-6">
+        <div className="text-sm font-semibold uppercase tracking-widest text-accent">Backoffice · Users</div>
+        <h1 className="mt-1 text-3xl font-bold text-white">Where they are</h1>
+        <p className="mt-2 text-muted">
+          {users} account{users === 1 ? "" : "s"} and {visitors} visitor{visitors === 1 ? "" : "s"} across{" "}
+          {countries} countr{countries === 1 ? "y" : "ies"} with a resolved location.
+        </p>
+      </header>
+      <GeoMapView counts={counts} />
     </>
   );
 }
