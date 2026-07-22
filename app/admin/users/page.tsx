@@ -3,7 +3,7 @@ import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth";
 import { listUsers } from "@/lib/adminUsers";
 import { listVisitors, getVisitorStats } from "@/lib/adminVisitors";
-import { getLocationCounts } from "@/lib/adminGeoCounts";
+import { getLocationCounts, getLocationPoints } from "@/lib/adminGeoCounts";
 import AdminTabs from "@/components/AdminTabs";
 import UsersTable from "@/components/UsersTable";
 import VisitorsTable from "@/components/VisitorsTable";
@@ -98,7 +98,7 @@ async function VisitorsView() {
 }
 
 async function MapView() {
-  const counts = await getLocationCounts();
+  const [counts, points] = await Promise.all([getLocationCounts(), getLocationPoints()]);
   const countries = counts.length;
   const users = counts.reduce((s, c) => s + c.users, 0);
   const visitors = counts.reduce((s, c) => s + c.visitors, 0);
@@ -113,7 +113,7 @@ async function MapView() {
           {countries} countr{countries === 1 ? "y" : "ies"} with a resolved location.
         </p>
       </header>
-      <GeoMapView counts={counts} />
+      <GeoMapView counts={counts} points={points} />
     </>
   );
 }

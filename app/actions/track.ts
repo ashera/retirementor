@@ -4,7 +4,7 @@ import { randomBytes } from "node:crypto";
 import { cookies, headers } from "next/headers";
 import { query } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
-import { lookupGeo } from "@/lib/geo";
+import { lookupGeoDetail } from "@/lib/geo";
 
 const VISITOR_COOKIE = "rw_visitor";
 const VISITOR_TTL_MS = 365 * 24 * 60 * 60 * 1000; // 1 year
@@ -31,7 +31,7 @@ async function readContext() {
   // Prefer a proxy-provided geo header when present (Cloudflare/Vercel); otherwise
   // resolve the country/region/city from the IP with the offline GeoLite database —
   // this is what actually populates on Railway, whose edge doesn't tag geo.
-  const geo = lookupGeo(ip);
+  const geo = lookupGeoDetail(ip);
   const cfCountry = h.get("cf-ipcountry");
   const vercelCountry = h.get("x-vercel-ip-country");
   const hdrCountry = cfCountry || vercelCountry || null;
@@ -54,6 +54,8 @@ async function readContext() {
     region: region?.slice(0, 80) ?? null,
     city: city?.slice(0, 120) ?? null,
     geo_source: geoSource,
+    lat: geo?.coordinates?.[0] ?? null,
+    lon: geo?.coordinates?.[1] ?? null,
     locale: locale?.slice(0, 40) ?? null,
     user_agent: ua?.slice(0, 400) ?? null,
   };
@@ -103,12 +105,12 @@ export async function trackVisit(input: TrackInput): Promise<void> {
          visitor_key, first_seen_at, last_seen_at, visits,
          set_super_balance, super_balance, set_budget_income, budget_income,
          visited_what_if, visited_stress_test,
-         country, region, city, ip, locale, user_agent, geo_source
+         country, region, city, ip, locale, user_agent, geo_source, lat, lon
        ) values (
          $1, now(), now(), 1,
          $2, $3, $4, $5,
          $6, $7,
-         $8, $9, $10, $11, $12, $13, $14
+         $8, $9, $10, $11, $12, $13, $14, $16, $17
        )
        on conflict (visitor_key) do update set
          last_seen_at = now(),
@@ -125,7 +127,9 @@ export async function trackVisit(input: TrackInput): Promise<void> {
          ip = coalesce(excluded.ip, visitors.ip),
          locale = coalesce(excluded.locale, visitors.locale),
          user_agent = coalesce(excluded.user_agent, visitors.user_agent),
-         geo_source = coalesce(excluded.geo_source, visitors.geo_source)`,
+         geo_source = coalesce(excluded.geo_source, visitors.geo_source),
+         lat = coalesce(excluded.lat, visitors.lat),
+         lon = coalesce(excluded.lon, visitors.lon)`,
       [
         visitorKey,
         input.event === "super",
@@ -142,6 +146,8 @@ export async function trackVisit(input: TrackInput): Promise<void> {
         ctx.user_agent,
         ctx.geo_source,
         isVisit ? 1 : 0,
+        ctx.lat,
+        ctx.lon,
       ],
     );
   } catch {

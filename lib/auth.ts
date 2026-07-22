@@ -3,7 +3,7 @@ import { randomBytes, scrypt, timingSafeEqual, createHash } from "crypto";
 import { promisify } from "util";
 import { cookies, headers } from "next/headers";
 import { query } from "./db";
-import { countryFromIp } from "./geo";
+import { lookupGeoDetail } from "./geo";
 
 const scryptAsync = promisify(scrypt);
 const COOKIE = "session";
@@ -62,19 +62,29 @@ export async function createSession(userId: string): Promise<void> {
     "insert into sessions (user_id, token, expires_at) values ($1, $2, $3)",
     [userId, token, expires],
   );
-  // Best-effort country from the sign-in IP (keep the prior value if we can't
-  // resolve this time — e.g. a private/unknown IP). We don't store the raw IP.
+  // Best-effort country + city coordinates from the sign-in IP (keep the prior
+  // values if we can't resolve this time — e.g. a private/unknown IP). We don't
+  // store the raw IP for accounts.
   let country: string | null = null;
+  let lat: number | null = null;
+  let lon: number | null = null;
   try {
     const h = await headers();
     const ip = (h.get("x-forwarded-for") || "").split(",")[0].trim() || h.get("x-real-ip");
-    country = countryFromIp(ip);
+    const geo = lookupGeoDetail(ip);
+    country = geo?.country ?? null;
+    lat = geo?.coordinates?.[0] ?? null;
+    lon = geo?.coordinates?.[1] ?? null;
   } catch {
     /* ignore */
   }
   await query(
-    "update users set last_login_at = now(), country = coalesce($2, country) where id = $1",
-    [userId, country],
+    `update users set last_login_at = now(),
+        country = coalesce($2, country),
+        lat = coalesce($3, lat),
+        lon = coalesce($4, lon)
+      where id = $1`,
+    [userId, country, lat, lon],
   );
   const store = await cookies();
   store.set(COOKIE, token, {

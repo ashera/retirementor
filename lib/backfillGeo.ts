@@ -4,24 +4,27 @@
 // scripts/backfill-geo.ts (manual). Uses ./geoLookup directly (no "server-only") so
 // it's safe in a plain Node script.
 import type { Client } from "pg";
-import { lookupGeo } from "./geoLookup";
+import { lookupGeoDetail } from "./geoLookup";
 
 export async function backfillVisitorGeo(c: Client): Promise<{ updated: number; scanned: number }> {
+  // Rows still missing either a country or coordinates, but with an IP to resolve.
   const rows = await c.query<{ id: string; ip: string }>(
-    "select id, ip from visitors where country is null and ip is not null",
+    "select id, ip from visitors where ip is not null and (country is null or lat is null)",
   );
   let updated = 0;
   for (const r of rows.rows) {
-    const geo = lookupGeo(r.ip);
+    const geo = lookupGeoDetail(r.ip);
     if (!geo?.country) continue;
     await c.query(
       `update visitors
-          set country = $2,
+          set country = coalesce(country, $2),
               region = coalesce(region, $3),
               city = coalesce(city, $4),
-              geo_source = coalesce(geo_source, 'geoip')
+              geo_source = coalesce(geo_source, 'geoip'),
+              lat = coalesce(lat, $5),
+              lon = coalesce(lon, $6)
         where id = $1`,
-      [r.id, geo.country, geo.region, geo.city],
+      [r.id, geo.country, geo.region, geo.city, geo.coordinates?.[0] ?? null, geo.coordinates?.[1] ?? null],
     );
     updated++;
   }

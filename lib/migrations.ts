@@ -28,6 +28,9 @@ alter table users add column if not exists avatar_url text;
 -- Best-effort country (2-letter ISO) of the account, from the IP at sign-in
 -- (IP→country via GeoLite; the raw IP is not stored for accounts).
 alter table users add column if not exists country text;
+-- City-level coordinates from the sign-in IP, for the admin map's city dots.
+alter table users add column if not exists lat double precision;
+alter table users add column if not exists lon double precision;
 alter table users alter column password_hash drop not null;
 create unique index if not exists users_google_sub_idx on users (google_sub);
 
@@ -250,6 +253,9 @@ alter table visitors add column if not exists geo_source text;
 -- The account this browser converted into (set at sign-in alongside signed_up), so
 -- the admin can see which email a tracked visitor signed up under.
 alter table visitors add column if not exists converted_user_id uuid references users(id) on delete set null;
+-- City-level coordinates (from the same GeoLite lookup) for the map's city dots.
+alter table visitors add column if not exists lat double precision;
+alter table visitors add column if not exists lon double precision;
 
 create index if not exists sessions_token_idx on sessions(token);
 create index if not exists plans_user_idx on plans(user_id);
