@@ -3,11 +3,12 @@ import type { StressEraResult } from "./stresstest";
 
 /**
  * A plain-English paragraph that ties the three stress-test figures — worst drawdown,
- * lowest balance (and when), and the ending balance — together with what actually
- * happened in the chart (the plan lasted, had a temporary gap then recovered, or ran
- * dry). Written so a user understands how the numbers relate, not just what they are.
+ * lowest balance (and when), and the ending balance — together with what happened in
+ * the chart. The key numbers are wrapped in **bold** markers (rendered by the view).
+ * When savings run out the Age Pension is a floor, so we never say a retiree is left
+ * with literally nothing once they're pension age.
  */
-export function stressNarrative(era: StressEraResult, life: number): string {
+export function stressNarrative(era: StressEraResult, life: number, agePensionAge: number): string {
   const dd = Math.round(era.maxDrawdownPct);
   const low = Math.max(0, Math.round(era.minBalance));
   const end = Math.max(0, Math.round(era.finalBalance));
@@ -18,37 +19,29 @@ export function stressNarrative(era: StressEraResult, life: number): string {
   if (era.lasts) {
     const trough =
       low > 0
-        ? `At its lowest your savings fell ${dd}% from their peak, dipping to ${lowStr} around age ${era.minAge}, before recovering.`
-        : `Your savings dropped ${dd}% at the low point near age ${era.minAge}, but never ran out.`;
-    const cut =
-      era.cutYears > 0
-        ? ` Getting there meant spending below plan for a few years, but the money held.`
-        : "";
-    return `The plan rides this one out. ${trough} It still finishes with ${endStr} at ${life} — the money outlasts the crash.${cut}`;
+        ? `Your savings dropped **${dd}%** at their lowest, down to **${lowStr}** around age **${era.minAge}**, before recovering`
+        : `Your savings dropped **${dd}%** at the low point near age **${era.minAge}** but never ran out`;
+    return `The plan rides this one out. ${trough}, and still finished with **${endStr}** at ${life} — the money outlasts the crash.`;
   }
 
   const yrsShort = life - (era.depletionAge ?? life);
-  const shortStr = `${yrsShort} year${yrsShort === 1 ? "" : "s"} short of ${life}`;
+  const shortStr = `**${yrsShort} year${yrsShort === 1 ? "" : "s"} short of ${life}**`;
 
-  // A temporary funding gap (usually the bridge to super) that the plan recovered from.
+  // A temporary funding gap (usually the bridge to super) the plan recovered from.
   if (era.recovered) {
-    const gap = `${era.unfundedYears} year${era.unfundedYears === 1 ? "" : "s"}`;
+    const gap = `**${era.unfundedYears} year${era.unfundedYears === 1 ? "" : "s"}**`;
     return (
-      `A close call. At its worst your savings fell ${dd}%, bottoming at ${lowStr} around age ${era.minAge} — ` +
+      `A close call. Your savings fell **${dd}%** at the worst, bottoming at **${lowStr}** around age **${era.minAge}** — ` +
       `low enough that for ${gap} near age ${era.depletionAge} your accessible savings ran dry before super unlocked, ` +
-      `so spending couldn't be fully covered. But the plan clawed back, ending with ${endStr} at ${life}.`
+      `so spending fell short. But the plan clawed back, ending with **${endStr}** at ${life}.`
     );
   }
 
-  // Permanent run-out.
-  if (end <= 0 && low <= 0) {
-    return (
-      `The plan can't absorb this shock. Your savings fall the whole way — a ${dd}% peak-to-trough drop — ` +
-      `and are gone by age ${era.depletionAge}, ${shortStr}. With nothing left to draw on, your final years go unfunded.`
-    );
-  }
-  return (
-    `The plan runs dry here. Your savings fell ${dd}% at their worst, down to ${lowStr} around age ${era.minAge}, ` +
-    `and were exhausted by age ${era.depletionAge} — ${shortStr}, ending with ${endStr}.`
-  );
+  // Permanent run-out — the Age Pension is the floor once savings are gone.
+  const dep = era.depletionAge ?? life;
+  const ageClause =
+    dep >= agePensionAge
+      ? `From there the Age Pension becomes your main income — a safety net, but well below your target.`
+      : `And with the Age Pension not starting until **${agePensionAge}**, there's little to live on until then, then the pension alone after.`;
+  return `The plan can't absorb this shock — your own savings fall **${dd}%** to **$0** by age **${dep}**, ${shortStr}. ${ageClause}`;
 }

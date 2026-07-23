@@ -34,11 +34,13 @@ const SAVED_ID_KEY = "au-retirement-saved-id";
 function Row({
   era,
   life,
+  agePensionAge,
   selected,
   onSelect,
 }: {
   era: StressEraResult;
   life: number;
+  agePensionAge: number;
   selected: boolean;
   onSelect: () => void;
 }) {
@@ -96,23 +98,19 @@ function Row({
       {selected && (
         <>
           <div className="border-t border-line bg-black/10 px-4 py-3">
-            <p className="text-xs leading-relaxed text-slate-300">{stressNarrative(era, life)}</p>
-            <dl className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted">
-              <div className="flex gap-1">
-                <dt>Worst drawdown</dt>
-                <dd className="font-semibold text-slate-300">−{Math.round(era.maxDrawdownPct)}%</dd>
-              </div>
-              <div className="flex gap-1">
-                <dt>Lowest balance</dt>
-                <dd className="font-semibold text-slate-300">
-                  {fmtCurrency(Math.max(0, Math.round(era.minBalance)))} at {era.minAge}
-                </dd>
-              </div>
-              <div className="flex gap-1">
-                <dt>Ends with</dt>
-                <dd className="font-semibold text-slate-300">{fmtCurrency(Math.max(0, Math.round(era.finalBalance)))}</dd>
-              </div>
-            </dl>
+            <p className="text-xs leading-relaxed text-slate-300">
+              {stressNarrative(era, life, agePensionAge)
+                .split("**")
+                .map((seg, i) =>
+                  i % 2 === 1 ? (
+                    <strong key={i} className="font-semibold text-white">
+                      {seg}
+                    </strong>
+                  ) : (
+                    <span key={i}>{seg}</span>
+                  ),
+                )}
+            </p>
           </div>
           {era.cutYears > 0 && (
             <div className="border-t border-line bg-amber-500/[0.06] px-4 py-2 text-center text-xs text-amber-300/90">
@@ -306,6 +304,7 @@ export default function StressTestView({
                       key={era.id}
                       era={era}
                       life={life}
+                      agePensionAge={config.agePensionAge}
                       selected={selectedId === era.id}
                       onSelect={() => setSelectedId((cur) => (cur === era.id ? null : era.id))}
                     />
