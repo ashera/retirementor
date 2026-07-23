@@ -19,7 +19,14 @@ function joinAnd(parts: string[]): string {
 function reductions(w: InitialWithdrawal, goal: GoalBreakdown): { label: string; amount: number }[] {
   const out: { label: string; amount: number }[] = [];
   const loanErosion = Math.round(goal.total - w.spend); // nominal loan − its deflated value that year
-  if (w.agePension + w.rent > 1) out.push({ label: `the Age Pension${w.rent > 1 ? " & rent" : ""}`, amount: Math.round(w.agePension + w.rent) });
+  if (w.agePension + w.rent > 1) {
+    // Only name the components that actually contribute, so a rent-only scenario
+    // (no Age Pension entitlement) doesn't misleadingly say "the Age Pension".
+    const hasPension = w.agePension > 1;
+    const hasRent = w.rent > 1;
+    const label = hasPension ? `the Age Pension${hasRent ? " & rent" : ""}` : "rent";
+    out.push({ label, amount: Math.round(w.agePension + w.rent) });
+  }
   if (loanErosion > 100) out.push({ label: "inflation eroding your fixed loan payment", amount: loanErosion });
   return out;
 }
@@ -240,8 +247,13 @@ function WithdrawalRateExplainer({
           {fmtCurrency(w.netSpend)} ÷ {fmtCurrency(w.portfolio)} = {pct}%
         </div>
         <p className="mt-2">
-          We take what your own savings must fund — your spending less the Age Pension{w.rent > 1 ? " and net rent" : ""} —
-          and divide it by your total investable assets (super{hasBuffer && " + outside savings"}) at
+          We take what your own savings must fund — your spending
+          {w.agePension > 1
+            ? ` less the Age Pension${w.rent > 1 ? " and net rent" : ""}`
+            : w.rent > 1
+              ? " less net rent"
+              : ""}{" "}
+          — and divide it by your total investable assets (super{hasBuffer && " + outside savings"}) at
           the start of that year.
         </p>
       </div>

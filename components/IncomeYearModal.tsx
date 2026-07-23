@@ -640,7 +640,13 @@ export default function IncomeYearModal({
                 )}
                 {shortfall > 1 && (
                   <div className="mt-1.5 font-semibold text-amber-400">
-                    ⚠ Your savings are exhausted, so your income here is just the Age Pension{rent > 0 ? " and rent" : ""} — below your target.
+                    ⚠ Your savings are exhausted, so{" "}
+                    {pension > 1
+                      ? `your income here is just the Age Pension${rent > 0 ? " and rent" : ""}`
+                      : rent > 0
+                        ? "your income here is just rent"
+                        : "you have no income here"}{" "}
+                    — below your target.
                   </div>
                 )}
               </div>
