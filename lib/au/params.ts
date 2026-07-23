@@ -113,6 +113,7 @@ export const PARAM_DESCRIPTORS: ParamDescriptor[] = [
 export const PARAM_CATEGORIES: string[] = [
   "Superannuation",
   "Super fees",
+  "Outside super",
   "Ages",
   "Age Pension · rates",
   "Age Pension · income test",
