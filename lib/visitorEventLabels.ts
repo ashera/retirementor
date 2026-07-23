@@ -14,16 +14,44 @@ function humanize(event: string): string {
   return t ? t.charAt(0).toUpperCase() + t.slice(1) : event;
 }
 
+// Guided-walkthrough steps, named by what each one covers (see GuidedIntro).
+const GUIDE_STEPS: Record<string, string> = {
+  "1": "Welcome",
+  "2": "About you",
+  "3": "On-track check",
+  "4": "Super at retirement",
+  "5": "Retirement income",
+  "6": "Reliability check",
+};
+
+// Setup-wizard steps, keyed by the step key fired in the event (see PlanWizard).
+const WIZARD_STEPS: Record<string, string> = {
+  household: "Your household",
+  you: "About you",
+  partner: "About your partner",
+  contributions: "Extra super contributions",
+  outside: "Savings outside super",
+  property: "Investment property",
+  goal: "Your retirement goal",
+  assumptions: "Assumptions",
+};
+
 // Friendly description per known event. A function may fold props into the text.
 const DESCRIBERS: Record<string, string | ((p: Props) => string)> = {
   "Get started shown": "Saw the get-started screen",
   "Results viewed": "Viewed their projection",
   "Get started: guide": "Chose the guided walkthrough",
   "Get started: wizard": "Chose the quick setup wizard",
-  "Guide step": (p) => `Guided walkthrough — step ${str(p, "step") ?? "?"}`,
+  "Guide step": (p) => {
+    const s = str(p, "step");
+    return `Guided walkthrough — ${(s && GUIDE_STEPS[s]) ?? `step ${s ?? "?"}`}`;
+  },
   "Guide completed": "Finished the guided walkthrough",
   "Guide exited to wizard": "Switched from the guide to the wizard",
-  "Wizard step": (p) => (str(p, "step") ? `Setup wizard — ${str(p, "step")}` : "Setup wizard step"),
+  "Wizard step": (p) => {
+    const k = str(p, "step");
+    return `Setup wizard — ${(k && WIZARD_STEPS[k]) ?? k ?? "step"}`;
+  },
   "Wizard completed": "Finished the setup wizard",
   "Budget opened": "Opened the budget builder",
   "Plan saved": "Saved their plan",

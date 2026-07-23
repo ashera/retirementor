@@ -4,7 +4,10 @@ import { describeVisitorEvent } from "../lib/visitorEventLabels";
 describe("describeVisitorEvent", () => {
   it("gives a friendly, prop-aware label for known events", () => {
     expect(describeVisitorEvent("Get started: guide", null).label).toBe("Chose the guided walkthrough");
-    expect(describeVisitorEvent("Guide step", { step: 2, phase: 1 }).label).toBe("Guided walkthrough — step 2");
+    expect(describeVisitorEvent("Guide step", { step: 2, phase: 1 }).label).toBe("Guided walkthrough — About you");
+    expect(describeVisitorEvent("Wizard step", { step: "property", index: 4 }).label).toBe(
+      "Setup wizard — Investment property",
+    );
     expect(describeVisitorEvent("Year breakdown opened", { chart: "income" }).label).toBe(
       "Opened a year's income breakdown",
     );
