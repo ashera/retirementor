@@ -21,10 +21,23 @@ function gaEventName(event: string) {
     .slice(0, 40);
 }
 
+// Optional sink that also records events to our own visitor activity log. Injected
+// by <VisitorActivity> for signed-out visitors (kept as an injected fn so this file
+// stays free of any server-action import). Null = not recording.
+type VisitorLogger = (event: string, props?: Props) => void;
+let visitorLogger: VisitorLogger | null = null;
+export function setVisitorLogger(fn: VisitorLogger) {
+  visitorLogger = fn;
+}
+export function clearVisitorLogger() {
+  visitorLogger = null;
+}
+
 export function track(event: string, props?: Props) {
   if (typeof window === "undefined") return;
   window.plausible?.(event, props ? { props } : undefined);
   window.gtag?.("event", gaEventName(event), props);
+  visitorLogger?.(event, props);
 }
 
 // Google Ads conversion event. The conversion action in Google Ads is linked to

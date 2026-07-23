@@ -1,4 +1,5 @@
 import CompareView from "@/components/CompareView";
+import VisitorActivity from "@/components/VisitorActivity";
 import { getCurrentUser } from "@/lib/auth";
 import { listPlans } from "@/app/actions/plans";
 import { getActiveConfig } from "@/lib/refdata";
@@ -12,5 +13,10 @@ export default async function ComparePage() {
     user ? listPlans() : Promise.resolve([]),
     getActiveConfig(),
   ]);
-  return <CompareView config={config} savedPlans={savedPlans} />;
+  return (
+    <>
+      {!user && <VisitorActivity />}
+      <CompareView config={config} savedPlans={savedPlans} />
+    </>
+  );
 }

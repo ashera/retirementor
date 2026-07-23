@@ -261,6 +261,19 @@ alter table visitors add column if not exists lon double precision;
 alter table visitors add column if not exists is_bot boolean;
 alter table visitors add column if not exists bot_reason text;
 
+-- Per-visitor action log: the sequence of things an anonymous visitor did (page
+-- views + named UI events tee'd from the client analytics stream), so the admin can
+-- see what someone actually did before they bounced. Capped per visitor in code.
+create table if not exists visitor_events (
+  id uuid primary key default gen_random_uuid(),
+  visitor_id uuid not null references visitors(id) on delete cascade,
+  event text not null,           -- 'pageview' or a named track() event
+  path text,                     -- the page it happened on
+  props jsonb,                   -- optional event properties (e.g. {chart:'balance'})
+  created_at timestamptz not null default now()
+);
+create index if not exists visitor_events_visitor_idx on visitor_events (visitor_id, created_at);
+
 create index if not exists sessions_token_idx on sessions(token);
 create index if not exists plans_user_idx on plans(user_id);
 create index if not exists demo_scenarios_pub_idx on demo_scenarios(published, sort_order);

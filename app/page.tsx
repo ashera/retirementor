@@ -1,4 +1,5 @@
 import PlannerApp from "@/components/PlannerApp";
+import VisitorActivity from "@/components/VisitorActivity";
 import { getCurrentUser } from "@/lib/auth";
 import { listPlans, getDraft } from "@/app/actions/plans";
 import { buildReviewData, getActiveConfig } from "@/lib/refdata";
@@ -53,6 +54,7 @@ export default async function Page() {
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      {!user && <VisitorActivity />}
       <PlannerApp
         user={user ? { email: user.email, isAdmin: user.is_admin, name: user.name, avatarUrl: user.avatar_url } : null}
         savedPlans={savedPlans}

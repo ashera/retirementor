@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { fmtDate, fmtDateTime, fmtCompact } from "@/lib/au/format";
 import FlagWithBasis from "@/components/FlagWithBasis";
+import VisitorDetailModal from "@/components/VisitorDetailModal";
 import type { AdminVisitorRow } from "@/lib/adminVisitors";
 
 /** City/region (the country is shown as the flag alongside). */
@@ -52,6 +53,7 @@ export default function VisitorsTable({ visitors }: { visitors: AdminVisitorRow[
   const [q, setQ] = useState("");
   const [engagedOnly, setEngagedOnly] = useState(false);
   const [hideBots, setHideBots] = useState(true);
+  const [selected, setSelected] = useState<AdminVisitorRow | null>(null);
   const query = q.trim().toLowerCase();
   const botCount = useMemo(() => visitors.filter((v) => v.is_bot).length, [visitors]);
 
@@ -108,7 +110,16 @@ export default function VisitorsTable({ visitors }: { visitors: AdminVisitorRow[
           </thead>
           <tbody>
             {filtered.map((v) => (
-              <tr key={v.id} className="border-b border-line/60 align-top transition hover:bg-panel-2/40">
+              <tr
+                key={v.id}
+                onClick={(e) => {
+                  // Ignore clicks that land on an interactive child (flag popover, email link).
+                  if ((e.target as HTMLElement).closest("button, a")) return;
+                  setSelected(v);
+                }}
+                title="Click for this visitor's activity"
+                className="cursor-pointer border-b border-line/60 align-top transition hover:bg-panel-2/40"
+              >
                 <td className="px-4 py-2.5 whitespace-nowrap text-muted">{fmtDateTime(v.last_seen_at)}</td>
                 <td className="px-4 py-2.5 text-right tabular-nums text-slate-200">{v.visits}</td>
                 <td className="px-4 py-2.5 text-slate-200">
@@ -175,6 +186,8 @@ export default function VisitorsTable({ visitors }: { visitors: AdminVisitorRow[
           </tbody>
         </table>
       </div>
+
+      {selected && <VisitorDetailModal visitor={selected} onClose={() => setSelected(null)} />}
     </>
   );
 }

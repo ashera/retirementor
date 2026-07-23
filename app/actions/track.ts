@@ -87,10 +87,12 @@ export async function trackVisit(input: TrackInput): Promise<void> {
     const user = await getCurrentUser();
     if (user) return;
 
-    // Ensure a stable visitor key + cookie.
+    // Ensure a stable visitor key + cookie. If the client already set one (so its
+    // events could attach immediately), adopt that key and (re)set it httpOnly so
+    // it's no longer JS-readable.
     let visitorKey = key;
-    if (!visitorKey) {
-      visitorKey = randomBytes(18).toString("base64url");
+    {
+      if (!visitorKey) visitorKey = randomBytes(18).toString("base64url");
       store.set(VISITOR_COOKIE, visitorKey, {
         httpOnly: true,
         sameSite: "lax",
@@ -164,5 +166,53 @@ export async function trackVisit(input: TrackInput): Promise<void> {
   } catch {
     // Analytics is best-effort; swallow everything so tracking can never break
     // the page it's attached to.
+  }
+}
+
+const MAX_EVENTS_PER_VISITOR = 800; // storage guard against a runaway/hostile client
+
+/**
+ * Append one action to a signed-out visitor's activity log (page views + named UI
+ * events tee'd from the client analytics). Identity comes from the rw_visitor cookie
+ * that trackVisit establishes — if it isn't set yet we skip, so this never creates a
+ * competing visitor row. No-op for signed-in users. Best-effort; never throws.
+ */
+export async function logVisitorEvent(input: {
+  event: string;
+  path?: string;
+  props?: Record<string, unknown>;
+}): Promise<void> {
+  try {
+    const event = (input.event || "").slice(0, 80);
+    if (!event) return;
+
+    const store = await cookies();
+    const key = store.get(VISITOR_COOKIE)?.value;
+    if (!key) return; // trackVisit owns identity; no cookie yet → skip
+
+    const user = await getCurrentUser();
+    if (user) return;
+
+    const path = input.path ? input.path.slice(0, 200) : null;
+    let props: string | null = null;
+    if (input.props && typeof input.props === "object") {
+      try {
+        const s = JSON.stringify(input.props);
+        if (s && s.length <= 2000) props = s;
+      } catch {
+        /* non-serialisable props — drop them */
+      }
+    }
+
+    await query(
+      `insert into visitor_events (visitor_id, event, path, props)
+         select v.id, $2, $3, $4::jsonb from visitors v
+          where v.visitor_key = $1
+            and (select count(*) from visitor_events e where e.visitor_id = v.id) < ${MAX_EVENTS_PER_VISITOR}`,
+      [key, event, path, props],
+    );
+    await query("update visitors set last_seen_at = now() where visitor_key = $1", [key]);
+  } catch {
+    /* best-effort */
   }
 }
