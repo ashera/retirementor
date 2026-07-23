@@ -9,6 +9,7 @@ import type { SavedPlan } from "@/app/actions/plans";
 import { runStressTest, STRESS_ERAS, type StressEraResult } from "@/lib/au/stresstest";
 import { essentialsFloor } from "@/lib/au/strategies";
 import { fmtCurrency } from "@/lib/au/format";
+import { stressNarrative } from "@/lib/au/stressNarrative";
 import { track } from "@/lib/analytics";
 import StressChart from "@/components/StressChart";
 import { ageGapInfo } from "@/components/ageAxis";
@@ -94,27 +95,25 @@ function Row({
       </button>
       {selected && (
         <>
-          <dl className="grid grid-cols-3 gap-2 border-t border-line bg-black/10 px-4 py-3 text-center text-xs">
-            <div>
-              <dt className="text-muted">Worst drawdown</dt>
-              <dd className="mt-0.5 font-semibold text-white">−{Math.round(era.maxDrawdownPct)}%</dd>
-            </div>
-            <div>
-              <dt className="text-muted">Lowest balance</dt>
-              <dd className="mt-0.5 font-semibold text-white">
-                {fmtCurrency(Math.max(0, Math.round(era.minBalance)))} <span className="font-normal text-muted">at {era.minAge}</span>
-              </dd>
-            </div>
-            <div>
-              <dt className="text-muted">Ends with</dt>
-              <dd className="mt-0.5 font-semibold text-white">{fmtCurrency(Math.max(0, Math.round(era.finalBalance)))}</dd>
-            </div>
-          </dl>
-          {era.recovered && (
-            <div className="border-t border-line bg-amber-500/[0.06] px-4 py-2 text-center text-xs text-amber-300/90">
-              A {era.unfundedYears}-year funding gap at age {era.depletionAge}: your accessible savings ran dry before super unlocked, so those years couldn&apos;t be fully funded — but the plan recovered and ended with money left.
-            </div>
-          )}
+          <div className="border-t border-line bg-black/10 px-4 py-3">
+            <p className="text-xs leading-relaxed text-slate-300">{stressNarrative(era, life)}</p>
+            <dl className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted">
+              <div className="flex gap-1">
+                <dt>Worst drawdown</dt>
+                <dd className="font-semibold text-slate-300">−{Math.round(era.maxDrawdownPct)}%</dd>
+              </div>
+              <div className="flex gap-1">
+                <dt>Lowest balance</dt>
+                <dd className="font-semibold text-slate-300">
+                  {fmtCurrency(Math.max(0, Math.round(era.minBalance)))} at {era.minAge}
+                </dd>
+              </div>
+              <div className="flex gap-1">
+                <dt>Ends with</dt>
+                <dd className="font-semibold text-slate-300">{fmtCurrency(Math.max(0, Math.round(era.finalBalance)))}</dd>
+              </div>
+            </dl>
+          </div>
           {era.cutYears > 0 && (
             <div className="border-t border-line bg-amber-500/[0.06] px-4 py-2 text-center text-xs text-amber-300/90">
               The cost of flexing: spending stayed below plan for {era.cutYears} year{era.cutYears === 1 ? "" : "s"}, bottoming at {fmtCurrency(Math.round(era.minLivingSpend))} (−{Math.round(era.deepestCutPct)}%).
