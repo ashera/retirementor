@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import CountryFlag from "@/components/CountryFlag";
 import { getVisitorEvents, type VisitorEvent } from "@/app/actions/visitorDetail";
+import { describeVisitorEvent } from "@/lib/visitorEventLabels";
 import type { AdminVisitorRow } from "@/lib/adminVisitors";
 
 function prettyPath(path: string | null): string {
@@ -32,10 +33,6 @@ function propsSummary(props: Record<string, unknown> | null): string {
   return parts.join(" · ");
 }
 
-function label(e: VisitorEvent): string {
-  if (e.event === "pageview") return `Viewed ${prettyPath(e.path)}`;
-  return e.event;
-}
 
 export default function VisitorDetailModal({
   visitor,
@@ -145,15 +142,18 @@ export default function VisitorDetailModal({
           {events && events.length > 0 && (
             <ol className="relative space-y-3 border-l border-line pl-4">
               {events.map((e, i) => {
-                const ps = propsSummary(e.props);
                 const isPage = e.event === "pageview";
+                const desc = isPage
+                  ? { label: `Viewed ${prettyPath(e.path)}`, keepProps: false }
+                  : describeVisitorEvent(e.event, e.props);
+                const ps = desc.keepProps ? propsSummary(e.props) : "";
                 return (
                   <li key={i} className="relative">
                     <span
                       className={`absolute -left-[21px] top-1 h-2 w-2 rounded-full ${isPage ? "bg-sky-400" : "bg-accent"}`}
                     />
                     <div className="flex items-baseline justify-between gap-3">
-                      <span className="text-sm text-slate-100">{label(e)}</span>
+                      <span className="text-sm text-slate-100">{desc.label}</span>
                       <span className="shrink-0 font-mono text-[11px] text-muted">{timeOf(e.created_at)}</span>
                     </div>
                     {ps && <div className="text-xs text-muted">{ps}</div>}
