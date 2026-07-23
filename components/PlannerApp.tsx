@@ -55,6 +55,7 @@ import type { EngineConfig } from "@/lib/au/config";
 import { fmtCurrency } from "@/lib/au/format";
 import { track, trackPlanBuiltConversion } from "@/lib/analytics";
 import { trackVisit } from "@/app/actions/track";
+import CountryFlag from "@/components/CountryFlag";
 import { planCompleteness } from "@/lib/au/completeness";
 import CompletenessRing from "@/components/CompletenessRing";
 import WithdrawalRateCard from "@/components/WithdrawalRateCard";
@@ -231,6 +232,7 @@ function Lever({
 
 export default function PlannerApp({
   user,
+  country = null,
   savedPlans,
   draft = null,
   config,
@@ -239,6 +241,7 @@ export default function PlannerApp({
   sharedPlan = null,
 }: {
   user: { email: string; isAdmin: boolean; name?: string | null; avatarUrl?: string | null } | null;
+  country?: string | null; // location flag for the menu bar (user's or visitor's)
   savedPlans: SavedPlan[];
   draft?: PlanDraft | null;
   config: EngineConfig;
@@ -860,6 +863,11 @@ export default function PlannerApp({
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3 text-sm">
         <Logo />
         <div className="flex items-center gap-3">
+        {country && (
+          <span className="flex items-center" title="Your location">
+            <CountryFlag code={country} showCode={false} />
+          </span>
+        )}
         {user ? (
           <>
             {user.isAdmin && userStats && (

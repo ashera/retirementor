@@ -1,6 +1,8 @@
+import { headers } from "next/headers";
 import PlannerApp from "@/components/PlannerApp";
 import VisitorActivity from "@/components/VisitorActivity";
 import { getCurrentUser } from "@/lib/auth";
+import { countryFromIp } from "@/lib/geo";
 import { listPlans, getDraft } from "@/app/actions/plans";
 import { buildReviewData, getActiveConfig } from "@/lib/refdata";
 import { getUserStats } from "@/lib/adminUsers";
@@ -51,12 +53,21 @@ export default async function Page() {
   ]);
   const reviewDue = user?.is_admin ? (await buildReviewData()).dueTotal : 0;
   const userStats = user?.is_admin ? await getUserStats() : null;
+  // The country flag for the menu bar: a signed-in user's stored country, else the
+  // anonymous visitor's country resolved from their IP (same GeoLite lookup we track).
+  let country = user?.country ?? null;
+  if (!user) {
+    const h = await headers();
+    const ip = (h.get("x-forwarded-for") || "").split(",")[0].trim() || h.get("x-real-ip");
+    country = countryFromIp(ip);
+  }
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       {!user && <VisitorActivity />}
       <PlannerApp
         user={user ? { email: user.email, isAdmin: user.is_admin, name: user.name, avatarUrl: user.avatar_url } : null}
+        country={country}
         savedPlans={savedPlans}
         draft={draft}
         config={config}

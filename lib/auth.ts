@@ -34,6 +34,7 @@ export interface User {
   is_admin: boolean;
   name: string | null;
   avatar_url: string | null;
+  country: string | null;
 }
 
 // --- Password hashing (scrypt, salt stored alongside the hash) ---
@@ -126,7 +127,7 @@ export async function getCurrentUser(): Promise<User | null> {
   const token = store.get(COOKIE)?.value;
   if (!token) return null;
   const r = await query<User>(
-    `select u.id, u.email, u.is_admin, u.name, u.avatar_url
+    `select u.id, u.email, u.is_admin, u.name, u.avatar_url, u.country
        from sessions s
        join users u on u.id = s.user_id
       where s.token = $1 and s.expires_at > now()
