@@ -99,3 +99,13 @@ input[type="range"]::-moz-range-thumb {
   cursor: pointer;
   border: 3px solid var(--color-ink);
 }
+
+/* On phones, suppress the Recharts hover/tap tooltips — the pop-ups obscure the
+   small charts and get in the way of scrolling/tapping. Tapping a year still opens
+   the full year-detail modal, which is the better mobile interaction anyway. */
+@media (max-width: 640px) {
+  .recharts-tooltip-wrapper,
+  .recharts-tooltip-cursor {
+    display: none !important;
+  }
+}
