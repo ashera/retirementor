@@ -5,6 +5,7 @@ import { cookies, headers } from "next/headers";
 import { query } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { lookupGeoDetail } from "@/lib/geo";
+import { classifyBot } from "@/lib/botDetect";
 
 const VISITOR_COOKIE = "rw_visitor";
 const VISITOR_TTL_MS = 365 * 24 * 60 * 60 * 1000; // 1 year
@@ -15,6 +16,9 @@ interface TrackInput {
   event: VisitEvent;
   // Only meaningful for the "super"/"budget" milestones; captured as a value too.
   value?: number;
+  // Client automation signal (navigator.webdriver) — a strong bot indicator that
+  // headless scrapers can't easily hide, even when they spoof a normal UA.
+  webdriver?: boolean;
 }
 
 /** Pull best-effort location from whatever the proxy/CDN injected. Railway sits
@@ -99,22 +103,27 @@ export async function trackVisit(input: TrackInput): Promise<void> {
     const ctx = await readContext();
     const amount = cleanAmount(input.value);
     const isVisit = input.event === "visit";
+    const bot = classifyBot(ctx.user_agent, { webdriver: input.webdriver });
 
     await query(
       `insert into visitors (
          visitor_key, first_seen_at, last_seen_at, visits,
          set_super_balance, super_balance, set_budget_income, budget_income,
          visited_what_if, visited_stress_test,
-         country, region, city, ip, locale, user_agent, geo_source, lat, lon
+         country, region, city, ip, locale, user_agent, geo_source, lat, lon,
+         is_bot, bot_reason
        ) values (
          $1, now(), now(), 1,
          $2, $3, $4, $5,
          $6, $7,
-         $8, $9, $10, $11, $12, $13, $14, $16, $17
+         $8, $9, $10, $11, $12, $13, $14, $16, $17,
+         $18, $19
        )
        on conflict (visitor_key) do update set
          last_seen_at = now(),
          visits = visitors.visits + $15,
+         is_bot = coalesce(visitors.is_bot, false) or $18,
+         bot_reason = coalesce(visitors.bot_reason, $19),
          set_super_balance = visitors.set_super_balance or excluded.set_super_balance,
          super_balance = coalesce(excluded.super_balance, visitors.super_balance),
          set_budget_income = visitors.set_budget_income or excluded.set_budget_income,
@@ -148,6 +157,8 @@ export async function trackVisit(input: TrackInput): Promise<void> {
         isVisit ? 1 : 0,
         ctx.lat,
         ctx.lon,
+        bot.isBot,
+        bot.reason,
       ],
     );
   } catch {

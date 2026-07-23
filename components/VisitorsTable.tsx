@@ -51,21 +51,24 @@ function Badge({ label, tone }: { label: string; tone: "super" | "budget" | "wha
 export default function VisitorsTable({ visitors }: { visitors: AdminVisitorRow[] }) {
   const [q, setQ] = useState("");
   const [engagedOnly, setEngagedOnly] = useState(false);
+  const [hideBots, setHideBots] = useState(true);
   const query = q.trim().toLowerCase();
+  const botCount = useMemo(() => visitors.filter((v) => v.is_bot).length, [visitors]);
 
   const filtered = useMemo(() => {
     return visitors.filter((v) => {
+      if (hideBots && v.is_bot) return false;
       if (engagedOnly && !(v.set_super_balance || v.set_budget_income || v.visited_what_if || v.visited_stress_test)) {
         return false;
       }
       if (!query) return true;
-      const hay = [v.city, v.region, v.country, v.ip, v.locale, v.user_agent, v.converted_email]
+      const hay = [v.city, v.region, v.country, v.ip, v.locale, v.user_agent, v.converted_email, v.bot_reason]
         .filter(Boolean)
         .join(" ")
         .toLowerCase();
       return hay.includes(query);
     });
-  }, [visitors, query, engagedOnly]);
+  }, [visitors, query, engagedOnly, hideBots]);
 
   return (
     <>
@@ -79,6 +82,10 @@ export default function VisitorsTable({ visitors }: { visitors: AdminVisitorRow[
         <label className="flex cursor-pointer items-center gap-2 text-sm text-muted">
           <input type="checkbox" checked={engagedOnly} onChange={(e) => setEngagedOnly(e.target.checked)} />
           Engaged only
+        </label>
+        <label className="flex cursor-pointer items-center gap-2 text-sm text-muted">
+          <input type="checkbox" checked={hideBots} onChange={(e) => setHideBots(e.target.checked)} />
+          Hide bots{botCount > 0 && ` (${botCount})`}
         </label>
         <span className="text-xs text-muted">
           {filtered.length}
@@ -142,7 +149,17 @@ export default function VisitorsTable({ visitors }: { visitors: AdminVisitorRow[
                   )}
                 </td>
                 <td className="px-4 py-2.5 text-muted" title={v.user_agent ?? undefined}>
-                  {deviceOf(v.user_agent)}
+                  <span className="flex items-center gap-1.5">
+                    {deviceOf(v.user_agent)}
+                    {v.is_bot && (
+                      <span
+                        className="rounded-full bg-orange-500/15 px-1.5 py-0.5 text-[11px] font-semibold text-orange-300"
+                        title={v.bot_reason ? `Likely bot — ${v.bot_reason}` : "Likely bot"}
+                      >
+                        🤖 bot
+                      </span>
+                    )}
+                  </span>
                   {v.locale && <div className="text-xs text-muted/70">{v.locale}</div>}
                 </td>
                 <td className="px-4 py-2.5 whitespace-nowrap text-muted">{fmtDate(v.first_seen_at)}</td>

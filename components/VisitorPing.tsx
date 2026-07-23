@@ -11,7 +11,7 @@ export default function VisitorPing({ event }: { event: VisitEvent }) {
   useEffect(() => {
     if (fired.current) return;
     fired.current = true;
-    void trackVisit({ event });
+    void trackVisit({ event, webdriver: navigator.webdriver === true });
   }, [event]);
   return null;
 }

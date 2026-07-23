@@ -256,6 +256,10 @@ alter table visitors add column if not exists converted_user_id uuid references 
 -- City-level coordinates (from the same GeoLite lookup) for the map's city dots.
 alter table visitors add column if not exists lat double precision;
 alter table visitors add column if not exists lon double precision;
+-- Likely-bot flag (from UA + client navigator.webdriver). Nullable = not yet
+-- classified (older rows, backfilled on deploy). bot_reason = why we flagged it.
+alter table visitors add column if not exists is_bot boolean;
+alter table visitors add column if not exists bot_reason text;
 
 create index if not exists sessions_token_idx on sessions(token);
 create index if not exists plans_user_idx on plans(user_id);

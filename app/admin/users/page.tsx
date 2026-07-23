@@ -87,9 +87,10 @@ async function VisitorsView() {
         <div className="text-sm font-semibold uppercase tracking-widest text-accent">Backoffice · Users</div>
         <h1 className="mt-1 text-3xl font-bold text-white">Anonymous visitors</h1>
         <p className="mt-2 text-muted">
-          People who used the site without signing up. {stats.total} tracked ·{" "}
-          {stats.last7Days} in the last 7 days · {stats.engaged} engaged ·{" "}
-          {stats.converted} later signed up.
+          People who used the site without signing up. {stats.total} human
+          {stats.total === 1 ? "" : "s"} · {stats.last7Days} in the last 7 days ·{" "}
+          {stats.engaged} engaged · {stats.converted} later signed up
+          {stats.bots > 0 && ` · ${stats.bots} likely bot${stats.bots === 1 ? "" : "s"} (hidden by default)`}.
         </p>
       </header>
       <VisitorsTable visitors={visitors} />

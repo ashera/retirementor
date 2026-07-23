@@ -15,7 +15,7 @@ export async function getLocationCounts(): Promise<CountryCount[]> {
       "select country, count(*)::int as n from users where country is not null group by country",
     ),
     query<{ country: string; n: number }>(
-      "select country, count(*)::int as n from visitors where country is not null group by country",
+      "select country, count(*)::int as n from visitors where country is not null and not coalesce(is_bot, false) group by country",
     ),
   ]);
 
@@ -50,7 +50,7 @@ export async function getLocationPoints(): Promise<LocationPoint[]> {
       "select lat, lon, null::text as city, null::text as region, country from users where lat is not null and lon is not null",
     ),
     query<{ lat: number; lon: number; city: string | null; region: string | null; country: string | null }>(
-      "select lat, lon, city, region, country from visitors where lat is not null and lon is not null",
+      "select lat, lon, city, region, country from visitors where lat is not null and lon is not null and not coalesce(is_bot, false)",
     ),
   ]);
 

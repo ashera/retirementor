@@ -450,7 +450,7 @@ export default function PlannerApp({
     track(configured ? "Results viewed" : "Get started shown", { signed_in: !!user });
     // Server-side anonymous-visitor funnel (persisted, admin-visible). No-op for
     // signed-in users; fires once per mount for a signed-out visit.
-    if (!user) void trackVisit({ event: "visit" });
+    if (!user) void trackVisit({ event: "visit", webdriver: navigator.webdriver === true });
   }, [ready, configured, user]);
 
   // Record when a signed-out visitor has entered a super balance (a key funnel
@@ -465,7 +465,7 @@ export default function PlannerApp({
     );
     if (totalSuper > 0) {
       superTracked.current = true;
-      void trackVisit({ event: "super", value: totalSuper });
+      void trackVisit({ event: "super", value: totalSuper, webdriver: navigator.webdriver === true });
     }
   }, [ready, user, configured, plan]);
 
@@ -650,7 +650,7 @@ export default function PlannerApp({
     setNotice("Budget applied — this is now your income goal.");
     if (!user) {
       const goal = update.targetSpending ?? plan.targetSpending;
-      void trackVisit({ event: "budget", value: Number.isFinite(goal) ? goal : undefined });
+      void trackVisit({ event: "budget", value: Number.isFinite(goal) ? goal : undefined, webdriver: navigator.webdriver === true });
     }
   };
 

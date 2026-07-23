@@ -3,7 +3,7 @@
 // Idempotent: applies the schema and seeds reference data / sources.
 import { Client } from "pg";
 import { migrate } from "../lib/migrations";
-import { backfillVisitorGeo } from "../lib/backfillGeo";
+import { backfillVisitorGeo, backfillVisitorBots } from "../lib/backfillGeo";
 import { sslFor } from "../lib/db";
 
 const url =
@@ -21,8 +21,10 @@ async function main() {
     try {
       const { updated, scanned } = await backfillVisitorGeo(c);
       console.log(`  visitor-geo: backfilled ${updated} of ${scanned} row(s) needing a country.`);
+      const bots = await backfillVisitorBots(c);
+      console.log(`  visitor-bots: classified ${bots.updated} previously-unlabelled row(s).`);
     } catch (e) {
-      console.warn("  visitor-geo: backfill skipped —", (e as Error).message);
+      console.warn("  visitor-geo/bots: backfill skipped —", (e as Error).message);
     }
     const t = await c.query(
       "select tablename from pg_tables where schemaname='public' order by tablename",
