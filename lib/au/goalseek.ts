@@ -8,7 +8,7 @@ import { runMonteCarlo, MC_CONFIDENCE_TARGET, MC_CONFIDENCE_MC } from "./monteca
 import { lifestageBreakdown } from "./lifestages";
 import { budgetToStages, budgetTotal, isEssential } from "./budget";
 import type { EngineConfig } from "./config";
-import type { RetirementPlan } from "./types";
+import { oldestCurrentAge, type RetirementPlan } from "./types";
 
 /**
  * Find the threshold value of a lever where `evaluate` flips to true.
@@ -107,7 +107,8 @@ export function whatWillItTake(
 
   const minRetireAge = solveThreshold(
     (v) => lasts({ ...plan, retirementAge: Math.round(v) }, config),
-    Math.min(plan.retirementAge, 45),
+    // Never search below the user's current age — "retire earlier" can't mean the past.
+    Math.max(oldestCurrentAge(plan), Math.min(plan.retirementAge, 45)),
     75,
     true,
     0.5,
@@ -155,7 +156,7 @@ export function earliestRetirement(
   const targetPct = Math.round(target * 100);
   // Floor at 40 to match the retirement-age control's range (and keep results
   // realistic); never below "retire now".
-  const lo = Math.max(plan.people[0].currentAge, 40);
+  const lo = Math.max(oldestCurrentAge(plan), 40);
   const hi = 75;
 
   const successAt = (age: number) =>

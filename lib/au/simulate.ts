@@ -815,7 +815,13 @@ export function simulate(
     const work = plan.workIncome;
     const workers = plan.people.length;
     const grossWork = work && oldest < work.untilAge ? Math.max(0, work.perYear) : 0;
-    const workTax = grossWork > 0 ? ages.reduce((s, a) => s + taxAtAge(grossWork / workers, a), 0) : 0;
+    // Part-time work income is taxed per person's share; a below-pension-age worker
+    // also owes the 2% Medicare levy on it (as a salary would — taxAtAge/senior tax
+    // omit the levy). Pension-age (SAPTO) workers are generally levy-exempt on low
+    // income, so we leave theirs out.
+    const workTax = grossWork > 0
+      ? ages.reduce((s, a) => s + taxAtAge(grossWork / workers, a) + (a < pensionAge ? medicareLevy(grossWork / workers) : 0), 0)
+      : 0;
     const netWork = grossWork - workTax;
     // Per-person EMPLOYMENT income = this person's share of part-time work plus, for a
     // still-working partner in the staggered gap, their career salary. The Work Bonus
@@ -851,7 +857,11 @@ export function simulate(
         (s, _p, i) => s + (ages[i] >= pensionAge ? superOf(i) : pension[i]),
         0,
       );
-      const financialAssets = outside + assessedSuper;
+      // Floor the outside pool at 0 for the means test: an underwater property sale
+      // can leave it negative, but unsecured debt isn't deductible from assessable
+      // assets (the property's own loan is already netted via propertyEquity), so a
+      // shortfall shouldn't understate assets and inflate the pension.
+      const financialAssets = Math.max(0, outside) + assessedSuper;
       const ap = agePension(
         {
           household: plan.household,
@@ -1066,7 +1076,9 @@ export function simulate(
             outsideCgtTax += Math.max(0, taxAtAge(base + cgtDiscount * gainPer, ages[i]) - taxAtAge(base, ages[i]));
           } else {
             const marginal = Math.max(0, taxAtAge(base + gainPer, ages[i]) - taxAtAge(base, ages[i]));
-            outsideCgtTax += onAgePension ? marginal : Math.max(marginal, cgtMinRate * gainPer);
+            // The 30%-minimum waiver is for actual Age Pension RECIPIENTS — a partner
+            // under pension age (not a recipient) still faces the floor on their share.
+            outsideCgtTax += onAgePension && ages[i] >= pensionAge ? marginal : Math.max(marginal, cgtMinRate * gainPer);
           }
         }
       });
@@ -1099,7 +1111,7 @@ export function simulate(
           gain: Math.max(0, realizedGain) / workers,
         },
         ages[i] >= pensionAge,
-        onAgePensionRet,
+        onAgePensionRet && ages[i] >= pensionAge, // waiver only for actual recipients
       ),
     );
 

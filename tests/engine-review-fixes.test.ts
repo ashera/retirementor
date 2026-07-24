@@ -5,6 +5,7 @@ import { incomeTax, medicareLevy, sapto, seniorIncomeTax, residentIncomeTax } fr
 import { outstandingBalance } from "../lib/au/mortgage";
 import { guardrailsTimeline } from "../lib/au/guardrails";
 import { failsafeSpend, runStressTest } from "../lib/au/stresstest";
+import { earliestRetirement, whatWillItTake } from "../lib/au/goalseek";
 import { bootstrapShockPath } from "../lib/au/historicalReturns";
 import { DEFAULT_PLAN, spendingForAge, type RetirementPlan, type Person } from "../lib/au/types";
 
@@ -426,5 +427,27 @@ describe("failsafeSpend — the tightest never-cut spend that survives all eras"
     const fs = failsafeSpend(plan, cfg);
     expect(fs.spend).toBeLessThan(fs.currentSpend); // headroom is negative
     expect(fs.headroomPct).toBeLessThan(0);
+  });
+});
+
+// ── Review cleanup batch (low-severity fixes) ─────────────────────────────────
+
+describe("Cleanup — earliest retirement is never below the current age", () => {
+  it("a well-funded 55yo isn't told they could 'retire' in the past", () => {
+    const plan = base({ people: [P({ currentAge: 55, superBalance: 2_000_000 })], outsideSuper: 500_000, retirementAge: 60, targetSpending: 40_000 });
+    const e = earliestRetirement(plan, cfg);
+    if (e.age != null) expect(e.age).toBeGreaterThanOrEqual(55);
+    const w = whatWillItTake(plan, cfg);
+    if (w.retireAge != null) expect(w.retireAge).toBeGreaterThanOrEqual(55);
+  });
+});
+
+describe("Cleanup — Medicare levy on below-pension-age part-time work", () => {
+  it("nets work income of tax AND the 2% levy for an under-67 worker", () => {
+    const plan = base({ people: [P({ currentAge: 60, superBalance: 600_000 })], retirementAge: 60, targetSpending: 30_000, workIncome: { perYear: 50_000, untilAge: 70 } });
+    const net = rowAt(plan, 62).breakdown.workIncome; // netWork, age 62 < pension age 67
+    expect(medicareLevy(50_000)).toBeGreaterThan(0); // sanity: levy applies at $50k
+    expect(net).toBeCloseTo(50_000 - residentIncomeTax(50_000) - medicareLevy(50_000), 0);
+    expect(net).toBeLessThan(50_000 - residentIncomeTax(50_000)); // the levy was deducted
   });
 });
