@@ -292,9 +292,16 @@ export function simulate(
       const taxed293 = Math.min(concessional, Math.max(0, div293Income - div293Threshold));
       const extra293 = taxed293 * config.div293ExtraTaxRate;
       const added = concessional * (1 - config.contributionsTax) - extra293 + ncc;
-      const fee = fixedAdmin + insurance;
+      // Fixed admin + insurance are $ deductions. Cap them at what the account can
+      // actually bear so a $0-balance, non-earning member (or a run-down account)
+      // can't go NEGATIVE — matching the retirement branch, which already floors the
+      // fee. For any funded account this is byte-identical to `fee * superHalf`.
+      const feeNominal = fixedAdmin + insurance;
+      const preFee = opening * (1 + superAccumReturn) + (added + ttrBenefit) * superHalf;
+      const feeImpact = Math.max(0, Math.min(feeNominal * superHalf, preFee));
+      const fee = superHalf > 0 ? feeImpact / superHalf : 0;
       const net = added - fee + ttrBenefit;
-      const newBalance = opening * (1 + superAccumReturn) + net * superHalf;
+      const newBalance = preFee - feeImpact;
       return {
         newBalance,
         contribGross: concessional,
@@ -703,6 +710,10 @@ export function simulate(
     const reconUntil = Math.max(reconFrom, recontribute?.untilAge ?? reconFrom);
     if (
       recontribute &&
+      t >= retireOffsets[0] && // person 0 has actually retired — recontribution is a
+      // retiree tax-shelter move; firing it while they're still working (a staggered
+      // gap) would double their NCC (cap breach) and shift assessed savings into
+      // still-accumulating, means-test-exempt super.
       ages[0] >= reconFrom &&
       ages[0] <= reconUntil &&
       ages[0] <= 75 &&
@@ -893,6 +904,14 @@ export function simulate(
     const externalIncome = agePensionAmt + afterTaxRent + netWork + workTakeHome;
     const privateNeed = Math.max(0, spending - externalIncome);
     if (externalIncome > spending) outside += externalIncome - spending;
+    // Staggered gap: a still-working partner keeps up the household's regular
+    // outside-super savings stream. It's added every accumulation year but was
+    // dropped the moment the FIRST partner retired — even though salary is still
+    // coming in. Mirror the accumulation-phase treatment for singles/same-age
+    // couples this is never true (all members retire together), so they're
+    // unaffected. Deflated flat (today's $), like the accumulation stream.
+    const stillEarning = plan.people.some((_, i) => t < retireOffsets[i] && !onBreak(i));
+    if (stillEarning) outside += plan.annualOutsideSavings;
 
     // Guardrails: update next year's spend from THIS year's realised withdrawal
     // rate — the net-of-pension draw over the whole investable portfolio (D1). The
@@ -1092,7 +1111,7 @@ export function simulate(
         contribGross: workContribGross,
         contribTax: workContribTax,
         contribNet: workContribNet,
-        savings: 0,
+        savings: stillEarning ? plan.annualOutsideSavings : 0,
         salaryIncome: workGrossSalary,
         takeHome: workTakeHome,
         ttrBenefit: 0,
@@ -1146,6 +1165,12 @@ export function simulate(
     depletedAge = zeroRow ? zeroRow.age : firstShortAge;
   }
 
+  // A plan only "lasts to life expectancy" if it actually modelled retirement years
+  // reaching that age — guard degenerate inputs (lifeExpectancy <= retirementAge, or
+  // NaN ages producing zero/empty rows) that would otherwise report success while
+  // simulating no retirement at all.
+  const modelledRetirement = rows.some((r) => r.phase !== "accumulation");
+
   return {
     rows,
     retirementAge: plan.retirementAge,
@@ -1156,7 +1181,7 @@ export function simulate(
     superAtRetirement,
     totalAtRetirement,
     depletedAge,
-    lastsToLifeExpectancy: depletedAge === null,
+    lastsToLifeExpectancy: depletedAge === null && modelledRetirement,
     firstAgePensionAge,
     realReturn: meanRealReturn,
   };

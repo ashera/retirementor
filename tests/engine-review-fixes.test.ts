@@ -296,3 +296,70 @@ describe("Review T3-4 — CGT discount input is normalised + clamped", () => {
     expect(mk(-5)).toBe(0); // clamped to the min
   });
 });
+
+// ── Adversarial review — round 3 (verified fixes) ─────────────────────────────
+
+describe("Review fix — fixed super fees can't drive a balance negative", () => {
+  it("a $0-balance, non-earning member keeps super >= 0 through accumulation", () => {
+    const plan = base({
+      people: [P({ currentAge: 55, superBalance: 0, salary: 0 })],
+      retirementAge: 65,
+      fees: { adminInvestmentPct: 0, fixedAdminAnnual: 200, insuranceAnnual: 300 },
+    });
+    const rows = simulate(plan, cfg).rows;
+    expect(Math.min(...rows.map((r) => r.totalSuper))).toBeGreaterThanOrEqual(0);
+  });
+});
+
+describe("Review fix — recontribution only fires once person 0 has retired", () => {
+  it("doesn't run (nor double NCC) while a staggered person 0 is still working", () => {
+    const plan = base({
+      household: "couple",
+      superMode: "individual",
+      people: [
+        P({ currentAge: 60, superBalance: 300_000, salary: 100_000, voluntaryNonConcessional: 100_000 }),
+        P({ currentAge: 60, superBalance: 300_000, salary: 0, retirementAge: 60 }), // retires first → household retired from t=0
+      ],
+      retirementAge: 67, // person 0 retires at 67
+      outsideSuper: 1_000_000,
+      recontribute: { perYear: 100_000, fromAge: 60, untilAge: 75 },
+      targetSpending: 40_000,
+    });
+    const rows = simulate(plan, cfg).rows;
+    // While person 0 (age < 67) is still working, no recontribution should be recorded.
+    const gapRows = rows.filter((r) => r.age >= 60 && r.age < 67 && r.phase !== "accumulation");
+    expect(gapRows.length).toBeGreaterThan(0); // ensure the staggered gap is actually exercised
+    expect(gapRows.every((r) => (r.breakdown.recontribution ?? 0) === 0)).toBe(true);
+    // …and it DOES fire once person 0 has retired.
+    expect(rows.find((r) => r.age === 67)?.breakdown.recontribution ?? 0).toBeGreaterThan(0);
+  });
+});
+
+describe("Review fix — staggered couple keeps saving while a partner still earns", () => {
+  it("adds annualOutsideSavings during the gap (higher terminal wealth than $0 savings)", () => {
+    const mk = (annualOutsideSavings: number) =>
+      base({
+        household: "couple",
+        superMode: "individual",
+        people: [
+          P({ currentAge: 60, superBalance: 400_000, salary: 120_000 }),
+          P({ currentAge: 60, superBalance: 400_000, salary: 0, retirementAge: 60 }),
+        ],
+        retirementAge: 67,
+        outsideSuper: 100_000,
+        annualOutsideSavings,
+        targetSpending: 40_000,
+      });
+    const withSaving = simulate(mk(20_000), cfg);
+    const without = simulate(mk(0), cfg);
+    const terminal = (r: ReturnType<typeof simulate>) => r.rows[r.rows.length - 1].total;
+    expect(terminal(withSaving)).toBeGreaterThan(terminal(without));
+  });
+});
+
+describe("Review fix — degenerate horizons don't report a false 'lasts'", () => {
+  it("lifeExpectancy <= retirementAge is not reported as lasting", () => {
+    const plan = base({ retirementAge: 70, lifeExpectancy: 65, people: [P({ currentAge: 55, superBalance: 500_000 })] });
+    expect(simulate(plan, cfg).lastsToLifeExpectancy).toBe(false);
+  });
+});
