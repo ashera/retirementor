@@ -7,7 +7,7 @@
 import { simulate } from "./simulate";
 import { mulberry32, returnParams, sampleReturnPath } from "./montecarlo";
 import { budgetSplit, presetCategories } from "./budget";
-import { householdHorizon, householdRetirementOffset } from "./types";
+import { householdHorizon, householdRetirementOffset, spendingForAge } from "./types";
 import type { EngineConfig } from "./config";
 import type { RetirementPlan } from "./types";
 
@@ -27,20 +27,27 @@ function percentile(sortedAsc: number[], p: number): number {
   return sortedAsc[idx];
 }
 
-const retirementSpends = (plan: RetirementPlan, config: EngineConfig, returns?: number[], outside?: number[]) =>
-  simulate(plan, config, returns, outside).rows.filter((r) => r.phase !== "accumulation").map((r) => r.breakdown.livingSpend);
+const retirementRows = (plan: RetirementPlan, config: EngineConfig, returns?: number[], outside?: number[]) =>
+  simulate(plan, config, returns, outside).rows.filter((r) => r.phase !== "accumulation");
+
+// Market flex per retirement year: living-spend ÷ THIS age's smile plan (1 = on
+// plan, <1 = trimmed by markets, >1 = raised). Measures only the guardrail's action,
+// not the smile's own age-decline — so a staged plan isn't read as cutting yearly.
+const retirementFactors = (plan: RetirementPlan, config: EngineConfig, returns?: number[], outside?: number[]) =>
+  retirementRows(plan, config, returns, outside).map((r) => {
+    const base = spendingForAge(plan, r.age);
+    return base > 0 ? r.breakdown.livingSpend / base : 1;
+  });
 
 export function guardrailsOutlook(
   plan: RetirementPlan,
   config: EngineConfig,
   opts?: { iterations?: number; seed?: number },
 ): GuardrailsOutlook {
-  const centralSpends = retirementSpends(plan, config);
-  const startSpend = centralSpends.length ? Math.round(centralSpends[0]) : 0;
-  const centralPath = simulate(plan, config).rows
-    .filter((r) => r.phase !== "accumulation")
-    .map((r) => ({ age: r.age, spend: Math.round(r.breakdown.livingSpend) }));
-  const everRaises = centralPath.some((p) => p.spend > startSpend * 1.01);
+  const centralRows = retirementRows(plan, config);
+  const startSpend = centralRows.length ? Math.round(centralRows[0].breakdown.livingSpend) : 0;
+  const centralPath = centralRows.map((r) => ({ age: r.age, spend: Math.round(r.breakdown.livingSpend) }));
+  const everRaises = retirementFactors(plan, config).some((f) => f > 1.01);
 
   const iterations = opts?.iterations ?? 150;
   const rand = mulberry32(opts?.seed ?? 0x9e3779b9);
@@ -50,20 +57,20 @@ export function guardrailsOutlook(
   const params = returnParams(plan, config);
   const horizon = householdHorizon(plan);
 
-  const minSpends: number[] = [];
+  const minFactors: number[] = [];
   const yearsBelow: number[] = [];
   for (let iter = 0; iter < iterations; iter++) {
     const { returns, outsideReturns } = sampleReturnPath(rand, horizon, params);
-    const spends = retirementSpends(plan, config, returns, outsideReturns);
-    if (!spends.length) continue;
-    minSpends.push(Math.min(...spends));
-    yearsBelow.push(spends.filter((v) => v < startSpend - 1).length);
+    const factors = retirementFactors(plan, config, returns, outsideReturns);
+    if (!factors.length) continue;
+    minFactors.push(Math.min(...factors)); // deepest MARKET trim vs plan in this run
+    yearsBelow.push(factors.filter((v) => v < 1 - 1e-3).length); // years trimmed below plan
   }
 
-  minSpends.sort((a, b) => a - b);
+  minFactors.sort((a, b) => a - b);
   yearsBelow.sort((a, b) => a - b);
-  const p10Min = percentile(minSpends, 10); // a rough (bottom-decile) run's deepest spend
-  const worstCutPct = startSpend > 0 ? Math.max(0, 1 - p10Min / startSpend) : 0;
+  const p10MinFactor = percentile(minFactors, 10); // a rough (bottom-decile) run's deepest trim
+  const worstCutPct = Math.max(0, 1 - p10MinFactor);
 
   // The illustrative "retire into a downturn" spend path (same as the modal), for
   // the card's mini-preview — truncated where the plan runs short.
@@ -87,8 +94,9 @@ export function guardrailsOutlook(
 
 export interface GuardrailsTimelinePoint {
   age: number;
-  spend: number; // living-spend that year (today's $)
+  spend: number; // living-spend that year (today's $) — includes the smile's age-decline
   rate: number; // net-of-pension withdrawal rate over the portfolio (fraction; 0 once depleted)
+  factor: number; // MARKET flex vs this age's smile plan (spend ÷ spendingForAge; 1 = on plan)
   action: "start" | "cut" | "raise" | "hold";
   funded: boolean; // was spending actually met this year (false once the portfolio is exhausted)
 }
@@ -136,11 +144,15 @@ export function guardrailsTimeline(
   const rows = sim.rows.filter((r) => r.phase !== "accumulation");
   const points: GuardrailsTimelinePoint[] = [];
   let wr0 = 0;
-  let prev = 0;
+  let prevFactor = 1;
   let pensionAge: number | null = null;
   rows.forEach((r, i) => {
     const b = r.breakdown;
     const spend = Math.round(b.livingSpend); // the flexed living spend (what the chart's spend line shows)
+    // Market flex vs THIS age's smile plan: 1 = on plan, <1 = trimmed by markets,
+    // >1 = raised. Isolates the guardrail's action from the smile's own age-decline.
+    const smileBase = spendingForAge(plan, r.age);
+    const factor = smileBase > 0 ? b.livingSpend / smileBase : 1;
     const portfolio = r.totalSuper + r.outside;
     // Match the ENGINE's guardrail rate: the FULL call on the portfolio — living
     // spend PLUS the home loan and any post-sale rent — net of ALL income (Age
@@ -154,10 +166,12 @@ export function guardrailsTimeline(
     // rails at 0) — mirrors the engine's deferred anchor.
     if (wr0 === 0 && netDraw > 1 && portfolio > 1) wr0 = rate;
     if (b.agePension > 1 && pensionAge == null) pensionAge = r.age;
+    // A "cut"/"raise" is a MARKET move (the factor changing) — the smile's own
+    // age-decline is NOT a cut, so compare the factor rather than the raw spend.
     const action: GuardrailsTimelinePoint["action"] =
-      i === 0 ? "start" : spend < prev - 1 ? "cut" : spend > prev + 1 ? "raise" : "hold";
-    prev = spend;
-    points.push({ age: r.age, spend, rate, action, funded: r.funded });
+      i === 0 ? "start" : factor < prevFactor - 1e-4 ? "cut" : factor > prevFactor + 1e-4 ? "raise" : "hold";
+    prevFactor = factor;
+    points.push({ age: r.age, spend, rate, factor, action, funded: r.funded });
   });
 
   const start = points.length ? points[0].spend : 0;
@@ -195,7 +209,9 @@ export type GuardrailsStory = "fails" | "raised" | "recovers" | "holds";
 /** How many retirement years the illustrative rough run spends BELOW the starting
  *  spend — the honest measure of how hard guardrails bite in that run. */
 export function yearsBelowStart(tl: GuardrailsTimeline): number {
-  return tl.points.filter((p) => p.spend < tl.start - 1).length;
+  // Years the MARKET trimmed spending below plan (factor < 1) — not the smile's own
+  // age-decline, which isn't a cut.
+  return tl.points.filter((p) => p.factor < 1 - 1e-3).length;
 }
 
 /**
@@ -213,8 +229,10 @@ export function yearsBelowStart(tl: GuardrailsTimeline): number {
 export function guardrailsStoryMode(tl: GuardrailsTimeline): GuardrailsStory {
   if (tl.failsAtAge != null) return "fails";
   const below = yearsBelowStart(tl);
-  const mostlyAboveStart = tl.points.length === 0 || below <= tl.points.length * 0.2;
-  if (tl.plateauSpend > tl.start + 1 && mostlyAboveStart) return "raised";
+  const mostlyOnPlan = tl.points.length === 0 || below <= tl.points.length * 0.2;
+  // Ends ABOVE plan (market raised it), not merely above the no-go floor of a smile.
+  const endFactor = tl.points.length ? tl.points[tl.points.length - 1].factor : 1;
+  if (endFactor > 1.01 && mostlyOnPlan) return "raised";
   if (tl.points.some((p) => p.action === "raise")) return "recovers";
   return "holds";
 }

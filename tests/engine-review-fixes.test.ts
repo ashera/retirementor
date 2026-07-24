@@ -5,7 +5,7 @@ import { incomeTax, medicareLevy, sapto, seniorIncomeTax, residentIncomeTax } fr
 import { outstandingBalance } from "../lib/au/mortgage";
 import { guardrailsTimeline } from "../lib/au/guardrails";
 import { bootstrapShockPath } from "../lib/au/historicalReturns";
-import { DEFAULT_PLAN, type RetirementPlan, type Person } from "../lib/au/types";
+import { DEFAULT_PLAN, spendingForAge, type RetirementPlan, type Person } from "../lib/au/types";
 
 // Regression tests for the adversarial engine review (Tier 1 + verified Tier 2).
 // livingStandardsGrowthPct = 0 so today's $ = nominal and the numbers are clean.
@@ -361,5 +361,43 @@ describe("Review fix — degenerate horizons don't report a false 'lasts'", () =
   it("lifeExpectancy <= retirementAge is not reported as lasting", () => {
     const plan = base({ retirementAge: 70, lifeExpectancy: 65, people: [P({ currentAge: 55, superBalance: 500_000 })] });
     expect(simulate(plan, cfg).lastsToLifeExpectancy).toBe(false);
+  });
+});
+
+// ── Design change — guardrails flex AROUND the spending smile ──────────────────
+
+describe("Guardrails flex around the spending smile (not flat at go-go)", () => {
+  const staged = (o: Partial<RetirementPlan> = {}) =>
+    base({
+      spendingMode: "stages",
+      spendingStages: { goGo: 60_000, slowGo: 48_000, noGo: 40_000, slowGoAge: 75, noGoAge: 85 },
+      guardrails: {},
+      retirementAge: 60,
+      ...o,
+    } as Partial<RetirementPlan>);
+
+  it("steps spending DOWN at each smile boundary (not held flat at go-go)", () => {
+    // Well funded → the market may nudge the factor, but a ~20% stage drop can't be
+    // masked by a single ≤10% guardrail raise, so spend must fall crossing a boundary.
+    const p = staged({ people: [P({ currentAge: 60, superBalance: 1_400_000 })], outsideSuper: 400_000 });
+    const rows = simulate(p, cfg).rows.filter((r) => r.phase !== "accumulation");
+    const at = (age: number) => rows.find((r) => r.age === age)!.breakdown.livingSpend;
+    // Every age where the plan's smile steps down, the engine's spend steps down too.
+    const boundaries = rows.filter((r) => spendingForAge(p, r.age) < spendingForAge(p, r.age - 1) - 1);
+    expect(boundaries.length).toBeGreaterThan(0);
+    for (const b of boundaries) expect(at(b.age)).toBeLessThan(at(b.age - 1));
+  });
+
+  it("still trims BELOW the smile plan when the portfolio is stressed", () => {
+    const p = staged({ people: [P({ currentAge: 60, superBalance: 350_000 })], outsideSuper: 0 });
+    const rows = simulate(p, cfg).rows.filter((r) => r.phase !== "accumulation");
+    const belowPlan = rows.some((r) => r.breakdown.livingSpend < spendingForAge(p, r.age) - 1);
+    expect(belowPlan).toBe(true); // guardrails still bite (factor < 1 somewhere)
+  });
+
+  it("a flat plan is unchanged (spend holds at target when the market co-operates)", () => {
+    const p = base({ people: [P({ currentAge: 60, superBalance: 1_200_000 })], outsideSuper: 300_000, targetSpending: 45_000, guardrails: {} });
+    const rows = simulate(p, cfg).rows.filter((r) => r.phase !== "accumulation");
+    expect(rows.every((r) => r.breakdown.livingSpend >= 45_000 - 1)).toBe(true); // never trimmed
   });
 });

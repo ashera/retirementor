@@ -220,9 +220,15 @@ export function simulate(
   const guardEssentials = guardrails
     ? budgetSplit(plan.budget?.categories ?? presetCategories(config, plan.household, plan.homeowner, "modest")).essential
     : 0;
-  let guardSpend: number | null = null; // dynamic living-spend (today's $), set on the first retired year
+  // Guardrails flex AROUND the spending smile: living-spend = this age's smile spend
+  // × a market-driven multiplier (guardFactor). The go-go/slow-go/no-go decline is
+  // preserved; guardFactor moves only on genuine market over/under-performance,
+  // measured on a smile-neutral withdrawal rate (below) so the smile's own decline
+  // doesn't trip the rails. For a flat plan (smile constant) this is byte-identical
+  // to the old fixed-dollar guardSpend.
+  let guardFactor = 1; // market-flex multiplier on the age's smile spend (D2/D3 ratchet)
+  let guardAnchorBase: number | null = null; // smile spend at the anchor year (the rail base)
   let guardWr0: number | null = null; // initial net-of-pension withdrawal rate (the rail reference)
-  let guardFloor = 0; // max(essentials, floorPct% of the initial spend)
   // The (exempt) home value tracked for the net-worth view: the current value
   // until a downsize (→ the smaller home) or a sale (→ 0). Homeowners without a
   // stated value get the same default the downsize lever assumes. It appreciates
@@ -741,19 +747,17 @@ export function simulate(
     // Rent once sold up (today's-dollars flat, like living costs), itemised
     // separately so the ledger can show it as its own line.
     const rentExpense = sellRent != null && oldest >= sellRent.atAge ? Math.max(0, sellRent.rentPerYear) : 0;
-    let livingSpend = spendingForAge(plan, oldest);
-    // Guardrails own the spending schedule once retired: the first retired year
-    // seeds the dynamic spend (and the floor); later years use the carried value,
-    // updated at the end of each iteration from the realised withdrawal rate.
+    const smileBase = spendingForAge(plan, oldest); // this age's go-go/slow-go/no-go level
+    let livingSpend = smileBase;
+    // Guardrails: flex the CURRENT smile level by the carried market factor. The
+    // first retired year anchors the rail base; later years keep declining with the
+    // smile while guardFactor rides the market. Floored per-age at essentials (capped
+    // at the smile) or floorPct% of THIS age's smile spend, so the floor tracks the
+    // smile down rather than being pinned to the go-go peak.
     if (guardrails) {
-      if (guardSpend == null) {
-        guardSpend = livingSpend;
-        // The floor is the greater of essentials or floorPct% of the initial spend,
-        // but never above the spend itself — you can't "hold" more than you spend
-        // (a plan whose spend is already all-essentials just has no room to trim).
-        guardFloor = Math.max(Math.min(guardEssentials, livingSpend), guardFloorPct * livingSpend);
-      }
-      livingSpend = guardSpend;
+      if (guardAnchorBase == null) guardAnchorBase = smileBase;
+      const floor = Math.max(Math.min(guardEssentials, smileBase), guardFloorPct * smileBase);
+      livingSpend = Math.max(smileBase * guardFactor, floor);
     }
     const spending = livingSpend + rentExpense + mortgageCost;
 
@@ -923,11 +927,19 @@ export function simulate(
     // there would peg the rails at ~0 and ratchet spending to the floor forever, and
     // a spurious "rate below the lower rail" would trigger an unwarranted raise. So
     // skip income-covered years; the anchor waits for the first real draw.
-    if (guardrails && guardSpend != null && privateNeed > EPS) {
+    if (guardrails && guardAnchorBase != null && privateNeed > EPS) {
       const portfolio = startSuper + startOutside;
+      // Measure the rate on the SMILE-NEUTRAL draw: the anchor-year smile level ×
+      // factor (plus fixed housing costs), net of income. Using the anchor base
+      // instead of THIS year's declining smile means the smile's own step-downs don't
+      // register as a falling withdrawal rate (which would wrongly trigger raises) —
+      // only real market over/under-performance moves the rate. For a flat plan the
+      // anchor base equals every year's smile, so this is the old privateNeed exactly.
+      const normNeed = Math.max(0, guardAnchorBase * guardFactor + rentExpense + mortgageCost - externalIncome);
       // A depleted portfolio means the draw rate is effectively infinite (drawing
       // from nothing) — that must read as ABOVE the upper rail, never a "0%".
-      const rate = portfolio > EPS ? privateNeed / portfolio : Infinity;
+      const rate = portfolio > EPS ? normNeed / portfolio : Infinity;
+      const factorFloor = Math.max(Math.min(guardEssentials, smileBase), guardFloorPct * smileBase) / Math.max(1, smileBase);
       if (guardWr0 == null) {
         // Don't anchor the reference rate while a still-working partner's salary is
         // masking the true draw (staggered retirement): the household "retires" when
@@ -936,10 +948,10 @@ export function simulate(
         // far too low and strands spending at the floor for decades. Wait for the
         // first year the household actually funds the full spend itself.
         if (workTakeHome <= EPS) guardWr0 = Number.isFinite(rate) ? rate : 0;
-      } else if (rate > guardWr0 * (1 + guardWidth) && guardSpend > guardFloor + EPS) {
-        guardSpend = Math.max(guardFloor, guardSpend * (1 - guardStep)); // pay cut
+      } else if (rate > guardWr0 * (1 + guardWidth) && guardFactor > factorFloor + 1e-9) {
+        guardFactor = Math.max(factorFloor, guardFactor * (1 - guardStep)); // pay cut
       } else if (Number.isFinite(rate) && rate < guardWr0 * (1 - guardWidth)) {
-        guardSpend *= 1 + guardStep; // raise
+        guardFactor *= 1 + guardStep; // raise
       }
     }
 

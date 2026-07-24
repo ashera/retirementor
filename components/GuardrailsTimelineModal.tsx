@@ -290,7 +290,10 @@ export default function GuardrailsTimelineModal({
                     <YAxis stroke="#8b97ad" fontSize={11} tickLine={false} axisLine={false} width={48} tickFormatter={fmtCompact} />
                     <Tooltip content={<SpendTooltip />} />
                     <ReferenceLine y={startTotal} stroke="#94a3b8" strokeDasharray="5 4" label={{ value: `Started ${fmtCompact(startTotal)}`, position: "insideTopLeft", fill: "#94a3b8", fontSize: 10 }} />
-                    {tl.floor < tl.start * 0.98 && <ReferenceLine y={floorTotal} stroke="#f59e0b" strokeDasharray="5 4" label={{ value: `Floor ${fmtCompact(floorTotal)}`, position: "insideBottomLeft", fill: "#f59e0b", fontSize: 10 }} />}
+                    {/* A single floor line only makes sense for a flat plan — with a
+                        spending smile the floor declines with each stage, so drawing one
+                        fixed line would sit above the natural no-go spend and mislead. */}
+                    {plan.spendingMode !== "stages" && tl.floor < tl.start * 0.98 && <ReferenceLine y={floorTotal} stroke="#f59e0b" strokeDasharray="5 4" label={{ value: `Floor ${fmtCompact(floorTotal)}`, position: "insideBottomLeft", fill: "#f59e0b", fontSize: 10 }} />}
                     {tl.pensionAge != null && <ReferenceLine x={tl.pensionAge} stroke="#a78bfa" strokeDasharray="4 3" label={{ value: "Age Pension", position: "top", fill: "#a78bfa", fontSize: 10 }} />}
                     {flexFails && <ReferenceLine x={tl.failsAtAge!} stroke="#f87171" strokeDasharray="2 3" label={{ value: "Runs short", position: "top", fill: "#f87171", fontSize: 10 }} />}
                     <Line type="stepAfter" dataKey="spend" stroke="#34d399" strokeWidth={2} dot={false} isAnimationActive={false} />
