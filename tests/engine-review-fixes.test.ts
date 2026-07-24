@@ -4,6 +4,7 @@ import { DEFAULT_CONFIG, withDefaults } from "../lib/au/config";
 import { incomeTax, medicareLevy, sapto, seniorIncomeTax, residentIncomeTax } from "../lib/au/tax";
 import { outstandingBalance } from "../lib/au/mortgage";
 import { guardrailsTimeline } from "../lib/au/guardrails";
+import { failsafeSpend, runStressTest } from "../lib/au/stresstest";
 import { bootstrapShockPath } from "../lib/au/historicalReturns";
 import { DEFAULT_PLAN, spendingForAge, type RetirementPlan, type Person } from "../lib/au/types";
 
@@ -399,5 +400,31 @@ describe("Guardrails flex around the spending smile (not flat at go-go)", () => 
     const p = base({ people: [P({ currentAge: 60, superBalance: 1_200_000 })], outsideSuper: 300_000, targetSpending: 45_000, guardrails: {} });
     const rows = simulate(p, cfg).rows.filter((r) => r.phase !== "accumulation");
     expect(rows.every((r) => r.breakdown.livingSpend >= 45_000 - 1)).toBe(true); // never trimmed
+  });
+});
+
+// ── ERN idea — failsafe withdrawal (survives every historical stress era) ──────
+
+describe("failsafeSpend — the tightest never-cut spend that survives all eras", () => {
+  it("survives every era at the failsafe, and fails just above it", () => {
+    const plan = base({
+      people: [P({ currentAge: 55, superBalance: 1_000_000 })],
+      outsideSuper: 150_000, retirementAge: 60, targetSpending: 60_000, investmentReturn: 6.5,
+    });
+    const fs = failsafeSpend(plan, cfg);
+    expect(fs.spend).toBeGreaterThan(0);
+    // At the failsafe every era lasts; a few % above, at least one fails (it's tight).
+    const at = runStressTest({ ...plan, guardrails: undefined, targetSpending: fs.spend }, cfg);
+    expect(at.survived).toBe(at.total);
+    const above = runStressTest({ ...plan, guardrails: undefined, targetSpending: fs.spend * 1.06 }, cfg);
+    expect(above.survived).toBeLessThan(above.total);
+    expect(fs.bindingEra).not.toBeNull();
+  });
+
+  it("is far below an over-spent plan's actual spend", () => {
+    const plan = base({ people: [P({ currentAge: 60, superBalance: 100_000 })], retirementAge: 60, targetSpending: 55_000, investmentReturn: 1 });
+    const fs = failsafeSpend(plan, cfg);
+    expect(fs.spend).toBeLessThan(fs.currentSpend); // headroom is negative
+    expect(fs.headroomPct).toBeLessThan(0);
   });
 });

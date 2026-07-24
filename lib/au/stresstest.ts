@@ -197,3 +197,80 @@ export function runStressTest(plan: RetirementPlan, config: EngineConfig): Stres
   }));
   return { eras: results, survived, total: results.length, worst: results[0] ?? null, central, retireAge, superUnlockAge: centralRes.superUnlockAge };
 }
+
+// ── Failsafe withdrawal (ERN-style) ───────────────────────────────────────────
+// The highest FIXED, never-cut spend a plan could START on and still fund every
+// single year through EVERY historical stress era — the "worst-case-proof" spend.
+// Guardrails are stripped (a failsafe is by definition a spend you never have to
+// trim). The Age Pension is included by the engine, so this is what YOUR savings +
+// pension can guarantee even if you retire straight into the worst run on record.
+
+export interface Failsafe {
+  spend: number; // failsafe first-year spend (today's $), never trimmed
+  rate: number; // spend ÷ retirement portfolio (gross of the Age Pension)
+  currentSpend: number; // the plan's own first-year spend, for comparison
+  bindingEra: StressEra | null; // the era that fails first as you spend more
+  headroomPct: number; // (failsafe − current) ÷ current — negative = you're above failsafe
+}
+
+/** Set the plan's FIRST-YEAR retirement spend to `level`, scaling a staged smile
+ *  proportionally, and strip guardrails (failsafe = fixed spending). */
+function withFirstYearSpend(plan: RetirementPlan, level: number, firstAge: number): RetirementPlan {
+  const fixed = { ...plan, guardrails: undefined };
+  if (plan.spendingMode !== "stages" || !plan.spendingStages) {
+    return { ...fixed, targetSpending: level };
+  }
+  const current = spendingForAge(plan, firstAge);
+  const f = current > 0 ? level / current : 0;
+  const s = plan.spendingStages;
+  return { ...fixed, spendingStages: { ...s, goGo: s.goGo * f, slowGo: s.slowGo * f, noGo: s.noGo * f } };
+}
+
+export function failsafeSpend(plan: RetirementPlan, config: EngineConfig): Failsafe {
+  const oldest = Math.max(...plan.people.map((p) => p.currentAge));
+  const firstAge = oldest + householdRetirementOffset(plan);
+  const currentSpend = spendingForAge(plan, firstAge);
+  const portfolio = Math.max(1, simulate({ ...plan, guardrails: undefined }, config).totalAtRetirement);
+
+  const survivesAll = (level: number): boolean => {
+    const p = withFirstYearSpend(plan, level, firstAge);
+    for (const era of STRESS_ERAS) {
+      const { returns, outsideReturns } = eraReturnPath(p, config, era);
+      if (!simulate(p, config, returns, outsideReturns).lastsToLifeExpectancy) return false;
+    }
+    return true;
+  };
+
+  // Binary search the highest surviving spend. $0 always survives (the pool only
+  // grows), so `lo` is a valid floor; `hi` is a generous ceiling no failsafe exceeds.
+  let lo = 0;
+  let hi = Math.max(currentSpend * 3, portfolio * 0.12, 1000);
+  for (let i = 0; i < 34; i++) {
+    const mid = (lo + hi) / 2;
+    if (survivesAll(mid)) lo = mid; else hi = mid;
+  }
+  const spend = lo;
+
+  // Which era binds just above the failsafe (fails at the earliest age)?
+  let bindingEra: StressEra | null = null;
+  if (spend > 1) {
+    const probe = withFirstYearSpend(plan, spend * 1.03, firstAge);
+    let worstDep = Infinity;
+    for (const era of STRESS_ERAS) {
+      const { returns, outsideReturns } = eraReturnPath(probe, config, era);
+      const r = simulate(probe, config, returns, outsideReturns);
+      if (!r.lastsToLifeExpectancy && (r.depletedAge ?? Infinity) < worstDep) {
+        worstDep = r.depletedAge ?? Infinity;
+        bindingEra = era;
+      }
+    }
+  }
+
+  return {
+    spend,
+    rate: spend / portfolio,
+    currentSpend,
+    bindingEra,
+    headroomPct: currentSpend > 0 ? (spend - currentSpend) / currentSpend : 0,
+  };
+}

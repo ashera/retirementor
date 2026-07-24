@@ -6,7 +6,7 @@ import type { EngineConfig } from "@/lib/au/config";
 import type { RetirementPlan } from "@/lib/au/types";
 import { DEFAULT_PLAN } from "@/lib/au/types";
 import type { SavedPlan } from "@/app/actions/plans";
-import { runStressTest, STRESS_ERAS, type StressEraResult } from "@/lib/au/stresstest";
+import { runStressTest, failsafeSpend, STRESS_ERAS, type StressEraResult } from "@/lib/au/stresstest";
 import { essentialsFloor } from "@/lib/au/strategies";
 import { fmtCurrency } from "@/lib/au/format";
 import { stressNarrative } from "@/lib/au/stressNarrative";
@@ -176,6 +176,9 @@ export default function StressTestView({
 
   const result = mode === "flex" ? flex : fixed;
   const uplift = fixed && flex ? flex.survived - fixed.survived : 0;
+  // ERN-style "failsafe": the most you could START spending and still fund every year
+  // through EVERY era on record — the worst-case-proof spend (fixed, never trimmed).
+  const failsafe = useMemo(() => (plan ? failsafeSpend(plan, config) : null), [plan, config]);
   // The era where flexing demanded the deepest spending cut — the honest "catch".
   const worstFlexCut = useMemo(
     () => (flex ? flex.eras.filter((e) => e.cutYears > 0).sort((a, b) => b.deepestCutPct - a.deepestCutPct)[0] ?? null : null),
@@ -294,6 +297,35 @@ export default function StressTestView({
                   </>
                 )}
               </div>
+
+              {/* ERN-style failsafe: the worst-case-proof starting spend. */}
+              {!running && failsafe && failsafe.spend > 1 && (
+                <div className="rounded-2xl border border-line bg-panel p-5">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-muted">Failsafe spend</div>
+                  <div className="mt-1 text-3xl font-bold text-white">
+                    {fmtCurrency(Math.round(failsafe.spend))}
+                    <span className="text-base font-normal text-muted">/yr</span>
+                  </div>
+                  <p className="mt-1 text-sm text-muted">
+                    The most you could start spending and still fund <strong className="text-slate-200">every year</strong>{" "}
+                    through <strong className="text-slate-200">every downturn on record</strong>
+                    {failsafe.bindingEra ? <> — {failsafe.bindingEra.label} is what caps it</> : null}.{" "}
+                    {failsafe.headroomPct >= 0.02 ? (
+                      <>
+                        You&apos;re on <span className="text-emerald-400">{fmtCurrency(Math.round(failsafe.currentSpend))}</span> — about{" "}
+                        {Math.round(failsafe.headroomPct * 100)}% under it.
+                      </>
+                    ) : failsafe.headroomPct <= -0.02 ? (
+                      <>
+                        You&apos;re on <span className="text-amber-400">{fmtCurrency(Math.round(failsafe.currentSpend))}</span> — about{" "}
+                        {Math.round(-failsafe.headroomPct * 100)}% above it.
+                      </>
+                    ) : (
+                      <>You&apos;re spending right at it.</>
+                    )}
+                  </p>
+                </div>
+              )}
 
               {/* Ranked, worst-first — revealed as each era's test completes. */}
               <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-panel">
