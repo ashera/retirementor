@@ -634,8 +634,9 @@ export default function IncomeYearModal({
                     Each year we draw just enough to meet your spending. The means-tested{" "}
                     <span className="text-slate-200">Age Pension</span> comes first — a floor
                     that <em>grows</em> as your assessable assets fall — then any rent, then
-                    top-ups from super and other savings. That&apos;s why the mix shifts toward
-                    the Age Pension later in retirement.
+                    top-ups drawn from your savings outside super, and lastly from super
+                    itself. That&apos;s why the mix shifts toward the Age Pension later in
+                    retirement.
                   </>
                 )}
                 {shortfall > 1 && (

@@ -450,10 +450,10 @@ export function RetirementIncomeGoalExplainer({
           Where the income comes from
         </h3>
         <p>
-          Each year this is funded from your super (drawn tax-free from age{" "}
-          {config.preservationAge}), your savings outside super, and — from age{" "}
-          {config.agePensionAge} — the means-tested Age Pension topping up
-          whatever&apos;s left. The <em>Income sources</em> chart shows the mix
+          Each year this is funded from your savings outside super first, then
+          your super (drawn tax-free from age {config.preservationAge}), and —
+          from age {config.agePensionAge} — the means-tested Age Pension topping
+          up whatever&apos;s left. The <em>Income sources</em> chart shows the mix
           year by year — including your salary through the working years.
         </p>
       </div>
@@ -598,12 +598,16 @@ export function MoneyLastsExplainer({
       <div>
         <h3 className="mb-1 font-semibold text-white">How it&apos;s worked out</h3>
         <p>
-          Each retirement year we draw your spending in order: from super
-          (accessible tax-free once you&apos;re {config.preservationAge}), then
-          from your savings outside super — with the means-tested Age Pension
-          topping up from age {config.agePensionAge}. &lsquo;Money lasts&rsquo;
-          is the first age those sources can&apos;t fully cover your spending, or
-          your whole horizon if they always can.
+          Each retirement year, after the ATO-required minimum drawdown from
+          super, we fund your spending from your savings outside super first,
+          then from super — outside money is taxable while super&apos;s earnings
+          are tax-free, so spending it first and leaving super invested makes the
+          money last longer. Before preservation age ({config.preservationAge})
+          super is locked, so any early-retirement years run on outside super
+          alone. The means-tested Age Pension tops up from age{" "}
+          {config.agePensionAge}. &lsquo;Money lasts&rsquo; is the first age these
+          sources can&apos;t fully cover your spending, or your whole horizon if
+          they always can.
         </p>
       </div>
 
