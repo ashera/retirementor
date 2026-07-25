@@ -3,8 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import type { EngineConfig } from "@/lib/au/config";
-import type { RetirementPlan, SimResult } from "@/lib/au/types";
-import { DEFAULT_PLAN, getInvestmentProperties } from "@/lib/au/types";
+import type { RetirementPlan, SimResult, LifeEvent } from "@/lib/au/types";
+import { DEFAULT_PLAN, getInvestmentProperties, oldestCurrentAge } from "@/lib/au/types";
 import { simulate } from "@/lib/au/simulate";
 import { runMonteCarlo, MC_CONFIDENCE_TARGET as SAFE_TARGET, MC_CONFIDENCE_MC as SAFE_MC } from "@/lib/au/montecarlo";
 import { guardrailsOutlook, type GuardrailsOutlook } from "@/lib/au/guardrails";
@@ -35,6 +35,7 @@ import AssumptionsModal from "@/components/AssumptionsModal";
 import StrategyAssumptionsModal from "@/components/StrategyAssumptionsModal";
 import GuardrailsTimelineModal from "@/components/GuardrailsTimelineModal";
 import SpendingBreakdown from "@/components/SpendingBreakdown";
+import LifeEventsEditor from "@/components/LifeEventsEditor";
 import { retirementGoal } from "@/lib/au/goal";
 import { initialWithdrawal, withdrawalBand } from "@/lib/au/withdrawal";
 import Field from "@/components/Field";
@@ -822,6 +823,31 @@ export default function WhatIfView({
           </>
         )}
       </div>
+
+      {/* ── Committed bucket: life events. These live on the base plan (part of the
+           projection), not the strategy layer — "things that happen TO you". ── */}
+      <div className="mt-8">
+        <LifeEventsEditor
+          events={baseline.lifeEvents ?? []}
+          minAge={oldestCurrentAge(baseline)}
+          maxAge={baseline.lifeExpectancy}
+          defaultAge={Math.max(oldestCurrentAge(baseline) + 1, baseline.retirementAge + 3)}
+          onChange={(lifeEvents: LifeEvent[]) => setBaseline({ ...baseline, lifeEvents })}
+        />
+      </div>
+
+      {/* ── Exploring bucket: what-if strategies. Toggle layer on top of the base;
+           "choices you MAKE". ── */}
+      <div className="mt-8 flex flex-wrap items-baseline gap-2">
+        <h2 className="flex items-center gap-2 text-lg font-semibold text-white">
+          <span aria-hidden>🎛</span> Strategies
+        </h2>
+        <span className="rounded-full bg-panel-2 px-2 py-0.5 text-[11px] font-medium text-muted">exploring</span>
+      </div>
+      <p className="mb-4 mt-0.5 text-sm text-muted">
+        Choices you could <span className="text-slate-200">make</span> — toggle any on to see how your plan responds.
+        They don&apos;t change your base plan until you save.
+      </p>
 
       {/* Strategy board */}
       {groups.length === 0 ? (

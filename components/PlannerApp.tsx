@@ -61,6 +61,7 @@ import CompletenessRing from "@/components/CompletenessRing";
 import WithdrawalRateCard from "@/components/WithdrawalRateCard";
 import {
   DEFAULT_PLAN,
+  getLifeEvents,
   hasInvestmentProperty,
   householdHorizon,
   householdRetirementOffset,
@@ -475,6 +476,13 @@ export default function PlannerApp({
   const result = useMemo(() => simulate(plan, config), [plan, config]);
   // The active scenario's strategy layer, for the chips (all baked into the numbers).
   const applied = useMemo(() => appliedStrategies(storable, config), [storable, config]);
+  // Committed life events on this plan — surfaced as chips too, so a known event
+  // (an inheritance, a big trip) is discoverable from the dashboard, editable in
+  // What-If. Sorted by age so they read as a mini-timeline.
+  const lifeEvents = useMemo(
+    () => [...getLifeEvents(storable)].sort((a, b) => a.atAge - b.atAge),
+    [storable],
+  );
   const mc = useMemo(() => runMonteCarlo(plan, config), [plan, config]);
   const successPct = Math.round(mc.successRate * 100);
   const successTone: "accent" | "amber" | "red" =
@@ -1277,11 +1285,12 @@ export default function PlannerApp({
           <div className="flex min-w-0 items-start gap-3">
             <span className="shrink-0 text-2xl" aria-hidden>🎛</span>
             <div className="min-w-0">
-              <div className="font-semibold text-white">What if you changed something?</div>
+              <div className="font-semibold text-white">Add a life event or try a strategy</div>
               <div className="text-sm text-muted">
-                Try strategies — downsize, retire later, salary-sacrifice, work part-time and more — and watch how
-                your balance, income and how long it lasts respond.
-                {applied.length === 0 && " It never touches this plan."}
+                Record a one-off you expect — an inheritance, a big trip, helping the kids — or try a strategy like
+                downsizing, retiring later or working part-time, and watch how your balance, income and how long it
+                lasts respond.
+                {applied.length === 0 && lifeEvents.length === 0 && " Strategies never touch this plan until you save."}
               </div>
             </div>
           </div>
@@ -1289,14 +1298,30 @@ export default function PlannerApp({
             {applied.length > 0 ? "Edit What-If Strategies →" : "Try What-If Strategies →"}
           </span>
         </div>
-        {/* The active scenario's strategy layer (see appliedStrategies): each is
-            applied on top of your base inputs and already shapes the numbers above. */}
-        {applied.length > 0 && (
+        {/* The active scenario's strategy layer (see appliedStrategies) + committed
+            life events: each is applied on top of your base inputs and already shapes
+            the numbers above. Life-event chips make a known event discoverable here. */}
+        {(applied.length > 0 || lifeEvents.length > 0) && (
           <div className="mt-4 border-t border-accent/20 pt-3">
             <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted">
-              Strategies applied to this plan — already in the numbers above
+              In this plan — already in the numbers above
             </div>
             <div className="flex flex-wrap gap-2">
+              {lifeEvents.map((e) => (
+                <span
+                  key={e.id}
+                  className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium ${
+                    e.kind === "income"
+                      ? "border-accent/40 bg-accent/10 text-accent"
+                      : "border-amber-400/40 bg-amber-400/10 text-amber-300"
+                  }`}
+                  title="A committed life event — edit it in What-If"
+                >
+                  <span aria-hidden>📌</span>
+                  {(e.label?.trim() || (e.kind === "income" ? "Windfall" : "Expense")) +
+                    ` ${e.kind === "income" ? "+" : "−"}${fmtCurrency(e.amount)} at ${e.atAge}`}
+                </span>
+              ))}
               {applied.map((s) => (
                 <span
                   key={s.id}
