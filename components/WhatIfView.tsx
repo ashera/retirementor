@@ -148,12 +148,6 @@ export default function WhatIfView({
   // The strategy whose detail card is open in the modal (params + impact). Set by
   // clicking a strategy pill in column 2; null = no modal.
   const [detailCard, setDetailCard] = useState<StrategyCard | null>(null);
-  // Priming loader: on load, walk through the strategies already active on this
-  // scenario (name + description, 5s each) so the user knows what's applied before
-  // scrolling. `loaderQueue` is snapshotted once so later toggles don't reopen it.
-  const [loaderQueue, setLoaderQueue] = useState<StrategyCard[] | null>(null);
-  const [loadStep, setLoadStep] = useState(0);
-  const loaderStarted = useRef(false);
 
   // Don't sync back to storage until the initial restore has been applied, so the
   // empty first render can't clobber the working plan.
@@ -225,23 +219,6 @@ export default function WhatIfView({
     [baseline, catalog, active, values],
   );
 
-  // Once the scenario has loaded, snapshot the active strategies (in catalog order)
-  // to walk through in the priming loader — runs once.
-  useEffect(() => {
-    if (loaderStarted.current || shared || !baseline) return;
-    loaderStarted.current = true;
-    setLoaderQueue(catalog.filter((c) => active.has(c.id)));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [baseline, catalog, active, shared]);
-
-  const loading = loaderQueue != null && loadStep < loaderQueue.length;
-  const loadingCard = loaderQueue?.[loadStep] ?? null;
-  useEffect(() => {
-    if (!loading) return;
-    const t = setTimeout(() => setLoadStep((s) => s + 1), 3000);
-    return () => clearTimeout(t);
-  }, [loading, loadStep]);
-  const skipLoader = () => setLoadStep(loaderQueue?.length ?? 0);
 
   // Sync the active scenario back to the shared working plan so the dashboard
   // reflects every strategy change (and a plain reload restores it). Skips the
@@ -713,9 +690,10 @@ export default function WhatIfView({
         <p className="mt-3 flex max-w-2xl items-start gap-2 rounded-lg border border-line bg-panel-2 px-3 py-2 text-sm text-slate-300">
           <span aria-hidden>🧪</span>
           <span>
-            This is a safe sandbox — experimenting here <strong className="text-white">never changes your saved
-            plan</strong>. It just starts from it. Like a combination? <strong className="text-white">Save it as a
-            scenario</strong> below to keep a separate copy.
+            <strong className="text-white">Strategies</strong> here are exploratory — they won&apos;t overwrite a
+            saved scenario until you <strong className="text-white">Save</strong>. <strong className="text-white">Life
+            events</strong> you add become part of your plan straight away. Either way,{" "}
+            <strong className="text-white">Save as a scenario</strong> below to keep a separate copy.
           </span>
         </p>
         <button
@@ -1055,33 +1033,6 @@ export default function WhatIfView({
       </div>{/* ── /COLUMN 2 ── */}
       </div>{/* ── /two-column grid ── */}
 
-      {/* Priming loader: walk through the strategies already active on this scenario. */}
-      {loading && loadingCard && loaderQueue && (
-        <div className="fixed inset-0 z-50 grid place-items-center p-4">
-          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
-          <div className="relative w-full max-w-md rounded-2xl border border-line bg-panel p-6 text-center shadow-2xl">
-            <div className="flex items-center justify-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted">
-              <span className="h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-accent border-t-transparent" aria-hidden />
-              Loading your active What-If strategies
-            </div>
-            <div className="mt-1 text-[11px] text-muted">
-              {loadStep + 1} of {loaderQueue.length}
-            </div>
-            <div className="mt-3 text-xl font-bold text-white">{loadingCard.label}</div>
-            {loadingCard.blurb && <p className="mt-1 text-sm text-muted">{loadingCard.blurb}</p>}
-            <div className="mt-5 h-1.5 w-full overflow-hidden rounded-full bg-panel-2">
-              <div
-                className="h-full rounded-full bg-accent transition-all duration-500"
-                style={{ width: `${(loadStep / loaderQueue.length) * 100}%` }}
-              />
-            </div>
-            <button onClick={skipLoader} className="mt-4 text-xs text-muted transition hover:text-white">
-              Skip →
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* Strategy detail modal: the full card (params, live note, impact, and the
           guardrails/spending panels) for the pill the user tapped. Reuses the exact
           StrategyCardRow the board used to render inline. */}
@@ -1169,21 +1120,25 @@ function MetricCard({
   pending?: boolean;
 }) {
   const tone = better ? "text-accent" : worse ? "text-amber-400" : "text-white";
+  // Only show the before→after form when the value actually changed — otherwise a
+  // strategy that doesn't touch this metric reads a redundant "$X → $X". Wrap +
+  // slightly smaller so two large ($millions) figures can never overflow the card.
+  const showBoth = now != null && now !== base;
   return (
     <div className="rounded-2xl border border-line bg-panel p-4">
       <div className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-muted">
         {label}
         {pending && <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent" aria-label="updating" />}
       </div>
-      <div className={`mt-1 flex items-baseline gap-2 ${pending ? "opacity-60" : ""}`}>
-        {now ? (
-          <>
-            <span className="text-lg text-muted line-through">{base}</span>
+      <div className={`mt-1 ${pending ? "opacity-60" : ""}`}>
+        {showBoth ? (
+          <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0">
+            <span className="text-sm text-muted line-through">{base}</span>
             <span aria-hidden className="text-muted">→</span>
-            <span className={`text-2xl font-bold tabular-nums ${tone}`}>{now}</span>
-          </>
+            <span className={`text-xl font-bold tabular-nums ${tone}`}>{now}</span>
+          </div>
         ) : (
-          <span className="text-2xl font-bold tabular-nums text-white">{base}</span>
+          <span className="text-2xl font-bold tabular-nums text-white">{now ?? base}</span>
         )}
       </div>
     </div>
