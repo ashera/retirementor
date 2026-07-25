@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { simulate } from "../lib/au/simulate";
 import { DEFAULT_CONFIG as cfg } from "../lib/au/config";
 import { DEFAULT_PLAN, getInvestmentProperties, type PropertyDetail, type RetirementPlan } from "../lib/au/types";
-import { buildStrategyCatalog, applyStrategies, resolveValues, maxSustainableSpend, maxSpendForConfidence, essentialsFloor, withSpend, appliedStrategies, stripStrategyFields } from "../lib/au/strategies";
+import { buildStrategyCatalog, applyStrategies, resolveValues, maxSustainableSpend, maxSpendForConfidence, essentialsFloor, withSpend, appliedStrategies, stripStrategyFields, strategyGoal, GOAL_ORDER } from "../lib/au/strategies";
 import { runMonteCarlo } from "../lib/au/montecarlo";
 import { incomeTax, medicareLevy } from "../lib/au/tax";
 import { rowNetWorth } from "../lib/au/networth";
@@ -27,6 +27,32 @@ const base = (over: Partial<RetirementPlan> = {}): RetirementPlan => ({
 const prop = (over: Partial<PropertyDetail> = {}): PropertyDetail => ({
   value: 500_000, growthReal: 2, grossYield: 4, costRatio: 25, loanBalance: 200_000,
   loanRate: 6, purchasePrice: 300_000, strategy: "hold", sellAtAge: 80, ...over,
+});
+
+describe("Outcome-first goal taxonomy", () => {
+  it("maps every catalog card (single + couple, home + mortgage + property) to a known goal", () => {
+    // A rich plan that unlocks nearly every lever, so no card slips the taxonomy.
+    const rich = base({
+      household: "couple",
+      superMode: "individual",
+      people: [
+        { currentAge: 55, superBalance: 400_000, salary: 90_000, voluntaryConcessional: 0, voluntaryNonConcessional: 0 },
+        { currentAge: 53, superBalance: 300_000, salary: 70_000, voluntaryConcessional: 0, voluntaryNonConcessional: 0, retirementAge: 67 },
+      ],
+      outsideSuper: 100_000, annualOutsideSavings: 5_000,
+      home: { value: 1_100_000, growthReal: 2 },
+      mortgage: { type: "principal_interest", balance: 200_000, interestRate: 6, annualRepayment: 18_000, payoffAge: 75, strategy: "carry" },
+      investmentProperties: [prop(), prop({ name: "Unit 2" })],
+    });
+    const catalog = buildStrategyCatalog(rich);
+    expect(catalog.length).toBeGreaterThan(8);
+    for (const card of catalog) {
+      expect(GOAL_ORDER, `card ${card.id} maps outside the goal set`).toContain(strategyGoal(card.id));
+    }
+    // The goals partition the catalog — every card lands in exactly one goal bucket.
+    const counted = GOAL_ORDER.reduce((s, g) => s + catalog.filter((c) => strategyGoal(c.id) === g).length, 0);
+    expect(counted).toBe(catalog.length);
+  });
 });
 
 const cardById = (plan: RetirementPlan, id: string) => buildStrategyCatalog(plan).find((c) => c.id === id)!;

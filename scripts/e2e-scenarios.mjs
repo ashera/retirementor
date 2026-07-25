@@ -99,8 +99,9 @@ try {
   await page.waitForURL("**/what-if").catch(() => {});
   await page.waitForTimeout(900);
   // Strategy groups are collapsed by default (the "Biggest wins" shortlist is the
-  // guided entry) — expand the group holding guardrails before toggling it.
-  await page.getByRole("button", { name: /Timing & contributions/i }).click().catch(() => {});
+  // guided entry) and grouped by goal — expand "Lower your risk" (where flexible
+  // spending / guardrails lives) before toggling it.
+  await page.getByRole("button", { name: /Lower your risk/i }).click().catch(() => {});
   await page.waitForTimeout(200);
   await page.getByText("Flexible spending (guardrails)", { exact: true }).click();
   await page.waitForTimeout(500);

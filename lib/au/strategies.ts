@@ -24,6 +24,46 @@ export const GROUP_LABEL: Record<StrategyGroup, string> = {
   work: "Work",
 };
 
+// Outcome-first grouping for the What-If board: instead of grouping strategies by
+// MECHANISM (home / mortgage / timing), group them by the GOAL a user actually
+// arrives with. Each strategy has ONE primary goal (its dominant purpose); the
+// "Biggest wins" shortlist already surfaces cross-cutting picks, so a clean
+// partition here keeps each goal a short, scannable list.
+export type StrategyGoal = "spend" | "last" | "risk" | "legacy" | "life";
+
+export const GOAL_META: Record<StrategyGoal, { label: string; icon: string; blurb: string }> = {
+  spend: { label: "Spend more", icon: "💰", blurb: "Free up income to live on now." },
+  last: { label: "Make it last longer", icon: "⏳", blurb: "Build the pot and stretch it further." },
+  risk: { label: "Lower your risk", icon: "🛡", blurb: "Cushion your plan against a bad run of markets." },
+  legacy: { label: "Leave more behind", icon: "🎁", blurb: "Pass more on, more tax-efficiently." },
+  life: { label: "Life & work choices", icon: "🧭", blurb: "Model a big one-off or time out of work." },
+};
+
+export const GOAL_ORDER: StrategyGoal[] = ["spend", "last", "risk", "legacy", "life"];
+
+// The primary goal each strategy serves. Dynamic ids (per-property / per-partner)
+// are matched by prefix; anything unmapped falls back to "life" (a safe catch-all).
+const GOAL_BY_ID: Record<string, StrategyGoal> = {
+  downsize: "spend",
+  "sell-and-rent": "spend",
+  "clear-mortgage": "spend",
+  "adjust-spending": "spend",
+  "retire-later": "last",
+  "salary-sacrifice": "last",
+  ttr: "last",
+  guardrails: "risk",
+  "part-time-work": "risk",
+  recontribute: "legacy",
+  "keep-accumulation": "legacy",
+  "lump-sum": "life",
+};
+
+export function strategyGoal(id: string): StrategyGoal {
+  if (id.startsWith("sell-prop")) return "spend";
+  if (id.startsWith("gap-years")) return "life";
+  return GOAL_BY_ID[id] ?? "life";
+}
+
 export interface StrategyParam {
   key: string;
   label: string;

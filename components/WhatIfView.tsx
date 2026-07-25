@@ -21,9 +21,11 @@ import {
   maxSpendForConfidence,
   withSpend,
   essentialsFloor,
-  GROUP_LABEL,
+  GOAL_META,
+  GOAL_ORDER,
+  strategyGoal,
   type StrategyCard,
-  type StrategyGroup,
+  type StrategyGoal,
 } from "@/lib/au/strategies";
 import { toActiveScenario, fromActiveScenario } from "@/lib/au/scenario";
 import RetirementChart from "@/components/RetirementChart";
@@ -43,7 +45,6 @@ import Field from "@/components/Field";
 const PLAN_KEY = "au-retirement-plan";
 const PLAN_TS_KEY = "au-retirement-plan-ts";
 const SAVED_ID_KEY = "au-retirement-saved-id"; // the plans-row id the active scenario is (for in-place Save)
-const GROUP_ORDER: StrategyGroup[] = ["home", "mortgage", "property", "timing", "work"];
 
 const annualSpend = (p: RetirementPlan) =>
   Math.max(1, p.spendingMode === "stages" ? p.spendingStages.goGo : p.targetSpending);
@@ -167,7 +168,7 @@ export default function WhatIfView({
   const [timelineOpen, setTimelineOpen] = useState(false);
   // Which strategy groups are manually expanded. A group is also shown whenever it
   // holds an active card (see isGroupOpen), so what's ON is never hidden.
-  const [openGroups, setOpenGroups] = useState<Set<StrategyGroup>>(new Set());
+  const [openGroups, setOpenGroups] = useState<Set<StrategyGoal>>(new Set());
   // Priming loader: on load, walk through the strategies already active on this
   // scenario (name + description, 5s each) so the user knows what's applied before
   // scrolling. `loaderQueue` is snapshotted once so later toggles don't reopen it.
@@ -632,11 +633,13 @@ export default function WhatIfView({
   // appears when the Retire later lever opens a working-past-60 window, and hides
   // again if retirement drops back to 60 or below.
   const cardVisible = (c: StrategyCard) => !(c.id === "ttr" && composed.retirementAge <= 60);
-  const groups = GROUP_ORDER.map((g) => ({
-    group: g,
-    cards: catalog.filter((c) => c.group === g && cardVisible(c)),
+  // Outcome-first: group the levers by the GOAL the user has ("spend more", "make
+  // it last", "lower risk"…) rather than by mechanism (home/mortgage/timing).
+  const groups = GOAL_ORDER.map((g) => ({
+    goal: g,
+    cards: catalog.filter((c) => cardVisible(c) && strategyGoal(c.id) === g),
   })).filter((x) => x.cards.length > 0);
-  const toggleGroup = (g: StrategyGroup) =>
+  const toggleGroup = (g: StrategyGoal) =>
     setOpenGroups((prev) => {
       const n = new Set(prev);
       n.has(g) ? n.delete(g) : n.add(g);
@@ -644,7 +647,7 @@ export default function WhatIfView({
     });
   // A group is open if the user expanded it OR it holds an active card (so what's
   // ON is always visible). Collapsed by default keeps the board from overwhelming.
-  const isGroupOpen = (g: StrategyGroup, cards: StrategyCard[]) =>
+  const isGroupOpen = (g: StrategyGoal, cards: StrategyCard[]) =>
     openGroups.has(g) || cards.some((c) => active.has(c.id));
 
   // Heading back to the planner: flush the active scenario to BOTH the working plan
@@ -936,7 +939,7 @@ export default function WhatIfView({
                 </div>
                 <button
                   onClick={() => {
-                    setOpenGroups((prev) => new Set(prev).add(card.group));
+                    setOpenGroups((prev) => new Set(prev).add(strategyGoal(card.id)));
                     toggle(card);
                   }}
                   className="shrink-0 rounded-lg border border-accent/40 bg-accent/10 px-3 py-1.5 text-sm font-semibold text-accent transition hover:bg-accent/20"
@@ -957,24 +960,31 @@ export default function WhatIfView({
         </p>
       ) : (
         <div className="space-y-3">
-          {groups.map(({ group, cards }) => {
-            const open = isGroupOpen(group, cards);
+          {groups.map(({ goal, cards }) => {
+            const open = isGroupOpen(goal, cards);
             const activeCount = cards.filter((c) => active.has(c.id)).length;
             const pinned = activeCount > 0; // holds an active card → kept open so it's visible
+            const meta = GOAL_META[goal];
             return (
-            <section key={group} className="overflow-hidden rounded-2xl border border-line bg-panel/40">
+            <section key={goal} className="overflow-hidden rounded-2xl border border-line bg-panel/40">
               <button
                 type="button"
-                onClick={() => toggleGroup(group)}
+                onClick={() => toggleGroup(goal)}
                 disabled={pinned}
                 className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left transition hover:bg-panel-2/40 disabled:cursor-default disabled:hover:bg-transparent"
               >
-                <span className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted">
-                  {GROUP_LABEL[group]}
-                  <span className="rounded-full bg-panel-2 px-1.5 py-0.5 text-[10px] font-medium normal-case text-muted">{cards.length}</span>
-                  {activeCount > 0 && (
-                    <span className="rounded-full bg-accent/15 px-1.5 py-0.5 text-[10px] font-semibold normal-case text-accent">{activeCount} on</span>
-                  )}
+                <span className="flex min-w-0 items-center gap-2.5">
+                  <span className="text-lg" aria-hidden>{meta.icon}</span>
+                  <span className="min-w-0">
+                    <span className="flex flex-wrap items-center gap-2">
+                      <span className="text-sm font-semibold text-white">{meta.label}</span>
+                      <span className="rounded-full bg-panel-2 px-1.5 py-0.5 text-[10px] font-medium text-muted">{cards.length}</span>
+                      {activeCount > 0 && (
+                        <span className="rounded-full bg-accent/15 px-1.5 py-0.5 text-[10px] font-semibold text-accent">{activeCount} on</span>
+                      )}
+                    </span>
+                    <span className="block truncate text-xs text-muted">{meta.blurb}</span>
+                  </span>
                 </span>
                 {!pinned && (
                   <span className="shrink-0 text-xs text-muted" aria-hidden>
