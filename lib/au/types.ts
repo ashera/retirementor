@@ -128,6 +128,19 @@ export interface CareerBreak {
   who: number; // person index (0 = "you")
 }
 
+// A general "life event": a one-off cashflow at a chosen age (the oldest person's
+// age on the timeline). v1 covers the two low-risk presets — a windfall/inheritance
+// (income lands in savings, not taxed) and a one-off expense (an extra draw that
+// year). Recurring streams and taxable income (a DB pension) are a later phase.
+// Amounts are in today's dollars, like targetSpending and lumpSum.
+export interface LifeEvent {
+  id: string; // stable id for the What-If list (add/edit/remove/toggle)
+  kind: "income" | "expense";
+  amount: number; // today's dollars
+  atAge: number; // oldest person's age when it happens
+  label?: string; // e.g. "Inheritance", "Big trip", "New car"
+}
+
 // One person's income-tax reconciliation for a year — all ordinary income taxed
 // together, with a single LITO + SAPTO application. For the tax-analysis modal.
 export interface PersonTaxDetail {
@@ -182,6 +195,7 @@ export interface RetirementPlan {
   recontribute?: { perYear: number; fromAge: number; untilAge: number }; // recontribution: after-tax (non-concessional) top-up of super from outside savings, each year from fromAge to untilAge (a one-off when they're equal), age ≤75, within the NCC + total-super caps
   careerBreak?: { atAge: number; years: number; spendFromSavings: number }; // DEPRECATED single-person form (person 0); read via getCareerBreaks(). Kept so plans saved before careerBreaks[] still load.
   careerBreaks?: CareerBreak[]; // "gap years": each entry = person `who` takes `years` off from their age `atAge` — no salary or super contributions in that window, drawing `spendFromSavings`/yr from outside savings to live. Savings additions pause only when EVERY working member is on a break that year. Super keeps earning on the existing balance; the lost contributions + compounding are the main cost.
+  lifeEvents?: LifeEvent[]; // committed one-off cashflows at an age: an income (windfall/inheritance) lands in outside savings untaxed; an expense is an extra draw that year (from savings while working, from the retirement drawdown once retired). Today's dollars. Flows through the means test, MC, stress test, failsafe and guardrails automatically.
   investmentProperties?: PropertyDetail[]; // income-producing properties (source of truth)
   investmentProperty?: PropertyDetail; // DEPRECATED legacy single property — read via getInvestmentProperties()
   // Which optional sections the user has explicitly answered in the wizard (incl.
@@ -225,6 +239,14 @@ export function hasInvestmentProperty(plan: RetirementPlan): boolean {
 export function getCareerBreaks(plan: RetirementPlan): CareerBreak[] {
   const raw = plan.careerBreaks ?? (plan.careerBreak ? [{ ...plan.careerBreak, who: 0 }] : []);
   return raw.filter((b) => b.who >= 0 && b.who < plan.people.length);
+}
+
+/** Valid life events on a plan: a positive amount and a kind the engine handles.
+ *  Tolerates a missing array. */
+export function getLifeEvents(plan: RetirementPlan): LifeEvent[] {
+  return (plan.lifeEvents ?? []).filter(
+    (e) => e && e.amount > 0 && (e.kind === "income" || e.kind === "expense"),
+  );
 }
 
 /**
@@ -390,6 +412,8 @@ export interface YearBreakdown {
   rentSaved?: number; // accumulation only: positive after-tax net rent reinvested into the outside pool (a geared loss isn't — it's a disposable drain)
   careerBreakDraw?: number; // accumulation only: living costs drawn from outside savings during a career break ("gap years"), floored at the balance available
   onBreak?: boolean; // accumulation only: at least one member is on a career break ("gap year") this year — charts shade the span
+  eventIncome?: number; // life-event windfall/inheritance received this year (added to outside savings, untaxed)
+  eventExpense?: number; // life-event one-off expense paid this year (extra draw; in accumulation, floored at available savings)
   // Retirement income
   agePension: number;
   pension: PensionBreakdown | null; // means-test working behind agePension (null before pension age)

@@ -16,6 +16,7 @@ import { agePension, deemedIncome } from "./agePension";
 import {
   getCareerBreaks,
   getInvestmentProperties,
+  getLifeEvents,
   hasStaggeredRetirement,
   householdHorizon,
   householdRetirementOffset,
@@ -205,6 +206,23 @@ export function simulate(
   // Optional one-off lump sum withdrawn (and spent) from super at a chosen age.
   const lumpSum = plan.lumpSum;
   let lumpSumTaken = false;
+  // Committed life events: one-off windfalls (→ savings, untaxed) and one-off
+  // expenses (an extra draw). Each fires ONCE, in the first year the oldest person
+  // reaches its age; `eventFired` guards against re-firing (mirrors lumpSumTaken).
+  const lifeEvents = getLifeEvents(plan);
+  const eventFired = lifeEvents.map(() => false);
+  // Sum this year's due events (marking them fired) into income + expense totals.
+  const fireLifeEvents = (oldestAge: number) => {
+    let income = 0;
+    let expense = 0;
+    lifeEvents.forEach((e, i) => {
+      if (eventFired[i] || oldestAge < e.atAge) return;
+      if (e.kind === "income") income += e.amount;
+      else expense += e.amount;
+      eventFired[i] = true;
+    });
+    return { income, expense };
+  };
   // Optional recontribution: annual after-tax top-up of super from outside savings.
   const recontribute = plan.recontribute;
   // Optional Guyton-Klinger guardrails: dynamic spending that flexes with the
@@ -406,6 +424,11 @@ export function simulate(
     const startSuper = totalSuper();
     const startOutside = outside;
 
+    // Life events due this year (fired once). Income adds to savings in either
+    // phase; an expense is an extra draw — from savings while working, folded into
+    // the retirement drawdown once retired (see each branch).
+    const { income: eventIncomeNow, expense: eventExpenseNow } = fireLifeEvents(oldest);
+
     if (accumPhase) {
       // --- Accumulation: add contributions (net of 15%), then grow. ---
       // Career breaks ("gap years"): a member on a break this year earns nothing —
@@ -509,6 +532,12 @@ export function simulate(
       // funded from salary (its negative-gearing tax saving is already in accumRentTax).
       const rentSaved = Math.max(0, accumRentCash - accumRentTax);
       outside += rentSaved;
+      // Life events (working years): a windfall lands in savings untaxed; a one-off
+      // expense is drawn from savings — super is preserved and can't fund it — so it's
+      // floored at what the outside pool holds (an unaffordable expense just empties it).
+      outside += eventIncomeNow;
+      const eventExpensePaid = Math.min(eventExpenseNow, Math.max(0, outside));
+      outside -= eventExpensePaid;
       // Living costs funded from savings during a career break (summed if both
       // partners are off at once), floored at what the outside pool actually holds
       // (super is preserved, so it can't fund a break).
@@ -556,6 +585,8 @@ export function simulate(
           rentTax: accumRentTax,
           rentSaved,
           careerBreakDraw,
+          eventIncome: eventIncomeNow,
+          eventExpense: eventExpensePaid,
           onBreak: plan.people.some((_, i) => onBreak(i)), // any member on a gap year → charts shade it
 
           minDrawdown: 0,
@@ -759,7 +790,11 @@ export function simulate(
       const floor = Math.max(Math.min(guardEssentials, smileBase), guardFloorPct * smileBase);
       livingSpend = Math.max(smileBase * guardFactor, floor);
     }
-    const spending = livingSpend + rentExpense + mortgageCost;
+    // A one-off life-event expense this year is added to what must be funded (an
+    // extra draw). It's deliberately kept OUT of the guardrails rail measure below
+    // (which uses guardAnchorBase, not `spending`), so a single big expense doesn't
+    // read as a permanently higher withdrawal rate and trigger spurious cuts.
+    const spending = livingSpend + rentExpense + mortgageCost + eventExpenseNow;
 
     // Investment property: real capital growth, actual net rent (income test) and
     // net equity (assets test — assessed, NOT deemed). An optional sale releases
@@ -926,6 +961,9 @@ export function simulate(
     // unaffected. Deflated flat (today's $), like the accumulation stream.
     const stillEarning = plan.people.some((_, i) => t < retireOffsets[i] && !onBreak(i));
     if (stillEarning) outside += plan.annualOutsideSavings;
+    // A life-event windfall lands in savings, available to fund this year's draw
+    // (so it offsets what's taken from super) with any excess left in the pool.
+    outside += eventIncomeNow;
 
     // Guardrails: update next year's spend from THIS year's realised withdrawal
     // rate — the net-of-pension draw over the whole investable portfolio (D1). The
@@ -1166,6 +1204,8 @@ export function simulate(
         mortgageCleared: mortgageClearedNow,
         lumpSum: lumpSumNow,
         recontribution: recontributionNow,
+        eventIncome: eventIncomeNow,
+        eventExpense: eventExpenseNow,
         propertyProceeds,
         propertyCgt,
         homeProceeds: homeProceedsThisYear,

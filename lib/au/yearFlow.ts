@@ -39,7 +39,10 @@ export function yearFlow(row: YearRow): YearFlow {
   // shortfall is drawn from super/outside. A minimum-drawdown surplus is drawn
   // from super but reinvested outside, so it nets out of this term.
   const external = retired ? b.agePension + b.rentIncome + b.workIncome + b.takeHome : 0;
-  const spending = retired ? b.livingSpend + b.rentCost + b.mortgageCost : 0;
+  // A retirement life-event expense is funded through the normal drawdown, so it's
+  // part of the spend the funding term reconciles. (In accumulation it's a direct
+  // draw on savings, itemised as its own line below.)
+  const spending = retired ? b.livingSpend + b.rentCost + b.mortgageCost + (b.eventExpense ?? 0) : 0;
   const privateNeed = Math.max(0, spending - external);
   const superSurplus = Math.max(0, row.superDrawn - privateNeed); // min-drawdown reinvested
   const savedIncome = Math.max(0, external - spending);
@@ -60,6 +63,10 @@ export function yearFlow(row: YearRow): YearFlow {
       amount: fundingNet,
     },
     { key: "proceeds", label: "Home / property sale", amount: proceeds },
+    { key: "eventIncome", label: "Windfall / inheritance", amount: b.eventIncome ?? 0 },
+    // In retirement the expense is already inside the funding term above; in
+    // accumulation it's a direct draw on savings, named here so nothing lands in "other".
+    { key: "eventExpense", label: "One-off expense", amount: retired ? 0 : -(b.eventExpense ?? 0) },
     { key: "loan", label: "Home loan cleared from super", amount: -b.mortgageCleared },
     { key: "lumpSum", label: "Lump sum withdrawn from super", amount: -(b.lumpSum ?? 0) },
     { key: "outsideTax", label: "Tax on savings (dividends + realised gains)", amount: -b.outsideTax },
