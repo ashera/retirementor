@@ -5,7 +5,7 @@ import { mortgageAnnualCost } from "@/lib/au/mortgage";
 import { rowWithdrawalRate, withdrawalBand } from "@/lib/au/withdrawal";
 import { yearFlow } from "@/lib/au/yearFlow";
 import { rowNetWorth } from "@/lib/au/networth";
-import { personRetirementOffset, type RetirementPlan, type YearRow } from "@/lib/au/types";
+import { getLifeEvents, personRetirementOffset, type RetirementPlan, type YearRow } from "@/lib/au/types";
 
 const WR_TONE: Record<"accent" | "amber" | "red", string> = {
   accent: "text-emerald-400",
@@ -168,7 +168,17 @@ export default function YearDetailModal({
     }
     return "one partner still working, one retired";
   })();
-  const spending = b.livingSpend + b.rentCost + b.mortgageCost;
+  const spending = b.livingSpend + b.rentCost + b.mortgageCost + (b.eventExpense ?? 0);
+  // The name(s) of the life event(s) landing this year (e.g. "Big trip"), matched by
+  // firing age (max of the event's age and the projection start). Falls back to a
+  // generic label. An event fires the year the oldest person first reaches its age.
+  const eventExpenseLabel = (() => {
+    const startOldest = Math.max(...plan.people.map((p) => p.currentAge));
+    const names = getLifeEvents(plan)
+      .filter((e) => e.kind === "expense" && Math.max(startOldest, Math.round(e.atAge)) === row.age && e.label?.trim())
+      .map((e) => e.label!.trim());
+    return names.length ? names.join(", ") : "Life event";
+  })();
   // This year's super withdrawal rate (share of the balance drawn).
   const wr = !isWorking && row.superDrawn > 0 && row.totalSuper > 0 ? rowWithdrawalRate(row) : null;
 
@@ -377,6 +387,14 @@ export default function YearDetailModal({
                   label="Lump sum from super"
                   sub="a one-off tax-free withdrawal you spent this year"
                   value={money(-b.lumpSum)}
+                  tone="text-amber-400"
+                />
+              )}
+              {(b.eventExpense ?? 0) > 0 && (
+                <Line
+                  label={eventExpenseLabel}
+                  sub="a one-off life-event expense you planned for"
+                  value={money(-(b.eventExpense ?? 0))}
                   tone="text-amber-400"
                 />
               )}

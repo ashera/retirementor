@@ -83,20 +83,26 @@ function AssetsTooltip({
         </div>
       )}
       {r.totalSuper !== undefined &&
-        ((r.accumSuper ?? 0) > 1 ? (
-          <>
+        (() => {
+          const pens = r.pensionSuper ?? 0;
+          const accum = r.accumSuper ?? 0;
+          if (pens > 1 && accum > 1) {
+            return (
+              <>
+                <div className="tabular-nums text-emerald-400">Pension {fmtCurrency(pens)}</div>
+                <div className="tabular-nums text-yellow-500">Accumulation {fmtCurrency(accum)}</div>
+              </>
+            );
+          }
+          // Single band: once super is in the pension pool it's "Pension"; while it's
+          // still all accumulation (working, an early-retirement bridge, or "keep super
+          // in accumulation") it's "Super".
+          return (
             <div className="tabular-nums text-emerald-400">
-              Pension {fmtCurrency(r.pensionSuper ?? 0)}
+              {pens > 1 ? "Pension" : "Super"} {fmtCurrency(r.totalSuper)}
             </div>
-            <div className="tabular-nums text-yellow-500">
-              Accumulation {fmtCurrency(r.accumSuper ?? 0)}
-            </div>
-          </>
-        ) : (
-          <div className="tabular-nums text-emerald-400">
-            Super {fmtCurrency(r.totalSuper)}
-          </div>
-        ))}
+          );
+        })()}
       {r.outside !== undefined && (
         <div className="tabular-nums text-sky-400">
           Outside {fmtCurrency(r.outside)}
