@@ -1,14 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import { fmtCurrency } from "@/lib/au/format";
 import type { LifeEvent } from "@/lib/au/types";
 
-// The "committed" bucket of the What-If hub: a user-managed list of one-off
-// cashflows the user EXPECTS to happen (inheritance, a big trip, helping the kids).
-// Unlike the exploratory strategy cards, these live on the base plan — they're part
-// of the projection, not a toggle. Editing them replaces the whole array via
-// onChange; the host puts it on `baseline.lifeEvents`, so it flows into the composed
-// chart, Monte Carlo, stress test and save automatically.
+// The "committed" bucket of the What-If board: a user-managed list of one-off
+// cashflows the user EXPECTS (inheritance, a big trip, helping the kids). Unlike
+// the exploratory strategies these live on the base plan. The column shows a
+// COMPACT list; adding or editing an event opens a modal form.
 
 function newId(): string {
   try {
@@ -59,94 +58,63 @@ export default function LifeEventsEditor({
   defaultAge: number;
   onChange: (events: LifeEvent[]) => void;
 }) {
-  const update = (id: string, patch: Partial<LifeEvent>) =>
-    onChange(events.map((e) => (e.id === id ? { ...e, ...patch } : e)));
-  const remove = (id: string) => onChange(events.filter((e) => e.id !== id));
-  const add = (kind: LifeEvent["kind"]) =>
-    onChange([
-      ...events,
-      {
-        id: newId(),
-        kind,
-        amount: kind === "income" ? 100_000 : 30_000,
-        atAge: Math.min(maxAge, Math.max(minAge, Math.round(defaultAge))),
-        label: kind === "income" ? "Inheritance" : "Big trip",
-      },
-    ]);
+  // The event currently open in the add/edit modal (a draft; only committed on Save).
+  const [draft, setDraft] = useState<LifeEvent | null>(null);
+  const isNew = draft != null && !events.some((e) => e.id === draft.id);
 
-  const valid = events.filter((e) => e.amount > 0);
-  const totalIn = valid.filter((e) => e.kind === "income").reduce((s, e) => s + e.amount, 0);
-  const totalOut = valid.filter((e) => e.kind === "expense").reduce((s, e) => s + e.amount, 0);
+  const clampAge = (a: number) => Math.min(maxAge, Math.max(minAge, Math.round(a)));
+  const startAdd = (kind: LifeEvent["kind"]) =>
+    setDraft({
+      id: newId(),
+      kind,
+      amount: kind === "income" ? 100_000 : 30_000,
+      atAge: clampAge(defaultAge),
+      label: kind === "income" ? "Inheritance" : "Big trip",
+    });
+  const save = () => {
+    if (!draft) return;
+    onChange(events.some((e) => e.id === draft.id) ? events.map((e) => (e.id === draft.id ? draft : e)) : [...events, draft]);
+    setDraft(null);
+  };
+  const remove = (id: string) => {
+    onChange(events.filter((e) => e.id !== id));
+    setDraft(null);
+  };
+
+  const shown = events.filter((e) => e.amount > 0 || draft?.id === e.id);
 
   return (
     <div className="rounded-2xl border border-line bg-panel p-4">
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div className="min-w-0">
-          <h3 className="flex items-center gap-2 font-semibold text-white">
-            <span aria-hidden>📌</span> Life events
-            <span className="rounded-full bg-panel-2 px-2 py-0.5 text-[11px] font-medium text-muted">committed</span>
-          </h3>
-          <p className="mt-0.5 text-sm text-muted">
-            One-off amounts you <span className="text-slate-200">expect</span> to happen — an inheritance, a big trip,
-            helping the kids. They&apos;re part of your plan, not a what-if.
-          </p>
-        </div>
-        {valid.length > 0 && (
-          <div className="shrink-0 text-right text-xs text-muted">
-            {totalIn > 0 && <div className="text-accent">+{fmtCurrency(totalIn)} in</div>}
-            {totalOut > 0 && <div className="text-amber-300">−{fmtCurrency(totalOut)} out</div>}
-          </div>
-        )}
-      </div>
+      <h3 className="flex items-center gap-2 font-semibold text-white">
+        <span aria-hidden>📌</span> Life events
+        <span className="rounded-full bg-panel-2 px-2 py-0.5 text-[11px] font-medium text-muted">committed</span>
+      </h3>
+      <p className="mt-0.5 text-xs text-muted">
+        One-off amounts you <span className="text-slate-200">expect</span> — an inheritance, a big trip. Part of your plan.
+      </p>
 
-      {events.length > 0 && (
-        <div className="mt-3 space-y-2">
-          {events.map((e) => (
-            <div
+      {shown.length > 0 && (
+        <div className="mt-3 space-y-1.5">
+          {shown.map((e) => (
+            <button
               key={e.id}
-              className="flex flex-wrap items-center gap-2 rounded-xl border border-line bg-panel-2 px-3 py-2"
+              type="button"
+              onClick={() => setDraft(e)}
+              className="flex w-full items-center gap-2 rounded-lg border border-line bg-panel-2 px-3 py-2 text-left text-sm transition hover:border-accent/40"
             >
-              <input
-                value={e.label ?? ""}
-                onChange={(ev) => update(e.id, { label: ev.target.value })}
-                placeholder={e.kind === "income" ? "e.g. Inheritance" : "e.g. Big trip"}
-                className="min-w-[7rem] flex-1 rounded-lg border border-line bg-panel px-2.5 py-1.5 text-sm text-white outline-none focus:border-accent"
+              <span
+                className={`h-2 w-2 shrink-0 rounded-full ${e.kind === "income" ? "bg-accent" : "bg-amber-400"}`}
+                aria-hidden
               />
-              <Segmented value={e.kind} onChange={(kind) => update(e.id, { kind })} />
-              <div className="flex items-center gap-1 rounded-lg border border-line bg-panel px-2 py-1.5 text-sm">
-                <span className="text-muted">$</span>
-                <input
-                  type="number"
-                  min={0}
-                  step={5_000}
-                  value={e.amount}
-                  onChange={(ev) => update(e.id, { amount: Math.max(0, Number(ev.target.value) || 0) })}
-                  className="w-24 bg-transparent text-white outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
-                />
-              </div>
-              <div className="flex items-center gap-1 rounded-lg border border-line bg-panel px-2 py-1.5 text-sm">
-                <span className="text-muted">at age</span>
-                <input
-                  type="number"
-                  min={minAge}
-                  max={maxAge}
-                  value={e.atAge}
-                  onChange={(ev) =>
-                    update(e.id, { atAge: Math.min(maxAge, Math.max(minAge, Math.round(Number(ev.target.value) || minAge))) })
-                  }
-                  className="w-14 bg-transparent text-white outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
-                />
-              </div>
-              <button
-                type="button"
-                onClick={() => remove(e.id)}
-                aria-label="Remove event"
-                title="Remove"
-                className="ml-auto shrink-0 rounded-lg border border-line px-2 py-1.5 text-muted transition hover:border-red-400/50 hover:text-red-400"
-              >
-                ✕
-              </button>
-            </div>
+              <span className="min-w-0 flex-1 truncate text-slate-200">
+                {e.label?.trim() || (e.kind === "income" ? "Windfall" : "Expense")}
+              </span>
+              <span className={`shrink-0 tabular-nums ${e.kind === "income" ? "text-accent" : "text-amber-300"}`}>
+                {e.kind === "income" ? "+" : "−"}
+                {fmtCurrency(e.amount)}
+              </span>
+              <span className="shrink-0 text-xs text-muted">at {e.atAge}</span>
+            </button>
           ))}
         </div>
       )}
@@ -154,19 +122,103 @@ export default function LifeEventsEditor({
       <div className="mt-3 flex flex-wrap gap-2">
         <button
           type="button"
-          onClick={() => add("income")}
-          className="rounded-lg border border-accent/40 bg-accent/10 px-3 py-1.5 text-sm font-medium text-accent transition hover:bg-accent/20"
+          onClick={() => startAdd("income")}
+          className="rounded-lg border border-accent/40 bg-accent/10 px-2.5 py-1.5 text-xs font-medium text-accent transition hover:bg-accent/20"
         >
-          + Money in (windfall)
+          + Money in
         </button>
         <button
           type="button"
-          onClick={() => add("expense")}
-          className="rounded-lg border border-amber-400/40 bg-amber-400/10 px-3 py-1.5 text-sm font-medium text-amber-300 transition hover:bg-amber-400/20"
+          onClick={() => startAdd("expense")}
+          className="rounded-lg border border-amber-400/40 bg-amber-400/10 px-2.5 py-1.5 text-xs font-medium text-amber-300 transition hover:bg-amber-400/20"
         >
-          + Money out (one-off expense)
+          + Money out
         </button>
       </div>
+
+      {/* Add / edit modal */}
+      {draft && (
+        <div className="fixed inset-0 z-50 grid place-items-center p-4" role="dialog" aria-modal="true">
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setDraft(null)} />
+          <div className="relative w-full max-w-sm rounded-2xl border border-line bg-panel p-5 shadow-2xl">
+            <div className="flex items-center justify-between">
+              <h4 className="font-semibold text-white">{isNew ? "Add a life event" : "Edit life event"}</h4>
+              <button onClick={() => setDraft(null)} aria-label="Close" className="text-muted transition hover:text-white">
+                ✕
+              </button>
+            </div>
+
+            <label className="mt-4 block text-xs font-medium text-muted">Label</label>
+            <input
+              value={draft.label ?? ""}
+              onChange={(ev) => setDraft({ ...draft, label: ev.target.value })}
+              placeholder={draft.kind === "income" ? "e.g. Inheritance" : "e.g. Big trip"}
+              className="mt-1 w-full rounded-lg border border-line bg-panel-2 px-3 py-2 text-sm text-white outline-none focus:border-accent"
+            />
+
+            <div className="mt-3 flex items-center justify-between gap-2">
+              <span className="text-xs font-medium text-muted">Direction</span>
+              <Segmented value={draft.kind} onChange={(kind) => setDraft({ ...draft, kind })} />
+            </div>
+
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-muted">Amount</label>
+                <div className="mt-1 flex items-center gap-1 rounded-lg border border-line bg-panel-2 px-2.5 py-2 text-sm">
+                  <span className="text-muted">$</span>
+                  <input
+                    type="number"
+                    min={0}
+                    step={5_000}
+                    value={draft.amount}
+                    onChange={(ev) => setDraft({ ...draft, amount: Math.max(0, Number(ev.target.value) || 0) })}
+                    className="w-full bg-transparent text-white outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-muted">At age</label>
+                <input
+                  type="number"
+                  min={minAge}
+                  max={maxAge}
+                  value={draft.atAge}
+                  onChange={(ev) => setDraft({ ...draft, atAge: clampAge(Number(ev.target.value) || minAge) })}
+                  className="mt-1 w-full rounded-lg border border-line bg-panel-2 px-2.5 py-2 text-sm text-white outline-none focus:border-accent [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
+                />
+              </div>
+            </div>
+
+            <div className="mt-5 flex items-center justify-between gap-2">
+              {!isNew ? (
+                <button
+                  onClick={() => remove(draft.id)}
+                  className="rounded-lg border border-line px-3 py-2 text-sm text-muted transition hover:border-red-400/50 hover:text-red-400"
+                >
+                  Remove
+                </button>
+              ) : (
+                <span />
+              )}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setDraft(null)}
+                  className="rounded-lg border border-line px-3 py-2 text-sm text-slate-200 transition hover:border-accent/50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={save}
+                  disabled={!(draft.amount > 0)}
+                  className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-ink transition hover:bg-accent-soft disabled:opacity-50"
+                >
+                  {isNew ? "Add" : "Save"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

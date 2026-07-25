@@ -114,27 +114,6 @@ function fmtDeltaYr(d: number): string | null {
   return `${d > 0 ? "+" : "−"}${fmtCurrency(Math.round(a / 100) * 100)}/yr`;
 }
 
-/** One plain-language line describing a strategy's biggest positive effects, for the
- *  "Biggest wins" shortlist — leads with the most compelling dimension, at most two. */
-function winLine(m: Marginal, aff: number, life: number): string {
-  const bits: string[] = [];
-  if (m.shortfallAvoided > 5_000)
-    bits.push(`covers about ${fmtCurrency(Math.round(m.shortfallAvoided / 1_000) * 1_000)} of spending that's currently unfunded`);
-  const yr = fmtDeltaYr(aff);
-  if (aff > 1_000 && yr) bits.push(`could let you spend about ${yr}`);
-  if (bits.length < 2 && m.years >= 1) {
-    const y = Math.round(m.years);
-    bits.push(`makes your money last about ${y} year${y === 1 ? "" : "s"} longer`);
-  }
-  if (bits.length < 2 && m.netWorth > 5_000) {
-    const nw = fmtDelta(m.netWorth);
-    if (nw) bits.push(`leaves about ${nw} more at ${life}`);
-  }
-  if (bits.length === 0) return "A modest improvement to your plan.";
-  const s = bits.slice(0, 2).join(", and ");
-  return `${s.charAt(0).toUpperCase()}${s.slice(1)}.`;
-}
-
 export default function WhatIfView({
   config,
   savedPlans: initialSavedPlans,
@@ -166,9 +145,9 @@ export default function WhatIfView({
   const [assumptionsOpen, setAssumptionsOpen] = useState(false);
   const [assumptionsCard, setAssumptionsCard] = useState<StrategyCard | null>(null);
   const [timelineOpen, setTimelineOpen] = useState(false);
-  // Which strategy groups are manually expanded. A group is also shown whenever it
-  // holds an active card (see isGroupOpen), so what's ON is never hidden.
-  const [openGroups, setOpenGroups] = useState<Set<StrategyGoal>>(new Set());
+  // The strategy whose detail card is open in the modal (params + impact). Set by
+  // clicking a strategy pill in column 2; null = no modal.
+  const [detailCard, setDetailCard] = useState<StrategyCard | null>(null);
   // Priming loader: on load, walk through the strategies already active on this
   // scenario (name + description, 5s each) so the user knows what's applied before
   // scrolling. `loaderQueue` is snapshotted once so later toggles don't reopen it.
@@ -522,38 +501,6 @@ export default function WhatIfView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [baseline, catalog, valsKey, config]);
 
-  // "Biggest wins for you": the inactive strategies that most improve THIS plan,
-  // ranked by a blended impact score (fixing unfunded spending weighs most, then
-  // extra spendable income, extra funding years, and net worth). Each is shown as a
-  // plain one-liner so the user gets a personalised "start here" instead of a flat
-  // list of 11 levers. Refines as the async `affordable` figures arrive.
-  const topWins = useMemo(() => {
-    if (!composed) return [] as { card: StrategyCard; line: string }[];
-    const life = composed.lifeExpectancy;
-    return catalog
-      .filter(
-        (c) =>
-          !active.has(c.id) &&
-          c.id !== "adjust-spending" && // a slider, not a discrete "win"
-          !(c.id === "ttr" && composed.retirementAge <= 60),
-      )
-      .map((c) => {
-        const m = marginal[c.id];
-        if (!m) return null;
-        const aff = affordable[c.id] ?? 0;
-        const score =
-          Math.max(0, m.shortfallAvoided) * 3 +
-          Math.max(0, aff) * 25 +
-          Math.max(0, m.netWorth) * 0.4 +
-          Math.max(0, m.years) * 15_000;
-        return { card: c, m, aff, score };
-      })
-      .filter((x): x is { card: StrategyCard; m: Marginal; aff: number; score: number } => !!x && x.score > 0)
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 3)
-      .map(({ card, m, aff }) => ({ card, line: winLine(m, aff, life) }));
-  }, [catalog, active, marginal, affordable, composed]);
-
   if (!baseline || !baseRes || !compRes || !composed) return <div className="min-h-screen bg-ink" />;
 
   const changed = active.size > 0;
@@ -639,16 +586,71 @@ export default function WhatIfView({
     goal: g,
     cards: catalog.filter((c) => cardVisible(c) && strategyGoal(c.id) === g),
   })).filter((x) => x.cards.length > 0);
-  const toggleGroup = (g: StrategyGoal) =>
-    setOpenGroups((prev) => {
-      const n = new Set(prev);
-      n.has(g) ? n.delete(g) : n.add(g);
-      return n;
-    });
-  // A group is open if the user expanded it OR it holds an active card (so what's
-  // ON is always visible). Collapsed by default keeps the board from overwhelming.
-  const isGroupOpen = (g: StrategyGoal, cards: StrategyCard[]) =>
-    openGroups.has(g) || cards.some((c) => active.has(c.id));
+
+  // Full props for one strategy's detail card (rendered inside the modal). Mirrors
+  // the per-card props the board used to build inline; only the open card needs them.
+  const detailProps = (card: StrategyCard) => ({
+    card,
+    on: active.has(card.id),
+    delta:
+      (card.id === "adjust-spending" ? spendDelta : marginal[card.id]) ?? {
+        years: 0,
+        moneyLeft: 0,
+        shortfallAvoided: 0,
+        netWorth: 0,
+        takeHomeNow: 0,
+      },
+    incomeDelta: affordable[card.id] ?? null,
+    incomePending: affordablePending,
+    life: baseline.lifeExpectancy,
+    baseTakeHome: baseRes.rows[0]?.takeHome ?? 0,
+    values: resolveValues(card, values[card.id]),
+    onToggle: () => toggle(card),
+    onParam: (k: string, v: number) => setParam(card.id, k, v),
+    onAssumptions: () => setAssumptionsCard(card),
+    onTimeline: card.id === "guardrails" ? () => setTimelineOpen(true) : undefined,
+    guardrails:
+      card.id === "guardrails" && grOutlook
+        ? {
+            outlook: grOutlook,
+            pending: grPending,
+            safeStart: safeSpend,
+            safePending,
+            currentStart: annualSpend(composed),
+            loan: spendMix?.loan ?? 0,
+            fixedPct: grUplift ? Math.round(grUplift.fixed * 100) : null,
+            flexPct: grUplift ? Math.round(grUplift.flex * 100) : null,
+            targetPct: Math.round(SAFE_TARGET * 100),
+            steadySafeSpend: safeSpend,
+            steadySafeRate: safeRate,
+            flexSafeSpend,
+            flexSafeRate,
+          }
+        : undefined,
+    sustainable:
+      card.id === "adjust-spending" && spendSustainable != null
+        ? {
+            essentials,
+            stretch: spendSustainable,
+            safe: safeSpend,
+            safePending,
+            targetPct: Math.round(SAFE_TARGET * 100),
+            life: baseline.lifeExpectancy,
+            startedPct: anchorMc != null ? Math.round(anchorMc * 100) : null,
+            nowPct: compMc != null ? Math.round(compMc * 100) : null,
+            likelihoodPending: mcPending,
+            nowRate,
+            safeRate,
+            flexSafeRate,
+            flexSafeSpend,
+            loan: spendMix?.loan ?? 0,
+            currentSpend: annualSpend(baseline),
+            onSetSafe: () => {
+              if (safeSpend != null) setParam("adjust-spending", "spend", safeSpend);
+            },
+          }
+        : undefined,
+  });
 
   // Heading back to the planner: flush the active scenario to BOTH the working plan
   // (localStorage) and — for signed-in users — the cloud draft, awaited, so neither
@@ -669,7 +671,7 @@ export default function WhatIfView({
   };
 
   return (
-    <div className="mx-auto max-w-4xl px-5 py-8">
+    <div className="mx-auto max-w-6xl px-5 py-8">
       <div className="mb-6 flex items-center justify-between gap-3">
         {/* Flush the active scenario, then full-navigate, so the planner opens on
             exactly what you were using here (shared views just navigate normally). */}
@@ -725,8 +727,12 @@ export default function WhatIfView({
         </button>
       </header>
 
+      <div className="grid gap-6 lg:grid-cols-3 lg:items-start">
+      {/* ── COLUMN 1: the "result" — metrics + chart. Sticky on desktop so the chart
+           (what users come for) stays put while the controls in column 2 scroll. ── */}
+      <div className="space-y-4 lg:col-span-2 lg:sticky lg:top-6">
       {/* Headline metrics */}
-      <div className="mb-6 grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-3">
         <MetricCard
           label="Money lasts"
           base={lastsLabel(baseRes, baseline)}
@@ -751,68 +757,8 @@ export default function WhatIfView({
         />
       </div>
 
-      {/* Spending mix — what a flexible-spending strategy can (discretionary) and
-          can't (essentials, home loan) move. */}
-      {spendMix && (
-        <div className="mb-6 rounded-2xl border border-line bg-panel p-4">
-          <div className="flex items-baseline justify-between gap-2">
-            <span className="text-[11px] font-medium uppercase tracking-wide text-muted">Your spending</span>
-            <span className="text-lg font-bold tabular-nums text-white">
-              {fmtCurrency(spendMix.total)}
-              <span className="ml-0.5 text-xs font-medium text-muted">/yr</span>
-            </span>
-          </div>
-          <SpendingBreakdown
-            essential={spendMix.essential}
-            discretionary={spendMix.discretionary}
-            loan={spendMix.loan}
-            estimated={spendMix.estimated}
-          />
-        </div>
-      )}
-
-      {/* Net worth trajectory */}
-      <div className="mb-6 rounded-2xl border border-line bg-panel p-4">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="min-w-0">
-            <div className="text-[11px] font-medium uppercase tracking-wide text-muted">
-              Net worth at {nwLife}
-            </div>
-            <div className="mt-1 flex flex-wrap items-baseline gap-2">
-              {changed ? (
-                <>
-                  <span className="text-lg text-muted line-through">{fmtCurrency(baseTermNW)}</span>
-                  <span aria-hidden className="text-muted">→</span>
-                  <span className="text-2xl font-bold tabular-nums text-white">{fmtCurrency(compTermNW)}</span>
-                  <span className={`text-sm font-semibold tabular-nums ${compTermNW >= baseTermNW ? "text-accent" : "text-amber-400"}`}>
-                    {fmtDelta(compTermNW - baseTermNW)}
-                  </span>
-                </>
-              ) : (
-                <span className="text-2xl font-bold tabular-nums text-white">{fmtCurrency(baseTermNW)}</span>
-              )}
-            </div>
-            <div className="mt-0.5 text-[11px] text-muted">
-              Total wealth — super, savings, home &amp; property — through retirement
-            </div>
-          </div>
-          <div className="flex flex-col items-end gap-1">
-            <Sparkline
-              series={changed ? [baseNW, compNW] : [compNW]}
-              colors={changed ? ["#94a3b8", "#34d399"] : ["#34d399"]}
-            />
-            {changed && (
-              <div className="flex gap-3 text-[10px] text-muted">
-                <span className="flex items-center gap-1"><span className="inline-block h-0.5 w-3 bg-[#94a3b8]" />Before</span>
-                <span className="flex items-center gap-1"><span className="inline-block h-0.5 w-3 bg-[#34d399]" />After</span>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Chart */}
-      <div className="mb-6 rounded-2xl border border-line bg-panel p-6">
+      {/* Chart — the hero of column 1 */}
+      <div className="rounded-2xl border border-line bg-panel p-5">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <h2 className="font-semibold text-white">
             {chartView === "balance" ? "Balance over time" : chartView === "networth" ? "Net worth (incl. your home)" : "Income sources"}{" "}
@@ -894,182 +840,138 @@ export default function WhatIfView({
         )}
       </div>
 
-      {/* ── Committed bucket: life events. These live on the base plan (part of the
-           projection), not the strategy layer — "things that happen TO you". ── */}
-      <div className="mt-8">
-        <LifeEventsEditor
-          events={baseline.lifeEvents ?? []}
-          minAge={oldestCurrentAge(baseline)}
-          maxAge={baseline.lifeExpectancy}
-          defaultAge={Math.max(oldestCurrentAge(baseline) + 1, baseline.retirementAge + 3)}
-          onChange={(lifeEvents: LifeEvent[]) => setBaseline({ ...baseline, lifeEvents })}
-        />
-      </div>
+      {/* Spending mix — compact, below the chart. */}
+      {spendMix && (
+        <div className="rounded-2xl border border-line bg-panel p-4">
+          <div className="flex items-baseline justify-between gap-2">
+            <span className="text-[11px] font-medium uppercase tracking-wide text-muted">Your spending</span>
+            <span className="text-lg font-bold tabular-nums text-white">
+              {fmtCurrency(spendMix.total)}
+              <span className="ml-0.5 text-xs font-medium text-muted">/yr</span>
+            </span>
+          </div>
+          <SpendingBreakdown
+            essential={spendMix.essential}
+            discretionary={spendMix.discretionary}
+            loan={spendMix.loan}
+            estimated={spendMix.estimated}
+          />
+        </div>
+      )}
 
-      {/* ── Exploring bucket: what-if strategies. Toggle layer on top of the base;
-           "choices you MAKE". ── */}
-      <div className="mt-8 flex flex-wrap items-baseline gap-2">
-        <h2 className="flex items-center gap-2 text-lg font-semibold text-white">
-          <span aria-hidden>🎛</span> Strategies
-        </h2>
-        <span className="rounded-full bg-panel-2 px-2 py-0.5 text-[11px] font-medium text-muted">exploring</span>
-      </div>
-      <p className="mb-4 mt-0.5 text-sm text-muted">
-        Choices you could <span className="text-slate-200">make</span> — toggle any on to see how your plan responds.
-        They don&apos;t change your base plan until you save.
-      </p>
-
-      {/* Biggest wins: a personalised "start here" shortlist so the board isn't 11
-          equal-weight levers. Ranked by impact on THIS plan; tap to try one. */}
-      {topWins.length > 0 && (
-        <div className="mb-6 rounded-2xl border border-accent/30 bg-accent/[0.06] p-4">
-          <h3 className="flex items-center gap-2 font-semibold text-white">
-            <span aria-hidden>✨</span> Biggest wins for you
-          </h3>
-          <p className="mt-0.5 text-sm text-muted">The moves that improve your plan the most right now — tap to try one.</p>
-          <div className="mt-3 space-y-2">
-            {topWins.map(({ card, line }) => (
-              <div
-                key={card.id}
-                className="flex items-center gap-3 rounded-xl border border-line bg-panel-2 px-3 py-2.5"
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-medium text-white">{card.label}</div>
-                  <div className="text-xs text-muted">{line}</div>
-                </div>
-                <button
-                  onClick={() => {
-                    setOpenGroups((prev) => new Set(prev).add(strategyGoal(card.id)));
-                    toggle(card);
-                  }}
-                  className="shrink-0 rounded-lg border border-accent/40 bg-accent/10 px-3 py-1.5 text-sm font-semibold text-accent transition hover:bg-accent/20"
-                >
-                  Try →
-                </button>
+      {/* Net worth trajectory — compact, below the chart. */}
+      <div className="rounded-2xl border border-line bg-panel p-4">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="min-w-0">
+            <div className="text-[11px] font-medium uppercase tracking-wide text-muted">
+              Net worth at {nwLife}
+            </div>
+            <div className="mt-1 flex flex-wrap items-baseline gap-2">
+              {changed ? (
+                <>
+                  <span className="text-lg text-muted line-through">{fmtCurrency(baseTermNW)}</span>
+                  <span aria-hidden className="text-muted">→</span>
+                  <span className="text-2xl font-bold tabular-nums text-white">{fmtCurrency(compTermNW)}</span>
+                  <span className={`text-sm font-semibold tabular-nums ${compTermNW >= baseTermNW ? "text-accent" : "text-amber-400"}`}>
+                    {fmtDelta(compTermNW - baseTermNW)}
+                  </span>
+                </>
+              ) : (
+                <span className="text-2xl font-bold tabular-nums text-white">{fmtCurrency(baseTermNW)}</span>
+              )}
+            </div>
+            <div className="mt-0.5 text-[11px] text-muted">
+              Total wealth — super, savings, home &amp; property — through retirement
+            </div>
+          </div>
+          <div className="flex flex-col items-end gap-1">
+            <Sparkline
+              series={changed ? [baseNW, compNW] : [compNW]}
+              colors={changed ? ["#94a3b8", "#34d399"] : ["#34d399"]}
+            />
+            {changed && (
+              <div className="flex gap-3 text-[10px] text-muted">
+                <span className="flex items-center gap-1"><span className="inline-block h-0.5 w-3 bg-[#94a3b8]" />Before</span>
+                <span className="flex items-center gap-1"><span className="inline-block h-0.5 w-3 bg-[#34d399]" />After</span>
               </div>
-            ))}
+            )}
           </div>
         </div>
-      )}
+      </div>
+      </div>{/* ── /COLUMN 1 ── */}
 
-      {/* Strategy board */}
-      {groups.length === 0 ? (
-        <p className="rounded-2xl border border-line bg-panel px-4 py-8 text-center text-muted">
-          No strategies apply to this scenario yet. Add a mortgage, investment property, or build a
-          plan with working years to unlock levers here.
+      {/* ── COLUMN 2: the controls — life events + strategies + save. Scrolls beside
+           the sticky chart, so the list feels short and cause↔effect stays on screen. ── */}
+      <div className="space-y-6">
+      {/* Committed bucket: life events (compact list; add/edit opens a modal). */}
+      <LifeEventsEditor
+        events={baseline.lifeEvents ?? []}
+        minAge={oldestCurrentAge(baseline)}
+        maxAge={baseline.lifeExpectancy}
+        defaultAge={Math.max(oldestCurrentAge(baseline) + 1, baseline.retirementAge + 3)}
+        onChange={(lifeEvents: LifeEvent[]) => setBaseline({ ...baseline, lifeEvents })}
+      />
+
+      {/* Exploring bucket: strategies, grouped by goal. Each is a compact pill; the
+          full detail card (params + impact) opens in a modal when clicked. */}
+      <div className="rounded-2xl border border-line bg-panel p-4">
+        <h3 className="flex items-center gap-2 font-semibold text-white">
+          <span aria-hidden>🎛</span> Strategies
+          <span className="rounded-full bg-panel-2 px-2 py-0.5 text-[11px] font-medium text-muted">exploring</span>
+        </h3>
+        <p className="mt-0.5 text-xs text-muted">
+          Choices you could <span className="text-slate-200">make</span>. Tap one for details &amp; to apply it — it
+          won&apos;t change your base plan until you save.
         </p>
-      ) : (
-        <div className="space-y-3">
-          {groups.map(({ goal, cards }) => {
-            const open = isGroupOpen(goal, cards);
-            const activeCount = cards.filter((c) => active.has(c.id)).length;
-            const pinned = activeCount > 0; // holds an active card → kept open so it's visible
-            const meta = GOAL_META[goal];
-            return (
-            <section key={goal} className="overflow-hidden rounded-2xl border border-line bg-panel/40">
-              <button
-                type="button"
-                onClick={() => toggleGroup(goal)}
-                disabled={pinned}
-                className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left transition hover:bg-panel-2/40 disabled:cursor-default disabled:hover:bg-transparent"
-              >
-                <span className="flex min-w-0 items-center gap-2.5">
-                  <span className="text-lg" aria-hidden>{meta.icon}</span>
-                  <span className="min-w-0">
-                    <span className="flex flex-wrap items-center gap-2">
-                      <span className="text-sm font-semibold text-white">{meta.label}</span>
-                      <span className="rounded-full bg-panel-2 px-1.5 py-0.5 text-[10px] font-medium text-muted">{cards.length}</span>
-                      {activeCount > 0 && (
-                        <span className="rounded-full bg-accent/15 px-1.5 py-0.5 text-[10px] font-semibold text-accent">{activeCount} on</span>
-                      )}
-                    </span>
-                    <span className="block truncate text-xs text-muted">{meta.blurb}</span>
-                  </span>
-                </span>
-                {!pinned && (
-                  <span className="shrink-0 text-xs text-muted" aria-hidden>
-                    {open ? "▲" : "▼"}
-                  </span>
-                )}
-              </button>
-              {open && (
-              <div className="space-y-3 px-3 pb-3">
-                {cards.map((card) => (
-                  <StrategyCardRow
-                    key={card.id}
-                    card={card}
-                    on={active.has(card.id)}
-                    delta={
-                      (card.id === "adjust-spending" ? spendDelta : marginal[card.id]) ?? {
-                        years: 0,
-                        moneyLeft: 0,
-                        shortfallAvoided: 0,
-                        netWorth: 0,
-                        takeHomeNow: 0,
-                      }
-                    }
-                    incomeDelta={affordable[card.id] ?? null}
-                    incomePending={affordablePending}
-                    life={baseline.lifeExpectancy}
-                    baseTakeHome={baseRes.rows[0]?.takeHome ?? 0}
-                    values={resolveValues(card, values[card.id])}
-                    onToggle={() => toggle(card)}
-                    onParam={(k, v) => setParam(card.id, k, v)}
-                    onAssumptions={() => setAssumptionsCard(card)}
-                    onTimeline={card.id === "guardrails" ? () => setTimelineOpen(true) : undefined}
-                    guardrails={
-                      card.id === "guardrails" && grOutlook
-                        ? {
-                            outlook: grOutlook,
-                            pending: grPending,
-                            safeStart: safeSpend,
-                            safePending,
-                            currentStart: annualSpend(composed),
-                            loan: spendMix?.loan ?? 0,
-                            fixedPct: grUplift ? Math.round(grUplift.fixed * 100) : null,
-                            flexPct: grUplift ? Math.round(grUplift.flex * 100) : null,
-                            targetPct: Math.round(SAFE_TARGET * 100),
-                            // Safe-rate uplift: steady (fixed) vs flexible (guardrails).
-                            steadySafeSpend: safeSpend,
-                            steadySafeRate: safeRate,
-                            flexSafeSpend,
-                            flexSafeRate,
-                          }
-                        : undefined
-                    }
-                    sustainable={
-                      card.id === "adjust-spending" && spendSustainable != null
-                        ? {
-                            essentials,
-                            stretch: spendSustainable,
-                            safe: safeSpend,
-                            safePending,
-                            targetPct: Math.round(SAFE_TARGET * 100),
-                            life: baseline.lifeExpectancy,
-                            startedPct: anchorMc != null ? Math.round(anchorMc * 100) : null,
-                            nowPct: compMc != null ? Math.round(compMc * 100) : null,
-                            likelihoodPending: mcPending,
-                            nowRate,
-                            safeRate,
-                            flexSafeRate,
-                            flexSafeSpend,
-                            loan: spendMix?.loan ?? 0,
-                            currentSpend: annualSpend(baseline),
-                            onSetSafe: () => {
-                              if (safeSpend != null) setParam("adjust-spending", "spend", safeSpend);
-                            },
-                          }
-                        : undefined
-                    }
-                  />
-                ))}
-              </div>
-              )}
-            </section>
-            );
-          })}
-        </div>
-      )}
+
+        {groups.length === 0 ? (
+          <p className="mt-3 rounded-xl border border-line bg-panel-2 px-3 py-6 text-center text-xs text-muted">
+            No strategies apply yet. Add a mortgage, investment property, or working years to unlock levers.
+          </p>
+        ) : (
+          <div className="mt-3 space-y-4">
+            {groups.map(({ goal, cards }) => {
+              const meta = GOAL_META[goal];
+              return (
+                <div key={goal}>
+                  <div className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-slate-300">
+                    <span aria-hidden>{meta.icon}</span>
+                    {meta.label}
+                  </div>
+                  <div className="space-y-1.5">
+                    {cards.map((card) => {
+                      const on = active.has(card.id);
+                      return (
+                        <button
+                          key={card.id}
+                          type="button"
+                          onClick={() => setDetailCard(card)}
+                          className={`flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm transition ${
+                            on
+                              ? "border-accent/50 bg-accent/10 text-white"
+                              : "border-line bg-panel-2 text-slate-200 hover:border-accent/40"
+                          }`}
+                        >
+                          <span
+                            className={`grid h-4 w-4 shrink-0 place-items-center rounded-full border text-[10px] ${
+                              on ? "border-accent bg-accent text-ink" : "border-line text-transparent"
+                            }`}
+                            aria-hidden
+                          >
+                            ✓
+                          </span>
+                          <span className="min-w-0 flex-1 truncate">{card.label}</span>
+                          <span className="shrink-0 text-xs text-muted">{on ? "Edit" : "›"}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
       {/* Save (owner) — or, for a shared viewer, an invite to build their own. */}
       {shared ? (
@@ -1144,6 +1046,8 @@ export default function WhatIfView({
         {saveMsg && <p className="mt-2 text-xs text-accent">{saveMsg}</p>}
       </div>
       )}
+      </div>{/* ── /COLUMN 2 ── */}
+      </div>{/* ── /two-column grid ── */}
 
       {/* Priming loader: walk through the strategies already active on this scenario. */}
       {loading && loadingCard && loaderQueue && (
@@ -1168,6 +1072,30 @@ export default function WhatIfView({
             <button onClick={skipLoader} className="mt-4 text-xs text-muted transition hover:text-white">
               Skip →
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Strategy detail modal: the full card (params, live note, impact, and the
+          guardrails/spending panels) for the pill the user tapped. Reuses the exact
+          StrategyCardRow the board used to render inline. */}
+      {detailCard && (
+        <div className="fixed inset-0 z-50 grid place-items-start justify-center overflow-y-auto p-4 py-10" role="dialog" aria-modal="true">
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setDetailCard(null)} />
+          <div className="relative w-full max-w-lg">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-xs font-medium uppercase tracking-wide text-muted">
+                {active.has(detailCard.id) ? "Applied to this scenario" : "Explore this strategy"}
+              </span>
+              <button
+                onClick={() => setDetailCard(null)}
+                aria-label="Close"
+                className="rounded-lg border border-line bg-panel px-2 py-1 text-sm text-muted transition hover:text-white"
+              >
+                ✕ Close
+              </button>
+            </div>
+            <StrategyCardRow {...detailProps(detailCard)} />
           </div>
         </div>
       )}

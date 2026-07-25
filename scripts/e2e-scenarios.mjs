@@ -98,13 +98,14 @@ try {
   await page.getByRole("link", { name: /What-If Strategies/i }).first().click();
   await page.waitForURL("**/what-if").catch(() => {});
   await page.waitForTimeout(900);
-  // Strategy groups are collapsed by default (the "Biggest wins" shortlist is the
-  // guided entry) and grouped by goal — expand "Lower your risk" (where flexible
-  // spending / guardrails lives) before toggling it.
-  await page.getByRole("button", { name: /Lower your risk/i }).click().catch(() => {});
-  await page.waitForTimeout(200);
-  await page.getByText("Flexible spending (guardrails)", { exact: true }).click();
-  await page.waitForTimeout(500);
+  // Strategies are compact goal-grouped pills; tapping one opens a detail modal
+  // whose switch applies it. Toggle guardrails on inside the modal, then close.
+  await page.getByRole("button", { name: /Flexible spending \(guardrails\)/ }).first().click();
+  await page.waitForTimeout(400);
+  await page.getByRole("switch").click(); // apply it in the modal
+  await page.waitForTimeout(300);
+  await page.getByRole("button", { name: /Close/ }).click().catch(() => {});
+  await page.waitForTimeout(400);
   await page.getByRole("button", { name: /Save changes/i }).click();
   await page.waitForTimeout(1500);
   let ps = await plans();
@@ -144,11 +145,12 @@ try {
   await page.getByRole("button", { name: /^Skip →$/ }).click().catch(() => {}); // skip the active-strategy loader
   await page.waitForTimeout(400);
   ok("?edit opens What-If editing 'Scenario One'", (await txt()).includes("Scenario One"));
-  const guardOn = await page.evaluate(() => {
-    const label = [...document.querySelectorAll("*")].find((e) => e.textContent === "Flexible spending (guardrails)");
-    return label?.closest("div.rounded-2xl")?.querySelector('[role="switch"]')?.getAttribute("aria-checked");
-  });
+  // Open the guardrails pill's detail modal and read its switch state.
+  await page.getByRole("button", { name: /Flexible spending \(guardrails\)/ }).first().click();
+  await page.waitForTimeout(300);
+  const guardOn = await page.getByRole("switch").getAttribute("aria-checked");
   ok("?edit shows the scenario's strategy toggled on", guardOn === "true");
+  await page.getByRole("button", { name: /Close/ }).click().catch(() => {});
 
   // F — historical stress test renders a scorecard + fixed/flex toggle for the plan.
   await page.goto(`${BASE}/stress-test`, { waitUntil: "networkidle" });
