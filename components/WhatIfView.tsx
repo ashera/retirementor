@@ -681,7 +681,11 @@ export default function WhatIfView({
         </div>
       )}
 
-      <header className="mb-6">
+      <div className="grid gap-6 lg:grid-cols-3 lg:items-start">
+      {/* ── COLUMN 1 (left 2/3): the intro + the result (metrics + chart). Holding
+           the intro here lets column 2 rise to the top, filling the old dead space. ── */}
+      <div className="space-y-4 lg:col-span-2">
+      <header>
         <h1 className="text-3xl font-bold text-white">What if…</h1>
         <p className="mt-2 max-w-2xl text-muted">
           Turn retirement strategies on and off and see the effect on your super, your income, and
@@ -705,10 +709,6 @@ export default function WhatIfView({
         </button>
       </header>
 
-      <div className="grid gap-6 lg:grid-cols-3 lg:items-start">
-      {/* ── COLUMN 1: the "result" — metrics + chart. Sticky on desktop so the chart
-           (what users come for) stays put while the controls in column 2 scroll. ── */}
-      <div className="space-y-4 lg:col-span-2 lg:sticky lg:top-6">
       {/* Headline metrics */}
       <div className="grid gap-3 sm:grid-cols-3">
         <MetricCard
@@ -878,8 +878,8 @@ export default function WhatIfView({
       </div>
       </div>{/* ── /COLUMN 1 ── */}
 
-      {/* ── COLUMN 2: the controls — life events + strategies + save. Scrolls beside
-           the sticky chart, so the list feels short and cause↔effect stays on screen. ── */}
+      {/* ── COLUMN 2 (right 1/3): the controls — life events + strategies + save. Now
+           rises to the top of the page, beside the intro in column 1. ── */}
       <div className="space-y-6">
       {/* Committed bucket: life events (compact list; add/edit opens a modal). */}
       <LifeEventsEditor
