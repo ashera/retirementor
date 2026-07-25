@@ -102,7 +102,7 @@ try {
   // detail modal in the active state. Close the modal, then save.
   await page.getByRole("button", { name: /Flexible spending \(guardrails\)/ }).first().click();
   await page.waitForTimeout(400);
-  await page.getByRole("button", { name: /Close/ }).click().catch(() => {});
+  await page.getByRole("button", { name: /^Save$/ }).click().catch(() => {}); // close the strategy modal
   await page.waitForTimeout(400);
   await page.getByRole("button", { name: /Save changes/i }).click();
   await page.waitForTimeout(1500);
@@ -146,7 +146,7 @@ try {
   await page.waitForTimeout(300);
   const guardOn = await page.getByRole("switch").getAttribute("aria-checked");
   ok("?edit shows the scenario's strategy toggled on", guardOn === "true");
-  await page.getByRole("button", { name: /Close/ }).click().catch(() => {});
+  await page.getByRole("button", { name: /^Save$/ }).click().catch(() => {}); // close the strategy modal
 
   // F — historical stress test renders a scorecard + fixed/flex toggle for the plan.
   await page.goto(`${BASE}/stress-test`, { waitUntil: "networkidle" });

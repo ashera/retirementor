@@ -1048,10 +1048,9 @@ export default function WhatIfView({
               </span>
               <button
                 onClick={() => setDetailCard(null)}
-                aria-label="Close"
-                className="rounded-lg border border-line bg-panel-2 px-2 py-1 text-sm text-muted transition hover:text-white"
+                className="rounded-lg bg-accent px-4 py-1 text-sm font-semibold text-ink transition hover:bg-accent-soft"
               >
-                ✕ Close
+                Save
               </button>
             </div>
             <StrategyCardRow {...detailProps(detailCard)} />
