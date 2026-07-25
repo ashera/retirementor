@@ -11,7 +11,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import type { SimResult, YearRow } from "@/lib/au/types";
+import type { LifeEvent, SimResult, YearRow } from "@/lib/au/types";
 import { fmtCompact, fmtCurrency } from "@/lib/au/format";
 import { breakSpans, breakSpanLabel } from "@/lib/au/breakSpans";
 import { rowNetWorth } from "@/lib/au/networth";
@@ -130,6 +130,7 @@ export default function RetirementChart({
   wageInflationPct,
   cpiPct,
   ages = null,
+  lifeEvents,
 }: {
   result: SimResult;
   bands?: SpendingBand[];
@@ -146,6 +147,9 @@ export default function RetirementChart({
   cpiPct?: number;
   // Couple with an age gap → label the x-axis with both partners' ages.
   ages?: AgeGapInfo | null;
+  // Committed life events → a pin on the year each one lands. atAge is the oldest
+  // person's age (same axis as depletedAge), so it places directly with no age-gap shift.
+  lifeEvents?: readonly LifeEvent[];
 }) {
   const { retirementAge, partnerRetirementAge, depletedAge } = result;
   // Markers sit on the OLDEST-person age axis, but each partner's OWN retirement age
@@ -230,6 +234,19 @@ export default function RetirementChart({
   if (depletedAge !== null) {
     markerInputs.push({ key: "deplete", x: depletedAge, color: "#ef4444", name: `Depletes ${depletedAge}`, dash: "2 2" });
   }
+  // Committed life events — a pin per event (green for money in, amber for money out).
+  // They join the same lane solver, so their labels never collide with the pins above.
+  (lifeEvents ?? [])
+    .filter((e) => e.amount > 0 && e.atAge >= (result.rows[0]?.age ?? 0))
+    .forEach((e, i) =>
+      markerInputs.push({
+        key: `life-${e.id ?? i}`,
+        x: e.atAge,
+        color: e.kind === "income" ? "#34d399" : "#fb923c",
+        name: e.label?.trim() || (e.kind === "income" ? "Windfall" : "Expense"),
+        dash: "4 3",
+      }),
+    );
   const { placed, rows: markerRows } = placeMarkers(markerInputs);
   const rowStepPx = 14;
   const rowTopPx = 6;

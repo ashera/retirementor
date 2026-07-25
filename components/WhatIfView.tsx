@@ -799,6 +799,7 @@ export default function WhatIfView({
               wageInflationPct={composed.inflation + (config.livingStandardsGrowthPct ?? 0)}
               cpiPct={composed.inflation}
               ages={ageGapInfo(composed)}
+              lifeEvents={composed.lifeEvents ?? []}
             />
             <div className="mt-3 flex flex-wrap gap-4">
               {[

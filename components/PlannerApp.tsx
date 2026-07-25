@@ -1394,6 +1394,7 @@ export default function PlannerApp({
           wageInflationPct={plan.inflation + (config.livingStandardsGrowthPct ?? 0)}
           cpiPct={plan.inflation}
           ages={ageGapInfo(plan)}
+          lifeEvents={lifeEvents}
         />
         <p className="mt-2 text-center text-xs text-muted">
           Tip: click any year for a full breakdown of income, tax and spending.
