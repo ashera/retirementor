@@ -298,6 +298,14 @@ export default function PlannerApp({
   const [baselineName, setBaselineName] = useState<string | null>(null);
   const [configured, setConfigured] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
+  // The dashboard replaces the full-screen guided intro in place (same route), so
+  // the window keeps whatever scroll position the guide was left at. Reset to the
+  // top when the guide closes, so the dashboard opens at the top — not halfway down.
+  const wasGuiding = useRef(showGuide);
+  useEffect(() => {
+    if (wasGuiding.current && !showGuide) window.scrollTo(0, 0);
+    wasGuiding.current = showGuide;
+  }, [showGuide]);
   const [ready, setReady] = useState(false); // false until localStorage decides guide vs dashboard
   const [wizardOpen, setWizardOpen] = useState(false);
   // When the user opts out of the guide, seed the wizard with what they entered
