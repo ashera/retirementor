@@ -64,10 +64,69 @@ describe("Keep super in accumulation", () => {
   it("offers a What-If lever that keeps super in accumulation when super exists", () => {
     const card = buildStrategyCatalog(base).find((c) => c.id === "keep-accumulation");
     expect(card).toBeTruthy();
-    expect(card!.apply(base, {}).keepSuperInAccumulation).toBe(true);
+    expect(card!.apply(base, card ? Object.fromEntries(card.params.map((p) => [p.key, p.default])) : {}).keepSuperInAccumulation).toBeTruthy();
     // Not offered once the baseline already keeps it in accumulation.
     expect(
       buildStrategyCatalog({ ...base, keepSuperInAccumulation: true }).some((c) => c.id === "keep-accumulation"),
     ).toBe(false);
+  });
+});
+
+// A couple, both retired at/over preservation age, outside super covers spending.
+const couple = (over: Partial<RetirementPlan> = {}): RetirementPlan => ({
+  ...base,
+  household: "couple",
+  people: [
+    { ...DEFAULT_PLAN.people[0], currentAge: 62, superBalance: 700_000, salary: 0, voluntaryConcessional: 0 },
+    { ...DEFAULT_PLAN.people[0], currentAge: 60, superBalance: 500_000, salary: 0, voluntaryConcessional: 0 },
+  ],
+  targetSpending: 70_000,
+  ...over,
+});
+const rowAtAge = (p: RetirementPlan, age: number) => simulate(p, cfg).rows.find((r) => r.age === age)!;
+
+describe("Keep super in accumulation — per-person + convert at Age-Pension age", () => {
+  it("keeps only the chosen partner in accumulation (the other starts a pension)", () => {
+    const r = rowAtAge(couple({ keepSuperInAccumulation: { who: [1], mode: "forever" } }), 63).breakdown;
+    // Person 0 → pension, person 1 → accumulation → the aggregate shows BOTH bands.
+    expect(r.pensionSuper).toBeGreaterThan(1);
+    expect(r.accumSuper).toBeGreaterThan(1);
+  });
+
+  it('"untilPensionAge" converts the kept partner to a pension at Age-Pension age', () => {
+    const p = couple({ keepSuperInAccumulation: { who: [1], mode: "untilPensionAge" } });
+    // Person 1 is 2 yrs younger, so under 67 while the oldest is under 69.
+    expect(rowAtAge(p, 65).breakdown.accumSuper).toBeGreaterThan(1); // person 1 is 63 — accumulation
+    expect(rowAtAge(p, 72).breakdown.accumSuper).toBeLessThan(1); // person 1 is 70 — converted to pension
+  });
+
+  it('"forever" never converts — the kept partner stays in accumulation past pension age', () => {
+    const p = couple({ keepSuperInAccumulation: { who: [1], mode: "forever" } });
+    expect(rowAtAge(p, 72).breakdown.accumSuper).toBeGreaterThan(1); // person 1 is 70, still accumulation
+  });
+
+  it("shields an under-67 partner's super from the means test → a higher Age Pension", () => {
+    // Person 0 is Age-Pension age; person 1 is under 67. Assets sit in the taper zone.
+    const near = (over: Partial<RetirementPlan> = {}) =>
+      couple({
+        people: [
+          { ...DEFAULT_PLAN.people[0], currentAge: 67, superBalance: 200_000, salary: 0, voluntaryConcessional: 0 },
+          { ...DEFAULT_PLAN.people[0], currentAge: 62, superBalance: 500_000, salary: 0, voluntaryConcessional: 0 },
+        ],
+        retirementAge: 67,
+        outsideSuper: 100_000,
+        targetSpending: 55_000,
+        ...over,
+      });
+    const shielded = rowAtAge(near({ keepSuperInAccumulation: { who: [1], mode: "untilPensionAge" } }), 67).agePension;
+    const bothPension = rowAtAge(near(), 67).agePension;
+    expect(bothPension).toBeGreaterThan(0);
+    expect(shielded).toBeGreaterThan(bothPension); // person 1's $500k super is exempt while under 67
+  });
+
+  it("legacy `true` still keeps everyone in accumulation for life", () => {
+    const r = rowAtAge(couple({ keepSuperInAccumulation: true }), 72).breakdown;
+    expect(r.accumSuper).toBeGreaterThan(1);
+    expect(r.pensionSuper).toBeLessThan(1);
   });
 });

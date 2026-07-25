@@ -17,6 +17,7 @@ import {
   getCareerBreaks,
   getInvestmentProperties,
   getLifeEvents,
+  keepAccumConfig,
   hasStaggeredRetirement,
   householdHorizon,
   householdRetirementOffset,
@@ -203,6 +204,8 @@ export function simulate(
   // (non-homeowner means test + ongoing rent) from `atAge`.
   const sellRent = plan.home?.sellAndRent;
   let soldHome = false;
+  // Keep-super-in-accumulation config (per-person + mode), null when off.
+  const keepAccum = keepAccumConfig(plan);
   // Optional one-off lump sum withdrawn (and spent) from super at a chosen age.
   const lumpSum = plan.lumpSum;
   let lumpSumTaken = false;
@@ -673,26 +676,30 @@ export function simulate(
     // a new tax-free pension pool. Fixed at transfer — the pension pool's growth
     // stays tax-free thereafter even if it grows past the cap. The excess (if any)
     // stays in accumulation and keeps being taxed at 15%.
-    // OPT-OUT: keepSuperInAccumulation leaves everything in accumulation (no
-    // pension started) — earnings still taxed 15%, but no mandatory minimum
-    // drawdown forces money out into taxable savings. Super is then only drawn
-    // when outside-super is exhausted (drawSuper pulls from accumulation).
-    if (!plan.keepSuperInAccumulation) {
-      accessibleIdx.forEach((i) => {
-        if (transferred[i]) return;
-        const toPension = Math.min(accum[i], config.transferBalanceCap);
-        // A preserved balance unlocking AFTER the household retired (an early
-        // retiree turning 60) flips the accumulation band to pension mid-retirement
-        // — flag the FIRST such age so the chart can explain it.
-        if (t > earliestOffset && toPension > 1 && superUnlockAge === null) {
-          superUnlockAge = oldest;
-          superUnlockIsPartner = i > 0;
-        }
-        pension[i] += toPension;
-        accum[i] -= toPension;
-        transferred[i] = true;
-      });
-    }
+    // OPT-OUT (keepSuperInAccumulation): a member kept in accumulation skips the
+    // transfer — earnings stay taxed 15%, but no mandatory minimum drawdown forces
+    // money into taxable savings, and (while UNDER Age-Pension age) the balance is
+    // exempt from the means test. With mode "untilPensionAge" they still convert once
+    // they reach Age-Pension age — when the exemption ends and tax-free pension
+    // earnings become the better deal; "forever" keeps them in accumulation for life.
+    // keepAccum null → every member transfers as before.
+    accessibleIdx.forEach((i) => {
+      if (transferred[i]) return;
+      const keep = !!keepAccum && keepAccum.who.has(i) && (keepAccum.mode === "forever" || ages[i] < pensionAge);
+      if (keep) return; // stays in accumulation this year (may convert at pension age)
+      const toPension = Math.min(accum[i], config.transferBalanceCap);
+      // A preserved balance unlocking AFTER the household retired (an early retiree
+      // turning 60, or a kept-in-accumulation member converting at Age-Pension age)
+      // flips the accumulation band to pension mid-retirement — flag the FIRST such
+      // age so the chart can explain it.
+      if (t > earliestOffset && toPension > 1 && superUnlockAge === null) {
+        superUnlockAge = oldest;
+        superUnlockIsPartner = i > 0;
+      }
+      pension[i] += toPension;
+      accum[i] -= toPension;
+      transferred[i] = true;
+    });
 
     // Opening split of this year's super (post-transfer). The pension pool sums
     // across everyone; accum is whatever's left of the plotted opening balance, so

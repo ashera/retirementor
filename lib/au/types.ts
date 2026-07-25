@@ -141,6 +141,12 @@ export interface LifeEvent {
   label?: string; // e.g. "Inheritance", "Big trip", "New car"
 }
 
+// Per-person "keep super in accumulation" configuration (see RetirementPlan).
+export interface KeepAccumulation {
+  who?: number[]; // person indices kept in accumulation (default: every member)
+  mode?: "untilPensionAge" | "forever"; // convert to a pension at Age-Pension age, or never
+}
+
 // One person's income-tax reconciliation for a year — all ordinary income taxed
 // together, with a single LITO + SAPTO application. For the tax-analysis modal.
 export interface PersonTaxDetail {
@@ -189,7 +195,7 @@ export interface RetirementPlan {
   home?: HomeDetail; // the principal home as an asset (exempt; net-worth context only)
   workIncome?: { perYear: number; untilAge: number }; // part-time work in early retirement (offsets drawdown; income-test assessable net of the Work Bonus)
   ttr?: { extraSacrifice: number }; // Transition to Retirement: extra pre-tax sacrifice/yr from preservation age → retirement, take-home held by a tax-free TTR pension
-  keepSuperInAccumulation?: boolean; // don't convert super to an account-based pension at retirement — keep it in accumulation (15% earnings tax, but NO mandatory minimum drawdown, so nothing is force-drawn into taxable savings). Useful when outside-super covers spending.
+  keepSuperInAccumulation?: boolean | KeepAccumulation; // keep super in accumulation instead of starting an account-based pension. Legacy `true` = every member, for life. The object form is per-person: keep a member in accumulation until they reach Age-Pension age (shields it from the means test — the age-gapped-couple strategy) then convert to pension, or keep it in accumulation for life (avoids the forced minimum drawdown). 15% earnings tax while in accumulation vs tax-free in pension.
   guardrails?: { guardPct?: number; adjustPct?: number; floorPct?: number }; // Guyton-Klinger dynamic spending: flex living-spend with the portfolio. If the net-of-pension withdrawal RATE drifts guardPct% (default 20) above its initial level, cut spending adjustPct% (default 10); if it drifts guardPct% below, raise it — never below the greater of essentials or floorPct% (default 70) of the initial spend. Presence enables it.
   lumpSum?: { atAge: number; amount: number }; // one-off tax-free super withdrawal at an age (spent), capped at the accessible super balance then
   recontribute?: { perYear: number; fromAge: number; untilAge: number }; // recontribution: after-tax (non-concessional) top-up of super from outside savings, each year from fromAge to untilAge (a one-off when they're equal), age ≤75, within the NCC + total-super caps
@@ -247,6 +253,23 @@ export function getLifeEvents(plan: RetirementPlan): LifeEvent[] {
   return (plan.lifeEvents ?? []).filter(
     (e) => e && e.amount > 0 && (e.kind === "income" || e.kind === "expense"),
   );
+}
+
+/** Resolve keepSuperInAccumulation into { who, mode }, or null when it's off.
+ *  Legacy `true` → every member, "forever" (byte-identical to the old all-or-nothing
+ *  behaviour). The object form defaults to every member converting at Age-Pension age. */
+export function keepAccumConfig(
+  plan: RetirementPlan,
+): { who: Set<number>; mode: "untilPensionAge" | "forever" } | null {
+  const k = plan.keepSuperInAccumulation;
+  if (!k) return null;
+  const everyone = plan.people.map((_, i) => i);
+  if (k === true) return { who: new Set(everyone), mode: "forever" };
+  const who = k.who && k.who.length ? k.who : everyone;
+  return {
+    who: new Set(who.filter((i) => i >= 0 && i < plan.people.length)),
+    mode: k.mode ?? "untilPensionAge",
+  };
 }
 
 /**

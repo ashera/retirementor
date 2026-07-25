@@ -79,6 +79,9 @@ export interface StrategyParam {
   // max is min(max, dynamicMax(values)); returns Infinity to impose no extra cap.
   dynamicMax?: (values: Record<string, number>) => number;
   hint?: string;
+  // When present, the param is a discrete CHOICE rendered as a segmented control
+  // (each option's numeric `value`) instead of a slider — for who/mode-style picks.
+  options?: { value: number; label: string }[];
 }
 
 export interface StrategyCard {
@@ -531,15 +534,62 @@ export function buildStrategyCatalog(
   // --- Keep super in accumulation (don't start an account-based pension) ---
   const totalStartSuper = startingSuperBalances(plan).reduce((s, v) => s + v, 0);
   if (totalStartSuper > 1_000 && !plan.keepSuperInAccumulation) {
+    // Default WHO: for an age-gapped couple, the YOUNGER partner (their super is
+    // shielded from the means test the longest); for same-age couples, both.
+    const younger = isCouple && plan.people[1].currentAge < plan.people[0].currentAge ? 1 : 0;
+    const sameAge = isCouple && plan.people[0].currentAge === plan.people[1].currentAge;
+    const whoDefault = isCouple ? (sameAge ? 2 : younger) : 0;
+    const whoLabel = (v: number) =>
+      !isCouple ? "Your super" : v === 2 ? "Both partners' super" : v === 1 ? "Your partner's super" : "Your super";
     cards.push({
       id: "keep-accumulation",
       group: "timing",
       label: "Keep super in accumulation",
-      blurb: "Leave super in accumulation instead of starting an account-based pension at retirement — no mandatory minimum drawdown, but earnings are taxed 15% instead of tax-free.",
-      params: [],
-      note: () =>
-        "Super stays in accumulation phase: there's no forced minimum drawdown, so nothing is pushed out into taxable savings — but its earnings are taxed at 15% rather than being tax-free. For most people, starting a pension and reinvesting any minimum you don't need is more tax-effective; use this to model the alternative (e.g. if your outside-super savings already cover your spending).",
-      apply: (p) => ({ ...p, keepSuperInAccumulation: true }),
+      blurb:
+        "Leave super in accumulation instead of starting an account-based pension. It stays OUT of the Age Pension means test until Age-Pension age (a lever for age-gapped couples), then converts to a tax-free pension — or stays in accumulation for life to avoid the forced minimum drawdown.",
+      params: [
+        ...(isCouple
+          ? [
+              {
+                key: "who",
+                label: "Whose super",
+                min: 0,
+                max: 2,
+                step: 1,
+                default: whoDefault,
+                options: [
+                  { value: 0, label: "You" },
+                  { value: 1, label: "Your partner" },
+                  { value: 2, label: "Both" },
+                ],
+              },
+            ]
+          : []),
+        {
+          key: "mode",
+          label: "Keep it in accumulation",
+          min: 0,
+          max: 1,
+          step: 1,
+          default: 0,
+          options: [
+            { value: 0, label: "Until Age-Pension age" },
+            { value: 1, label: "For life" },
+          ],
+        },
+      ],
+      note: (v) => {
+        const forever = v.mode === 1;
+        const whoTxt = whoLabel(v.who ?? whoDefault);
+        return forever
+          ? `${whoTxt} stays in accumulation for life — no forced minimum drawdown (nothing is pushed into taxable savings), but earnings are taxed 15%, and from Age-Pension age it's counted by the means test anyway.`
+          : `${whoTxt} stays in accumulation until Age-Pension age (67) — keeping it OUT of the Age Pension means test until then${isCouple ? " (most useful when one partner is younger)" : ""} — then converts to an account-based pension so its earnings become tax-free.`;
+      },
+      apply: (p, v) => {
+        const whoVal = v.who ?? whoDefault;
+        const who = whoVal === 2 ? p.people.map((_, i) => i) : [Math.min(whoVal, p.people.length - 1)];
+        return { ...p, keepSuperInAccumulation: { who, mode: v.mode === 1 ? "forever" : "untilPensionAge" } };
+      },
     });
   }
 

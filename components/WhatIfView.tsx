@@ -1467,6 +1467,35 @@ function StrategyCardRow({
             <ImpactBreakdown delta={delta} incomeDelta={incomeDelta} life={life} />
           )}
           {card.params.map((pm) => {
+            // A discrete CHOICE param (who / mode) → a segmented control, not a slider.
+            if (pm.options) {
+              const cur = values[pm.key] ?? pm.default;
+              return (
+                <div key={pm.key} className="space-y-1.5">
+                  <div className="text-sm font-medium text-slate-200">{pm.label}</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {pm.options.map((opt) => {
+                      const on = cur === opt.value;
+                      return (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => onParam(pm.key, opt.value)}
+                          className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition ${
+                            on
+                              ? "border-accent bg-accent/15 text-accent"
+                              : "border-line bg-panel-2 text-slate-200 hover:border-accent/40"
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {pm.hint && <p className="text-xs text-muted">{pm.hint}</p>}
+                </div>
+              );
+            }
             // A param can cap itself against the card's other live values (e.g.
             // the downsizer contribution can't exceed the equity actually freed).
             const cap = pm.dynamicMax ? pm.dynamicMax(values) : Infinity;
