@@ -94,12 +94,14 @@ function AssetsTooltip({
               </>
             );
           }
-          // Single band: once super is in the pension pool it's "Pension"; while it's
-          // still all accumulation (working, an early-retirement bridge, or "keep super
-          // in accumulation") it's "Super".
+          // Name the pool the super sits in — never a generic "Super". It's a
+          // "Pension" once it's an account-based pension, otherwise "Accumulation"
+          // (still growing: working years, an early-retirement bridge, or "keep super
+          // in accumulation"). Colours match the split bands (pension green, accum yellow).
+          const isPension = pens > 1;
           return (
-            <div className="tabular-nums text-emerald-400">
-              {pens > 1 ? "Pension" : "Super"} {fmtCurrency(r.totalSuper)}
+            <div className={`tabular-nums ${isPension ? "text-emerald-400" : "text-yellow-500"}`}>
+              {isPension ? "Pension" : "Accumulation"} {fmtCurrency(r.totalSuper)}
             </div>
           );
         })()}
