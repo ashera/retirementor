@@ -1,8 +1,56 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { fmtCurrency } from "@/lib/au/format";
 import type { LifeEvent } from "@/lib/au/types";
+
+/** A string-backed numeric input: you can clear it (no forced "0" or leading
+ *  zeros), leading zeros are stripped as you type, and it clamps to [min, max] on
+ *  blur. Fixes the "can't clear the amount → 0900000" controlled-number-input bug. */
+function NumberInput({
+  value,
+  min,
+  max,
+  onChange,
+  className,
+  ariaLabel,
+}: {
+  value: number;
+  min: number;
+  max: number;
+  onChange: (n: number) => void;
+  className: string;
+  ariaLabel: string;
+}) {
+  const clamp = (n: number) => Math.min(max, Math.max(min, Math.round(n)));
+  const [text, setText] = useState(String(value));
+  const [focused, setFocused] = useState(false);
+  // Reflect external value changes (opening a different event) — but not mid-type.
+  useEffect(() => {
+    if (!focused) setText(String(value));
+  }, [value, focused]);
+  return (
+    <input
+      type="text"
+      inputMode="numeric"
+      aria-label={ariaLabel}
+      value={text}
+      onFocus={() => setFocused(true)}
+      onChange={(e) => {
+        const raw = e.target.value.replace(/[^\d]/g, "").replace(/^0+(?=\d)/, "");
+        setText(raw);
+        if (raw !== "") onChange(clamp(Number(raw)));
+      }}
+      onBlur={() => {
+        setFocused(false);
+        const next = text === "" ? min : clamp(Number(text));
+        setText(String(next));
+        onChange(next);
+      }}
+      className={className}
+    />
+  );
+}
 
 // The "committed" bucket of the What-If board: a user-managed list of one-off
 // cashflows the user EXPECTS (inheritance, a big trip, helping the kids). Unlike
@@ -168,28 +216,25 @@ export default function LifeEventsEditor({
                 <label className="block text-xs font-medium text-muted">Amount</label>
                 <div className="mt-1 flex items-center gap-1 rounded-lg border border-line bg-panel-2 px-2.5 py-2 text-sm">
                   <span className="text-muted">$</span>
-                  <input
-                    type="number"
-                    min={0}
-                    step={5_000}
+                  <NumberInput
                     value={draft.amount}
-                    onChange={(ev) => setDraft({ ...draft, amount: Math.max(0, Number(ev.target.value) || 0) })}
-                    className="w-full bg-transparent text-white outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
+                    min={0}
+                    max={100_000_000}
+                    onChange={(n) => setDraft({ ...draft, amount: n })}
+                    ariaLabel="Amount"
+                    className="w-full bg-transparent text-white outline-none"
                   />
                 </div>
               </div>
               <div>
                 <label className="block text-xs font-medium text-muted">At age</label>
-                <input
-                  type="number"
+                <NumberInput
+                  value={draft.atAge}
                   min={minAge}
                   max={maxAge}
-                  value={draft.atAge}
-                  // Don't clamp while typing (that snaps a partial "7" up to the floor
-                  // and blocks multi-digit ages); round only, then clamp on blur/save.
-                  onChange={(ev) => setDraft({ ...draft, atAge: Math.round(Number(ev.target.value)) })}
-                  onBlur={() => setDraft((d) => (d ? { ...d, atAge: clampAge(d.atAge) } : d))}
-                  className="mt-1 w-full rounded-lg border border-line bg-panel-2 px-2.5 py-2 text-sm text-white outline-none focus:border-accent [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
+                  onChange={(n) => setDraft({ ...draft, atAge: n })}
+                  ariaLabel="At age"
+                  className="mt-1 w-full rounded-lg border border-line bg-panel-2 px-2.5 py-2 text-sm text-white outline-none focus:border-accent"
                 />
               </div>
             </div>
