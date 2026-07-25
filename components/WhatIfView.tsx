@@ -113,6 +113,27 @@ function fmtDeltaYr(d: number): string | null {
   return `${d > 0 ? "+" : "−"}${fmtCurrency(Math.round(a / 100) * 100)}/yr`;
 }
 
+/** One plain-language line describing a strategy's biggest positive effects, for the
+ *  "Biggest wins" shortlist — leads with the most compelling dimension, at most two. */
+function winLine(m: Marginal, aff: number, life: number): string {
+  const bits: string[] = [];
+  if (m.shortfallAvoided > 5_000)
+    bits.push(`covers about ${fmtCurrency(Math.round(m.shortfallAvoided / 1_000) * 1_000)} of spending that's currently unfunded`);
+  const yr = fmtDeltaYr(aff);
+  if (aff > 1_000 && yr) bits.push(`could let you spend about ${yr}`);
+  if (bits.length < 2 && m.years >= 1) {
+    const y = Math.round(m.years);
+    bits.push(`makes your money last about ${y} year${y === 1 ? "" : "s"} longer`);
+  }
+  if (bits.length < 2 && m.netWorth > 5_000) {
+    const nw = fmtDelta(m.netWorth);
+    if (nw) bits.push(`leaves about ${nw} more at ${life}`);
+  }
+  if (bits.length === 0) return "A modest improvement to your plan.";
+  const s = bits.slice(0, 2).join(", and ");
+  return `${s.charAt(0).toUpperCase()}${s.slice(1)}.`;
+}
+
 export default function WhatIfView({
   config,
   savedPlans: initialSavedPlans,
@@ -144,6 +165,9 @@ export default function WhatIfView({
   const [assumptionsOpen, setAssumptionsOpen] = useState(false);
   const [assumptionsCard, setAssumptionsCard] = useState<StrategyCard | null>(null);
   const [timelineOpen, setTimelineOpen] = useState(false);
+  // Which strategy groups are manually expanded. A group is also shown whenever it
+  // holds an active card (see isGroupOpen), so what's ON is never hidden.
+  const [openGroups, setOpenGroups] = useState<Set<StrategyGroup>>(new Set());
   // Priming loader: on load, walk through the strategies already active on this
   // scenario (name + description, 5s each) so the user knows what's applied before
   // scrolling. `loaderQueue` is snapshotted once so later toggles don't reopen it.
@@ -497,6 +521,38 @@ export default function WhatIfView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [baseline, catalog, valsKey, config]);
 
+  // "Biggest wins for you": the inactive strategies that most improve THIS plan,
+  // ranked by a blended impact score (fixing unfunded spending weighs most, then
+  // extra spendable income, extra funding years, and net worth). Each is shown as a
+  // plain one-liner so the user gets a personalised "start here" instead of a flat
+  // list of 11 levers. Refines as the async `affordable` figures arrive.
+  const topWins = useMemo(() => {
+    if (!composed) return [] as { card: StrategyCard; line: string }[];
+    const life = composed.lifeExpectancy;
+    return catalog
+      .filter(
+        (c) =>
+          !active.has(c.id) &&
+          c.id !== "adjust-spending" && // a slider, not a discrete "win"
+          !(c.id === "ttr" && composed.retirementAge <= 60),
+      )
+      .map((c) => {
+        const m = marginal[c.id];
+        if (!m) return null;
+        const aff = affordable[c.id] ?? 0;
+        const score =
+          Math.max(0, m.shortfallAvoided) * 3 +
+          Math.max(0, aff) * 25 +
+          Math.max(0, m.netWorth) * 0.4 +
+          Math.max(0, m.years) * 15_000;
+        return { card: c, m, aff, score };
+      })
+      .filter((x): x is { card: StrategyCard; m: Marginal; aff: number; score: number } => !!x && x.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 3)
+      .map(({ card, m, aff }) => ({ card, line: winLine(m, aff, life) }));
+  }, [catalog, active, marginal, affordable, composed]);
+
   if (!baseline || !baseRes || !compRes || !composed) return <div className="min-h-screen bg-ink" />;
 
   const changed = active.size > 0;
@@ -580,6 +636,16 @@ export default function WhatIfView({
     group: g,
     cards: catalog.filter((c) => c.group === g && cardVisible(c)),
   })).filter((x) => x.cards.length > 0);
+  const toggleGroup = (g: StrategyGroup) =>
+    setOpenGroups((prev) => {
+      const n = new Set(prev);
+      n.has(g) ? n.delete(g) : n.add(g);
+      return n;
+    });
+  // A group is open if the user expanded it OR it holds an active card (so what's
+  // ON is always visible). Collapsed by default keeps the board from overwhelming.
+  const isGroupOpen = (g: StrategyGroup, cards: StrategyCard[]) =>
+    openGroups.has(g) || cards.some((c) => active.has(c.id));
 
   // Heading back to the planner: flush the active scenario to BOTH the working plan
   // (localStorage) and — for signed-in users — the cloud draft, awaited, so neither
@@ -850,6 +916,39 @@ export default function WhatIfView({
         They don&apos;t change your base plan until you save.
       </p>
 
+      {/* Biggest wins: a personalised "start here" shortlist so the board isn't 11
+          equal-weight levers. Ranked by impact on THIS plan; tap to try one. */}
+      {topWins.length > 0 && (
+        <div className="mb-6 rounded-2xl border border-accent/30 bg-accent/[0.06] p-4">
+          <h3 className="flex items-center gap-2 font-semibold text-white">
+            <span aria-hidden>✨</span> Biggest wins for you
+          </h3>
+          <p className="mt-0.5 text-sm text-muted">The moves that improve your plan the most right now — tap to try one.</p>
+          <div className="mt-3 space-y-2">
+            {topWins.map(({ card, line }) => (
+              <div
+                key={card.id}
+                className="flex items-center gap-3 rounded-xl border border-line bg-panel-2 px-3 py-2.5"
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-medium text-white">{card.label}</div>
+                  <div className="text-xs text-muted">{line}</div>
+                </div>
+                <button
+                  onClick={() => {
+                    setOpenGroups((prev) => new Set(prev).add(card.group));
+                    toggle(card);
+                  }}
+                  className="shrink-0 rounded-lg border border-accent/40 bg-accent/10 px-3 py-1.5 text-sm font-semibold text-accent transition hover:bg-accent/20"
+                >
+                  Try →
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Strategy board */}
       {groups.length === 0 ? (
         <p className="rounded-2xl border border-line bg-panel px-4 py-8 text-center text-muted">
@@ -857,11 +956,34 @@ export default function WhatIfView({
           plan with working years to unlock levers here.
         </p>
       ) : (
-        <div className="space-y-6">
-          {groups.map(({ group, cards }) => (
-            <section key={group}>
-              <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted">{GROUP_LABEL[group]}</h3>
-              <div className="space-y-3">
+        <div className="space-y-3">
+          {groups.map(({ group, cards }) => {
+            const open = isGroupOpen(group, cards);
+            const activeCount = cards.filter((c) => active.has(c.id)).length;
+            const pinned = activeCount > 0; // holds an active card → kept open so it's visible
+            return (
+            <section key={group} className="overflow-hidden rounded-2xl border border-line bg-panel/40">
+              <button
+                type="button"
+                onClick={() => toggleGroup(group)}
+                disabled={pinned}
+                className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left transition hover:bg-panel-2/40 disabled:cursor-default disabled:hover:bg-transparent"
+              >
+                <span className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted">
+                  {GROUP_LABEL[group]}
+                  <span className="rounded-full bg-panel-2 px-1.5 py-0.5 text-[10px] font-medium normal-case text-muted">{cards.length}</span>
+                  {activeCount > 0 && (
+                    <span className="rounded-full bg-accent/15 px-1.5 py-0.5 text-[10px] font-semibold normal-case text-accent">{activeCount} on</span>
+                  )}
+                </span>
+                {!pinned && (
+                  <span className="shrink-0 text-xs text-muted" aria-hidden>
+                    {open ? "▲" : "▼"}
+                  </span>
+                )}
+              </button>
+              {open && (
+              <div className="space-y-3 px-3 pb-3">
                 {cards.map((card) => (
                   <StrategyCardRow
                     key={card.id}
@@ -932,8 +1054,10 @@ export default function WhatIfView({
                   />
                 ))}
               </div>
+              )}
             </section>
-          ))}
+            );
+          })}
         </div>
       )}
 
