@@ -1419,7 +1419,10 @@ function StrategyCardRow({
       : null;
   return (
     <div className={`rounded-2xl border p-4 transition ${on ? "border-accent/40 bg-accent/5" : "border-line bg-panel"}`}>
-      <div className="flex items-center gap-3">
+      {/* Wraps on narrow screens: the delta chip is wide, so instead of squeezing
+          the label into a few px (its text then overflows into the chip), let the
+          chip drop to its own line and right-align. */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <button
           type="button"
           role="switch"
@@ -1429,18 +1432,20 @@ function StrategyCardRow({
         >
           <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all ${on ? "left-[22px]" : "left-0.5"}`} />
         </button>
-        <button type="button" onClick={onToggle} className="min-w-0 flex-1 text-left">
+        <button type="button" onClick={onToggle} className="min-w-0 text-left">
           <div className="text-sm font-semibold text-white">{card.label}</div>
         </button>
-        {guardrails ? (
-          // Guardrails isn't a wealth-mover — it's a spending rule / stress test, so
-          // money-lasts / income / net-worth deltas misframe it. Tag it as such.
-          <span className="shrink-0 rounded-full bg-panel-2 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted">
-            Stress test
-          </span>
-        ) : (
-          <DeltaChip years={delta.years} moneyLeft={delta.moneyLeft} netWorth={delta.netWorth} incomeDelta={incomeDelta} incomePending={incomePending} life={life} />
-        )}
+        <div className="ml-auto shrink-0">
+          {guardrails ? (
+            // Guardrails isn't a wealth-mover — it's a spending rule / stress test, so
+            // money-lasts / income / net-worth deltas misframe it. Tag it as such.
+            <span className="rounded-full bg-panel-2 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted">
+              Stress test
+            </span>
+          ) : (
+            <DeltaChip years={delta.years} moneyLeft={delta.moneyLeft} netWorth={delta.netWorth} incomeDelta={incomeDelta} incomePending={incomePending} life={life} />
+          )}
+        </div>
       </div>
 
       {on && (
