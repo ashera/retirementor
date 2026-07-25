@@ -945,7 +945,13 @@ export default function WhatIfView({
                         <button
                           key={card.id}
                           type="button"
-                          onClick={() => setDetailCard(card)}
+                          onClick={() => {
+                            // Selecting a strategy APPLIES it and opens the modal in
+                            // its active state (params + impact) — no second click to
+                            // toggle. Re-selecting an active one just reopens it.
+                            if (!on) toggle(card);
+                            setDetailCard(card);
+                          }}
                           className={`flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm transition ${
                             on
                               ? "border-accent/50 bg-accent/10 text-white"
@@ -1082,15 +1088,17 @@ export default function WhatIfView({
       {detailCard && (
         <div className="fixed inset-0 z-50 grid place-items-start justify-center overflow-y-auto p-4 py-10" role="dialog" aria-modal="true">
           <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setDetailCard(null)} />
-          <div className="relative w-full max-w-lg">
-            <div className="mb-2 flex items-center justify-between">
+          {/* Solid panel so the card (which uses a translucent accent tint when
+              active) stays readable over the dimmed backdrop. */}
+          <div className="relative w-full max-w-lg rounded-2xl border border-line bg-panel p-3 shadow-2xl">
+            <div className="mb-2 flex items-center justify-between px-1">
               <span className="text-xs font-medium uppercase tracking-wide text-muted">
                 {active.has(detailCard.id) ? "Applied to this scenario" : "Explore this strategy"}
               </span>
               <button
                 onClick={() => setDetailCard(null)}
                 aria-label="Close"
-                className="rounded-lg border border-line bg-panel px-2 py-1 text-sm text-muted transition hover:text-white"
+                className="rounded-lg border border-line bg-panel-2 px-2 py-1 text-sm text-muted transition hover:text-white"
               >
                 ✕ Close
               </button>

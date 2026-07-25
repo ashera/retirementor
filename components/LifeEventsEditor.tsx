@@ -73,7 +73,9 @@ export default function LifeEventsEditor({
     });
   const save = () => {
     if (!draft) return;
-    onChange(events.some((e) => e.id === draft.id) ? events.map((e) => (e.id === draft.id ? draft : e)) : [...events, draft]);
+    // Clamp on save (typing is left unclamped so multi-digit ages are enterable).
+    const clean: LifeEvent = { ...draft, atAge: clampAge(draft.atAge), amount: Math.max(0, draft.amount) };
+    onChange(events.some((e) => e.id === clean.id) ? events.map((e) => (e.id === clean.id ? clean : e)) : [...events, clean]);
     setDraft(null);
   };
   const remove = (id: string) => {
@@ -183,7 +185,10 @@ export default function LifeEventsEditor({
                   min={minAge}
                   max={maxAge}
                   value={draft.atAge}
-                  onChange={(ev) => setDraft({ ...draft, atAge: clampAge(Number(ev.target.value) || minAge) })}
+                  // Don't clamp while typing (that snaps a partial "7" up to the floor
+                  // and blocks multi-digit ages); round only, then clamp on blur/save.
+                  onChange={(ev) => setDraft({ ...draft, atAge: Math.round(Number(ev.target.value)) })}
+                  onBlur={() => setDraft((d) => (d ? { ...d, atAge: clampAge(d.atAge) } : d))}
                   className="mt-1 w-full rounded-lg border border-line bg-panel-2 px-2.5 py-2 text-sm text-white outline-none focus:border-accent [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
                 />
               </div>

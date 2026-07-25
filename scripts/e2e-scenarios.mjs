@@ -98,12 +98,10 @@ try {
   await page.getByRole("link", { name: /What-If Strategies/i }).first().click();
   await page.waitForURL("**/what-if").catch(() => {});
   await page.waitForTimeout(900);
-  // Strategies are compact goal-grouped pills; tapping one opens a detail modal
-  // whose switch applies it. Toggle guardrails on inside the modal, then close.
+  // Strategies are compact goal-grouped pills; tapping one APPLIES it and opens its
+  // detail modal in the active state. Close the modal, then save.
   await page.getByRole("button", { name: /Flexible spending \(guardrails\)/ }).first().click();
   await page.waitForTimeout(400);
-  await page.getByRole("switch").click(); // apply it in the modal
-  await page.waitForTimeout(300);
   await page.getByRole("button", { name: /Close/ }).click().catch(() => {});
   await page.waitForTimeout(400);
   await page.getByRole("button", { name: /Save changes/i }).click();
