@@ -12,9 +12,13 @@ import ReportView from "@/components/ReportView";
 import { DEFAULT_CONFIG as config } from "@/lib/au/config";
 import { simulate } from "@/lib/au/simulate";
 import { runMonteCarlo } from "@/lib/au/montecarlo";
+import { appliedStrategies } from "@/lib/au/strategies";
+import { toActiveScenario } from "@/lib/au/scenario";
+import { runStressTest, failsafeSpend } from "@/lib/au/stresstest";
 import { budgetToStages, budgetTotal, presetCategories } from "@/lib/au/budget";
 import {
   DEFAULT_PLAN,
+  getLifeEvents,
   type MortgageDetail,
   type PropertyDetail,
   type RetirementPlan,
@@ -57,6 +61,24 @@ const CASES: Record<string, RetirementPlan> = {
   // Single with a full staged budget — stresses the page-2 budget table + page-3 cards.
   budget: withBudget(base({ people: [person({ superBalance: 420_000 })] }), true),
   "budget-renter": withBudget(base({ homeowner: false }), false),
+  // Exercises the extra pages: several What-If strategies + a full life-events list.
+  scenario: base({
+    household: "couple",
+    people: [person({ currentAge: 60, superBalance: 500_000, salary: 0 }), person({ currentAge: 56, superBalance: 350_000, salary: 0 })],
+    retirementAge: 60,
+    targetSpending: 70_000,
+    outsideSuper: 300_000,
+    guardrails: {},
+    workIncome: { perYear: 20_000, untilAge: 66 },
+    recontribute: { perYear: 20_000, fromAge: 60, untilAge: 70 },
+    keepSuperInAccumulation: { who: [1], mode: "untilPensionAge" },
+    lifeEvents: [
+      { id: "a", kind: "income", amount: 250_000, atAge: 70, label: "Inheritance" },
+      { id: "b", kind: "expense", amount: 40_000, atAge: 68, label: "Big trip" },
+      { id: "c", kind: "expense", amount: 30_000, atAge: 75, label: "New car" },
+      { id: "d", kind: "expense", amount: 25_000, atAge: 80, label: "Help the kids" },
+    ],
+  }),
 };
 
 function MeasuredReport() {
@@ -65,7 +87,37 @@ function MeasuredReport() {
   const plan = CASES[key] ?? CASES.heavy;
   const result = simulate(plan, config);
   const mc = runMonteCarlo(plan, config);
-  return <ReportView plan={plan} result={result} mc={mc} config={config} name={`measure:${key}`} generatedAt="—" />;
+  const strategies = appliedStrategies(plan, config);
+  const lifeEvents = getLifeEvents(plan);
+  let baseline = null;
+  if (strategies.length > 0) {
+    const b = toActiveScenario(plan).base;
+    const baseRes = simulate(b, config);
+    const baseMc = runMonteCarlo(b, config);
+    baseline = {
+      superAtRetirement: baseRes.superAtRetirement,
+      lastsToLifeExpectancy: baseRes.lastsToLifeExpectancy,
+      depletedAge: baseRes.depletedAge,
+      successPct: Math.round(baseMc.successRate * 100),
+    };
+  }
+  const stress = runStressTest(plan, config);
+  const failsafe = failsafeSpend(plan, config);
+  return (
+    <ReportView
+      plan={plan}
+      result={result}
+      mc={mc}
+      config={config}
+      name={`measure:${key}`}
+      generatedAt="—"
+      strategies={strategies}
+      lifeEvents={lifeEvents}
+      baseline={baseline}
+      stress={stress}
+      failsafe={failsafe}
+    />
+  );
 }
 
 export default function ReportMeasurePage() {

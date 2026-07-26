@@ -2,8 +2,10 @@
 
 import Link from "next/link";
 import type { EngineConfig } from "@/lib/au/config";
-import { getInvestmentProperties, hasStaggeredRetirement, householdHorizon, householdRetirementOffset, oldestCurrentAge, personRetirementAge, type RetirementPlan, type SimResult } from "@/lib/au/types";
+import { getInvestmentProperties, getLifeEvents, hasStaggeredRetirement, householdHorizon, householdRetirementOffset, oldestCurrentAge, personRetirementAge, type LifeEvent, type RetirementPlan, type SimResult } from "@/lib/au/types";
 import type { MonteCarloResult } from "@/lib/au/montecarlo";
+import type { AppliedStrategy } from "@/lib/au/strategies";
+import type { StressTestResult, Failsafe } from "@/lib/au/stresstest";
 import { retirementGoal } from "@/lib/au/goal";
 import { fmtCurrency } from "@/lib/au/format";
 import { track } from "@/lib/analytics";
@@ -92,6 +94,11 @@ export default function ReportView({
   config,
   name,
   generatedAt,
+  strategies = [],
+  lifeEvents,
+  baseline = null,
+  stress = null,
+  failsafe = null,
 }: {
   plan: RetirementPlan;
   result: SimResult;
@@ -99,9 +106,18 @@ export default function ReportView({
   config: EngineConfig;
   name: string;
   generatedAt: string;
+  // Optional extra pages — rendered only when the relevant data is present.
+  strategies?: AppliedStrategy[]; // active What-If strategies (already baked into the figures)
+  lifeEvents?: LifeEvent[]; // committed one-off cashflows (defaults to the plan's own)
+  baseline?: { superAtRetirement: number; lastsToLifeExpectancy: boolean; depletedAge: number | null; successPct: number } | null; // pre-strategies figures, for a before/after
+  stress?: StressTestResult | null; // historical-downturn scorecard
+  failsafe?: Failsafe | null; // highest never-cut spend that survives every era
 }) {
   const goal = retirementGoal(plan);
   const successPct = Math.round(mc.successRate * 100);
+  // Extra-page data: life events default to the plan's own; a "money lasts" label.
+  const events = lifeEvents ?? getLifeEvents(plan);
+  const lastsText = (lasts: boolean, depAge: number | null) => (lasts ? `to ${plan.lifeExpectancy}+` : `to age ${depAge}`);
   const wageInfl = plan.inflation + (config.livingStandardsGrowthPct ?? 0);
   const people = plan.people;
   const mtg = plan.mortgage;
@@ -460,6 +476,144 @@ export default function ReportView({
           </Section>
         </div>
 
+        {/* ───────── What-if strategies applied (only when the plan carries some) ───────── */}
+        {strategies.length > 0 && (
+          <div className="break-before-page">
+            <Section title="What-if strategies applied">
+              <Lead>
+                This scenario has {strategies.length} strateg{strategies.length === 1 ? "y" : "ies"} switched on. They&apos;re
+                already reflected in every figure in this report — here&apos;s what they are
+                {baseline ? " and how they moved the headline results" : ""}.
+              </Lead>
+              <ul className="grid grid-cols-1 gap-x-8 gap-y-0.5 text-xs sm:grid-cols-2">
+                {strategies.map((s) => (
+                  <li key={s.id} className="flex items-baseline gap-2 border-b border-slate-100 py-0.5">
+                    <span className="text-teal-600">✓</span>
+                    <span className="font-medium text-slate-800">{s.label}</span>
+                  </li>
+                ))}
+              </ul>
+              {baseline && (
+                <table className="mt-4 w-full border-collapse text-right text-xs tabular-nums">
+                  <thead className="text-[10px] uppercase tracking-wide text-slate-500">
+                    <tr className="border-b border-slate-300">
+                      <th className="py-0.5 text-left">Headline result</th>
+                      <th>Base plan</th>
+                      <th>With strategies</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr className="border-b border-slate-100">
+                      <td className="py-0.5 text-left font-medium text-slate-700">Super at retirement</td>
+                      <td className="text-slate-500">{money(baseline.superAtRetirement)}</td>
+                      <td className="font-medium text-slate-800">{money(result.superAtRetirement)}</td>
+                    </tr>
+                    <tr className="border-b border-slate-100">
+                      <td className="py-0.5 text-left font-medium text-slate-700">Money lasts</td>
+                      <td className="text-slate-500">{lastsText(baseline.lastsToLifeExpectancy, baseline.depletedAge)}</td>
+                      <td className="font-medium text-slate-800">{lastsText(result.lastsToLifeExpectancy, result.depletedAge)}</td>
+                    </tr>
+                    <tr className="border-b border-slate-100">
+                      <td className="py-0.5 text-left font-medium text-slate-700">Likely to fund the plan</td>
+                      <td className="text-slate-500">{baseline.successPct}%</td>
+                      <td className="font-medium text-slate-800">{successPct}%</td>
+                    </tr>
+                  </tbody>
+                </table>
+              )}
+            </Section>
+          </div>
+        )}
+
+        {/* ───────── Life events (only when the plan carries some) ───────── */}
+        {events.length > 0 && (
+          <div className="break-before-page">
+            <Section title="Life events">
+              <Lead>
+                One-off amounts you expect, modelled as cashflows at the ages below — money in lands in your savings
+                (not taxed); money out is an extra draw that year. All in today&apos;s dollars, and reflected in the
+                projection above.
+              </Lead>
+              <table className="w-full border-collapse text-right text-xs tabular-nums">
+                <thead className="text-[10px] uppercase tracking-wide text-slate-500">
+                  <tr className="border-b border-slate-300">
+                    <th className="py-0.5 text-left">Event</th>
+                    <th className="text-left">Direction</th>
+                    <th>Amount</th>
+                    <th>At age</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[...events]
+                    .sort((a, b) => a.atAge - b.atAge)
+                    .map((e) => (
+                      <tr key={e.id} className="border-b border-slate-100">
+                        <td className="py-0.5 text-left font-medium text-slate-700">
+                          {e.label?.trim() || (e.kind === "income" ? "Windfall" : "Expense")}
+                        </td>
+                        <td className="text-left text-slate-500">{e.kind === "income" ? "Money in" : "Money out"}</td>
+                        <td className="font-medium text-slate-800">
+                          {e.kind === "income" ? "+" : "−"}
+                          {money(e.amount)}
+                        </td>
+                        <td className="text-slate-600">{e.atAge}</td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </Section>
+          </div>
+        )}
+
+        {/* ───────── Stress test — historical downturns ───────── */}
+        {stress && stress.eras.length > 0 && (
+          <div className="break-before-page">
+            <Section title={`Stress test — survived ${stress.survived} of ${stress.total} historical downturns`}>
+              <Lead>
+                How this plan holds up if a major historical bear market struck right at retirement — each era replays
+                its actual year-by-year returns (the crash and the recovery). A plan &ldquo;survives&rdquo; if it funds
+                your spending every year to age {plan.lifeExpectancy}.
+              </Lead>
+              <table className="w-full border-collapse text-right text-xs tabular-nums">
+                <thead className="text-[10px] uppercase tracking-wide text-slate-500">
+                  <tr className="border-b border-slate-300">
+                    <th className="py-0.5 text-left">If you retired into…</th>
+                    <th className="text-left">Outcome</th>
+                    <th>Worst fall</th>
+                    <th>Ends with</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {stress.eras.map((e) => (
+                    <tr key={e.id} className="border-b border-slate-100">
+                      <td className="py-0.5 text-left font-medium text-slate-700">{e.label}</td>
+                      <td className="text-left">
+                        {e.lasts ? (
+                          <span className="font-medium text-teal-700">Funded to {plan.lifeExpectancy}</span>
+                        ) : e.recovered ? (
+                          <span className="text-amber-700">Tight ~{e.unfundedYears} yr, then recovered</span>
+                        ) : (
+                          <span className="text-rose-700">Runs short at {e.depletionAge}</span>
+                        )}
+                      </td>
+                      <td className="text-slate-600">−{Math.round(e.maxDrawdownPct)}%</td>
+                      <td className="text-slate-600">{money(e.finalBalance)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {failsafe && failsafe.spend > 0 && (
+                <p className="mt-3 text-xs text-slate-600">
+                  <strong className="text-slate-800">Failsafe spend: {money(failsafe.spend)}/yr</strong> ({(failsafe.rate * 100).toFixed(1)}%) —
+                  the highest fixed spend that would have survived <em>every</em> one of these downturns without a cut,
+                  {failsafe.bindingEra ? ` set by ${failsafe.bindingEra.label}.` : "."} Flexible spending (easing off in
+                  bad years) lets you safely start higher than this.
+                </p>
+              )}
+            </Section>
+          </div>
+        )}
+
         {/* ───────── PAGE 4: Year-by-year projection · Assumptions ───────── */}
         <div className="break-before-page">
           <Section title="Year-by-year projection" allowBreak>
@@ -533,7 +687,7 @@ export default function ReportView({
                 <ul className="list-disc space-y-1 pl-4">
                   <li>Super fees (admin + investment %, a fixed member fee and any insurance) are deducted using default figures — real fees vary by fund.</li>
                   <li>Transfer Balance Cap is treated simply; CGT and interest-only loans are approximations.</li>
-                  <li>Excludes aged-care costs, one-off spending, and future changes to rates or law.</li>
+                  <li>Excludes aged-care costs and future changes to rates or law.</li>
                 </ul>
               </div>
             </div>

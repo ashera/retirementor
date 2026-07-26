@@ -12,7 +12,7 @@ import { chromium } from "playwright";
 
 const BASE = (process.env.BASE_URL ?? "http://localhost:3000").replace(/\/$/, "");
 const URL = `${BASE}/report/measure`;
-const CASES = ["simple", "couple", "heavy", "budget", "budget-renter"];
+const CASES = ["simple", "couple", "heavy", "budget", "budget-renter", "scenario"];
 
 // A4 @96dpi minus 14mm margins on each side (1mm = 3.7795px).
 const CONTENT_PX = Math.round((297 - 2 * 14) * 3.7795); // ≈ 1017
