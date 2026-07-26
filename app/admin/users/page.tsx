@@ -2,11 +2,12 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth";
 import { listUsers } from "@/lib/adminUsers";
-import { listVisitors, getVisitorStats } from "@/lib/adminVisitors";
+import { listVisitors, getVisitorStats, getDailyUniqueVisitors } from "@/lib/adminVisitors";
 import { getLocationCounts, getLocationPoints } from "@/lib/adminGeoCounts";
 import AdminTabs from "@/components/AdminTabs";
 import UsersTable from "@/components/UsersTable";
 import VisitorsTable from "@/components/VisitorsTable";
+import VisitorsDailyChart from "@/components/VisitorsDailyChart";
 import GeoMapView from "@/components/GeoMapView";
 
 export const metadata = { title: "Backoffice — Users", robots: { index: false } };
@@ -79,7 +80,11 @@ async function AccountsView() {
 }
 
 async function VisitorsView() {
-  const [visitors, stats] = await Promise.all([listVisitors(), getVisitorStats()]);
+  const [visitors, stats, daily] = await Promise.all([
+    listVisitors(),
+    getVisitorStats(),
+    getDailyUniqueVisitors(30),
+  ]);
 
   return (
     <>
@@ -93,6 +98,7 @@ async function VisitorsView() {
           {stats.bots > 0 && ` · ${stats.bots} likely bot${stats.bots === 1 ? "" : "s"} (hidden by default)`}.
         </p>
       </header>
+      <VisitorsDailyChart data={daily} />
       <VisitorsTable visitors={visitors} />
     </>
   );

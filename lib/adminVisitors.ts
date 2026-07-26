@@ -81,3 +81,34 @@ export async function getVisitorStats(): Promise<VisitorStats> {
     bots: row?.bots ?? 0,
   };
 }
+
+export interface DailyVisitors {
+  day: string; // YYYY-MM-DD
+  uniques: number;
+}
+
+/** Unique (human) visitors ACTIVE each day over the last `days` days — distinct
+ *  visitor_ids in the pageview/event log, bucketed by day, empty days filled with 0.
+ *  Bots are excluded, matching getVisitorStats. */
+export async function getDailyUniqueVisitors(days = 30): Promise<DailyVisitors[]> {
+  const r = await query<{ day: string; uniques: number }>(
+    `select to_char(d, 'YYYY-MM-DD') as day, coalesce(c.uniques, 0)::int as uniques
+       from generate_series(
+              (now() - ($1::int - 1) * interval '1 day')::date,
+              now()::date,
+              interval '1 day'
+            ) d
+       left join (
+         select date_trunc('day', e.created_at)::date as day,
+                count(distinct e.visitor_id) as uniques
+           from visitor_events e
+           join visitors v on v.id = e.visitor_id
+          where e.created_at >= (now() - ($1::int - 1) * interval '1 day')::date
+            and not coalesce(v.is_bot, false)
+          group by 1
+       ) c on c.day = d::date
+      order by d`,
+    [days],
+  );
+  return r.rows;
+}
