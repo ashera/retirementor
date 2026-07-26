@@ -12,7 +12,7 @@ import { fmtCurrency } from "@/lib/au/format";
 import { rowNetWorth } from "@/lib/au/networth";
 import { track } from "@/lib/analytics";
 import type { SavedPlan } from "@/app/actions/plans";
-import { savePlan, updatePlan, saveDraft } from "@/app/actions/plans";
+import { savePlan, updatePlan, getOrCreateActiveScenario, setActivePlan } from "@/app/actions/plans";
 import {
   buildStrategyCatalog,
   applyStrategies,
@@ -117,11 +117,15 @@ function fmtDeltaYr(d: number): string | null {
 export default function WhatIfView({
   config,
   savedPlans: initialSavedPlans,
+  active: activeScenario = null,
   signedIn,
   sharedPlan = null,
 }: {
   config: EngineConfig;
   savedPlans: SavedPlan[];
+  // The user's active named scenario (the auto-save target), or null. Used to
+  // resolve id/name and as the cross-device cloud copy when localStorage is stale.
+  active?: SavedPlan | null;
   signedIn: boolean;
   // Public read-only view (a share link or a curated /scenario/<slug> demo):
   // start from this scenario and never read/write the viewer's own localStorage.
@@ -177,16 +181,35 @@ export default function WhatIfView({
         name = editPlan.name;
         id = editPlan.id;
         // Adopt this saved scenario as the working plan straight away, so heading
-        // back to the planner (even without a change) opens on it too.
+        // back to the planner (even without a change) opens on it too — and make it
+        // the active scenario on the server so auto-save writes to this same plan.
         localStorage.setItem(PLAN_KEY, JSON.stringify(stored));
         localStorage.setItem(PLAN_TS_KEY, String(Date.now()));
         localStorage.setItem(SAVED_ID_KEY, editPlan.id);
         window.history.replaceState(null, "", "/what-if"); // don't re-trigger on refresh
+        if (signedIn) void setActivePlan(editPlan.id);
       } else {
+        // The working plan the dashboard left in localStorage, else the active
+        // scenario from the server (fresh sign-in / cleared storage). Either way the
+        // id/name come from the active scenario — it's where auto-save writes.
         const raw = localStorage.getItem(PLAN_KEY);
-        if (raw) stored = { ...DEFAULT_PLAN, ...JSON.parse(raw) };
-        id = localStorage.getItem(SAVED_ID_KEY);
-        if (id) name = initialSavedPlans.find((s) => s.id === id)?.name ?? null;
+        const localTs = Number(localStorage.getItem(PLAN_TS_KEY) || 0);
+        const activeTs = activeScenario ? new Date(activeScenario.updated_at).getTime() : 0;
+        if (raw && (!activeScenario || localTs >= activeTs)) {
+          stored = { ...DEFAULT_PLAN, ...JSON.parse(raw) };
+        } else if (activeScenario) {
+          stored = { ...DEFAULT_PLAN, ...activeScenario.data };
+          localStorage.setItem(PLAN_KEY, JSON.stringify(stored));
+          localStorage.setItem(PLAN_TS_KEY, String(activeTs));
+        }
+        if (activeScenario) {
+          id = activeScenario.id;
+          name = activeScenario.name;
+          localStorage.setItem(SAVED_ID_KEY, activeScenario.id);
+        } else {
+          id = localStorage.getItem(SAVED_ID_KEY);
+          if (id) name = initialSavedPlans.find((s) => s.id === id)?.name ?? null;
+        }
       }
     } catch {}
     const sc = toActiveScenario(stored);
@@ -232,6 +255,33 @@ export default function WhatIfView({
         )
       : null;
 
+  // Latest active-scenario id + name for the debounced / leave-page auto-save, so it
+  // targets the right plan even when it fires after these changed (stale-closure safe).
+  const savedIdRef = useRef(savedId);
+  savedIdRef.current = savedId;
+  const savedNameRef = useRef(savedName);
+  savedNameRef.current = savedName;
+
+  // Write the working scenario to the user's active named scenario (in place). No
+  // active scenario yet (a just-signed-up guest) → create "My First Scenario" from
+  // this work. Signed-out users never reach here (their work is localStorage-only).
+  const autoSaveActive = async (data: RetirementPlan) => {
+    if (!signedIn) return;
+    const id = savedIdRef.current;
+    if (id) {
+      await updatePlan(id, savedNameRef.current || "My First Scenario", data);
+      return;
+    }
+    const res = await getOrCreateActiveScenario(data);
+    if (res.id) {
+      setSavedId(res.id);
+      try {
+        localStorage.setItem(SAVED_ID_KEY, res.id);
+      } catch {}
+      if (!savedNameRef.current) setSavedName("My First Scenario");
+    }
+  };
+
   useEffect(() => {
     if (shared || !baseline) return;
     if (!persistReady.current) {
@@ -246,11 +296,10 @@ export default function WhatIfView({
     } catch {
       /* ignore storage failures */
     }
-    // Also keep the signed-in user's cloud draft current, so the working scenario
-    // (incl. strategy changes) survives across devices and can't be shadowed by a
-    // stale draft when the dashboard reloads.
+    // Also auto-save to the signed-in user's active scenario, so strategy changes
+    // survive across devices and can't be shadowed by a stale copy on reload.
     if (!signedIn) return;
-    const t = setTimeout(() => void saveDraft(storable), 1200);
+    const t = setTimeout(() => void autoSaveActive(storable), 1200);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, values, baseline, shared, signedIn]);
@@ -633,16 +682,16 @@ export default function WhatIfView({
   });
 
   // Heading back to the planner: flush the active scenario to BOTH the working plan
-  // (localStorage) and — for signed-in users — the cloud draft, awaited, so neither
-  // can be shadowed by a stale copy; then do a full navigation so the dashboard
-  // mounts fresh and opens on the scenario you were just using.
+  // (localStorage) and — for signed-in users — their active scenario, awaited, so
+  // neither can be shadowed by a stale copy; then do a full navigation so the
+  // dashboard mounts fresh and opens on the scenario you were just using.
   const backToPlanner = async () => {
     const storable = activeStorable();
     if (storable) {
       try {
         localStorage.setItem(PLAN_KEY, JSON.stringify(storable));
         localStorage.setItem(PLAN_TS_KEY, String(Date.now()));
-        if (signedIn) await saveDraft(storable);
+        if (signedIn) await autoSaveActive(storable);
       } catch {
         /* fall through to navigation */
       }

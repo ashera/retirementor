@@ -3,7 +3,7 @@ import PlannerApp from "@/components/PlannerApp";
 import VisitorActivity from "@/components/VisitorActivity";
 import { getCurrentUser } from "@/lib/auth";
 import { countryFromIp } from "@/lib/geo";
-import { listPlans, getDraft } from "@/app/actions/plans";
+import { listPlans, ensureActiveScenario } from "@/app/actions/plans";
 import { buildReviewData, getActiveConfig } from "@/lib/refdata";
 import { getUserStats } from "@/lib/adminUsers";
 import { SITE_URL, SITE_NAME, SITE_DESCRIPTION } from "@/lib/site";
@@ -46,11 +46,13 @@ const jsonLd = {
 
 export default async function Page() {
   const user = await getCurrentUser();
-  const [savedPlans, draft, config] = await Promise.all([
-    user ? listPlans() : Promise.resolve([]),
-    user ? getDraft() : Promise.resolve(null),
+  // Resolve (and, on first load, lazily migrate) the active scenario BEFORE listing,
+  // so a just-migrated "My First Scenario" is included in the list.
+  const [active, config] = await Promise.all([
+    user ? ensureActiveScenario() : Promise.resolve(null),
     getActiveConfig(),
   ]);
+  const savedPlans = user ? await listPlans() : [];
   const reviewDue = user?.is_admin ? (await buildReviewData()).dueTotal : 0;
   const userStats = user?.is_admin ? await getUserStats() : null;
   // The country flag for the menu bar: a signed-in user's stored country, else the
@@ -69,7 +71,7 @@ export default async function Page() {
         user={user ? { email: user.email, isAdmin: user.is_admin, name: user.name, avatarUrl: user.avatar_url } : null}
         country={country}
         savedPlans={savedPlans}
-        draft={draft}
+        active={active}
         config={config}
         reviewDue={reviewDue}
         userStats={userStats}

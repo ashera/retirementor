@@ -44,11 +44,10 @@ import {
   deletePlan,
   savePlan,
   updatePlan,
-  saveDraft,
+  getOrCreateActiveScenario,
   createShareLink,
   revokeShareLink,
   type SavedPlan,
-  type PlanDraft,
 } from "@/app/actions/plans";
 import { simulate } from "@/lib/au/simulate";
 import type { EngineConfig } from "@/lib/au/config";
@@ -235,7 +234,7 @@ export default function PlannerApp({
   user,
   country = null,
   savedPlans,
-  draft = null,
+  active = null,
   config,
   reviewDue = 0,
   userStats = null,
@@ -244,7 +243,7 @@ export default function PlannerApp({
   user: { email: string; isAdmin: boolean; name?: string | null; avatarUrl?: string | null } | null;
   country?: string | null; // location flag for the menu bar (user's or visitor's)
   savedPlans: SavedPlan[];
-  draft?: PlanDraft | null;
+  active?: SavedPlan | null;
   config: EngineConfig;
   reviewDue?: number;
   userStats?: { total: number; last7Days: number } | null;
@@ -355,49 +354,41 @@ export default function PlannerApp({
       return;
     }
     // Decide which working plan to restore. Priority: the newer of the local
-    // working copy vs. the signed-in user's cloud draft (so work follows them
-    // across devices / survives cleared storage); else the most recent saved
-    // scenario; else the empty Get-started state.
+    // working copy vs. the signed-in user's ACTIVE scenario (so work follows them
+    // across devices / survives cleared storage). The active scenario is where all
+    // auto-save writes go; local edits belong to it, so it always owns the id/name.
+    // No active + no local → the empty Get-started state.
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       const localTs = Number(localStorage.getItem(WORKING_TS_KEY) || 0);
-      const draftTs = draft ? new Date(draft.updated_at).getTime() : 0;
+      const activeTs = active ? new Date(active.updated_at).getTime() : 0;
 
-      if (draft && draftTs >= localTs) {
-        // Cloud draft is at least as fresh (e.g. newer work from another device
-        // or a first sign-in here) → adopt it and mirror to this device.
-        const working = { ...DEFAULT_PLAN, ...draft.data };
+      if (active && activeTs >= localTs) {
+        // Cloud scenario is at least as fresh (newer work from another device, a
+        // first sign-in here, or no local copy) → adopt it and mirror to this device.
+        const working = { ...DEFAULT_PLAN, ...active.data };
         splitInto(working);
         setBaseline(working);
-        setBaselineName(null);
-        setSavedId(localStorage.getItem(SAVED_ID_KEY));
+        setBaselineName(active.name);
+        setSavedId(active.id);
+        persistSavedId(active.id);
         setConfigured(true);
         localStorage.setItem(STORAGE_KEY, JSON.stringify(working));
-        localStorage.setItem(WORKING_TS_KEY, String(draftTs));
-        if (raw && localTs < draftTs) setNotice("Restored your latest work from your account.");
+        localStorage.setItem(WORKING_TS_KEY, String(activeTs));
+        localStorage.setItem(BASELINE_KEY, JSON.stringify(working));
+        localStorage.setItem(BASELINE_NAME_KEY, active.name);
+        if (raw && localTs < activeTs) setNotice(`Loaded “${active.name}” from your account.`);
       } else if (raw) {
+        // Local copy is fresher (edits made since the last cloud write) → keep it,
+        // but stamp it with the active scenario's identity when signed in.
         const working = { ...DEFAULT_PLAN, ...JSON.parse(raw) };
         const rawBase = localStorage.getItem(BASELINE_KEY);
         splitInto(working);
         setBaseline(rawBase ? { ...DEFAULT_PLAN, ...JSON.parse(rawBase) } : working);
-        setBaselineName(localStorage.getItem(BASELINE_NAME_KEY) || null);
-        setSavedId(localStorage.getItem(SAVED_ID_KEY));
+        setBaselineName(active ? active.name : localStorage.getItem(BASELINE_NAME_KEY) || null);
+        setSavedId(active ? active.id : localStorage.getItem(SAVED_ID_KEY));
+        if (active) persistSavedId(active.id);
         setConfigured(true);
-      } else if (savedPlans.length > 0) {
-        // No working copy anywhere, but there are saved scenarios → open the most
-        // recent (listPlans() is ordered newest-first) straight into the dashboard.
-        const sp = savedPlans[0];
-        const working = { ...DEFAULT_PLAN, ...sp.data };
-        splitInto(working);
-        setBaseline(working);
-        setBaselineName(sp.name);
-        setSavedId(sp.id);
-        setConfigured(true);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(working));
-        localStorage.setItem(BASELINE_KEY, JSON.stringify(working));
-        localStorage.setItem(BASELINE_NAME_KEY, sp.name);
-        localStorage.setItem(SAVED_ID_KEY, sp.id);
-        setNotice(`Loaded your most recent scenario “${sp.name}”.`);
       }
       if (localStorage.getItem(NUDGE_KEY)) setNudgeDismissed(true);
     } catch {
@@ -418,6 +409,31 @@ export default function PlannerApp({
   // Keep a ref to the latest storable plan for the visibility-flush handler below.
   const storableRef = useRef(storable);
   storableRef.current = storable;
+  // Latest active-scenario id + name, so the debounced / tab-hide auto-save writes
+  // to the right plan even when they fire after these values changed (stale-closure
+  // safe). savedId can be null right after signup — the first save creates the plan.
+  const savedIdRef = useRef(savedId);
+  savedIdRef.current = savedId;
+  const activeNameRef = useRef(baselineName);
+  activeNameRef.current = baselineName;
+
+  // Write the working scenario to the user's active named scenario (in place). When
+  // there's no active scenario yet (a just-signed-up guest), create "My First
+  // Scenario" from this work and adopt its id. Signed-out users never reach here.
+  const autoSaveActive = async (data: RetirementPlan) => {
+    if (!user) return;
+    const id = savedIdRef.current;
+    if (id) {
+      void updatePlan(id, activeNameRef.current || "My First Scenario", data);
+      return;
+    }
+    const res = await getOrCreateActiveScenario(data);
+    if (res.id) {
+      setSavedId(res.id);
+      persistSavedId(res.id);
+      if (!activeNameRef.current) setBaselineName("My First Scenario");
+    }
+  };
 
   // Persist the working scenario locally on every change (in its storable form, so
   // the strategy layer survives a reload / hop to the other page). Skips the
@@ -428,15 +444,16 @@ export default function PlannerApp({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storable, ready, configured, shared]);
 
-  // Debounced cloud auto-save of the working scenario (signed-in users) so unsaved
-  // work is backed up server-side and follows them to other devices / survives
-  // cleared browser storage.
+  // Debounced cloud auto-save of the working scenario (signed-in users) to their
+  // active named scenario, so every edit is backed up server-side and follows them
+  // to other devices / survives cleared browser storage.
   useEffect(() => {
     if (!ready || !user || !configured) return;
     const t = setTimeout(() => {
-      void saveDraft(storable);
+      void autoSaveActive(storable);
     }, 1500);
     return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storable, ready, user, configured]);
 
   // Best-effort flush when the tab is hidden, to catch edits made within the
@@ -444,10 +461,11 @@ export default function PlannerApp({
   useEffect(() => {
     if (!user) return;
     const flush = () => {
-      if (document.visibilityState === "hidden" && configured) void saveDraft(storableRef.current);
+      if (document.visibilityState === "hidden" && configured) void autoSaveActive(storableRef.current);
     };
     document.addEventListener("visibilitychange", flush);
     return () => document.removeEventListener("visibilitychange", flush);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, configured]);
 
   // Funnel top: tag each visit once we've read localStorage — did the visitor

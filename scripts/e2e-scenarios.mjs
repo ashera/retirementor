@@ -1,13 +1,14 @@
-// End-to-end regression for the scenario model (save/load lifecycle + What-If) as a
-// signed-in user. Drives a real browser and asserts both the UI and the database.
+// End-to-end regression for the active-scenario model (continuous auto-save to ONE
+// named scenario per user + What-If) as a signed-in user. Drives a real browser and
+// asserts both the UI and the database.
 //
 // Needs: the dev server running AND a local Postgres.
 //   npm run dev                       (note the port; it auto-increments if 3000 is taken)
 //   node scripts/e2e-scenarios.mjs    (or: npm run test:e2e)
 //   BASE_URL=http://localhost:3001 DATABASE_URL=... node scripts/e2e-scenarios.mjs
 //
-// It creates a dedicated, isolated test user, resets its plans/drafts, runs the
-// journeys, then cleans up. Refuses any non-local DATABASE_URL. Exits non-zero on
+// It creates a dedicated, isolated test user, resets its plans/active pointer, runs
+// the journeys, then cleans up. Refuses any non-local DATABASE_URL. Exits non-zero on
 // any failed assertion, so it can gate CI.
 
 import { chromium } from "playwright";
@@ -61,6 +62,7 @@ const up = await db.query(
 );
 const uid = up.rows[0].id;
 const reset = async () => {
+  // active_plan_id FK is ON DELETE SET NULL, so dropping the plans clears the pointer.
   await db.query("delete from plans where user_id=$1", [uid]);
   await db.query("delete from plan_drafts where user_id=$1", [uid]);
 };
@@ -68,8 +70,9 @@ await reset();
 const token = randomBytes(32).toString("hex");
 await db.query("insert into sessions (user_id, token, expires_at) values ($1, $2, now()+interval '1 day')", [uid, token]);
 
-const plans = async () => (await db.query("select name, data from plans where user_id=$1 order by updated_at", [uid])).rows;
-const draft = async () => (await db.query("select data from plan_drafts where user_id=$1", [uid])).rows[0]?.data ?? null;
+const plans = async () => (await db.query("select id, name, data from plans where user_id=$1 order by updated_at", [uid])).rows;
+const activePlanId = async () => (await db.query("select active_plan_id from users where id=$1", [uid])).rows[0]?.active_plan_id ?? null;
+const draftCount = async () => Number((await db.query("select count(*) c from plan_drafts where user_id=$1", [uid])).rows[0].c);
 
 const browser = await chromium.launch();
 try {
@@ -79,76 +82,60 @@ try {
   page.on("pageerror", (e) => console.error("  PAGEERROR:", e.message));
   const txt = () => page.evaluate(() => document.body.innerText);
 
-  // A — save a fresh plan (in-place-save entry point).
+  // A — a signed-in user with local work but no scenarios yet: the first auto-save
+  //     silently creates their ONE active scenario, "My First Scenario". No button.
   await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
   await page.evaluate((p) => {
     localStorage.setItem("au-retirement-plan", JSON.stringify(p));
     localStorage.setItem("au-retirement-plan-ts", String(Date.now()));
     localStorage.removeItem("au-retirement-saved-id");
+    localStorage.removeItem("au-retirement-baseline-name");
   }, PLAN);
   await page.reload({ waitUntil: "networkidle" });
-  await page.waitForTimeout(1000);
-  await page.getByPlaceholder(/Name it/i).fill("Scenario One");
-  await page.getByRole("button", { name: /Save scenario/i }).click();
-  await page.waitForTimeout(1500);
-  ok("save creates exactly 1 plan", (await plans()).length === 1);
-  ok("dashboard shows 'Currently editing Scenario One'", (await txt()).includes("Scenario One"));
+  await page.waitForTimeout(3500); // debounced auto-save (1.5s) + create + round-trip
+  let ps = await plans();
+  ok("auto-save creates exactly 1 active scenario", ps.length === 1);
+  ok("it is named 'My First Scenario'", ps[0]?.name === "My First Scenario");
+  ok("users.active_plan_id points at it", (await activePlanId()) === ps[0]?.id);
+  ok("no throwaway draft is written", (await draftCount()) === 0);
+  const firstId = ps[0]?.id;
 
-  // B — What-If toggles a strategy; Save changes updates the SAME plan in place.
+  // B — What-If toggles a strategy; auto-save updates the SAME active plan in place.
   await page.getByRole("link", { name: /What-If Strategies/i }).first().click();
   await page.waitForURL("**/what-if").catch(() => {});
-  await page.waitForTimeout(900);
+  await page.waitForTimeout(1200);
   // Strategies are compact goal-grouped pills; tapping one APPLIES it and opens its
-  // detail modal in the active state. Close the modal, then save.
+  // detail modal in the active state. Close the modal; auto-save flushes on its own.
   await page.getByRole("button", { name: /Flexible spending \(guardrails\)/ }).first().click();
-  await page.waitForTimeout(400);
+  await page.waitForTimeout(500);
   await page.getByRole("button", { name: /^Save$/ }).click().catch(() => {}); // close the strategy modal
-  await page.waitForTimeout(400);
-  await page.getByRole("button", { name: /Save changes/i }).click();
-  await page.waitForTimeout(1500);
-  let ps = await plans();
-  ok("What-If 'Save changes' stays 1 plan (in place)", ps.length === 1);
-  ok("that plan now carries guardrails", !!ps[0]?.data?.guardrails);
+  await page.waitForTimeout(2200); // debounced auto-save (1.2s) + round-trip
+  ps = await plans();
+  ok("What-If auto-save stays 1 plan (in place)", ps.length === 1);
+  ok("the active plan now carries guardrails", !!ps[0]?.data?.guardrails);
+  ok("active_plan_id is unchanged", ps[0]?.id === firstId && (await activePlanId()) === firstId);
 
-  // Back to planner opens on exactly the scenario just edited.
+  // C — Back to planner opens on exactly the scenario just edited, strategy intact.
   await page.getByRole("link", { name: /Back to planner/i }).click();
   await page.waitForURL(`${BASE}/`).catch(() => {});
   await page.waitForTimeout(2500);
-  ok("back-to-planner shows the guardrails chip", (await txt()).includes("Flexible spending (guardrails)"));
-  ok("back-to-planner shows 'Scenario One'", (await txt()).includes("Scenario One"));
+  const back = await txt();
+  ok("back-to-planner shows the guardrails chip", back.includes("Flexible spending (guardrails)"));
+  ok("back-to-planner names 'My First Scenario'", back.includes("My First Scenario"));
 
-  // C — Save as a copy creates a distinct second plan.
-  await page.getByPlaceholder(/New name/i).fill("Scenario Two");
-  await page.getByRole("button", { name: /Save as a copy/i }).click();
+  // D — ?edit=<id> adopts a specific saved scenario in What-If AND makes it active,
+  //     so subsequent auto-saves target it (the switcher's underlying mechanism).
+  const ins = await db.query(
+    "insert into plans (user_id, name, data) values ($1, $2, $3) returning id",
+    [uid, "Scenario Two", JSON.stringify({ ...PLAN, targetSpending: 60000 })],
+  );
+  const twoId = ins.rows[0].id;
+  await page.goto(`${BASE}/what-if?edit=${twoId}`, { waitUntil: "networkidle" });
   await page.waitForTimeout(1500);
-  ps = await plans();
-  ok("Save-as-copy creates a 2nd plan", ps.length === 2);
-  ok("both copies carry the strategy", ps.every((p) => !!p.data.guardrails));
+  ok("?edit opens What-If editing 'Scenario Two'", (await txt()).includes("Scenario Two"));
+  ok("?edit sets it as the active scenario on the server", (await activePlanId()) === twoId);
 
-  // D — the signed-in cloud draft reflects the What-If work (cross-device).
-  const d = await draft();
-  ok("cloud draft exists", !!d);
-  ok("cloud draft carries guardrails", !!d?.guardrails);
-
-  // E — ?edit=<id> adopts a specific saved scenario in What-If.
-  await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
-  await page.waitForTimeout(1000);
-  const opts = await page.$$eval("option", (os) => os.map((o) => ({ v: o.value, t: o.textContent })));
-  const oneId = opts.find((o) => (o.t || "").includes("Scenario One"))?.v;
-  if (oneId) await page.getByLabel("Choose a saved scenario").selectOption(oneId);
-  await page.waitForTimeout(400);
-  await page.locator('a[href*="what-if?edit="]').click();
-  await page.waitForURL("**/what-if**").catch(() => {});
-  await page.waitForTimeout(1200);
-  ok("?edit opens What-If editing 'Scenario One'", (await txt()).includes("Scenario One"));
-  // Open the guardrails pill's detail modal and read its switch state.
-  await page.getByRole("button", { name: /Flexible spending \(guardrails\)/ }).first().click();
-  await page.waitForTimeout(300);
-  const guardOn = await page.getByRole("switch").getAttribute("aria-checked");
-  ok("?edit shows the scenario's strategy toggled on", guardOn === "true");
-  await page.getByRole("button", { name: /^Save$/ }).click().catch(() => {}); // close the strategy modal
-
-  // F — historical stress test renders a scorecard + fixed/flex toggle for the plan.
+  // E — historical stress test renders a scorecard + fixed/flex toggle for the plan.
   await page.goto(`${BASE}/stress-test`, { waitUntil: "networkidle" });
   await page.waitForTimeout(1000);
   await page.getByRole("button", { name: /Skip the theatrics/i }).click().catch(() => {}); // skip the timed run
@@ -169,5 +156,5 @@ try {
 
 const failed = results.filter(([pass]) => !pass).length;
 console.log(`\n${results.length - failed}/${results.length} passed`);
-console.log(failed ? "RESULT: e2e failures ✗" : "RESULT: scenario model e2e green ✓");
+console.log(failed ? "RESULT: e2e failures ✗" : "RESULT: active-scenario e2e green ✓");
 process.exit(failed ? 1 : 0);

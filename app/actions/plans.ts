@@ -135,6 +135,56 @@ export async function createScenario(name: string, data: RetirementPlan): Promis
   return { ok: true, id };
 }
 
+/** Resolve the user's active scenario, migrating on first call (lazy, per-user):
+ *   1. already have one → return it;
+ *   2. else promote their auto-saved draft to a named scenario (→ "My First
+ *      Scenario" if they have no plans yet, else "Working scenario") + set active,
+ *      then drop the draft;
+ *   3. else adopt their most-recent saved plan as active;
+ *   4. else (brand-new, no work) → null; the active scenario is created when they
+ *      first configure a plan or on signup.
+ *  Returns the active plan, or null. Signed-out → null (guests use localStorage). */
+export async function ensureActiveScenario(): Promise<SavedPlan | null> {
+  const user = await getCurrentUser();
+  if (!user) return null;
+
+  const active = await getActivePlan();
+  if (active) return active;
+
+  const [draft, plans] = await Promise.all([getDraft(), listPlans()]);
+  if (draft) {
+    // Inline insert (not createScenario) so this stays revalidatePath-free — it may
+    // run during a page render, where revalidate isn't allowed.
+    const name = plans.length === 0 ? "My First Scenario" : "Working scenario";
+    const ins = await query<{ id: string }>(
+      "insert into plans (user_id, name, data) values ($1, $2, $3) returning id",
+      [user.id, name, JSON.stringify(draft.data)],
+    );
+    const id = ins.rows[0]?.id;
+    if (id) {
+      await query("update users set active_plan_id = $1 where id = $2", [id, user.id]);
+      await query("delete from plan_drafts where user_id = $1", [user.id]); // migrated → drop it
+      return getActivePlan();
+    }
+  }
+  if (plans.length > 0) {
+    await query("update users set active_plan_id = $1 where id = $2", [plans[0].id, user.id]);
+    return getActivePlan();
+  }
+  return null;
+}
+
+/** Auto-save target for a signed-in user: their active scenario if they have one,
+ *  otherwise create "My First Scenario" from the given data and make it active.
+ *  Called on the first auto-save after a fresh signup (promotes the guest's work). */
+export async function getOrCreateActiveScenario(data: RetirementPlan): Promise<ActionResult> {
+  const user = await getCurrentUser();
+  if (!user) return { error: "You need to be signed in." };
+  const active = await getActivePlan();
+  if (active) return { ok: true, id: active.id };
+  return createScenario("My First Scenario", data);
+}
+
 export async function savePlan(
   name: string,
   data: RetirementPlan,

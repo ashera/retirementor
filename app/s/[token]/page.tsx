@@ -29,7 +29,7 @@ export default async function SharedScenarioPage({
     <PlannerApp
       user={null}
       savedPlans={[]}
-      draft={null}
+      active={null}
       config={config}
       sharedPlan={{ plan, name: saved.name, basePath: `/s/${token}` }}
     />
