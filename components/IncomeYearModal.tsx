@@ -2,7 +2,7 @@
 
 import { fmtCurrency } from "@/lib/au/format";
 import { minDrawdownRate, type EngineConfig } from "@/lib/au/config";
-import { getInvestmentProperties, type RetirementPlan, type YearRow } from "@/lib/au/types";
+import { getInvestmentProperties, getLifeEvents, type RetirementPlan, type YearRow } from "@/lib/au/types";
 import { netRentCash, propertyValueAt } from "@/lib/au/property";
 import { essentialsFloor } from "@/lib/au/strategies";
 
@@ -93,12 +93,23 @@ export default function IncomeYearModal({
   const goalLiving = row.breakdown.livingSpend;
   const goalEssentials = Math.min(essentialsFloor(plan, config), goalLiving);
   const goalDiscretionary = Math.max(0, goalLiving - goalEssentials);
+  // The life event(s) landing this year, matched by firing age (max of the event's
+  // age and the projection start), so we can name them in the breakdown.
+  const eventName = (() => {
+    const startOldest = Math.max(...plan.people.map((p) => p.currentAge));
+    return getLifeEvents(plan)
+      .filter((e) => e.kind === "expense" && Math.max(startOldest, Math.round(e.atAge)) === row.age && e.label?.trim())
+      .map((e) => e.label!.trim())
+      .join(", ");
+  })();
   const goalParts = [
     goalEssentials > 0 ? `${cur(goalEssentials)} essentials` : null,
     goalDiscretionary > 0 ? `${cur(goalDiscretionary)} discretionary` : null,
     row.breakdown.mortgageCost > 0 ? `${cur(row.breakdown.mortgageCost)} home loan` : null,
     row.breakdown.rentCost > 0 ? `${cur(row.breakdown.rentCost)} rent` : null,
-    (row.breakdown.eventExpense ?? 0) > 0 ? `${cur(row.breakdown.eventExpense ?? 0)} life event` : null,
+    (row.breakdown.eventExpense ?? 0) > 0
+      ? `${cur(row.breakdown.eventExpense ?? 0)} life event${eventName ? ` (${eventName})` : ""}`
+      : null,
   ].filter(Boolean);
   // Spending the household must fund from savings, after income (pension, rent,
   // a still-working partner's salary). The ATO minimum can force super out beyond
