@@ -87,6 +87,54 @@ export async function saveDraft(data: RetirementPlan): Promise<ActionResult> {
   return { ok: true };
 }
 
+// ── Active scenario (the named plan continuous auto-save targets) ─────────────
+// Phase 1 of moving off the throwaway draft: these back the "one active named
+// scenario per user" model. Inert until the auto-save rewire (Phase 2) uses them.
+
+/** The user's ACTIVE scenario (the named plan auto-save writes to), or null when
+ *  none is set yet (a brand-new or not-yet-migrated user). */
+export async function getActivePlan(): Promise<SavedPlan | null> {
+  const user = await getCurrentUser();
+  if (!user) return null;
+  const r = await query<SavedPlan>(
+    `select p.id, p.name, p.data, p.updated_at, p.share_token
+       from users u join plans p on p.id = u.active_plan_id
+      where u.id = $1`,
+    [user.id],
+  );
+  return r.rows[0] ?? null;
+}
+
+/** Point the user's active scenario at one of their own plans (owner-scoped). */
+export async function setActivePlan(id: string): Promise<ActionResult> {
+  const user = await getCurrentUser();
+  if (!user) return { error: "You need to be signed in." };
+  const r = await query(
+    `update users set active_plan_id = p.id
+       from plans p
+      where users.id = $1 and p.id = $2 and p.user_id = $1`,
+    [user.id, id],
+  );
+  if (!r.rowCount) return { error: "Scenario not found." };
+  return { ok: true, id };
+}
+
+/** Create a new named scenario and make it the active one (auto-save target).
+ *  Used for signup ("My First Scenario") and "New scenario" (a copy of the current). */
+export async function createScenario(name: string, data: RetirementPlan): Promise<ActionResult> {
+  const user = await getCurrentUser();
+  if (!user) return { error: "You need to be signed in." };
+  const trimmed = name.trim() || "Untitled scenario";
+  const r = await query<{ id: string }>(
+    "insert into plans (user_id, name, data) values ($1, $2, $3) returning id",
+    [user.id, trimmed, JSON.stringify(data)],
+  );
+  const id = r.rows[0]?.id;
+  if (id) await query("update users set active_plan_id = $1 where id = $2", [id, user.id]);
+  revalidatePath("/");
+  return { ok: true, id };
+}
+
 export async function savePlan(
   name: string,
   data: RetirementPlan,

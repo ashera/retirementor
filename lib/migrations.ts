@@ -67,8 +67,14 @@ create table if not exists plans (
 -- ALTER (not part of the create above) so existing databases pick it up too.
 alter table plans add column if not exists share_token text;
 
+-- The user's ACTIVE scenario — the named plan that continuous auto-save writes to,
+-- and which follows them across devices (replaces the per-user draft). Nulled if that
+-- plan is deleted, so the app can fall back to another scenario (or create a fresh one).
+alter table users add column if not exists active_plan_id uuid references plans(id) on delete set null;
+
 -- One auto-saved working draft per user, so unsaved work survives across
 -- devices and cleared browser storage (upserted on the user_id primary key).
+-- DEPRECATED: being replaced by continuous auto-save to the active scenario above.
 create table if not exists plan_drafts (
   user_id uuid primary key references users(id) on delete cascade,
   data jsonb not null,
