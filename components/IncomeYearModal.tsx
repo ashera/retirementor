@@ -4,6 +4,7 @@ import { fmtCurrency } from "@/lib/au/format";
 import { minDrawdownRate, type EngineConfig } from "@/lib/au/config";
 import { getInvestmentProperties, type RetirementPlan, type YearRow } from "@/lib/au/types";
 import { netRentCash, propertyValueAt } from "@/lib/au/property";
+import { essentialsFloor } from "@/lib/au/strategies";
 
 const cur = (n: number) => fmtCurrency(Math.round(n));
 
@@ -86,6 +87,19 @@ export default function IncomeYearModal({
   const partnerStillWorking = retired && row.salaryIncome > 1;
   const salaryTakeHome = retired ? row.breakdown.takeHome : 0;
   const spend = row.spending;
+  // What makes up this year's spending goal, for the header subtext: essentials +
+  // discretionary (the living-cost smile), plus any home loan, rent (after selling
+  // up) and a one-off life-event expense. These sum back to `spend`.
+  const goalLiving = row.breakdown.livingSpend;
+  const goalEssentials = Math.min(essentialsFloor(plan, config), goalLiving);
+  const goalDiscretionary = Math.max(0, goalLiving - goalEssentials);
+  const goalParts = [
+    goalEssentials > 0 ? `${cur(goalEssentials)} essentials` : null,
+    goalDiscretionary > 0 ? `${cur(goalDiscretionary)} discretionary` : null,
+    row.breakdown.mortgageCost > 0 ? `${cur(row.breakdown.mortgageCost)} home loan` : null,
+    row.breakdown.rentCost > 0 ? `${cur(row.breakdown.rentCost)} rent` : null,
+    (row.breakdown.eventExpense ?? 0) > 0 ? `${cur(row.breakdown.eventExpense ?? 0)} life event` : null,
+  ].filter(Boolean);
   // Spending the household must fund from savings, after income (pension, rent,
   // a still-working partner's salary). The ATO minimum can force super out beyond
   // that — the surplus is reinvested, not spent, so it isn't spendable income
@@ -366,6 +380,11 @@ export default function IncomeYearModal({
                     ? `${cur(shortfall)} short of your ${cur(spend)} spending goal`
                     : `covering your ${cur(spend)} spending goal`}
                 </div>
+                {goalParts.length > 0 && (
+                  <div className="mt-1 text-[11px] leading-snug text-muted">
+                    Made up of {goalParts.join(" · ")}
+                  </div>
+                )}
               </div>
 
               <section>
