@@ -32,7 +32,7 @@ export default function VisitorsDailyChart({ data }: { data: DailyVisitors[] }) 
         </span>
       </div>
       <ResponsiveContainer width="100%" height={200}>
-        <BarChart data={data} margin={{ top: 4, right: 4, left: -22, bottom: 0 }}>
+        <BarChart data={data} margin={{ top: 4, right: 6, left: 0, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#ffffff12" vertical={false} />
           <XAxis
             dataKey="day"
@@ -46,7 +46,7 @@ export default function VisitorsDailyChart({ data }: { data: DailyVisitors[] }) 
           <YAxis
             allowDecimals={false}
             tick={{ fill: "#94a3b8", fontSize: 10 }}
-            width={34}
+            width={32}
             tickLine={false}
             axisLine={false}
           />
