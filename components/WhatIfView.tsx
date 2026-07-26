@@ -367,8 +367,11 @@ export default function WhatIfView({
     if (!composed) return null;
     const goal = retirementGoal(composed);
     const ess = Math.min(essentialsFloor(composed, config), goal.living);
-    return { total: goal.total, essential: ess, discretionary: Math.max(0, goal.living - ess), loan: goal.loanCost, estimated: !composed.budget };
-  }, [composed, config]);
+    // The base-plan spend (pre-strategies), so a lever that moves the goal can show
+    // the original crossed out → the new amount + the change, like the metric cards.
+    const baseTotal = baseline ? retirementGoal(baseline).total : goal.total;
+    return { total: goal.total, baseTotal, essential: ess, discretionary: Math.max(0, goal.living - ess), loan: goal.loanCost, estimated: !composed.budget };
+  }, [composed, config, baseline]);
 
   // Prudent "safe spend" = highest spend with ≥ SAFE_TARGET Monte Carlo success.
   // Heavy (bisected MC), so debounced off the interaction path with a pending
@@ -823,9 +826,20 @@ export default function WhatIfView({
         <div className="rounded-2xl border border-line bg-panel p-4">
           <div className="flex items-baseline justify-between gap-2">
             <span className="text-[11px] font-medium uppercase tracking-wide text-muted">Your spending</span>
-            <span className="text-lg font-bold tabular-nums text-white">
-              {fmtCurrency(spendMix.total)}
-              <span className="ml-0.5 text-xs font-medium text-muted">/yr</span>
+            <span className="flex flex-wrap items-baseline justify-end gap-x-1.5 tabular-nums">
+              {Math.abs(spendMix.baseTotal - spendMix.total) >= 1 ? (
+                <>
+                  <span className="text-sm text-muted line-through">{fmtCurrency(spendMix.baseTotal)}</span>
+                  <span aria-hidden className="text-muted">→</span>
+                  <span className="text-lg font-bold text-white">{fmtCurrency(spendMix.total)}</span>
+                  <span className={`text-xs font-semibold ${spendMix.total >= spendMix.baseTotal ? "text-accent" : "text-amber-400"}`}>
+                    {fmtDelta(spendMix.total - spendMix.baseTotal)}
+                  </span>
+                </>
+              ) : (
+                <span className="text-lg font-bold text-white">{fmtCurrency(spendMix.total)}</span>
+              )}
+              <span className="text-xs font-medium text-muted">/yr</span>
             </span>
           </div>
           <SpendingBreakdown
