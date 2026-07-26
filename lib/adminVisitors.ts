@@ -84,25 +84,39 @@ export async function getVisitorStats(): Promise<VisitorStats> {
 
 export interface DailyVisitors {
   day: string; // YYYY-MM-DD
-  uniques: number;
+  looked: number; // active that day, hit NO milestone ("just looked around")
+  engaged: number; // active that day, hit ≥1 milestone (super/budget/what-if/stress)
+  uniques: number; // looked + engaged (total distinct human visitors active)
 }
 
 /** Unique (human) visitors ACTIVE each day over the last `days` days — distinct
  *  visitor_ids in the pageview/event log, bucketed by day, empty days filled with 0.
- *  Bots are excluded, matching getVisitorStats. */
+ *  Each day's uniques are split into "engaged" (the visitor hit at least one funnel
+ *  milestone) vs "looked around" (none), using the same engaged definition as
+ *  getVisitorStats. Engagement is a per-visitor attribute, so a visitor who engages
+ *  on any day counts as engaged on every day they were active. Bots are excluded. */
 export async function getDailyUniqueVisitors(days = 30): Promise<DailyVisitors[]> {
   // Bucket by AUSTRALIAN local days (Sydney, AEST/AEDT) — `created_at` is timestamptz,
   // so we convert to Sydney time before truncating to a date, and anchor "today" to
   // the Sydney date. The event scan is filtered a little wide; the join to the day
   // series restricts it to the exact window.
-  const r = await query<{ day: string; uniques: number }>(
+  const r = await query<{ day: string; looked: number; engaged: number }>(
     `with b as (select (now() at time zone 'Australia/Sydney')::date as today_au)
-     select to_char(d, 'YYYY-MM-DD') as day, coalesce(c.uniques, 0)::int as uniques
+     select to_char(d, 'YYYY-MM-DD') as day,
+            coalesce(c.looked, 0)::int as looked,
+            coalesce(c.engaged, 0)::int as engaged
        from b,
             generate_series(b.today_au - ($1::int - 1), b.today_au, interval '1 day') d
        left join (
          select (e.created_at at time zone 'Australia/Sydney')::date as day,
-                count(distinct e.visitor_id) as uniques
+                count(distinct e.visitor_id) filter (
+                  where not (v.set_super_balance or v.set_budget_income
+                             or v.visited_what_if or v.visited_stress_test)
+                ) as looked,
+                count(distinct e.visitor_id) filter (
+                  where v.set_super_balance or v.set_budget_income
+                        or v.visited_what_if or v.visited_stress_test
+                ) as engaged
            from visitor_events e
            join visitors v on v.id = e.visitor_id
           where e.created_at >= now() - ($1::int + 1) * interval '1 day'
@@ -112,5 +126,5 @@ export async function getDailyUniqueVisitors(days = 30): Promise<DailyVisitors[]
       order by d`,
     [days],
   );
-  return r.rows;
+  return r.rows.map((row) => ({ ...row, uniques: row.looked + row.engaged }));
 }
