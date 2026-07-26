@@ -80,6 +80,7 @@ try {
   await ctx.addCookies([{ name: "session", value: token, domain: HOST, path: "/", httpOnly: true, sameSite: "Lax" }]);
   const page = await ctx.newPage();
   page.on("pageerror", (e) => console.error("  PAGEERROR:", e.message));
+  page.on("dialog", (d) => d.accept()); // accept the delete confirm()
   const txt = () => page.evaluate(() => document.body.innerText);
 
   // A — a signed-in user with local work but no scenarios yet: the first auto-save
@@ -134,6 +135,40 @@ try {
   await page.waitForTimeout(1500);
   ok("?edit opens What-If editing 'Scenario Two'", (await txt()).includes("Scenario Two"));
   ok("?edit sets it as the active scenario on the server", (await activePlanId()) === twoId);
+
+  // F — inline rename of the active scenario from the dashboard name field.
+  await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
+  await page.waitForTimeout(1800);
+  const nameField = page.getByLabel("Scenario name");
+  await nameField.click();
+  await nameField.fill("Renamed Two");
+  await nameField.press("Enter");
+  await page.waitForTimeout(1200);
+  ok(
+    "inline rename updates the active scenario name",
+    (await db.query("select name from plans where id=$1", [twoId])).rows[0]?.name === "Renamed Two",
+  );
+
+  // G — "New scenario" branches a copy and switches the active pointer to it.
+  const beforeBranch = (await plans()).length;
+  await page.getByRole("button", { name: /New scenario/i }).click();
+  await page.waitForTimeout(1800);
+  const afterBranch = await plans();
+  const copy = afterBranch.find((p) => /^Copy of Renamed Two/.test(p.name));
+  ok("New scenario branches a copy (count +1)", afterBranch.length === beforeBranch + 1);
+  ok("branch is named 'Copy of {name}'", !!copy);
+  ok("branch becomes the active scenario", (await activePlanId()) === copy?.id);
+
+  // H — the switcher flips the active scenario; deleting the active one falls back.
+  await page.getByLabel("Switch scenario").selectOption(twoId);
+  await page.waitForTimeout(1600);
+  ok("switcher makes the chosen scenario active", (await activePlanId()) === twoId);
+  await page.getByRole("button", { name: /Delete Renamed Two/i }).click();
+  await page.waitForTimeout(1600);
+  const remaining = await plans();
+  const activeAfterDelete = await activePlanId();
+  ok("delete removes the active scenario", !remaining.some((p) => p.id === twoId));
+  ok("delete falls back to another active scenario", remaining.some((p) => p.id === activeAfterDelete));
 
   // E — historical stress test renders a scorecard + fixed/flex toggle for the plan.
   await page.goto(`${BASE}/stress-test`, { waitUntil: "networkidle" });

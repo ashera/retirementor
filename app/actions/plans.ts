@@ -222,10 +222,43 @@ export async function updatePlan(
   return { ok: true, id };
 }
 
+/** Rename a scenario in place (owner-scoped). Doesn't touch `data` or `updated_at`
+ *  — the name isn't plan content, so it mustn't shadow fresher local edits on load. */
+export async function renameScenario(id: string, name: string): Promise<ActionResult> {
+  const user = await getCurrentUser();
+  if (!user) return { error: "You need to be signed in." };
+  const trimmed = name.trim();
+  if (!trimmed) return { error: "Give your scenario a name." };
+  const r = await query(
+    "update plans set name = $1 where id = $2 and user_id = $3",
+    [trimmed, id, user.id],
+  );
+  if (!r.rowCount) return { error: "Scenario not found." };
+  revalidatePath("/");
+  return { ok: true, id };
+}
+
+/** Delete a scenario (owner-scoped). If it was the active one, fall back to the
+ *  most-recent remaining scenario (the FK's ON DELETE SET NULL already cleared the
+ *  pointer). Returns `id` = the new active scenario, or undefined when none remain. */
 export async function deletePlan(id: string): Promise<ActionResult> {
   const user = await getCurrentUser();
   if (!user) return { error: "You need to be signed in." };
+  const wasActive =
+    (await query<{ active_plan_id: string | null }>(
+      "select active_plan_id from users where id = $1",
+      [user.id],
+    )).rows[0]?.active_plan_id === id;
   await query("delete from plans where id = $1 and user_id = $2", [id, user.id]);
+  let nextActive: string | undefined;
+  if (wasActive) {
+    const r = await query<{ id: string }>(
+      "select id from plans where user_id = $1 order by updated_at desc limit 1",
+      [user.id],
+    );
+    nextActive = r.rows[0]?.id;
+    if (nextActive) await query("update users set active_plan_id = $1 where id = $2", [nextActive, user.id]);
+  }
   revalidatePath("/");
-  return { ok: true };
+  return { ok: true, id: nextActive };
 }

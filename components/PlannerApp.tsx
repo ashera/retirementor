@@ -42,8 +42,10 @@ import { essentialsFloor } from "@/lib/au/lifestages";
 import { logout } from "@/app/actions/auth";
 import {
   deletePlan,
-  savePlan,
   updatePlan,
+  renameScenario,
+  createScenario,
+  setActivePlan,
   getOrCreateActiveScenario,
   createShareLink,
   revokeShareLink,
@@ -75,20 +77,6 @@ const BASELINE_NAME_KEY = "au-retirement-baseline-name"; // label for the ghost 
 const WORKING_TS_KEY = "au-retirement-plan-ts"; // when the local working plan was last saved
 const SAVED_ID_KEY = "au-retirement-saved-id"; // the plans-row id the active scenario is (for in-place Save)
 const NUDGE_KEY = "au-retirement-nudge-dismissed"; // signed-out "save your work" banner dismissed
-
-/** Deep structural equality (order-insensitive for object keys) — tells whether the
- *  live plan still exactly matches a saved scenario's data (any edit stops the match).
- *  Uses the UNION of keys so a `key: undefined` in memory equals a key dropped by the
- *  DB's JSON round-trip (both read as undefined). */
-function deepEqual(a: unknown, b: unknown): boolean {
-  if (a === b) return true;
-  if (typeof a !== "object" || typeof b !== "object" || a === null || b === null) return false;
-  const ao = a as Record<string, unknown>;
-  const bo = b as Record<string, unknown>;
-  const keys = new Set([...Object.keys(ao), ...Object.keys(bo)]);
-  for (const k of keys) if (!deepEqual(ao[k], bo[k])) return false;
-  return true;
-}
 
 // A blank starting point for a first-time visitor's "Enter my details" wizard:
 // the personal figures (age, super, salary) start empty (NaN renders as a blank
@@ -319,10 +307,17 @@ export default function PlannerApp({
   const [taxAge, setTaxAge] = useState<number | null>(null);
   const [fanAge, setFanAge] = useState<number | null>(null);
   const [showReturnSeries, setShowReturnSeries] = useState(false);
-  const [saveName, setSaveName] = useState("");
-  // The plans-row id the active scenario IS (loaded or saved) — so "Save" updates it
-  // in place rather than making a copy. Null → an unsaved working scenario. Persisted
-  // in localStorage so it survives reload and the hop to/from What-If.
+  // The active scenario's name (what auto-save writes under, shown + inline-editable
+  // in the scenario bar). `nameDraft` backs the editable input so typing doesn't fire
+  // a rename / auto-save on every keystroke.
+  const [activeName, setActiveName] = useState<string | null>(null);
+  const [nameDraft, setNameDraft] = useState("");
+  useEffect(() => {
+    setNameDraft(activeName ?? "");
+  }, [activeName]);
+  // The plans-row id the active scenario IS. Auto-save writes here in place; a "New
+  // scenario" branch points it at the fresh copy. Null → not yet created (created on
+  // the first auto-save). Persisted in localStorage so it survives reload + the What-If hop.
   const [savedId, setSavedId] = useState<string | null>(null);
   const persistSavedId = (id: string | null) => {
     if (shared) return;
@@ -333,9 +328,6 @@ export default function PlannerApp({
       /* ignore */
     }
   };
-  // Which saved scenario the dropdown has selected (the Run report / Share / View
-  // buttons act on it). Falls back to the first saved plan when unset or stale.
-  const [selectedPlanId, setSelectedPlanId] = useState<string>("");
   const [pending, startTransition] = useTransition();
   const [notice, setNotice] = useState<string | null>(null);
   const [nudgeDismissed, setNudgeDismissed] = useState(false);
@@ -370,6 +362,7 @@ export default function PlannerApp({
         splitInto(working);
         setBaseline(working);
         setBaselineName(active.name);
+        setActiveName(active.name);
         setSavedId(active.id);
         persistSavedId(active.id);
         setConfigured(true);
@@ -379,16 +372,24 @@ export default function PlannerApp({
         localStorage.setItem(BASELINE_NAME_KEY, active.name);
         if (raw && localTs < activeTs) setNotice(`Loaded “${active.name}” from your account.`);
       } else if (raw) {
-        // Local copy is fresher (edits made since the last cloud write) → keep it,
-        // but stamp it with the active scenario's identity when signed in.
+        // Local copy is fresher (edits made since the last cloud write) → keep it.
+        // The data belongs to whatever scenario last saved it (SAVED_ID_KEY), so the
+        // id travels WITH the data — not from `active`, which can drift on another
+        // device. If the server pointer drifted, reconcile it so auto-save writes and
+        // the active pointer target the same scenario.
         const working = { ...DEFAULT_PLAN, ...JSON.parse(raw) };
         const rawBase = localStorage.getItem(BASELINE_KEY);
+        const localId = localStorage.getItem(SAVED_ID_KEY);
         splitInto(working);
         setBaseline(rawBase ? { ...DEFAULT_PLAN, ...JSON.parse(rawBase) } : working);
-        setBaselineName(active ? active.name : localStorage.getItem(BASELINE_NAME_KEY) || null);
-        setSavedId(active ? active.id : localStorage.getItem(SAVED_ID_KEY));
-        if (active) persistSavedId(active.id);
+        const nm = localId
+          ? savedPlans.find((sp) => sp.id === localId)?.name ?? active?.name ?? null
+          : null;
+        setSavedId(localId);
+        setActiveName(nm);
+        setBaselineName(localStorage.getItem(BASELINE_NAME_KEY) || nm);
         setConfigured(true);
+        if (localId && active && active.id !== localId) void setActivePlan(localId);
       }
       if (localStorage.getItem(NUDGE_KEY)) setNudgeDismissed(true);
     } catch {
@@ -414,8 +415,8 @@ export default function PlannerApp({
   // safe). savedId can be null right after signup — the first save creates the plan.
   const savedIdRef = useRef(savedId);
   savedIdRef.current = savedId;
-  const activeNameRef = useRef(baselineName);
-  activeNameRef.current = baselineName;
+  const activeNameRef = useRef(activeName);
+  activeNameRef.current = activeName;
 
   // Write the working scenario to the user's active named scenario (in place). When
   // there's no active scenario yet (a just-signed-up guest), create "My First
@@ -431,7 +432,8 @@ export default function PlannerApp({
     if (res.id) {
       setSavedId(res.id);
       persistSavedId(res.id);
-      if (!activeNameRef.current) setBaselineName("My First Scenario");
+      if (!activeNameRef.current) setActiveName("My First Scenario");
+      router.refresh(); // bring the just-created plan into savedPlans (switcher / share / report)
     }
   };
 
@@ -695,6 +697,7 @@ export default function PlannerApp({
     commit({ ...DEFAULT_PLAN, ...sp.data }, sp.name);
     setSavedId(sp.id);
     persistSavedId(sp.id);
+    setActiveName(sp.name);
     setConfigured(true);
     setNotice(`Loaded “${sp.name}”.`);
   };
@@ -717,83 +720,98 @@ export default function PlannerApp({
     splitInto(DEFAULT_PLAN);
     setBaseline(DEFAULT_PLAN);
     setBaselineName(null);
+    setActiveName(null);
     setSavedId(null);
     setConfigured(false);
     setShowGuide(false);
-    setSaveName("");
     setNotice(null);
   };
 
-  // Save the active scenario. `asNew` (or no saved id yet) inserts a fresh plan;
-  // otherwise it updates the plan the scenario already IS, in place.
-  const saveScenario = (asNew: boolean) => {
-    const name =
-      saveName.trim() || (!asNew && baselineName) || `Plan ${savedPlans.length + 1}`;
+  // Rename the active scenario in place (blur / Enter on the name field). Only the
+  // name changes — data + updated_at are untouched, so it can't shadow local edits.
+  const renameActive = () => {
+    const name = nameDraft.trim();
+    if (!savedId || !name || name === activeName) {
+      setNameDraft(activeName ?? "");
+      return;
+    }
+    setActiveName(name);
     startTransition(async () => {
-      if (!asNew && savedId) {
-        const res = await updatePlan(savedId, name, storable);
-        if (res.error) {
-          setNotice(res.error);
-          return;
-        }
-        // Re-baseline to the saved state so "unsaved changes" clears.
-        setBaseline(storable);
-        setBaselineName(name);
-        persistBaseline(storable, name);
-        setSaveName("");
-        setNotice(`Saved changes to “${name}”.`);
-        track("Plan updated");
-        router.refresh();
-      } else {
-        const res = await savePlan(name, storable);
-        if (res.error) {
-          setNotice(res.error);
-          return;
-        }
-        setSavedId(res.id ?? null);
-        persistSavedId(res.id ?? null);
-        commit(storable, name); // adopt as baseline, labelled with its name
-        setSaveName("");
-        setNotice(`Saved “${name}”.`);
-        track("Plan saved");
-        router.refresh();
-      }
+      const res = await renameScenario(savedId, name);
+      if (res.error) setNotice(res.error);
+      else router.refresh();
     });
   };
-  const handleSave = () => saveScenario(false);
-  const handleSaveAsNew = () => saveScenario(true);
+
+  // "New scenario" = branch: copy the current scenario into a fresh plan and make it
+  // active, so you can explore without touching the one you were on. No naming prompt
+  // — it's "Copy of {name}" (deduped), renameable inline afterwards.
+  const newScenario = () => {
+    const taken = savedPlans.map((p) => p.name);
+    const base = `Copy of ${activeName ?? "scenario"}`;
+    let name = base;
+    for (let i = 2; taken.includes(name); i++) name = `${base} ${i}`;
+    startTransition(async () => {
+      const res = await createScenario(name, storable);
+      if (res.error) {
+        setNotice(res.error);
+        return;
+      }
+      setSavedId(res.id ?? null);
+      persistSavedId(res.id ?? null);
+      commit(storable, name); // re-baseline to the copy (same data, new name)
+      setActiveName(name);
+      setNotice(`Created “${name}” — you’re now editing it.`);
+      track("Scenario branched");
+      router.refresh();
+    });
+  };
+
+  // Switch the active scenario to another saved plan and load it in.
+  const switchScenario = (id: string) => {
+    if (id === savedId) return;
+    const sp = savedPlans.find((p) => p.id === id);
+    if (!sp) return;
+    startTransition(async () => {
+      await setActivePlan(id);
+      handleLoad(sp);
+      router.refresh();
+    });
+  };
 
   const handleDelete = (sp: SavedPlan) => {
+    if (!window.confirm(`Delete “${sp.name}”? This can’t be undone.`)) return;
     startTransition(async () => {
       const res = await deletePlan(sp.id);
-      if (res.error) setNotice(res.error);
-      else {
-        setNotice(`Deleted “${sp.name}”.`);
-        router.refresh();
+      if (res.error) {
+        setNotice(res.error);
+        return;
       }
+      const next = res.id ? savedPlans.find((p) => p.id === res.id) : undefined;
+      if (next) {
+        handleLoad(next); // fell back to another scenario → open it
+      } else if (sp.id === savedId) {
+        // Deleted the last scenario → clean slate (Get-started).
+        try {
+          [STORAGE_KEY, BASELINE_KEY, BASELINE_NAME_KEY, SAVED_ID_KEY].forEach((k) => localStorage.removeItem(k));
+        } catch {
+          /* ignore */
+        }
+        splitInto(DEFAULT_PLAN);
+        setBaseline(DEFAULT_PLAN);
+        setBaselineName(null);
+        setActiveName(null);
+        setSavedId(null);
+        setConfigured(false);
+      }
+      setNotice(`Deleted “${sp.name}”.`);
+      router.refresh();
     });
   };
 
-  // The scenario the dropdown is pointing at — the Run report / Share / View /
-  // Delete buttons all act on this. Fall back to the first saved plan so a stale
-  // or empty selection still resolves to something valid.
-  const selectedPlan = savedPlans.find((sp) => sp.id === selectedPlanId) ?? savedPlans[0] ?? null;
-
-  // The active scenario's identity — derived from the saved-plan the working plan IS
-  // (savedId → savedPlans), so it's consistent everywhere the name is shown (e.g. the
-  // stress-test view uses the same lookup). NOT from baselineName, which the cloud
-  // draft restore clears.
-  //  - `savedPlan`  — the saved row this scenario is, or null (unsaved / stale id / deleted);
-  //  - `activeName` — that plan's name (null = never-named working plan);
-  //  - `neverSaved` — configured but not tied to a saved plan (needs a first Save);
-  //  - `dirty`      — a saved scenario whose working plan now differs from what's stored.
-  const savedPlan = savedId ? (savedPlans.find((sp) => sp.id === savedId) ?? null) : null;
-  const activeName = savedPlan?.name ?? null;
-  const neverSaved = configured && savedPlan == null;
-  const dirty =
-    configured &&
-    savedPlan != null &&
-    !deepEqual({ ...plan, whatIf: undefined }, { ...DEFAULT_PLAN, ...savedPlan.data, whatIf: undefined });
+  // The active scenario's saved row (for Run report / Share / Delete / What-if). Null
+  // for a just-created one until router.refresh brings it into savedPlans.
+  const activePlan = savedId ? (savedPlans.find((sp) => sp.id === savedId) ?? null) : null;
 
   const isCouple = plan.household === "couple";
   const comfortable = isCouple
@@ -1057,161 +1075,105 @@ export default function PlannerApp({
       {/* Status confirmations (loaded / saved / applied) — shown to everyone. */}
       {notice && <p className="mb-4 text-xs text-accent">{notice}</p>}
 
-      {/* Saved-scenarios card — signed-in users only. */}
+      {/* Scenario bar — signed-in users only. The active scenario auto-saves; the
+          name is inline-editable, "New scenario" branches a copy, and the switcher
+          flips which scenario is active. */}
       {user && (configured || savedPlans.length > 0) && (
       <div className="mb-6 rounded-2xl border border-line bg-panel px-5 py-4">
-        {/* The active scenario: its name + whether it has unsaved changes. Distinct
-            from the dropdown below, which just targets the action buttons. */}
-        <div className="mb-3 flex flex-wrap items-baseline gap-x-2 gap-y-1 border-b border-line pb-3">
-          <span className="text-[11px] font-medium uppercase tracking-wide text-muted">Currently editing</span>
-          <span className={`text-sm font-semibold ${activeName && !dirty ? "text-white" : "text-amber-300"}`}>
-            {activeName ?? "Working scenario"}
-          </span>
-          {dirty && (
-            <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-semibold text-amber-300">
-              Unsaved changes
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-medium uppercase tracking-wide text-muted">Editing</span>
+            <input
+              value={nameDraft}
+              onChange={(e) => setNameDraft(e.target.value)}
+              onBlur={renameActive}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") e.currentTarget.blur();
+                if (e.key === "Escape") {
+                  setNameDraft(activeName ?? "");
+                  e.currentTarget.blur();
+                }
+              }}
+              disabled={!savedId}
+              aria-label="Scenario name"
+              placeholder={savedId ? "Name this scenario" : "Working scenario"}
+              className="min-w-[9rem] max-w-[18rem] rounded-lg border border-transparent bg-transparent px-2 py-1 text-sm font-semibold text-white outline-none hover:border-line focus:border-accent focus:bg-panel-2 disabled:cursor-default disabled:hover:border-transparent"
+            />
+            <span className="text-[11px] text-muted" title="Every change is saved to this scenario automatically">
+              · saved automatically
             </span>
+          </div>
+          {savedPlans.length > 1 && (
+            <label className="flex items-center gap-1.5 text-xs text-muted">
+              Switch to
+              <select
+                value={savedId ?? ""}
+                onChange={(e) => switchScenario(e.target.value)}
+                aria-label="Switch scenario"
+                disabled={pending}
+                className="max-w-[15rem] rounded-lg border border-line bg-panel-2 px-2 py-1 text-sm text-white outline-none focus:border-accent disabled:opacity-60"
+              >
+                {savedId == null && <option value="">Working scenario</option>}
+                {savedPlans.map((sp) => (
+                  <option key={sp.id} value={sp.id}>
+                    {sp.name}
+                    {sp.data.whatIf ? " · What-if" : ""}
+                  </option>
+                ))}
+              </select>
+            </label>
           )}
-          {neverSaved && (
-            <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-semibold text-amber-300">
-              Not saved yet
-            </span>
-          )}
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <span className="text-xs font-semibold uppercase tracking-wide text-muted">
-            Saved scenarios
-          </span>
-            {savedPlans.length === 0 && (
-              <span className="text-sm text-muted">None yet — save the plan you&apos;re viewing below ↓</span>
-            )}
-            {selectedPlan && (
-              <div className="flex flex-wrap items-center gap-2">
-                <select
-                  value={selectedPlan.id}
-                  onChange={(e) => setSelectedPlanId(e.target.value)}
-                  aria-label="Choose a saved scenario"
-                  className="min-w-[11rem] max-w-[16rem] rounded-lg border border-line bg-panel-2 px-3 py-1.5 text-sm text-white outline-none focus:border-accent"
-                >
-                  {savedPlans.map((sp) => (
-                    <option key={sp.id} value={sp.id}>
-                      {sp.name}
-                      {sp.data.whatIf ? " · What-if" : ""}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  onClick={() => handleLoad(selectedPlan)}
-                  title={`Load ${selectedPlan.name} into your dashboard`}
-                  className="rounded-lg border border-accent/40 bg-accent/10 px-3 py-1.5 text-sm font-semibold text-accent transition hover:bg-accent/20"
-                >
-                  View
-                </button>
-                <Link
-                  href={`/report/${selectedPlan.id}`}
-                  target="_blank"
-                  title={`Open a printable PDF report for ${selectedPlan.name}`}
-                  className="rounded-lg border border-line bg-panel-2 px-3 py-1.5 text-sm font-medium text-slate-200 transition hover:border-accent/50 hover:text-white"
-                >
-                  ↗ Run report
-                </Link>
-                <ShareControl key={selectedPlan.id} id={selectedPlan.id} initialToken={selectedPlan.share_token} onNotice={setNotice} />
-                {selectedPlan.data.whatIf && (
-                  <Link
-                    href={`/what-if?edit=${selectedPlan.id}`}
-                    title={`Reopen ${selectedPlan.name}'s strategies in What-if`}
-                    className="rounded-lg border border-line bg-panel-2 px-3 py-1.5 text-sm font-medium text-slate-200 transition hover:border-accent/50 hover:text-white"
-                  >
-                    ✎ What-if
-                  </Link>
-                )}
-                <button
-                  onClick={() => handleDelete(selectedPlan)}
-                  aria-label={`Delete ${selectedPlan.name}`}
-                  disabled={pending}
-                  className="rounded-lg border border-line bg-panel-2 px-3 py-1.5 text-sm font-medium text-muted transition hover:border-red-400/50 hover:text-red-400 disabled:opacity-60"
-                >
-                  ✕ Delete
-                </button>
-              </div>
-            )}
+          <button
+            onClick={newScenario}
+            disabled={pending || !configured}
+            title="Copy this scenario into a new one and switch to it — so you can explore without touching this plan"
+            className="rounded-lg border border-accent/40 bg-accent/10 px-3 py-1.5 text-sm font-semibold text-accent transition hover:bg-accent/20 disabled:opacity-50"
+          >
+            ＋ New scenario
+          </button>
         </div>
 
-        {/* Save the active scenario. A saved scenario gets "Save changes" (updates
-            it in place) plus "Save as a copy"; a never-saved one just gets a named
-            first save. */}
-        {configured && (
-          <div className="mt-3 border-t border-line pt-3">
-            {savedPlan ? (
-              <>
-                <div className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted">
-                  {dirty ? "You have unsaved changes" : "This scenario is saved"}
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    onClick={handleSave}
-                    disabled={pending || !dirty}
-                    className="rounded-lg bg-accent px-3 py-1.5 text-sm font-semibold text-ink transition hover:bg-accent-soft disabled:opacity-40"
-                  >
-                    ✓ Save changes{activeName ? ` to “${activeName}”` : ""}
-                  </button>
-                  <input
-                    value={saveName}
-                    onChange={(e) => setSaveName(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && !pending) handleSaveAsNew();
-                    }}
-                    placeholder="New name — e.g. “Retire at 60”"
-                    className="w-full max-w-[14rem] rounded-lg border border-line bg-panel-2 px-3 py-1.5 text-sm text-white outline-none focus:border-accent"
-                  />
-                  <button
-                    onClick={handleSaveAsNew}
-                    disabled={pending}
-                    className="rounded-lg border border-line bg-panel-2 px-3 py-1.5 text-sm font-medium text-slate-200 transition hover:border-accent/50 hover:text-white disabled:opacity-60"
-                  >
-                    + Save as a copy
-                  </button>
-                </div>
-              </>
-            ) : (
-              <>
-                <label htmlFor="save-scenario-name" className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted">
-                  Save the plan you&apos;re viewing
-                </label>
-                <div className="flex flex-wrap items-center gap-2">
-                  <input
-                    id="save-scenario-name"
-                    value={saveName}
-                    onChange={(e) => setSaveName(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && !pending) handleSave();
-                    }}
-                    placeholder="Name it — e.g. “Retire at 60”"
-                    className="w-full max-w-xs rounded-lg border border-line bg-panel-2 px-3 py-1.5 text-sm text-white outline-none focus:border-accent"
-                  />
-                  <button
-                    onClick={handleSave}
-                    disabled={pending}
-                    className="rounded-lg bg-accent px-3 py-1.5 text-sm font-semibold text-ink transition hover:bg-accent-soft disabled:opacity-60"
-                  >
-                    + Save scenario
-                  </button>
-                  <span className="text-xs text-muted">
-                    Keeps a copy you can reload, share or run a report on later.
-                  </span>
-                </div>
-              </>
-            )}
-          </div>
-        )}
-        <div className="mt-3 flex flex-wrap gap-2 border-t border-line pt-3">
-          <Link
-            href="/compare"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-panel-2 px-3 py-1.5 text-sm font-medium text-slate-200 transition hover:border-accent/50 hover:text-white"
-          >
-            ⚖ Compare scenarios
-            <span aria-hidden>→</span>
-          </Link>
+        {/* Actions on the active scenario. */}
+        <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-line pt-3">
+          {activePlan ? (
+            <>
+              <Link
+                href={`/report/${activePlan.id}`}
+                target="_blank"
+                title={`Open a printable PDF report for ${activePlan.name}`}
+                className="rounded-lg border border-line bg-panel-2 px-3 py-1.5 text-sm font-medium text-slate-200 transition hover:border-accent/50 hover:text-white"
+              >
+                ↗ Run report
+              </Link>
+              <ShareControl key={activePlan.id} id={activePlan.id} initialToken={activePlan.share_token} onNotice={setNotice} />
+              {activePlan.data.whatIf && (
+                <Link
+                  href={`/what-if?edit=${activePlan.id}`}
+                  title={`Reopen ${activePlan.name}'s strategies in What-if`}
+                  className="rounded-lg border border-line bg-panel-2 px-3 py-1.5 text-sm font-medium text-slate-200 transition hover:border-accent/50 hover:text-white"
+                >
+                  ✎ What-if
+                </Link>
+              )}
+              <Link
+                href="/compare"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-panel-2 px-3 py-1.5 text-sm font-medium text-slate-200 transition hover:border-accent/50 hover:text-white"
+              >
+                ⚖ Compare
+                <span aria-hidden>→</span>
+              </Link>
+              <button
+                onClick={() => handleDelete(activePlan)}
+                aria-label={`Delete ${activePlan.name}`}
+                disabled={pending}
+                className="ml-auto rounded-lg border border-line bg-panel-2 px-3 py-1.5 text-sm font-medium text-muted transition hover:border-red-400/50 hover:text-red-400 disabled:opacity-60"
+              >
+                ✕ Delete
+              </button>
+            </>
+          ) : (
+            <span className="text-sm text-muted">Saving your scenario…</span>
+          )}
         </div>
       </div>
       )}

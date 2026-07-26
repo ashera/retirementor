@@ -12,7 +12,7 @@ import { fmtCurrency } from "@/lib/au/format";
 import { rowNetWorth } from "@/lib/au/networth";
 import { track } from "@/lib/analytics";
 import type { SavedPlan } from "@/app/actions/plans";
-import { savePlan, updatePlan, getOrCreateActiveScenario, setActivePlan } from "@/app/actions/plans";
+import { createScenario, updatePlan, getOrCreateActiveScenario, setActivePlan } from "@/app/actions/plans";
 import {
   buildStrategyCatalog,
   applyStrategies,
@@ -139,9 +139,8 @@ export default function WhatIfView({
   const [baseline, setBaseline] = useState<RetirementPlan | null>(null);
   const [active, setActive] = useState<Set<string>>(new Set());
   const [values, setValues] = useState<Record<string, Record<string, number>>>({});
-  const [savedName, setSavedName] = useState<string | null>(null); // name if the active scenario is a saved plan
-  const [savedId, setSavedId] = useState<string | null>(null); // plans-row id the active scenario is (in-place Save)
-  const [saveName, setSaveName] = useState("");
+  const [savedName, setSavedName] = useState<string | null>(null); // the active scenario's name
+  const [savedId, setSavedId] = useState<string | null>(null); // plans-row id the active scenario is (auto-save target)
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [chartView, setChartView] = useState<"balance" | "networth" | "income">("balance");
@@ -574,20 +573,22 @@ export default function WhatIfView({
   const setParam = (cardId: string, key: string, v: number) =>
     setValues((prev) => ({ ...prev, [cardId]: { ...prev[cardId], [key]: v } }));
 
-  // Save the active scenario in its storable form (composed + the strategy layer).
-  // `asNew` (or no saved id yet) makes a fresh copy; otherwise it updates the plan
-  // the scenario already IS, in place. The working plan is already synced to storage,
-  // so the dashboard shows this scenario the moment you head back.
-  const doSave = async (asNew: boolean) => {
+  // Branch: copy the current scenario (composed + strategy layer) into a fresh plan
+  // and make it active, so you can keep exploring without touching the one you were
+  // on. No naming prompt — "Copy of {name}" (deduped), renameable on the dashboard.
+  const branchScenario = async () => {
     if (!baseline) return;
     setSaving(true);
     setSaveMsg(null);
-    const name = saveName.trim() || (!asNew && savedName) || "What-if scenario";
+    const taken = initialSavedPlans.map((p) => p.name);
+    const base = `Copy of ${savedName ?? "scenario"}`;
+    let name = base;
+    for (let i = 2; taken.includes(name); i++) name = `${base} ${i}`;
     const storable = fromActiveScenario(
       { base: baseline, strategies: { active: [...active], values }, name, savedId: null, dirty: false },
       config,
     );
-    const res = !asNew && savedId ? await updatePlan(savedId, name, storable) : await savePlan(name, storable);
+    const res = await createScenario(name, storable);
     setSaving(false);
     if (res.error) {
       setSaveMsg(res.error);
@@ -600,9 +601,8 @@ export default function WhatIfView({
       } catch {}
     }
     setSavedName(name);
-    setSaveMsg(`Saved “${name}” — it’s on your dashboard too.`);
-    setSaveName("");
-    track("What-if saved");
+    setSaveMsg(`Branched into “${name}” — you’re now editing it. Your previous scenario is untouched.`);
+    track("Scenario branched");
   };
 
   // Show TTR only once the (composed) retirement age clears 60 — so it also
@@ -714,6 +714,7 @@ export default function WhatIfView({
         <span className="text-sm text-muted">
           Editing{" "}
           <span className="font-semibold text-slate-200">{savedName ?? "your working scenario"}</span>
+          {signedIn && <span className="text-muted"> · changes save automatically</span>}
         </span>
       </div>
 
@@ -744,12 +745,12 @@ export default function WhatIfView({
           how long it lasts. Each toggle shows its own impact; the numbers up top show them combined.
         </p>
         <p className="mt-3 flex max-w-2xl items-start gap-2 rounded-lg border border-line bg-panel-2 px-3 py-2 text-sm text-slate-300">
-          <span aria-hidden>🧪</span>
+          <span aria-hidden>✏️</span>
           <span>
-            <strong className="text-white">Strategies</strong> here are exploratory — they won&apos;t overwrite a
-            saved scenario until you <strong className="text-white">Save</strong>. <strong className="text-white">Life
-            events</strong> you add become part of your plan straight away. Either way,{" "}
-            <strong className="text-white">Save as a scenario</strong> below to keep a separate copy.
+            You&apos;re editing{" "}
+            <strong className="text-white">{savedName ?? "your scenario"}</strong> — every strategy and life event
+            you add {signedIn ? "saves to it automatically" : "is kept on this device"}. To try something without
+            touching it, <strong className="text-white">New scenario</strong> below branches a copy.
           </span>
         </p>
         <button
@@ -1035,61 +1036,25 @@ export default function WhatIfView({
         </div>
       ) : (
       <div className="mt-8 rounded-2xl border border-line bg-panel p-4">
-        {savedId ? (
-          <>
-            <div className="flex flex-wrap items-center gap-3">
-              <span className="text-sm font-medium text-slate-200">
-                Editing <span className="font-semibold">{savedName ?? "a saved scenario"}</span>
-              </span>
-              <button
-                onClick={() => doSave(false)}
-                disabled={saving}
-                className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-ink transition hover:bg-accent-soft disabled:opacity-50"
-              >
-                {saving ? "Saving…" : "✓ Save changes"}
-              </button>
-              <input
-                value={saveName}
-                onChange={(e) => setSaveName(e.target.value)}
-                placeholder="New name for a copy"
-                className="min-w-[10rem] flex-1 rounded-lg border border-line bg-panel-2 px-3 py-2 text-sm text-white outline-none focus:border-accent"
-              />
-              <button
-                onClick={() => doSave(true)}
-                disabled={saving}
-                className="rounded-lg border border-line bg-panel-2 px-4 py-2 text-sm font-medium text-slate-200 transition hover:border-accent/50 hover:text-white disabled:opacity-50"
-              >
-                + Save as a copy
-              </button>
-            </div>
-            <p className="mt-2 text-xs text-muted">
-              “Save changes” updates this scenario everywhere; “Save as a copy” keeps a separate one.
-            </p>
-          </>
-        ) : (
-          <>
-            <div className="flex flex-wrap items-center gap-3">
-              <span className="text-sm font-medium text-slate-200">Like this combination?</span>
-              <input
-                value={saveName}
-                onChange={(e) => setSaveName(e.target.value)}
-                placeholder="Name this scenario"
-                className="min-w-[12rem] flex-1 rounded-lg border border-line bg-panel-2 px-3 py-2 text-sm text-white outline-none focus:border-accent"
-              />
-              <button
-                onClick={() => doSave(true)}
-                disabled={saving || !changed}
-                className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-ink transition hover:bg-accent-soft disabled:opacity-50"
-              >
-                {saving ? "Saving…" : "Save as scenario"}
-              </button>
-            </div>
-            <p className="mt-2 text-xs text-muted">
-              Saves it as a scenario you can reload, share or run a report on — your dashboard opens on it too.
-            </p>
-          </>
-        )}
-        {!signedIn && <p className="mt-2 text-xs text-muted">Sign in to save scenarios to your account.</p>}
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="text-sm font-medium text-slate-200">
+            Editing <span className="font-semibold">{savedName ?? "your scenario"}</span>
+            {signedIn && <span className="font-normal text-muted"> — changes save automatically</span>}
+          </span>
+          <button
+            onClick={branchScenario}
+            disabled={saving || !signedIn}
+            title="Copy this scenario into a new one and switch to it — so you can explore without touching this plan"
+            className="rounded-lg border border-accent/40 bg-accent/10 px-4 py-2 text-sm font-semibold text-accent transition hover:bg-accent/20 disabled:opacity-50"
+          >
+            {saving ? "Working…" : "＋ New scenario"}
+          </button>
+        </div>
+        <p className="mt-2 text-xs text-muted">
+          {signedIn
+            ? "Want to keep this plan as-is and try a variation? New scenario branches a copy and switches you to it — the original is left untouched."
+            : "Your work is kept on this device. Sign in to save named scenarios to your account and sync them across devices."}
+        </p>
         {saveMsg && <p className="mt-2 text-xs text-accent">{saveMsg}</p>}
       </div>
       )}
