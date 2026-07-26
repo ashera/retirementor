@@ -13,6 +13,7 @@ import RetirementChart, { type SpendingBand } from "@/components/RetirementChart
 import { ageGapInfo } from "@/components/ageAxis";
 import IncomeChart from "@/components/IncomeChart";
 import FanChart from "@/components/FanChart";
+import ReportStressChart from "@/components/ReportStressChart";
 import ReportExplainers from "@/components/ReportExplainers";
 import { lifestageBreakdown } from "@/lib/au/lifestages";
 import { BUDGET_CATEGORY_META } from "@/lib/au/budget";
@@ -476,9 +477,10 @@ export default function ReportView({
           </Section>
         </div>
 
-        {/* ───────── What-if strategies applied (only when the plan carries some) ───────── */}
-        {strategies.length > 0 && (
+        {/* ───────── Your scenario: What-if strategies + Life events + Net worth ───────── */}
+        {(strategies.length > 0 || events.length > 0) && (
           <div className="break-before-page">
+            {strategies.length > 0 && (
             <Section title="What-if strategies applied">
               <Lead>
                 This scenario has {strategies.length} strateg{strategies.length === 1 ? "y" : "ies"} switched on. They&apos;re
@@ -522,12 +524,9 @@ export default function ReportView({
                 </table>
               )}
             </Section>
-          </div>
-        )}
+            )}
 
-        {/* ───────── Life events (only when the plan carries some) ───────── */}
-        {events.length > 0 && (
-          <div className="break-before-page">
+            {events.length > 0 && (
             <Section title="Life events">
               <Lead>
                 One-off amounts you expect, modelled as cashflows at the ages below — money in lands in your savings
@@ -562,6 +561,19 @@ export default function ReportView({
                 </tbody>
               </table>
             </Section>
+            )}
+
+            {/* Net-worth chart fills the rest of the scenario page. */}
+            <Section title="Net worth over time">
+              <Lead>
+                Your total wealth year by year — savings (super + outside) PLUS your home equity and any investment
+                property. The home stays exempt from the Age Pension, so a downsize reallocates net worth (home shrinks,
+                savings grow) rather than losing it.
+              </Lead>
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-2">
+                <RetirementChart result={result} showHome bands={bands} animate={false} height={300} wageInflationPct={wageInfl} cpiPct={plan.inflation} ages={ageGapInfo(plan)} />
+              </div>
+            </Section>
           </div>
         )}
 
@@ -570,10 +582,13 @@ export default function ReportView({
           <div className="break-before-page">
             <Section title={`Stress test — survived ${stress.survived} of ${stress.total} historical downturns`}>
               <Lead>
-                How this plan holds up if a major historical bear market struck right at retirement — each era replays
-                its actual year-by-year returns (the crash and the recovery). A plan &ldquo;survives&rdquo; if it funds
-                your spending every year to age {plan.lifeExpectancy}.
+                How this plan holds up if a major historical bear market struck right at retirement — each faint line
+                replays one era&apos;s actual returns (crash and recovery), against your smooth projection (blue). A plan
+                &ldquo;survives&rdquo; if it funds your spending every year to age {plan.lifeExpectancy}.
               </Lead>
+              <div className="mb-3 rounded-lg border border-slate-200 bg-slate-50 p-2">
+                <ReportStressChart result={stress} height={155} />
+              </div>
               <table className="w-full border-collapse text-right text-xs tabular-nums">
                 <thead className="text-[10px] uppercase tracking-wide text-slate-500">
                   <tr className="border-b border-slate-300">
