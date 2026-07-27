@@ -1,9 +1,18 @@
+import { readFileSync } from "fs";
+import { join } from "path";
 import { ImageResponse } from "next/og";
 import { SITE_NAME } from "@/lib/site";
 
+export const runtime = "nodejs"; // read the mark off disk at render time
 export const alt = `${SITE_NAME} — Australian Retirement & Super Planner`;
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
+
+// The RetireWiz mark (same artwork as the favicon/report), embedded as a data URI —
+// Satori renders <img> data URIs reliably without a network fetch.
+const markSrc = `data:image/png;base64,${readFileSync(
+  join(process.cwd(), "public/logo-mark.png"),
+).toString("base64")}`;
 
 // Branded 1200×630 card used for link previews (og:image + twitter:image).
 export default function OgImage() {
@@ -22,18 +31,8 @@ export default function OgImage() {
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: "28px" }}>
-          <svg width="132" height="99" viewBox="0 0 64 48">
-            <path d="M5 41 A27 27 0 0 1 59 41 L46 41 A14 14 0 0 0 18 41 Z" fill="#22c55e" />
-            <path
-              d="M11.5 41 A20.5 20.5 0 0 1 52.5 41"
-              fill="none"
-              stroke="#ffffff"
-              strokeWidth="2.4"
-              strokeLinecap="round"
-              strokeDasharray="2.4 5"
-              opacity="0.85"
-            />
-          </svg>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={markSrc} width={128} height={119} alt="" />
           <div style={{ display: "flex", fontSize: 72, fontWeight: 800, letterSpacing: "-2px" }}>
             <span style={{ color: "#34d399" }}>Retire</span>
             <span style={{ color: "#ffffff" }}>Wiz</span>
