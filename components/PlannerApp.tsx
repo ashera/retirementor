@@ -1117,7 +1117,6 @@ export default function PlannerApp({
                 {savedPlans.map((sp) => (
                   <option key={sp.id} value={sp.id}>
                     {sp.name}
-                    {sp.data.whatIf ? " · What-if" : ""}
                   </option>
                 ))}
               </select>
