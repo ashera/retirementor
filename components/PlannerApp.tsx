@@ -1145,15 +1145,6 @@ export default function PlannerApp({
                 ↗ Run report
               </Link>
               <ShareControl key={activePlan.id} id={activePlan.id} initialToken={activePlan.share_token} onNotice={setNotice} />
-              {activePlan.data.whatIf && (
-                <Link
-                  href={`/what-if?edit=${activePlan.id}`}
-                  title={`Reopen ${activePlan.name}'s strategies in What-if`}
-                  className="rounded-lg border border-line bg-panel-2 px-3 py-1.5 text-sm font-medium text-slate-200 transition hover:border-accent/50 hover:text-white"
-                >
-                  ✎ What-if
-                </Link>
-              )}
               <Link
                 href="/compare"
                 className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-panel-2 px-3 py-1.5 text-sm font-medium text-slate-200 transition hover:border-accent/50 hover:text-white"
