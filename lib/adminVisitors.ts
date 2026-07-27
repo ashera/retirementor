@@ -86,7 +86,8 @@ export interface DailyVisitors {
   day: string; // YYYY-MM-DD
   looked: number; // active that day, hit NO milestone ("just looked around")
   engaged: number; // active that day, hit ≥1 milestone (super/budget/what-if/stress)
-  uniques: number; // looked + engaged (total distinct human visitors active)
+  bots: number; // active that day, flagged as a likely bot
+  uniques: number; // looked + engaged (total distinct HUMAN visitors active)
 }
 
 /** Unique (human) visitors ACTIVE each day over the last `days` days — distinct
@@ -94,33 +95,38 @@ export interface DailyVisitors {
  *  Each day's uniques are split into "engaged" (the visitor hit at least one funnel
  *  milestone) vs "looked around" (none), using the same engaged definition as
  *  getVisitorStats. Engagement is a per-visitor attribute, so a visitor who engages
- *  on any day counts as engaged on every day they were active. Bots are excluded. */
+ *  on any day counts as engaged on every day they were active. Likely bots are
+ *  counted separately (`bots`) so they can be shown as their own segment; `uniques`
+ *  stays human-only (looked + engaged). */
 export async function getDailyUniqueVisitors(days = 30): Promise<DailyVisitors[]> {
   // Bucket by AUSTRALIAN local days (Sydney, AEST/AEDT) — `created_at` is timestamptz,
   // so we convert to Sydney time before truncating to a date, and anchor "today" to
   // the Sydney date. The event scan is filtered a little wide; the join to the day
   // series restricts it to the exact window.
-  const r = await query<{ day: string; looked: number; engaged: number }>(
+  const r = await query<{ day: string; looked: number; engaged: number; bots: number }>(
     `with b as (select (now() at time zone 'Australia/Sydney')::date as today_au)
      select to_char(d, 'YYYY-MM-DD') as day,
             coalesce(c.looked, 0)::int as looked,
-            coalesce(c.engaged, 0)::int as engaged
+            coalesce(c.engaged, 0)::int as engaged,
+            coalesce(c.bots, 0)::int as bots
        from b,
             generate_series(b.today_au - ($1::int - 1), b.today_au, interval '1 day') d
        left join (
          select (e.created_at at time zone 'Australia/Sydney')::date as day,
                 count(distinct e.visitor_id) filter (
-                  where not (v.set_super_balance or v.set_budget_income
+                  where not coalesce(v.is_bot, false)
+                    and not (v.set_super_balance or v.set_budget_income
                              or v.visited_what_if or v.visited_stress_test)
                 ) as looked,
                 count(distinct e.visitor_id) filter (
-                  where v.set_super_balance or v.set_budget_income
-                        or v.visited_what_if or v.visited_stress_test
-                ) as engaged
+                  where not coalesce(v.is_bot, false)
+                    and (v.set_super_balance or v.set_budget_income
+                         or v.visited_what_if or v.visited_stress_test)
+                ) as engaged,
+                count(distinct e.visitor_id) filter (where coalesce(v.is_bot, false)) as bots
            from visitor_events e
            join visitors v on v.id = e.visitor_id
           where e.created_at >= now() - ($1::int + 1) * interval '1 day'
-            and not coalesce(v.is_bot, false)
           group by 1
        ) c on c.day = d::date
       order by d`,

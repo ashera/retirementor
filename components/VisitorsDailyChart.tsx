@@ -5,6 +5,7 @@ import type { DailyVisitors } from "@/lib/adminVisitors";
 
 const LOOKED = "#64748b"; // slate — "just looked around"
 const ENGAGED = "#34d399"; // emerald — hit a funnel milestone
+const BOTS = "#b45309"; // amber-700 — likely bots (filtered from the human counts)
 
 function DayTooltip({ active, payload }: { active?: boolean; payload?: { payload: DailyVisitors }[] }) {
   if (!active || !payload?.length) return null;
@@ -23,8 +24,14 @@ function DayTooltip({ active, payload }: { active?: boolean; payload?: { payload
         <span className="inline-block h-2 w-2 rounded-sm" style={{ background: LOOKED }} />
         {d.looked} looked around
       </div>
+      {d.bots > 0 && (
+        <div className="flex items-center gap-1.5 tabular-nums text-amber-500">
+          <span className="inline-block h-2 w-2 rounded-sm" style={{ background: BOTS }} />
+          {d.bots} bot{d.bots === 1 ? "" : "s"}
+        </div>
+      )}
       <div className="mt-1 border-t border-line pt-1 tabular-nums text-white">
-        {d.uniques} total{d.uniques ? ` · ${rate}% engaged` : ""}
+        {d.uniques} human{d.uniques === 1 ? "" : "s"}{d.uniques ? ` · ${rate}% engaged` : ""}
       </div>
     </div>
   );
@@ -45,14 +52,16 @@ function Swatch({ color, label }: { color: string; label: string }) {
 export default function VisitorsDailyChart({ data }: { data: DailyVisitors[] }) {
   const total = data.reduce((s, d) => s + d.uniques, 0);
   const engaged = data.reduce((s, d) => s + d.engaged, 0);
-  const peak = data.reduce((m, d) => Math.max(m, d.uniques), 0);
+  const bots = data.reduce((s, d) => s + d.bots, 0);
+  const peak = data.reduce((m, d) => Math.max(m, d.uniques + d.bots), 0);
   const rate = total ? Math.round((engaged / total) * 100) : 0;
   return (
     <div className="mb-6 rounded-2xl border border-line bg-panel p-4">
       <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-sm font-semibold text-white">Unique visitors per day</h2>
         <span className="text-xs text-muted">
-          last {data.length} days · peak {peak}/day · {rate}% engaged · excludes bots
+          last {data.length} days · peak {peak}/day · {rate}% engaged
+          {bots > 0 ? ` · ${bots} bot${bots === 1 ? "" : "s"}` : ""}
         </span>
       </div>
       <ResponsiveContainer width="100%" height={200}>
@@ -75,14 +84,16 @@ export default function VisitorsDailyChart({ data }: { data: DailyVisitors[] }) 
             axisLine={false}
           />
           <Tooltip cursor={{ fill: "#ffffff08" }} content={<DayTooltip />} />
-          {/* Stacked: looked-around on the bottom, engaged on top (rounded cap). */}
+          {/* Stacked bottom→top: looked-around, engaged, then bots (rounded cap). */}
           <Bar dataKey="looked" stackId="v" fill={LOOKED} maxBarSize={26} />
           <Bar dataKey="engaged" stackId="v" fill={ENGAGED} radius={[2, 2, 0, 0]} maxBarSize={26} />
+          <Bar dataKey="bots" stackId="v" fill={BOTS} fillOpacity={0.6} radius={[2, 2, 0, 0]} maxBarSize={26} />
         </BarChart>
       </ResponsiveContainer>
       <div className="mt-3 flex flex-wrap items-center gap-4 border-t border-line pt-3">
         <Swatch color={ENGAGED} label="Engaged (hit a milestone)" />
         <Swatch color={LOOKED} label="Just looked around" />
+        <Swatch color={BOTS} label="Likely bots" />
       </div>
     </div>
   );
