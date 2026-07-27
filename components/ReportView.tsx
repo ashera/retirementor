@@ -23,35 +23,9 @@ const money = (n: number) => fmtCurrency(Math.round(n));
 function BrandMark() {
   return (
     <div className="flex items-center gap-3">
-      <svg viewBox="0 0 64 64" className="h-12 w-auto" aria-hidden>
-        <defs>
-          <linearGradient id="rep-rw" x1="14" y1="46" x2="50" y2="16" gradientUnits="userSpaceOnUse">
-            <stop offset="0" stopColor="#0d9488" />
-            <stop offset="1" stopColor="#7c3aed" />
-          </linearGradient>
-        </defs>
-        {/* RetireWiz "W" — rising chart strokes, final upstroke tipped with an arrow */}
-        <path
-          d="M13 18 L21 45 L32 29 L43 45 L51 13"
-          fill="none"
-          stroke="url(#rep-rw)"
-          strokeWidth="6.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        <path
-          d="M44 15 L51 13 L52 20"
-          fill="none"
-          stroke="url(#rep-rw)"
-          strokeWidth="6.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        <path
-          d="M49 25 c.7 2.7 1.9 3.9 4.6 4.6 c-2.7 .7 -3.9 1.9 -4.6 4.6 c-.7 -2.7 -1.9 -3.9 -4.6 -4.6 c2.7 -.7 3.9 -1.9 4.6 -4.6 Z"
-          fill="#8b5cf6"
-        />
-      </svg>
+      {/* The actual RetireWiz mark (extracted from the logo artwork, transparent). */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/logo-mark.png" alt="" className="h-12 w-auto" aria-hidden />
       <div className="leading-none">
         <div className="text-3xl font-extrabold tracking-tight">
           <span className="text-teal-600">Retire</span>
