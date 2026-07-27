@@ -22,6 +22,7 @@ import Disclosures from "@/components/Disclosures";
 import LifestageModal from "@/components/LifestageModal";
 import GuidedIntro from "@/components/GuidedIntro";
 import GetStartedPanel from "@/components/GetStartedPanel";
+import NewScenarioModal from "@/components/NewScenarioModal";
 import {
   AgePensionExplainer,
   LikelihoodExplainer,
@@ -89,6 +90,14 @@ const BLANK_STARTER: RetirementPlan = {
   superMode: "individual",
   outsideSuper: 0,
   annualOutsideSavings: 0,
+};
+
+/** Whether a plan has actually been built (vs. a blank "start from scratch" shell,
+ *  whose personal figures are unset — NaN in memory, null after a JSON round-trip).
+ *  A blank scenario renders the Get-started build state, not a projection. */
+const planIsBuilt = (plan: RetirementPlan): boolean => {
+  const age = plan?.people?.[0]?.currentAge;
+  return typeof age === "number" && Number.isFinite(age) && age > 0;
 };
 
 function LegendDot({ color, label }: { color: string; label: string }) {
@@ -331,6 +340,7 @@ export default function PlannerApp({
   const [pending, startTransition] = useTransition();
   const [notice, setNotice] = useState<string | null>(null);
   const [nudgeDismissed, setNudgeDismissed] = useState(false);
+  const [newScenarioOpen, setNewScenarioOpen] = useState(false);
 
   useEffect(() => {
     // Public share-link view: load the shared scenario straight in and stop —
@@ -359,18 +369,27 @@ export default function PlannerApp({
         // Cloud scenario is at least as fresh (newer work from another device, a
         // first sign-in here, or no local copy) → adopt it and mirror to this device.
         const working = { ...DEFAULT_PLAN, ...active.data };
-        splitInto(working);
-        setBaseline(working);
-        setBaselineName(active.name);
+        // A blank "from scratch" scenario has no usable plan yet → keep base on a valid
+        // DEFAULT_PLAN (so the projection memos don't choke on unset figures) and show
+        // Get-started; the real plan replaces it when the user builds.
+        const built = planIsBuilt(working);
+        const workBase = built ? working : DEFAULT_PLAN;
+        splitInto(workBase);
+        setBaseline(workBase);
+        setBaselineName(built ? active.name : null);
         setActiveName(active.name);
         setSavedId(active.id);
         persistSavedId(active.id);
-        setConfigured(true);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(working));
-        localStorage.setItem(WORKING_TS_KEY, String(activeTs));
-        localStorage.setItem(BASELINE_KEY, JSON.stringify(working));
-        localStorage.setItem(BASELINE_NAME_KEY, active.name);
-        if (raw && localTs < activeTs) setNotice(`Loaded “${active.name}” from your account.`);
+        setConfigured(built);
+        if (built) {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(working));
+          localStorage.setItem(WORKING_TS_KEY, String(activeTs));
+          localStorage.setItem(BASELINE_KEY, JSON.stringify(working));
+          localStorage.setItem(BASELINE_NAME_KEY, active.name);
+          if (raw && localTs < activeTs) setNotice(`Loaded “${active.name}” from your account.`);
+        } else {
+          [STORAGE_KEY, WORKING_TS_KEY, BASELINE_KEY, BASELINE_NAME_KEY].forEach((k) => localStorage.removeItem(k));
+        }
       } else if (raw) {
         // Local copy is fresher (edits made since the last cloud write) → keep it.
         // The data belongs to whatever scenario last saved it (SAVED_ID_KEY), so the
@@ -378,17 +397,18 @@ export default function PlannerApp({
         // device. If the server pointer drifted, reconcile it so auto-save writes and
         // the active pointer target the same scenario.
         const working = { ...DEFAULT_PLAN, ...JSON.parse(raw) };
+        const built = planIsBuilt(working); // defensive — blank plans are never persisted here
         const rawBase = localStorage.getItem(BASELINE_KEY);
         const localId = localStorage.getItem(SAVED_ID_KEY);
-        splitInto(working);
-        setBaseline(rawBase ? { ...DEFAULT_PLAN, ...JSON.parse(rawBase) } : working);
+        splitInto(built ? working : DEFAULT_PLAN);
+        setBaseline(built ? (rawBase ? { ...DEFAULT_PLAN, ...JSON.parse(rawBase) } : working) : DEFAULT_PLAN);
         const nm = localId
           ? savedPlans.find((sp) => sp.id === localId)?.name ?? active?.name ?? null
           : null;
         setSavedId(localId);
         setActiveName(nm);
-        setBaselineName(localStorage.getItem(BASELINE_NAME_KEY) || nm);
-        setConfigured(true);
+        setBaselineName(built ? localStorage.getItem(BASELINE_NAME_KEY) || nm : null);
+        setConfigured(built);
         if (localId && active && active.id !== localId) void setActivePlan(localId);
       }
       if (localStorage.getItem(NUDGE_KEY)) setNudgeDismissed(true);
@@ -743,26 +763,44 @@ export default function PlannerApp({
     });
   };
 
-  // "New scenario" = branch: copy the current scenario into a fresh plan and make it
-  // active, so you can explore without touching the one you were on. No naming prompt
-  // — it's "Copy of {name}" (deduped), renameable inline afterwards.
-  const newScenario = () => {
-    const taken = savedPlans.map((p) => p.name);
-    const base = `Copy of ${activeName ?? "scenario"}`;
-    let name = base;
-    for (let i = 2; taken.includes(name); i++) name = `${base} ${i}`;
+  // "New scenario" opens a modal to choose a name and whether to start from a copy of
+  // the current scenario or from scratch. `createScenarioFrom` does the work:
+  //  - "copy"    → a fresh plan with the CURRENT plan's data, adopted for editing;
+  //  - "scratch" → a blank plan → drop to the Get-started build state to fill it in.
+  // Either way the new scenario becomes the active (auto-save) one.
+  const createScenarioFrom = (name: string, mode: "copy" | "scratch") => {
+    setNewScenarioOpen(false);
+    const data = mode === "copy" ? storable : BLANK_STARTER;
     startTransition(async () => {
-      const res = await createScenario(name, storable);
+      const res = await createScenario(name, data);
       if (res.error) {
         setNotice(res.error);
         return;
       }
       setSavedId(res.id ?? null);
       persistSavedId(res.id ?? null);
-      commit(storable, name); // re-baseline to the copy (same data, new name)
       setActiveName(name);
-      setNotice(`Created “${name}” — you’re now editing it.`);
-      track("Scenario branched");
+      if (mode === "copy") {
+        commit(storable, name); // re-baseline to the copy (same data, new name)
+        setConfigured(true);
+        setNotice(`Created “${name}” — you’re now editing it.`);
+      } else {
+        // Drop to Get-started. `base` stays a valid DEFAULT_PLAN so the projection
+        // memos don't choke on the blank scenario's unset figures; the DB row holds
+        // BLANK_STARTER, so a reload also resolves to Get-started (planIsBuilt=false).
+        // The user's first build auto-saves their real plan into this named scenario.
+        splitInto(DEFAULT_PLAN);
+        setBaseline(DEFAULT_PLAN);
+        setBaselineName(null);
+        setConfigured(false);
+        try {
+          [STORAGE_KEY, WORKING_TS_KEY, BASELINE_KEY, BASELINE_NAME_KEY].forEach((k) => localStorage.removeItem(k));
+        } catch {
+          /* ignore */
+        }
+        setNotice(`Created “${name}” — build it from scratch below.`);
+      }
+      track("Scenario created", { mode });
       router.refresh();
     });
   };
@@ -1123,9 +1161,9 @@ export default function PlannerApp({
             </label>
           )}
           <button
-            onClick={newScenario}
-            disabled={pending || !configured}
-            title="Copy this scenario into a new one and switch to it — so you can explore without touching this plan"
+            onClick={() => setNewScenarioOpen(true)}
+            disabled={pending}
+            title="Create a new scenario — from a copy of this one or from scratch"
             className="rounded-lg border border-accent/40 bg-accent/10 px-3 py-1.5 text-sm font-semibold text-accent transition hover:bg-accent/20 disabled:opacity-50"
           >
             ＋ New scenario
@@ -2113,6 +2151,17 @@ export default function PlannerApp({
             />
           );
         })()}
+
+      {newScenarioOpen && (
+        <NewScenarioModal
+          currentName={activeName}
+          existingNames={savedPlans.map((p) => p.name)}
+          pending={pending}
+          canCopy={configured}
+          onCreate={createScenarioFrom}
+          onClose={() => setNewScenarioOpen(false)}
+        />
+      )}
 
       {taxAge != null &&
         (() => {

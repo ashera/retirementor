@@ -149,15 +149,39 @@ try {
     (await db.query("select name from plans where id=$1", [twoId])).rows[0]?.name === "Renamed Two",
   );
 
-  // G — "New scenario" branches a copy and switches the active pointer to it.
+  // G — "New scenario" opens a modal; the "copy" mode branches from the current plan.
   const beforeBranch = (await plans()).length;
   await page.getByRole("button", { name: /New scenario/i }).click();
+  await page.waitForTimeout(500);
+  ok("New scenario opens a dialog", (await page.getByRole("dialog").count()) > 0);
+  // "Based on this scenario" is the default; name pre-fills "Copy of {name}".
+  await page.getByRole("button", { name: /Create scenario/i }).click();
   await page.waitForTimeout(1800);
   const afterBranch = await plans();
   const copy = afterBranch.find((p) => /^Copy of Renamed Two/.test(p.name));
-  ok("New scenario branches a copy (count +1)", afterBranch.length === beforeBranch + 1);
-  ok("branch is named 'Copy of {name}'", !!copy);
-  ok("branch becomes the active scenario", (await activePlanId()) === copy?.id);
+  ok("copy mode branches a copy (count +1)", afterBranch.length === beforeBranch + 1);
+  ok("copy is named 'Copy of {name}'", !!copy);
+  ok("copy becomes the active scenario", (await activePlanId()) === copy?.id);
+
+  // G2 — "Start from scratch" creates a blank named scenario and drops to Get-started.
+  await page.getByRole("button", { name: /New scenario/i }).click();
+  await page.waitForTimeout(500);
+  await page.getByRole("button", { name: /Start from scratch/i }).click();
+  const nameInput = page.getByRole("dialog").getByLabel("Scenario name");
+  await nameInput.fill("Fresh Build");
+  await page.getByRole("button", { name: /Create scenario/i }).click();
+  await page.waitForTimeout(1600);
+  const scratch = (await plans()).find((p) => p.name === "Fresh Build");
+  ok("scratch mode creates the named scenario", !!scratch);
+  ok("scratch scenario is the active one", (await activePlanId()) === scratch?.id);
+  const bodyAfterScratch = await txt();
+  ok(
+    "scratch drops to the Get-started build state",
+    /get started|build|enter (your )?details|guided/i.test(bodyAfterScratch),
+  );
+  // Switch back to the copy so the delete-fallback test below has a built active plan.
+  await page.getByLabel("Switch scenario").selectOption(twoId);
+  await page.waitForTimeout(1500);
 
   // H — the switcher flips the active scenario; deleting the active one falls back.
   await page.getByLabel("Switch scenario").selectOption(twoId);

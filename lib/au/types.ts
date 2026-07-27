@@ -319,6 +319,10 @@ export function oldestCurrentAge(plan: RetirementPlan): number {
  *  For a single, or a couple of the same age, this equals the old LE − age. */
 export function householdHorizon(plan: RetirementPlan): number {
   const youngest = Math.min(...plan.people.map((p) => p.currentAge));
+  // A not-yet-built ("start from scratch") plan has unset figures (NaN in memory, null
+  // after a JSON round-trip) → guard so the horizon is a valid length (0), never NaN,
+  // which would make `new Array(horizon + 1)` throw "Invalid array length" downstream.
+  if (!Number.isFinite(youngest) || !Number.isFinite(plan.lifeExpectancy)) return 0;
   return Math.max(0, Math.round(plan.lifeExpectancy - youngest));
 }
 
