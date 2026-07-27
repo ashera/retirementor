@@ -23,22 +23,33 @@ const money = (n: number) => fmtCurrency(Math.round(n));
 function BrandMark() {
   return (
     <div className="flex items-center gap-3">
-      <svg viewBox="0 0 64 48" className="h-14 w-auto" aria-hidden>
+      <svg viewBox="0 0 64 64" className="h-12 w-auto" aria-hidden>
         <defs>
-          <linearGradient id="rep-bridge" x1="0" y1="1" x2="1" y2="0">
+          <linearGradient id="rep-rw" x1="14" y1="46" x2="50" y2="16" gradientUnits="userSpaceOnUse">
             <stop offset="0" stopColor="#0d9488" />
-            <stop offset="1" stopColor="#22c55e" />
+            <stop offset="1" stopColor="#7c3aed" />
           </linearGradient>
         </defs>
-        <path d="M5 41 A27 27 0 0 1 59 41 L46 41 A14 14 0 0 0 18 41 Z" fill="url(#rep-bridge)" />
+        {/* RetireWiz "W" — rising chart strokes, final upstroke tipped with an arrow */}
         <path
-          d="M11.5 41 A20.5 20.5 0 0 1 52.5 41"
+          d="M13 18 L21 45 L32 29 L43 45 L51 13"
           fill="none"
-          stroke="#ffffff"
-          strokeWidth="2.2"
+          stroke="url(#rep-rw)"
+          strokeWidth="6.5"
           strokeLinecap="round"
-          strokeDasharray="2.4 5"
-          opacity="0.85"
+          strokeLinejoin="round"
+        />
+        <path
+          d="M44 15 L51 13 L52 20"
+          fill="none"
+          stroke="url(#rep-rw)"
+          strokeWidth="6.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <path
+          d="M49 25 c.7 2.7 1.9 3.9 4.6 4.6 c-2.7 .7 -3.9 1.9 -4.6 4.6 c-.7 -2.7 -1.9 -3.9 -4.6 -4.6 c2.7 -.7 3.9 -1.9 4.6 -4.6 Z"
+          fill="#8b5cf6"
         />
       </svg>
       <div className="leading-none">
