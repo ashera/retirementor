@@ -33,6 +33,8 @@ import { ageGapInfo } from "@/components/ageAxis";
 import IncomeChart from "@/components/IncomeChart";
 import YearDetailModal from "@/components/YearDetailModal";
 import IncomeYearModal from "@/components/IncomeYearModal";
+import TaxYearModal from "@/components/TaxYearModal";
+import TaxChart from "@/components/TaxChart";
 import AssumptionsModal from "@/components/AssumptionsModal";
 import StrategyAssumptionsModal from "@/components/StrategyAssumptionsModal";
 import GuardrailsTimelineModal from "@/components/GuardrailsTimelineModal";
@@ -143,7 +145,7 @@ export default function WhatIfView({
   const [savedId, setSavedId] = useState<string | null>(null); // plans-row id the active scenario is (auto-save target)
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [chartView, setChartView] = useState<"balance" | "networth" | "income">("balance");
+  const [chartView, setChartView] = useState<"balance" | "networth" | "income" | "tax">("balance");
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
   const [assumptionsOpen, setAssumptionsOpen] = useState(false);
   const [assumptionsCard, setAssumptionsCard] = useState<StrategyCard | null>(null);
@@ -792,7 +794,13 @@ export default function WhatIfView({
       <div className="rounded-2xl border border-line bg-panel p-5">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <h2 className="font-semibold text-white">
-            {chartView === "balance" ? "Balance over time" : chartView === "networth" ? "Net worth (incl. your home)" : "Income sources"}{" "}
+            {chartView === "balance"
+              ? "Balance over time"
+              : chartView === "networth"
+                ? "Net worth (incl. your home)"
+                : chartView === "income"
+                  ? "Income sources"
+                  : "Tax each year"}{" "}
             <span className="text-sm font-normal text-muted">(today&apos;s dollars)</span>
           </h2>
           <div className="flex gap-1 rounded-lg border border-line bg-panel-2 p-1 text-xs">
@@ -800,6 +808,7 @@ export default function WhatIfView({
               ["balance", "Balance"],
               ["networth", "Net worth"],
               ["income", "Income"],
+              ["tax", "Tax"],
             ] as const).map(([v, label]) => (
               <button
                 key={v}
@@ -829,6 +838,37 @@ export default function WhatIfView({
               {changed ? "Your income mix with the selected strategies. " : "Where your income comes from each year. "}
               Dotted lines mark where super&apos;s minimum drawdown rate steps up (5% → 6% → 7%…), which can shift the
               super-vs-savings mix. Click a year to see why it&apos;s that amount.
+            </p>
+          </>
+        ) : chartView === "tax" ? (
+          <>
+            <TaxChart
+              result={compRes}
+              height={300}
+              animate={false}
+              onSelectYear={setSelectedYear}
+              ages={ageGapInfo(composed)}
+            />
+            <div className="mt-3 flex flex-wrap gap-4">
+              {[
+                { c: "#e2e8f0", l: "Total tax" },
+                { c: "#fbbf24", l: "Income tax" },
+                { c: "#f472b6", l: "Medicare" },
+                { c: "#34d399", l: "Super contributions" },
+                { c: "#a78bfa", l: "Super earnings" },
+                { c: "#38bdf8", l: "Capital gains" },
+              ].map((it) => (
+                <span key={it.l} className="flex items-center gap-1.5 text-xs text-muted">
+                  <span className="h-2.5 w-2.5 rounded-full" style={{ background: it.c }} />
+                  {it.l}
+                </span>
+              ))}
+            </div>
+            <p className="mt-2 text-xs text-muted">
+              {changed ? "The tax you’d pay each year with the selected strategies, by type. " : "Every tax the projection charges, by type. "}
+              Super pension drawdowns and the Age Pension are tax-free, so tax usually falls sharply at retirement.
+              A strategy that cuts your tax (e.g. salary sacrifice, keeping super in accumulation) shows up here. Click a
+              year for the full breakdown.
             </p>
           </>
         ) : (
@@ -1117,6 +1157,8 @@ export default function WhatIfView({
           };
           return chartView === "income" ? (
             <IncomeYearModal row={row} plan={composed} config={config} {...nav} />
+          ) : chartView === "tax" ? (
+            <TaxYearModal row={row} plan={composed} {...nav} />
           ) : (
             <YearDetailModal
               row={row}
