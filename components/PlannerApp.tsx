@@ -785,10 +785,12 @@ export default function PlannerApp({
         setConfigured(true);
         setNotice(`Created “${name}” — you’re now editing it.`);
       } else {
-        // Drop to Get-started. `base` stays a valid DEFAULT_PLAN so the projection
-        // memos don't choke on the blank scenario's unset figures; the DB row holds
-        // BLANK_STARTER, so a reload also resolves to Get-started (planIsBuilt=false).
-        // The user's first build auto-saves their real plan into this named scenario.
+        // Skip the guided walkthrough and Get-started — jump straight into the wizard
+        // with blank fields so they enter their details right away. `base` stays a
+        // valid DEFAULT_PLAN so the projection memos don't choke on the blank scenario's
+        // unset figures; the DB row holds BLANK_STARTER, so an abandon-then-reload
+        // resolves to Get-started (planIsBuilt=false). Completing the wizard flips
+        // configured→true and auto-saves the real plan into this named scenario.
         splitInto(DEFAULT_PLAN);
         setBaseline(DEFAULT_PLAN);
         setBaselineName(null);
@@ -798,7 +800,10 @@ export default function PlannerApp({
         } catch {
           /* ignore */
         }
-        setNotice(`Created “${name}” — build it from scratch below.`);
+        setShowGuide(false);
+        setWizardSeed(null); // null → the wizard opens on BLANK_STARTER (empty fields)
+        setWizardOpen(true);
+        setNotice(`Created “${name}” — enter your details.`);
       }
       track("Scenario created", { mode });
       router.refresh();

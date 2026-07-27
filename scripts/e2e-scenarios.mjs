@@ -163,9 +163,9 @@ try {
   ok("copy is named 'Copy of {name}'", !!copy);
   ok("copy becomes the active scenario", (await activePlanId()) === copy?.id);
 
-  // G2 — "Start from scratch" creates a blank named scenario and drops to Get-started.
+  // G2 — "Start from scratch" creates a blank named scenario and jumps into the wizard.
   await page.getByRole("button", { name: /New scenario/i }).click();
-  await page.waitForTimeout(500);
+  await page.getByRole("dialog").getByRole("button", { name: /Start from scratch/i }).waitFor();
   await page.getByRole("button", { name: /Start from scratch/i }).click();
   const nameInput = page.getByRole("dialog").getByLabel("Scenario name");
   await nameInput.fill("Fresh Build");
@@ -174,12 +174,11 @@ try {
   const scratch = (await plans()).find((p) => p.name === "Fresh Build");
   ok("scratch mode creates the named scenario", !!scratch);
   ok("scratch scenario is the active one", (await activePlanId()) === scratch?.id);
-  const bodyAfterScratch = await txt();
-  ok(
-    "scratch drops to the Get-started build state",
-    /get started|build|enter (your )?details|guided/i.test(bodyAfterScratch),
-  );
-  // Switch back to the copy so the delete-fallback test below has a built active plan.
+  ok("scratch jumps straight into the wizard (no guide/Get-started)", (await txt()).includes("Your plan overview"));
+  // Reload to a clean state (wizard closed), then switch back to the copy so the
+  // delete-fallback test below has a built active plan.
+  await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
+  await page.waitForTimeout(1500);
   await page.getByLabel("Switch scenario").selectOption(twoId);
   await page.waitForTimeout(1500);
 
