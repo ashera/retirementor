@@ -285,6 +285,22 @@ create index if not exists plans_user_idx on plans(user_id);
 create index if not exists demo_scenarios_pub_idx on demo_scenarios(published, sort_order);
 create index if not exists ref_audit_version_idx on ref_data_audit(version_id, changed_at desc);
 create index if not exists test_results_run_idx on test_results(run_id, area);
+
+-- Release notes / changelog: one row per prod release, authored in the backoffice.
+-- The notes column is a JSON array of plain-language bullet strings (business terms).
+create table if not exists releases (
+  id uuid primary key default gen_random_uuid(),
+  version text not null,
+  build integer,
+  commit_hash text,
+  released_at date not null default current_date,
+  title text,
+  notes jsonb not null default '[]'::jsonb,
+  published boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists releases_pub_idx on releases(published, released_at desc, build desc);
 `;
 
 /** Apply the schema. Safe to run repeatedly. */

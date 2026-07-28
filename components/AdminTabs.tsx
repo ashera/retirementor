@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-type Tab = "review" | "parameters" | "sources" | "returns" | "tests" | "scenarios" | "moneysmart" | "users" | "media" | "feedback" | "advisers" | "marketing" | "reddit";
+type Tab = "review" | "parameters" | "sources" | "returns" | "tests" | "scenarios" | "moneysmart" | "users" | "media" | "feedback" | "advisers" | "marketing" | "reddit" | "releases";
 
 export default function AdminTabs({
   active,
@@ -50,6 +50,7 @@ export default function AdminTabs({
         {tab("/admin/scenarios", "scenarios", "Persona Tests", 0)}
         {tab("/admin/moneysmart", "moneysmart", "Moneysmart", 0)}
         {tab("/admin/users", "users", "Users", 0)}
+        {tab("/admin/releases", "releases", "Releases", 0)}
       </div>
 
       {/* Marketing section */}
