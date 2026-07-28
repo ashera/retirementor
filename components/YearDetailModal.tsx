@@ -93,6 +93,21 @@ export default function YearDetailModal({
   // The home/property change is whatever isn't explained by the savings drivers.
   const nwClosing = nextRow ? rowNetWorth(nextRow) : nwTotal;
   const homePropChange = nwClosing - nwTotal - flow.net;
+  // Why any super sits in the taxed accumulation pool this year — it isn't always the
+  // Transfer Balance Cap. For a staggered couple it's usually a partner who's still
+  // working (their super only converts to pension when they retire); it can also be a
+  // deliberate keep-in-accumulation strategy, or bridge super preserved before access.
+  // Only the genuine leftover (retired, past preservation, nothing else explains it)
+  // is TBC excess.
+  const isCouple = plan.people.length > 1;
+  const stillWorking = (b.salaryIncome ?? 0) > 1;
+  const accumReason = stillWorking
+    ? "a partner still working; it converts to pension when they retire"
+    : plan.keepSuperInAccumulation
+      ? "you've chosen to keep it there"
+      : row.phase === "bridge"
+        ? "preserved until you can access super"
+        : "above the transfer balance cap";
   // Above the Transfer Balance Cap, show how the opening super splits between the
   // tax-free pension pool and the taxed accumulation pool.
   const superLabel =
@@ -293,11 +308,21 @@ export default function YearDetailModal({
 
             {b.accumSuper > 1 && (
               <p className="mt-2 border-t border-line pt-2 text-[11px] leading-snug text-muted">
-                <span className="font-semibold text-emerald-300">{fmtCurrency(Math.round(b.pensionSuper))}</span> of
-                your super is in the tax-free <span className="text-slate-300">pension pool</span>; the{" "}
-                <span className="font-semibold text-amber-300">{fmtCurrency(Math.round(b.accumSuper))}</span> above
-                the transfer balance cap stays in <span className="text-slate-300">accumulation</span>, its earnings
-                taxed 15%.
+                {b.pensionSuper > 1 ? (
+                  <>
+                    <span className="font-semibold text-emerald-300">{fmtCurrency(Math.round(b.pensionSuper))}</span> of
+                    your super is in the tax-free <span className="text-slate-300">pension pool</span>; the{" "}
+                    <span className="font-semibold text-amber-300">{fmtCurrency(Math.round(b.accumSuper))}</span> in{" "}
+                    <span className="text-slate-300">accumulation</span> ({accumReason}) has its earnings taxed 15%.
+                  </>
+                ) : (
+                  <>
+                    Your <span className="font-semibold text-amber-300">{fmtCurrency(Math.round(b.accumSuper))}</span> of
+                    super is in <span className="text-slate-300">accumulation</span>, its earnings taxed 15% — it moves to
+                    the tax-free <span className="text-slate-300">pension pool</span> when you retire
+                    {isCouple ? " (each of you, as you retire)" : ""}.
+                  </>
+                )}
               </p>
             )}
 
