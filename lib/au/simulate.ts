@@ -307,7 +307,7 @@ export function simulate(
     // keeps working carries the same real wage growth their contributions had
     // before the boundary. Returns the new balance and ledger deltas.
     const superHalf = Math.pow(1 + superAccumReturn, 0.5);
-    const contribute = (p: Person, opening: number, scale: number, ttrEligible: boolean) => {
+    const contribute = (p: Person, opening: number, scale: number, ttrEligible: boolean, senior: boolean) => {
       const salary = p.salary * scale;
       const cap = config.concessionalCap * scale;
       const nccCap = config.nonConcessionalCap * scale;
@@ -315,14 +315,18 @@ export function simulate(
       const concessional = Math.min(salary * config.sgRate + p.voluntaryConcessional * scale, cap);
       const sacrificed = Math.max(0, concessional - salary * config.sgRate);
       const taxable = Math.max(0, salary - sacrificed);
+      // Personal income tax on the salary: a still-working partner who has reached Age
+      // Pension age (a staggered gap) gets SAPTO, so use the senior scale — matching
+      // taxAtAge in the retirement branch (the old flat resident scale over-taxed them).
+      const netTax = senior ? (x: number) => seniorIncomeTax(x, plan.household) : residentIncomeTax;
       // Take-home is real cash the household spends/banks, so it must include the 2%
-      // Medicare levy (unlike residentIncomeTax, which omits it for the CGT use).
-      const takeHome = taxable - residentIncomeTax(taxable) - medicareLevy(taxable);
+      // Medicare levy (unlike the income-tax fns, which omit it for the CGT use).
+      const takeHome = taxable - netTax(taxable) - medicareLevy(taxable, senior);
       let ttrBenefit = 0;
       if (ttrEligible && plan.ttr && plan.ttr.extraSacrifice > 0) {
         const ttrSacrificed = Math.min(plan.ttr.extraSacrifice * scale, Math.max(0, cap - concessional));
         if (ttrSacrificed > 0) {
-          const taxSaved = residentIncomeTax(taxable) - residentIncomeTax(Math.max(0, taxable - ttrSacrificed));
+          const taxSaved = netTax(taxable) - netTax(Math.max(0, taxable - ttrSacrificed));
           ttrBenefit = taxSaved - ttrSacrificed * config.contributionsTax;
         }
       }
@@ -354,7 +358,7 @@ export function simulate(
         superGrowth: newBalance - opening - net,
         takeHome,
         taxable, // taxable salary (after sacrifice) — the base a rental loss/gain stacks on
-        salaryIncomeTax: residentIncomeTax(taxable), // personal income tax on the salary (after LITO), surfaced for the tax analysis
+        salaryIncomeTax: netTax(taxable), // personal income tax on the salary (after LITO/SAPTO), surfaced for the tax analysis
         medicareLevyPaid: medicareLevy(taxable),
         ttrBenefit,
       };
@@ -468,7 +472,7 @@ export function simulate(
       plan.people.forEach((p, i) => {
         const brk = onBreak(i);
         const person = brk ? { ...p, salary: 0, voluntaryConcessional: 0 } : p;
-        const r = contribute(person, accum[i], 1, i === 0 && ages[i] >= preservationAge && !brk);
+        const r = contribute(person, accum[i], 1, i === 0 && ages[i] >= preservationAge && !brk, ages[i] >= pensionAge);
         accum[i] = r.newBalance;
         contribGross += r.contribGross;
         contribTax += r.contribTax;
@@ -751,7 +755,7 @@ export function simulate(
       const brk = onBreak(i);
       if (brk) workOnBreak = true;
       const person = brk ? { ...p, salary: 0, voluntaryConcessional: 0 } : p;
-      const r = contribute(person, accum[i], gapScale, i === 0 && ages[i] >= preservationAge && !brk);
+      const r = contribute(person, accum[i], gapScale, i === 0 && ages[i] >= preservationAge && !brk, ages[i] >= pensionAge);
       accum[i] = r.newBalance;
       workContribGross += r.contribGross;
       workContribTax += r.contribTax;

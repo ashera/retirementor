@@ -554,3 +554,16 @@ describe("Engine audit — gap-year pension modal reflects the halved payment (#
     expect(row.agePension).toBeCloseTo(Math.min(b.assetsTestAnnual, b.incomeTestAnnual), 0);
   });
 });
+
+describe("Engine audit — SAPTO for a 67+ still-working partner in the gap (#9)", () => {
+  it("taxes the gap partner's salary on the senior scale, not the flat resident one", () => {
+    const plan = base({
+      household: "couple", superMode: "individual", retirementAge: 60, outsideSuper: 200_000, targetSpending: 40_000,
+      people: [P({ currentAge: 60, superBalance: 300_000, retirementAge: 60 }), P({ currentAge: 66, superBalance: 300_000, salary: 40_000, retirementAge: 70 })],
+    });
+    const row = simulate(plan, cfg).rows.find((r) => r.age === 68)!; // partner 1 (the oldest) is 68 and still working
+    const th = row.breakdown.takeHome;
+    expect(th).toBeCloseTo(40_000 - seniorIncomeTax(40_000, "couple"), 0); // SAPTO applied, no levy under senior threshold
+    expect(th).toBeGreaterThan(40_000 - residentIncomeTax(40_000) - medicareLevy(40_000)); // more than the resident scale
+  });
+});
