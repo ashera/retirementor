@@ -752,6 +752,12 @@ export function buildStrategyCatalog(
   // as leveraged, liquid, deductible shares OUTSIDE super instead of locked inside it.
   if (working && plan.people[0]?.salary > 0 && plan.mortgage && plan.mortgage.balance > 0) {
     const defaultRate = Math.round(plan.mortgage.interestRate ?? 6);
+    // Recycling needs a salary (to deduct the interest against + service the loan), so
+    // it runs only while working and stops at retirement (`untilAge` = your retirement).
+    // For a staggered couple it carries on through the gap while EITHER partner earns.
+    const drStopAge = plan.retirementAge;
+    const drPartnerRetire = isCouple ? plan.people[1]?.retirementAge ?? plan.retirementAge : null;
+    const drStaggered = drPartnerRetire != null && drPartnerRetire !== drStopAge;
     cards.push({
       id: "debt-recycle",
       group: "mortgage",
@@ -767,7 +773,16 @@ export function buildStrategyCatalog(
         `tax-deductible investment loan to buy shares OUTSIDE super. The interest (${v.loanRatePct}% p.a.) is deducted ` +
         `against your salary and the refund reinvested. Unlike extra super, the shares are accessible before 60 — but ` +
         `you're geared: it builds MORE wealth when returns beat the after-tax loan cost and LESS when they don't, so a ` +
-        `bad market run bites harder (see the likelihood and stress-test views). The loan is repaid at retirement.`,
+        `bad market run bites harder (see the likelihood and stress-test views). ` +
+        `Recycling needs a salary — to deduct the interest against and to service the loan — so it only runs while ` +
+        `you're working and stops at retirement (age ${drStopAge}); the investment loan is then repaid from your ` +
+        `savings, and nothing geared is carried into retirement. ` +
+        (isCouple
+          ? drStaggered
+            ? `As a couple, your partner retires at ${drPartnerRetire} but recycling keeps going right through the gap ` +
+              `while either of you still earns — deducting against whoever's working — and unwinds when you retire at ${drStopAge}.`
+            : `As a couple it runs while either of you is still earning and unwinds when you retire at ${drStopAge}.`
+          : ``),
       apply: (p, v) => ({
         ...p,
         debtRecycle: { perYear: v.perYear, loanRatePct: v.loanRatePct, untilAge: p.retirementAge },
