@@ -10,6 +10,7 @@ import {
   type RetirementPlan,
 } from "../../lib/au/types";
 import * as ref from "../../lib/au/scenarios/reference";
+import { outstandingBalance } from "../../lib/au/mortgage";
 
 // ── Stress matrix ────────────────────────────────────────────────────────────
 // A cartesian sweep across every permutation the app supports. For EACH plan we
@@ -252,8 +253,14 @@ describe(`Stress matrix — ${PLANS.length} plans, universal invariants`, () => 
       for (const row of r.rows) {
         if (row.phase === "accumulation") continue;
         const t = row.age - Math.max(...plan.people.map((x) => x.currentAge));
-        const active = mtg.type === "interest_only" || (mtg.payoffAge != null && row.age < mtg.payoffAge);
-        const exp = active ? nominal / Math.pow(1 + plan.inflation / 100, t) : 0;
+        // Mirror the engine: a P&I loan is active while its amortised balance is still
+        // owed, and the final repayment is capped at what actually clears it.
+        const active = mtg.type === "interest_only" || outstandingBalance(mtg, t) > 0.5;
+        const nominalOwed =
+          mtg.type === "principal_interest"
+            ? Math.min(nominal, outstandingBalance(mtg, t) * (1 + mtg.interestRate / 100))
+            : nominal;
+        const exp = active ? nominalOwed / Math.pow(1 + plan.inflation / 100, t) : 0;
         if (!near(row.breakdown.mortgageCost, exp, 1)) {
           fails.push(`${name} @${row.age}: mortgageCost ${row.breakdown.mortgageCost.toFixed(0)} vs ${exp.toFixed(0)}`);
           break;

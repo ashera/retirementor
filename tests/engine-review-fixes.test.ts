@@ -51,7 +51,7 @@ describe("Review fix #3 — downsizing after mortgage payoff releases full equit
     const home = { value: 900_000, growthReal: 0, downsize: { atAge: 70, newValue: 500_000, toSuper: 0 } };
     const withLoan = base({
       people: [P({ currentAge: 60, superBalance: 400_000 })], retirementAge: 65, home,
-      mortgage: { type: "principal_interest", balance: 200_000, interestRate: 5, annualRepayment: 24_000, payoffAge: 65, strategy: "carry" },
+      mortgage: { type: "principal_interest", balance: 200_000, interestRate: 5, annualRepayment: 50_000, payoffAge: 65, strategy: "carry" },
     });
     const noLoan = base({ people: [P({ currentAge: 60, superBalance: 400_000 })], retirementAge: 65, home });
     const relWith = rowAt(withLoan, 70).breakdown.homeProceeds;
@@ -504,5 +504,25 @@ describe("Engine audit — Medicare levy on all ordinary income, senior-aware (#
     const p = base({ people: [P({ currentAge: 67, superBalance: 200_000 })], retirementAge: 67, outsideSuper: 300_000, targetSpending: 30_000, investmentReturn: 5 });
     const b = simulate(p, cfg).rows.find((r) => r.age === 70)!.breakdown;
     expect(b.medicare ?? 0).toBe(0); // dividend income sits under the $43,020 senior threshold
+  });
+});
+
+describe("Engine audit — mortgage amortisation is the source of truth (#5, #10)", () => {
+  it("keeps charging a P&I loan the repayment can't clear by a too-early stored payoff age", () => {
+    // $14k/yr barely amortises $200k @6% (clears ~age 100); a stored payoffAge of 70
+    // must NOT forgive the ~$180k still owed.
+    const p = base({
+      people: [P({ currentAge: 60, superBalance: 900_000 })], retirementAge: 60, targetSpending: 40_000,
+      mortgage: { type: "principal_interest", balance: 200_000, interestRate: 6, annualRepayment: 14_000, payoffAge: 70, strategy: "carry" },
+    });
+    const cost70 = simulate(p, cfg).rows.find((r) => r.age === 70)!.breakdown.mortgageCost;
+    expect(cost70).toBeGreaterThan(10_000); // still repaying at 70, not forgiven at the stored age
+  });
+  it("runs a negative-amortising loan (repayment < interest) for life, not forgiven", () => {
+    const p = base({
+      people: [P({ currentAge: 60, superBalance: 1_100_000 })], retirementAge: 60, targetSpending: 40_000,
+      mortgage: { type: "principal_interest", balance: 200_000, interestRate: 6, annualRepayment: 10_000, payoffAge: null, strategy: "carry" },
+    });
+    expect(simulate(p, cfg).rows.find((r) => r.age === 85)!.breakdown.mortgageCost).toBeGreaterThan(9_000);
   });
 });

@@ -27,7 +27,7 @@ const piLoan: MortgageDetail = {
   balance: 150_000,
   interestRate: 6,
   annualRepayment: 18_000,
-  payoffAge: 70,
+  payoffAge: 72, // $18k/yr amortises $150k @6% by ~72 (suggestPayoffAge), not the old 70
   strategy: "carry",
 };
 
@@ -49,7 +49,8 @@ describe("Mortgage in retirement", () => {
     expect(spendAt(r, 60)).toBe(68_000); // 50k + 18k, no deflation in year 0
     expect(spendAt(r, 69)).toBeGreaterThan(50_000); // still paying...
     expect(spendAt(r, 69)).toBeLessThan(spendAt(r, 60)); // ...but eroded in real terms
-    expect(spendAt(r, 70)).toBe(50_000); // paid off — back to the steady-state budget
+    expect(spendAt(r, 71)).toBeGreaterThan(50_000); // last (partial) repayment year — loan clears ~72
+    expect(spendAt(r, 72)).toBe(50_000); // paid off — back to the steady-state budget
   });
 
   it("charges interest for life on an interest-only loan (principal never clears)", () => {

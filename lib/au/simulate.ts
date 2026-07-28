@@ -398,7 +398,7 @@ export function simulate(
     // original balance would over-state the debt and destroy real equity.
     const loanBalReal = mortgage ? outstandingBalance(mortgage, t) / Math.pow(1 + plan.inflation / 100, t) : 0;
     const loanBal =
-      mortgage && !mortgageCleared && mortgageActiveAtAge(mortgage, oldest) ? loanBalReal : 0;
+      mortgage && !mortgageCleared && mortgageActiveAtAge(mortgage, oldest, t) ? loanBalReal : 0;
     let homeProceedsThisYear = 0;
     let homeToSuperThisYear = 0;
     if (downsize && !downsized && oldest >= downsize.atAge) {
@@ -433,7 +433,7 @@ export function simulate(
     // which discharges the loan from the sale proceeds (mortgageCleared is already
     // set at the top of this loop when a downsize/sale happens).
     const outstandingLoan =
-      mortgage && !mortgageCleared && isHomeowner && mortgageActiveAtAge(mortgage, oldest) ? loanBalReal : 0;
+      mortgage && !mortgageCleared && isHomeowner && mortgageActiveAtAge(mortgage, oldest, t) ? loanBalReal : 0;
     const homeEquityThisYear = Math.max(0, homeValueThisYear - outstandingLoan);
 
     // Balances at the START of this year (on the birthday) — this is what each
@@ -597,7 +597,7 @@ export function simulate(
         anyoneWorking &&
         mortgage &&
         !mortgageCleared &&
-        mortgageActiveAtAge(mortgage, oldest) &&
+        mortgageActiveAtAge(mortgage, oldest, t) &&
         oldest < drCfg.untilAge &&
         drCfg.perYear > 0
       ) {
@@ -696,7 +696,7 @@ export function simulate(
       drCfg.perYear > 0 &&
       !!mortgage &&
       !mortgageCleared &&
-      mortgageActiveAtAge(mortgage, oldest) &&
+      mortgageActiveAtAge(mortgage, oldest, t) &&
       oldest < drCfg.untilAge &&
       plan.people.some((_, i) => t < retireOffsets[i] && !onBreak(i));
     // Unwind the geared sleeve once recycling has finished — repay the investment loan
@@ -875,8 +875,16 @@ export function simulate(
     // fixed in nominal dollars, so in this today's-dollars model it erodes by
     // inflation each year and (for P&I) stops at payoff.
     let mortgageCost = 0;
-    if (mortgage && !mortgageCleared && isHomeowner && mortgageActiveAtAge(mortgage, oldest)) {
-      mortgageCost = mortgageAnnualCost(mortgage) / Math.pow(1 + plan.inflation / 100, t);
+    if (mortgage && !mortgageCleared && isHomeowner && mortgageActiveAtAge(mortgage, oldest, t)) {
+      // Cap a P&I loan's final-year repayment at what actually clears it (balance +
+      // one year's interest), so the household never pays more than it owes — the
+      // stored payoff age would otherwise charge a full repayment in the last year.
+      const nominalRepay = mortgageAnnualCost(mortgage);
+      const owedNominal =
+        mortgage.type === "principal_interest"
+          ? Math.min(nominalRepay, outstandingBalance(mortgage, t) * (1 + mortgage.interestRate / 100))
+          : nominalRepay;
+      mortgageCost = owedNominal / Math.pow(1 + plan.inflation / 100, t);
     }
     // Rent once sold up (today's-dollars flat, like living costs), itemised
     // separately so the ledger can show it as its own line.

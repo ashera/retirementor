@@ -39,7 +39,7 @@ function defaultMortgage(oldestAtRetire: number): MortgageDetail {
     balance,
     interestRate: 6,
     annualRepayment: repayment,
-    payoffAge: suggestPayoffAge(balance, 6, repayment, oldestAtRetire) ?? oldestAtRetire + 10,
+    payoffAge: suggestPayoffAge(balance, 6, repayment, oldestAtRetire), // null when the repayment can't amortise it → runs "for life", not forgiven at a fake age
     strategy: "carry",
   };
 }

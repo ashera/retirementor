@@ -17,10 +17,16 @@ export function mortgageAnnualCost(m: MortgageDetail): number {
 /**
  * Whether a P&I loan is still being repaid at a given age. Interest-only loans
  * run indefinitely (the principal never amortises), so they're always "active"
- * until cleared some other way.
+ * until cleared some other way. For a P&I loan, when the caller knows how many
+ * years have elapsed we drive "active" off the ACTUAL amortised balance rather
+ * than the stored payoff age — so repayments stop precisely when the loan clears
+ * (no rounding divergence, no forgiven remainder) and a loan whose repayment never
+ * covers the interest keeps running for life instead of being forgiven at a fake
+ * payoff age. Without the elapsed years we fall back to the stored payoff age.
  */
-export function mortgageActiveAtAge(m: MortgageDetail, oldestAge: number): boolean {
+export function mortgageActiveAtAge(m: MortgageDetail, oldestAge: number, yearsElapsed?: number): boolean {
   if (m.type === "interest_only") return true;
+  if (yearsElapsed != null) return outstandingBalance(m, yearsElapsed) > 0.5;
   return m.payoffAge == null || oldestAge < m.payoffAge;
 }
 
