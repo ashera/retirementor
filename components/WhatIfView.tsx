@@ -1279,6 +1279,12 @@ function ImpactBreakdown({ delta, incomeDelta, life }: { delta: Marginal; income
           <span className={`shrink-0 font-semibold tabular-nums ${r.v > 0 ? "text-accent" : "text-amber-400"}`}>{"str" in r ? r.str : fmtDelta(r.v)}</span>
         </div>
       ))}
+      {incomeStr && incomeDelta! > 0 && (
+        <p className="mt-1.5 border-t border-line pt-1.5 text-[10px] leading-snug text-muted/80">
+          “Income you could afford” is <span className="text-slate-300">headroom, not automatic income</span> — until you lift
+          your spending goal it just builds up as extra balance. Raise it with “Adjust discretionary spending” to draw it.
+        </p>
+      )}
     </div>
   );
 }
