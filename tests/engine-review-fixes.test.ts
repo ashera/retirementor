@@ -526,3 +526,17 @@ describe("Engine audit — mortgage amortisation is the source of truth (#5, #10
     expect(simulate(p, cfg).rows.find((r) => r.age === 85)!.breakdown.mortgageCost).toBeGreaterThan(9_000);
   });
 });
+
+describe("Engine audit — investment-property IO loan deflates to today's $ (#6)", () => {
+  it("net equity grows as the fixed nominal loan erodes in real terms", () => {
+    const p = base({
+      people: [P({ currentAge: 55, superBalance: 400_000, salary: 90_000 })], retirementAge: 67, inflation: 2.5,
+      investmentProperties: [{ name: "IP", value: 600_000, purchasePrice: 600_000, growthReal: 0, grossYield: 5, costRatio: 20, loanBalance: 300_000, loanRate: 6, strategy: "hold", sellAtAge: 99 }],
+    });
+    const r = simulate(p, cfg);
+    const eq = (age: number) => r.rows.find((x) => x.age === age)!.propertyEquity;
+    // zero real growth → value flat; equity rises purely because the loan deflates.
+    expect(eq(75)).toBeGreaterThan(eq(56) + 30_000);
+    expect(eq(75)).toBeCloseTo(600_000 - 300_000 / 1.025 ** (75 - 55), -2); // value − deflated loan
+  });
+});

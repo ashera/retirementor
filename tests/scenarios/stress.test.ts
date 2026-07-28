@@ -212,7 +212,7 @@ describe(`Stress matrix — ${PLANS.length} plans, universal invariants`, () => 
         return Math.max(0, p.salary - sacrificed);
       };
       const prop = plan.investmentProperty;
-      const netRentAt = prop ? (y: number) => ref.propertyNetRent(prop, y) : undefined;
+      const netRentAt = prop ? (y: number) => ref.propertyNetRent(prop, y, plan.inflation) : undefined;
       const expOutside = ref.outsideAccumWithTax(
         plan.outsideSuper, plan.annualOutsideSavings, plan.investmentReturn, wageInfl,
         cfg.outsideTax.incomeYieldPct, n, plan.people.map(taxableSalary), netRentAt,
@@ -226,8 +226,10 @@ describe(`Stress matrix — ${PLANS.length} plans, universal invariants`, () => 
 
   it("held-property equity & net rent match the INDEPENDENT formulas at retirement", () => {
     const valueAt = (p: PropertyDetail, t: number) => p.value * Math.pow(1 + p.growthReal / 100, t);
-    const equity = (p: PropertyDetail, t: number) => Math.max(0, valueAt(p, t) - p.loanBalance);
-    const rent = (p: PropertyDetail, t: number) => valueAt(p, t) * (p.grossYield / 100) * (1 - p.costRatio / 100) - p.loanBalance * (p.loanRate / 100);
+    // Loan deflated to today's dollars (mirrors the engine — a nominal IO balance).
+    const loanReal = (p: PropertyDetail, t: number, inf: number) => p.loanBalance / Math.pow(1 + inf / 100, t);
+    const equity = (p: PropertyDetail, t: number, inf: number) => Math.max(0, valueAt(p, t) - loanReal(p, t, inf));
+    const rent = (p: PropertyDetail, t: number, inf: number) => valueAt(p, t) * (p.grossYield / 100) * (1 - p.costRatio / 100) - loanReal(p, t, inf) * (p.loanRate / 100);
     const fails: string[] = [];
     for (const { name, plan } of PLANS) {
       const p = plan.investmentProperty;
@@ -237,8 +239,8 @@ describe(`Stress matrix — ${PLANS.length} plans, universal invariants`, () => 
       const n = Math.max(0, Math.round(plan.retirementAge - plan.people[0].currentAge));
       const retRow = r.rows.find((x) => x.age === startOldest + n);
       if (!retRow) continue;
-      if (!near(retRow.propertyEquity, equity(p, n), 1)) fails.push(`${name}: equity ${retRow.propertyEquity.toFixed(0)} vs ${equity(p, n).toFixed(0)}`);
-      if (!near(retRow.rentIncome, rent(p, n), 1)) fails.push(`${name}: rent ${retRow.rentIncome.toFixed(0)} vs ${rent(p, n).toFixed(0)}`);
+      if (!near(retRow.propertyEquity, equity(p, n, plan.inflation), 1)) fails.push(`${name}: equity ${retRow.propertyEquity.toFixed(0)} vs ${equity(p, n, plan.inflation).toFixed(0)}`);
+      if (!near(retRow.rentIncome, rent(p, n, plan.inflation), 1)) fails.push(`${name}: rent ${retRow.rentIncome.toFixed(0)} vs ${rent(p, n, plan.inflation).toFixed(0)}`);
     }
     expect(fails.slice(0, 25)).toEqual([]);
   });

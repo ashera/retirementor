@@ -201,7 +201,8 @@ describe("Multiple investment properties", () => {
     for (const age of [60, 68, 72]) {
       const row = rowAt(r, age);
       const t = age - 55;
-      const perProp = props.reduce((s, pr) => s + (pr.strategy === "sell" && age >= pr.sellAtAge ? 0 : netRentCash(pr, propertyValueAt(pr, t))), 0);
+      const def = Math.pow(1 + 2.5 / 100, t); // deflate the nominal IO loan (base inflation 2.5%)
+      const perProp = props.reduce((s, pr) => s + (pr.strategy === "sell" && age >= pr.sellAtAge ? 0 : netRentCash({ ...pr, loanBalance: pr.loanBalance / def }, propertyValueAt(pr, t))), 0);
       expect(perProp).toBeCloseTo(row.rentIncome, 0);
     }
   });

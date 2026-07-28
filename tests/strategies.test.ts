@@ -351,8 +351,10 @@ describe("What-If strategies", () => {
     // Net worth as the chart plots it (rowNetWorth = super + outside + home equity
     // + property equity, bridging the sale year with that year's proceeds).
     const nw = (age: number) => rowNetWorth(rows.find((x) => x.age === age)!);
-    // The held property's net equity ($600k − $200k loan) is on the net-worth ledger...
-    expect(rows.find((r) => r.age === 69)!.propertyEquity).toBeCloseTo(400_000, -3);
+    // The held property's net equity ($600k − the loan) is on the net-worth ledger.
+    // The $200k nominal IO loan is deflated to today's $ (t=3 from currentAge 66).
+    const loanReal69 = 200_000 / (1 + b.inflation / 100) ** 3;
+    expect(rows.find((r) => r.age === 69)!.propertyEquity).toBeCloseTo(600_000 - loanReal69, -2);
     // ...and drops to 0 at the sale as the proceeds move into savings.
     expect(rows.find((r) => r.age === 70)!.propertyEquity).toBe(0);
     // No windfall: the sale-year net-worth change is ordinary drawdown, NOT a jump

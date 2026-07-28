@@ -251,12 +251,17 @@ export function agePension(
 export function propertyValueAt(p: PropertyDetail, years: number): number {
   return p.value * Math.pow(1 + p.growthReal / 100, years);
 }
-export function propertyNetRent(p: PropertyDetail, years: number): number {
-  const v = propertyValueAt(p, years);
-  return v * (p.grossYield / 100) * (1 - p.costRatio / 100) - p.loanBalance * (p.loanRate / 100);
+// The secured loan is a fixed nominal balance; the value is in today's dollars,
+// so the loan is deflated to the same basis (mirrors the engine + the home loan).
+function propertyLoanReal(p: PropertyDetail, years: number, inflationPct: number): number {
+  return p.loanBalance / Math.pow(1 + inflationPct / 100, years);
 }
-export function propertyNetEquity(p: PropertyDetail, years: number): number {
-  return Math.max(0, propertyValueAt(p, years) - p.loanBalance);
+export function propertyNetRent(p: PropertyDetail, years: number, inflationPct = 0): number {
+  const v = propertyValueAt(p, years);
+  return v * (p.grossYield / 100) * (1 - p.costRatio / 100) - propertyLoanReal(p, years, inflationPct) * (p.loanRate / 100);
+}
+export function propertyNetEquity(p: PropertyDetail, years: number, inflationPct = 0): number {
+  return Math.max(0, propertyValueAt(p, years) - propertyLoanReal(p, years, inflationPct));
 }
 export function propertyCGT(p: PropertyDetail, years: number, cgt: RefCgtRules, owners = 1): number {
   const gain = Math.max(0, propertyValueAt(p, years) - p.purchasePrice);
@@ -271,9 +276,9 @@ export function propertyCGT(p: PropertyDetail, years: number, cgt: RefCgtRules, 
         : Math.max(incomeTax(gainPer), (cgt.minRatePct / 100) * gainPer);
   return perOwner * n;
 }
-export function propertySaleProceeds(p: PropertyDetail, years: number, cgt: RefCgtRules, owners = 1): number {
+export function propertySaleProceeds(p: PropertyDetail, years: number, cgt: RefCgtRules, owners = 1, inflationPct = 0): number {
   // Not floored — an underwater sale (loan > value) leaves a shortfall paid from savings.
-  return propertyValueAt(p, years) - p.loanBalance - propertyCGT(p, years, cgt, owners);
+  return propertyValueAt(p, years) - propertyLoanReal(p, years, inflationPct) - propertyCGT(p, years, cgt, owners);
 }
 
 // ── Mortgage cost (fixed nominal, deflated to today's dollars) ───────────────

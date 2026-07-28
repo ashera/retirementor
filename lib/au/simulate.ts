@@ -524,7 +524,8 @@ export function simulate(
           { regime: cgtRegime, discountPct: config.outsideTax?.cgtDiscountPct ?? 50, minRatePct: config.outsideTax?.cgtMinRatePct ?? 30, onAgePension: false },
           plan.people.length,
         );
-        const proceeds = value - prop.loanBalance - cgtPaid;
+        const loanReal = prop.loanBalance / Math.pow(1 + plan.inflation / 100, t); // nominal IO loan → today's $
+        const proceeds = value - loanReal - cgtPaid;
         addCpiRealOutside(proceeds, t); // CPI-real sale proceeds → basis-corrected before the boundary
         // Report the proceeds on the same (wage-real) basis as this accumulation-year
         // pool so the net-worth bridge reconciles; the boundary rebase restores CPI-real.
@@ -537,12 +538,13 @@ export function simulate(
       // sold property drops out (its equity became savings above). The engine
       // otherwise only needs this in retirement (the means test), but the net-worth
       // band spans the whole timeline, so we compute it here too.
-      const accumPropertyEquity = properties.reduce((s, prop, pi) => s + (sold[pi] ? 0 : netEquity(prop, propertyValueAt(prop, t))), 0);
+      const accumPropDeflator = Math.pow(1 + plan.inflation / 100, t); // deflate the nominal IO loan to today's $
+      const accumPropertyEquity = properties.reduce((s, prop, pi) => s + (sold[pi] ? 0 : netEquity({ ...prop, loanBalance: prop.loanBalance / accumPropDeflator }, propertyValueAt(prop, t))), 0);
       // Net rent the properties throw off during the working years too (positive
       // income, or a negative cash drain for a geared property) — surfaced on the
       // income chart alongside take-home pay. Like salary take-home it's disposable
       // income, not auto-saved, so it doesn't itself move the balance.
-      const accumRentCash = properties.reduce((s, prop, pi) => s + (sold[pi] ? 0 : netRentCash(prop, propertyValueAt(prop, t))), 0);
+      const accumRentCash = properties.reduce((s, prop, pi) => s + (sold[pi] ? 0 : netRentCash({ ...prop, loanBalance: prop.loanBalance / accumPropDeflator }, propertyValueAt(prop, t))), 0);
       // Income tax on that rent, marginal, stacked on each owner's taxable salary and
       // split equally across the household. A rental LOSS reduces income tax — this is
       // negative gearing (the working-years benefit). NEGATIVE rentTax = a tax saving.
@@ -918,6 +920,10 @@ export function simulate(
     properties.forEach((prop, pi) => {
       if (sold[pi]) return;
       const value = propertyValueAt(prop, t);
+      // The secured loan is a nominal balance; the value is in today's dollars, so
+      // deflate the loan to the same basis (mirrors the home loanBalReal) or its real
+      // burden would never erode — over-stating the debt against net equity + net rent.
+      const propReal = { ...prop, loanBalance: prop.loanBalance / Math.pow(1 + plan.inflation / 100, t) };
       if (prop.strategy === "sell" && oldest >= prop.sellAtAge) {
         // The Age Pension exemption from the 30% minimum uses the PRIOR year's
         // receipt (this year's pension is worked out after the sale, below).
@@ -931,14 +937,14 @@ export function simulate(
         // at $0: an underwater sale (loan > value) leaves a shortfall that must be
         // repaid from savings, so it reduces `outside` rather than silently vanishing.
         const cgtPaid = capitalGainsTax(prop, value, cgtRules, plan.people.length);
-        const proceeds = value - prop.loanBalance - cgtPaid;
+        const proceeds = value - propReal.loanBalance - cgtPaid;
         propertyProceeds += proceeds;
         propertyCgt += cgtPaid;
         outside += proceeds;
         sold[pi] = true;
       } else {
-        const eq = netEquity(prop, value);
-        rentCash += netRentCash(prop, value);
+        const eq = netEquity(propReal, value);
+        rentCash += netRentCash(propReal, value);
         propertyEquity += eq;
         propertyParts.push({ name: prop.name, index: pi, equity: eq });
       }

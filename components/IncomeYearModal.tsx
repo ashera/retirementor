@@ -131,10 +131,14 @@ export default function IncomeYearModal({
   const propertyCount = propsList.length;
   // Per-property net rent this year (same computation the engine sums into rentIncome:
   // net rent for held properties, $0 once sold). Only shown when there's more than one.
+  const propLoanDeflator = Math.pow(1 + (plan.inflation ?? 0) / 100, yearsElapsed); // nominal IO loan → today's $ (matches the engine)
   const rentByProperty = propsList
     .map((prop, i) => ({
       name: prop.name?.trim() || `Property ${i + 1}`,
-      net: prop.strategy === "sell" && row.age >= prop.sellAtAge ? 0 : netRentCash(prop, propertyValueAt(prop, yearsElapsed)),
+      net:
+        prop.strategy === "sell" && row.age >= prop.sellAtAge
+          ? 0
+          : netRentCash({ ...prop, loanBalance: prop.loanBalance / propLoanDeflator }, propertyValueAt(prop, yearsElapsed)),
     }))
     .filter((x) => Math.abs(x.net) > 0.5);
   // Number of income rows the retirement view shows — the reconciling "Total income"
