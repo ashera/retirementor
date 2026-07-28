@@ -7,6 +7,7 @@ import { PARAM_DESCRIPTORS } from "./au/params";
 import { SOURCE_SEEDS } from "./au/sources";
 import { DEMO_SCENARIOS } from "./au/scenarios/demoScenarios";
 import { RELEASE_HISTORY } from "./releaseHistory";
+import { APP_VERSION, BUILD, GIT_SHA, BUILD_DATE, COMMITS } from "./version";
 
 export const SCHEMA_SQL = `
 create table if not exists users (
@@ -582,6 +583,7 @@ export async function migrate(c: Client): Promise<void> {
   await seedMarketingAssets(c);
   await seedDemoScenarios(c);
   await seedReleases(c);
+  await autoDraftRelease(c);
   await retirePlanDrafts(c);
 }
 
@@ -629,6 +631,46 @@ export async function seedReleases(c: Client): Promise<void> {
     added += res.rowCount ?? 0;
   }
   console.log(`  releases: backfilled ${added} of ${RELEASE_HISTORY.length} historical release(s).`);
+}
+
+/**
+ * Auto-draft a release for THIS build on deploy. Inserts one UNPUBLISHED row for the
+ * current version whose notes are the commit subjects since the most recent existing
+ * release (published or draft) — so every push lands a ready-to-curate changelog entry
+ * in /admin/releases without touching the public /releases page until someone edits &
+ * publishes it. Idempotent: the unique `version` index means a re-deploy of the same
+ * build is a no-op. Reads commits from lib/version.ts (captured at build time), so it
+ * needs no git at deploy time.
+ */
+export async function autoDraftRelease(c: Client): Promise<void> {
+  // Already have a row for this version (re-deploy, or someone published it) → leave it.
+  const exists = await c.query("select 1 from releases where version = $1", [APP_VERSION]);
+  if (exists.rowCount) {
+    console.log(`  releases: ${APP_VERSION} already present — no auto-draft.`);
+    return;
+  }
+  // Boundary = the newest release by build (a draft counts, so consecutive un-published
+  // deploys don't each re-scan from the last PUBLISHED release and duplicate bullets).
+  const last = await c.query<{ commit_hash: string | null }>(
+    "select commit_hash from releases order by build desc nulls last, created_at desc limit 1",
+  );
+  const lastSha = last.rows[0]?.commit_hash ?? null;
+  // COMMITS is newest-first. Take everything ABOVE the last release's commit (i.e. newer).
+  // If it's outside the captured window, fall back to the most recent handful.
+  const idx = lastSha ? COMMITS.findIndex((x) => x.sha === lastSha) : -1;
+  const fresh = lastSha ? (idx >= 0 ? COMMITS.slice(0, idx) : COMMITS.slice(0, 10)) : COMMITS.slice(0, 10);
+  const notes = fresh.map((x) => x.subject).slice(0, 30);
+  if (!notes.length) {
+    console.log(`  releases: no new commits since ${lastSha ?? "(none)"} — no auto-draft.`);
+    return;
+  }
+  await c.query(
+    `insert into releases (version, build, commit_hash, released_at, title, notes, published)
+     values ($1, $2, $3, $4, $5, $6, false)
+     on conflict (version) do nothing`,
+    [APP_VERSION, BUILD, GIT_SHA, BUILD_DATE, `Draft — build ${BUILD} (needs review)`, JSON.stringify(notes)],
+  );
+  console.log(`  releases: auto-drafted ${APP_VERSION} with ${notes.length} commit note(s) — UNPUBLISHED.`);
 }
 
 /**
