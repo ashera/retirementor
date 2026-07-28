@@ -58,35 +58,6 @@ export async function revokeShareLink(id: string): Promise<ActionResult> {
   return { ok: true };
 }
 
-export interface PlanDraft {
-  data: RetirementPlan;
-  updated_at: string;
-}
-
-/** The user's auto-saved working draft (their latest unsaved work), or null. */
-export async function getDraft(): Promise<PlanDraft | null> {
-  const user = await getCurrentUser();
-  if (!user) return null;
-  const r = await query<PlanDraft>(
-    "select data, updated_at from plan_drafts where user_id = $1",
-    [user.id],
-  );
-  return r.rows[0] ?? null;
-}
-
-/** Upsert the working draft. Silently no-ops for signed-out users (their work
- *  still lives in localStorage). Called debounced from the client. */
-export async function saveDraft(data: RetirementPlan): Promise<ActionResult> {
-  const user = await getCurrentUser();
-  if (!user) return { ok: true };
-  await query(
-    `insert into plan_drafts (user_id, data, updated_at) values ($1, $2, now())
-     on conflict (user_id) do update set data = excluded.data, updated_at = now()`,
-    [user.id, JSON.stringify(data)],
-  );
-  return { ok: true };
-}
-
 // ── Active scenario (the named plan continuous auto-save targets) ─────────────
 // Phase 1 of moving off the throwaway draft: these back the "one active named
 // scenario per user" model. Inert until the auto-save rewire (Phase 2) uses them.
@@ -137,13 +108,12 @@ export async function createScenario(name: string, data: RetirementPlan): Promis
 
 /** Resolve the user's active scenario, migrating on first call (lazy, per-user):
  *   1. already have one → return it;
- *   2. else promote their auto-saved draft to a named scenario (→ "My First
- *      Scenario" if they have no plans yet, else "Working scenario") + set active,
- *      then drop the draft;
- *   3. else adopt their most-recent saved plan as active;
- *   4. else (brand-new, no work) → null; the active scenario is created when they
+ *   2. else adopt their most-recent saved plan as active;
+ *   3. else (brand-new, no work) → null; the active scenario is created when they
  *      first configure a plan or on signup.
- *  Returns the active plan, or null. Signed-out → null (guests use localStorage). */
+ *  Returns the active plan, or null. Signed-out → null (guests use localStorage).
+ *  (Legacy plan_drafts were promoted to named scenarios by the Phase-2 lazy path and
+ *  the Phase-4 deploy backfill; the table is gone, so there's nothing to migrate here.) */
 export async function ensureActiveScenario(): Promise<SavedPlan | null> {
   const user = await getCurrentUser();
   if (!user) return null;
@@ -151,22 +121,7 @@ export async function ensureActiveScenario(): Promise<SavedPlan | null> {
   const active = await getActivePlan();
   if (active) return active;
 
-  const [draft, plans] = await Promise.all([getDraft(), listPlans()]);
-  if (draft) {
-    // Inline insert (not createScenario) so this stays revalidatePath-free — it may
-    // run during a page render, where revalidate isn't allowed.
-    const name = plans.length === 0 ? "My First Scenario" : "Working scenario";
-    const ins = await query<{ id: string }>(
-      "insert into plans (user_id, name, data) values ($1, $2, $3) returning id",
-      [user.id, name, JSON.stringify(draft.data)],
-    );
-    const id = ins.rows[0]?.id;
-    if (id) {
-      await query("update users set active_plan_id = $1 where id = $2", [id, user.id]);
-      await query("delete from plan_drafts where user_id = $1", [user.id]); // migrated → drop it
-      return getActivePlan();
-    }
-  }
+  const plans = await listPlans();
   if (plans.length > 0) {
     await query("update users set active_plan_id = $1 where id = $2", [plans[0].id, user.id]);
     return getActivePlan();

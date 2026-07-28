@@ -76,11 +76,9 @@ alter table users add column if not exists active_plan_id uuid references plans(
 -- One auto-saved working draft per user, so unsaved work survives across
 -- devices and cleared browser storage (upserted on the user_id primary key).
 -- DEPRECATED: being replaced by continuous auto-save to the active scenario above.
-create table if not exists plan_drafts (
-  user_id uuid primary key references users(id) on delete cascade,
-  data jsonb not null,
-  updated_at timestamptz not null default now()
-);
+-- (plan_drafts was retired in Phase 4 — everything now auto-saves to a named
+-- scenario. Any leftover drafts are promoted then the table is dropped in the
+-- seed step, so it isn't recreated here.)
 
 -- Curated, code-seeded demo scenarios (e.g. reproductions of Reddit FIRE debates)
 -- shared publicly at /scenario/<slug>. Not owned by a user; authored in code and
@@ -584,6 +582,7 @@ export async function migrate(c: Client): Promise<void> {
   await seedMarketingAssets(c);
   await seedDemoScenarios(c);
   await seedReleases(c);
+  await retirePlanDrafts(c);
 }
 
 /**
@@ -630,4 +629,42 @@ export async function seedReleases(c: Client): Promise<void> {
     added += res.rowCount ?? 0;
   }
   console.log(`  releases: backfilled ${added} of ${RELEASE_HISTORY.length} historical release(s).`);
+}
+
+/**
+ * Phase 4 of the active-scenario migration: retire `plan_drafts`. Everything now
+ * auto-saves to a named scenario, but a user who hadn't loaded since Phase 2 may
+ * still have an un-migrated draft. So — ONCE, before dropping the table — promote any
+ * leftover draft (for a user with no active scenario yet) to a named plan and set it
+ * active, then drop the whole table. Guarded on the table still existing, so it's a
+ * no-op on every deploy after the first.
+ */
+export async function retirePlanDrafts(c: Client): Promise<void> {
+  const exists = await c.query(
+    "select 1 from information_schema.tables where table_schema = 'public' and table_name = 'plan_drafts'",
+  );
+  if (!exists.rowCount) return; // already retired
+
+  const leftover = await c.query<{ user_id: string; data: unknown }>(
+    `select d.user_id, d.data
+       from plan_drafts d
+       join users u on u.id = d.user_id
+      where u.active_plan_id is null`,
+  );
+  let promoted = 0;
+  for (const row of leftover.rows) {
+    const cnt = await c.query<{ n: number }>("select count(*)::int as n from plans where user_id = $1", [row.user_id]);
+    const name = (cnt.rows[0]?.n ?? 0) === 0 ? "My First Scenario" : "Working scenario";
+    const ins = await c.query<{ id: string }>(
+      "insert into plans (user_id, name, data) values ($1, $2, $3) returning id",
+      [row.user_id, name, JSON.stringify(row.data)],
+    );
+    const id = ins.rows[0]?.id;
+    if (id) {
+      await c.query("update users set active_plan_id = $1 where id = $2", [id, row.user_id]);
+      promoted++;
+    }
+  }
+  await c.query("drop table plan_drafts");
+  console.log(`  plan-drafts: promoted ${promoted} leftover draft(s), then dropped the table.`);
 }

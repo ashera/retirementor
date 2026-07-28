@@ -64,7 +64,6 @@ const uid = up.rows[0].id;
 const reset = async () => {
   // active_plan_id FK is ON DELETE SET NULL, so dropping the plans clears the pointer.
   await db.query("delete from plans where user_id=$1", [uid]);
-  await db.query("delete from plan_drafts where user_id=$1", [uid]);
 };
 await reset();
 const token = randomBytes(32).toString("hex");
@@ -72,7 +71,6 @@ await db.query("insert into sessions (user_id, token, expires_at) values ($1, $2
 
 const plans = async () => (await db.query("select id, name, data from plans where user_id=$1 order by updated_at", [uid])).rows;
 const activePlanId = async () => (await db.query("select active_plan_id from users where id=$1", [uid])).rows[0]?.active_plan_id ?? null;
-const draftCount = async () => Number((await db.query("select count(*) c from plan_drafts where user_id=$1", [uid])).rows[0].c);
 
 const browser = await chromium.launch();
 try {
@@ -98,7 +96,6 @@ try {
   ok("auto-save creates exactly 1 active scenario", ps.length === 1);
   ok("it is named 'My First Scenario'", ps[0]?.name === "My First Scenario");
   ok("users.active_plan_id points at it", (await activePlanId()) === ps[0]?.id);
-  ok("no throwaway draft is written", (await draftCount()) === 0);
   const firstId = ps[0]?.id;
 
   // B — What-If toggles a strategy; auto-save updates the SAME active plan in place.

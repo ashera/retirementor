@@ -14,7 +14,6 @@ export interface AdminUserRow {
 
 export interface AdminUserDetail extends AdminUserRow {
   plans: { id: string; name: string; updated_at: string }[];
-  has_draft: boolean;
 }
 
 const ROW_SELECT = `
@@ -52,11 +51,7 @@ export async function getUserDetail(id: string): Promise<AdminUserDetail | null>
       "select id, name, updated_at from plans where user_id = $1 order by updated_at desc",
       [id],
     );
-    const draft = await query<{ exists: boolean }>(
-      "select exists(select 1 from plan_drafts where user_id = $1) as exists",
-      [id],
-    );
-    return { ...user, plans: plans.rows, has_draft: draft.rows[0]?.exists ?? false };
+    return { ...user, plans: plans.rows };
   } catch {
     // Invalid uuid or missing → treat as not found.
     return null;

@@ -59,7 +59,6 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
         <Info label="Joined" value={fmtDate(u.created_at)} />
         <Info label="Last login" value={fmtDateTime(u.last_login_at)} />
         <Info label="Saved plans" value={String(u.plan_count)} />
-        <Info label="Autosaved draft" value={u.has_draft ? "Yes" : "None"} />
       </div>
 
       <section className="mt-6 rounded-2xl border border-line bg-panel p-5">
