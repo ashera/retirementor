@@ -127,7 +127,6 @@ export function simulate(
   // (repaid from the pool) from the retirement boundary on.
   let drLoan = 0;
   const drCfg = plan.debtRecycle;
-  const drRate = (drCfg?.loanRatePct ?? plan.mortgage?.interestRate ?? 6) / 100;
   const outsideIncomeYield = (config.outsideTax?.incomeYieldPct ?? 0) / 100;
   const cgtDiscount = 1 - (config.outsideTax?.cgtDiscountPct ?? 0) / 100;
   const cgtRegime = config.outsideTax?.cgtRegime ?? "indexed";
@@ -577,7 +576,11 @@ export function simulate(
         oldest < drCfg.untilAge &&
         drCfg.perYear > 0
       ) {
-        drInterest = drStart * drRate; // interest on the opening loan balance
+        // Real interest cost: the loan rate is nominal, but the balance is in today's
+        // dollars — so deflate it (as the mortgage does) or we'd charge ~inflation too
+        // much and wipe out the leverage spread. `deflator` is wage inflation here.
+        const drRateReal = realRate(drCfg.loanRatePct, deflator);
+        drInterest = drStart * drRateReal; // real interest on the opening loan balance
         if (drInterest > 0) {
           const per = drInterest / Math.max(1, plan.people.length);
           drTaxSaving = taxables.reduce(

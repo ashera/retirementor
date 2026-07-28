@@ -71,8 +71,20 @@ describe("Debt recycling — engine", () => {
   });
 
   it("leverage HURTS when returns fall below the after-tax loan cost (the downside)", () => {
-    // 3% real vs a 6% loan (~3.7% after 39% marginal tax) → debt recycling loses ground.
-    expect(row(recycle({}, 3), 60).outside).toBeLessThan(row({ ...base, investmentReturn: 3 }, 60).outside);
+    // Rates are REAL: a 6% loan deflated by ~1.2% wage growth ≈ 4.7% real, ~2.9%
+    // after the deduction. A 2% return sits below that crossover → recycling loses ground.
+    expect(row(recycle({}, 2), 60).outside).toBeLessThan(row({ ...base, investmentReturn: 2 }, 60).outside);
+  });
+
+  it("charges the loan at a REAL rate (deflated), so it still helps under inflation", () => {
+    // Regression: the loan rate is nominal but balances are today's-dollar real. If we
+    // charged the nominal rate on the real balance we'd over-charge by ~inflation and
+    // wipe out the spread. With 2.5% inflation and a 7% return, real return (~4.2%)
+    // still beats the real after-tax loan cost, so recycling must come out ahead.
+    const infl = { ...base, inflation: 2.5, investmentReturn: 7 };
+    const on = simulate({ ...infl, debtRecycle: { perYear: 20_000, loanRatePct: 6, untilAge: 60 } }, cfg).rows.find((r) => r.age === 60)!;
+    const off = simulate(infl, cfg).rows.find((r) => r.age === 60)!;
+    expect(on.outside).toBeGreaterThan(off.outside);
   });
 
   it("bigger recycling amounts amplify the spread (more leverage, more effect)", () => {
