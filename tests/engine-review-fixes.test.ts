@@ -337,8 +337,11 @@ describe("Review fix — recontribution only fires once person 0 has retired", (
   });
 });
 
-describe("Review fix — staggered couple keeps saving while a partner still earns", () => {
-  it("adds annualOutsideSavings during the gap (higher terminal wealth than $0 savings)", () => {
+describe("Audit fix — staggered gap saves the SURPLUS, not a phantom savings stream", () => {
+  // The still-working partner's take-home is already credited against spending and any
+  // genuine surplus is banked, so adding annualOutsideSavings on top would be unfunded
+  // (conservation-of-money violation). Changing the savings input must NOT change wealth.
+  it("annualOutsideSavings adds no unfunded money during the gap (equal to $0)", () => {
     const mk = (annualOutsideSavings: number) =>
       base({
         household: "couple",
@@ -352,10 +355,8 @@ describe("Review fix — staggered couple keeps saving while a partner still ear
         annualOutsideSavings,
         targetSpending: 40_000,
       });
-    const withSaving = simulate(mk(20_000), cfg);
-    const without = simulate(mk(0), cfg);
     const terminal = (r: ReturnType<typeof simulate>) => r.rows[r.rows.length - 1].total;
-    expect(terminal(withSaving)).toBeGreaterThan(terminal(without));
+    expect(terminal(simulate(mk(20_000), cfg))).toBeCloseTo(terminal(simulate(mk(0), cfg)), 0);
   });
 });
 
@@ -449,5 +450,29 @@ describe("Cleanup — Medicare levy on below-pension-age part-time work", () => 
     expect(medicareLevy(50_000)).toBeGreaterThan(0); // sanity: levy applies at $50k
     expect(net).toBeCloseTo(50_000 - residentIncomeTax(50_000) - medicareLevy(50_000), 0);
     expect(net).toBeLessThan(50_000 - residentIncomeTax(50_000)); // the levy was deducted
+  });
+});
+
+// ── Adversarial engine-audit fixes (2026-07-28) ──────────────────────────────
+describe("Engine audit — wage→CPI rebase leak (#1)", () => {
+  const cfgWage = { ...DEFAULT_CONFIG, livingStandardsGrowthPct: 1.2 }; // wage > CPI → non-zero wedge
+  it("a property sold BEFORE retirement isn't over-inflated by the boundary rebase", () => {
+    const prop = { value: 500_000, growthReal: 0, grossYield: 0, costRatio: 0, loanBalance: 0, loanRate: 6, purchasePrice: 500_000 };
+    const mk = (strategy: "hold" | "sell", sellAtAge: number) =>
+      base({ people: [P({ currentAge: 40, superBalance: 0 })], retirementAge: 60, outsideSuper: 0, investmentReturn: 3.7, inflation: 2.5, investmentProperties: [{ ...prop, strategy, sellAtAge }] });
+    const held = simulate(mk("hold", 85), cfgWage).rows.find((r) => r.age === 60)!;
+    const sold = simulate(mk("sell", 55), cfgWage).rows.find((r) => r.age === 60)!;
+    // Zero-growth, zero-CGT property: selling vs holding is net-worth-neutral at retirement.
+    expect(sold.outside).toBeCloseTo(held.propertyEquity ?? 0, -3); // ~$500k both, within ~$1k
+    expect(sold.outside).toBeLessThan(560_000); // NOT the ~$631k over-inflated value
+  });
+});
+
+describe("Engine audit — guardrails don't ratchet on a life-event expense (#2)", () => {
+  it("a one-off expense in an income-covered year leaves living-spend flat", () => {
+    const p = base({ people: [P({ currentAge: 60, superBalance: 120_000 })], outsideSuper: 150_000, targetSpending: 30_000, investmentReturn: 7, inflation: 2.5, guardrails: {} });
+    const withEvent: RetirementPlan = { ...p, lifeEvents: [{ id: "x", kind: "expense", atAge: 70, label: "Shock", amount: 12_000 }] };
+    const ls = (plan: RetirementPlan, age: number) => simulate(plan, DEFAULT_CONFIG).rows.find((r) => r.age === age)!.breakdown.livingSpend ?? 0;
+    for (const a of [72, 75, 80, 90]) expect(ls(withEvent, a)).toBeCloseTo(ls(p, a), 0);
   });
 });

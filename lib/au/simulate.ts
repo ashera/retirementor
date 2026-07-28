@@ -176,6 +176,16 @@ export function simulate(
   // whole staggered path collapses to the original single-boundary behaviour.
   const retireOffsets = plan.people.map((_, i) => personRetirementOffset(plan, i));
   const earliestOffset = householdRetirementOffset(plan);
+  // The wage→CPI re-express factor applied to the whole `outside` pool at the
+  // retirement boundary (below). CPI-real amounts injected into `outside` BEFORE the
+  // boundary (a property sale, downsize or sell-and-rent during the working years)
+  // must be pre-divided by it, or the boundary rebase over-inflates them (they're
+  // already CPI-real, not wage-real like salary-derived savings).
+  const boundaryRebase = earliestOffset > 0 ? Math.pow((1 + wageInflation / 100) / (1 + cpi / 100), earliestOffset) : 1;
+  // Add a CPI-real amount to the outside pool on the correct basis for the phase.
+  const addCpiRealOutside = (amount: number, t: number) => {
+    outside += t < earliestOffset ? amount / boundaryRebase : amount;
+  };
 
   const rows: YearRow[] = [];
   let depletedAge: number | null = null;
@@ -361,12 +371,11 @@ export function simulate(
     // pool by ((1+wage)/(1+cpi))ⁿ. It also makes the means test assess the same
     // CPI-real balance the retiree actually holds. (No-op when wage == cpi.)
     if (t === earliestOffset && earliestOffset > 0) {
-      const rebase = Math.pow((1 + wageInflation / 100) / (1 + cpi / 100), earliestOffset);
       for (let i = 0; i < accum.length; i++) {
-        accum[i] *= rebase;
-        pension[i] *= rebase;
+        accum[i] *= boundaryRebase;
+        pension[i] *= boundaryRebase;
       }
-      outside *= rebase;
+      outside *= boundaryRebase;
     }
 
     // The home appreciates in real terms over the prior year (until it is sold).
@@ -401,7 +410,7 @@ export function simulate(
       const toSuper = Math.max(0, Math.min(downsize.toSuper, release, 300_000 * plan.people.length));
       const toOutside = Math.max(0, release - toSuper);
       if (accum.length) addToSuper(0, toSuper);
-      outside += toOutside;
+      addCpiRealOutside(toOutside, t); // CPI-real freed equity — pre-boundary it's basis-corrected
       downsized = true;
       homeProceedsThisYear = release;
       homeToSuperThisYear = toSuper;
@@ -412,7 +421,7 @@ export function simulate(
     // loan, which is repaid from proceeds). Renter status/rent apply below.
     if (sellRent && !soldHome && oldest >= sellRent.atAge) {
       const release = Math.max(0, homeVal - loanBal);
-      outside += release;
+      addCpiRealOutside(release, t); // CPI-real freed equity — pre-boundary it's basis-corrected
       soldHome = true;
       homeProceedsThisYear = release;
       homeVal = 0;
@@ -511,8 +520,10 @@ export function simulate(
           plan.people.length,
         );
         const proceeds = value - prop.loanBalance - cgtPaid;
-        outside += proceeds;
-        accumPropertyProceeds += proceeds;
+        addCpiRealOutside(proceeds, t); // CPI-real sale proceeds → basis-corrected before the boundary
+        // Report the proceeds on the same (wage-real) basis as this accumulation-year
+        // pool so the net-worth bridge reconciles; the boundary rebase restores CPI-real.
+        accumPropertyProceeds += proceeds / boundaryRebase;
         accumPropertyCgt += cgtPaid;
         sold[pi] = true;
       });
@@ -1031,14 +1042,12 @@ export function simulate(
     const externalIncome = agePensionAmt + afterTaxRent + netWork + workTakeHome;
     const privateNeed = Math.max(0, spending - externalIncome);
     if (externalIncome > spending) outside += externalIncome - spending;
-    // Staggered gap: a still-working partner keeps up the household's regular
-    // outside-super savings stream. It's added every accumulation year but was
-    // dropped the moment the FIRST partner retired — even though salary is still
-    // coming in. Mirror the accumulation-phase treatment for singles/same-age
-    // couples this is never true (all members retire together), so they're
-    // unaffected. Deflated flat (today's $), like the accumulation stream.
-    const stillEarning = plan.people.some((_, i) => t < retireOffsets[i] && !onBreak(i));
-    if (stillEarning) outside += plan.annualOutsideSavings;
+    // Staggered gap: a partner still earning has their take-home ALREADY credited
+    // against spending (in externalIncome above), and any genuine surplus is banked on
+    // the line just above — so we do NOT also add annualOutsideSavings here (that would
+    // be unfunded double-counting; accumulation credits neither take-home nor spending,
+    // so its savings stream is real there, but the gap credits both). Singles / same-age
+    // couples never reach the gap, so they're unaffected.
     // Debt recycling through the staggered gap: borrow `perYear` (→ loan), buy that in
     // shares (→ pool), and deduct the (real) interest against the STILL-WORKING
     // partner's salary — the refund reinvested. Same mechanic as the accumulation
@@ -1079,15 +1088,21 @@ export function simulate(
     // there would peg the rails at ~0 and ratchet spending to the floor forever, and
     // a spurious "rate below the lower rail" would trigger an unwarranted raise. So
     // skip income-covered years; the anchor waits for the first real draw.
-    if (guardrails && guardAnchorBase != null && privateNeed > EPS) {
+    // Measure the rate on the SMILE-NEUTRAL draw: the anchor-year smile level ×
+    // factor (plus fixed housing costs), net of income. Using the anchor base instead
+    // of THIS year's declining smile means the smile's own step-downs don't register as
+    // a falling withdrawal rate (which would wrongly trigger raises) — only real market
+    // over/under-performance moves the rate. It ALSO excludes one-off life-event
+    // expenses, so a cash shock in an otherwise income-covered year can't be read as a
+    // low rate. GATE on this smile-neutral need (NOT privateNeed, which includes the
+    // event) — else an event opens the rails while the rate reads 0 and fires a
+    // spurious, self-compounding RAISE. For a flat plan this equals the old privateNeed.
+    const normNeed =
+      guardAnchorBase != null
+        ? Math.max(0, guardAnchorBase * guardFactor + rentExpense + mortgageCost - externalIncome)
+        : 0;
+    if (guardrails && guardAnchorBase != null && normNeed > EPS) {
       const portfolio = startSuper + startOutside;
-      // Measure the rate on the SMILE-NEUTRAL draw: the anchor-year smile level ×
-      // factor (plus fixed housing costs), net of income. Using the anchor base
-      // instead of THIS year's declining smile means the smile's own step-downs don't
-      // register as a falling withdrawal rate (which would wrongly trigger raises) —
-      // only real market over/under-performance moves the rate. For a flat plan the
-      // anchor base equals every year's smile, so this is the old privateNeed exactly.
-      const normNeed = Math.max(0, guardAnchorBase * guardFactor + rentExpense + mortgageCost - externalIncome);
       // A depleted portfolio means the draw rate is effectively infinite (drawing
       // from nothing) — that must read as ABOVE the upper rail, never a "0%".
       const rate = portfolio > EPS ? normNeed / portfolio : Infinity;
@@ -1280,7 +1295,7 @@ export function simulate(
         contribGross: workContribGross,
         contribTax: workContribTax,
         contribNet: workContribNet,
-        savings: stillEarning ? plan.annualOutsideSavings : 0,
+        savings: 0, // no separate savings stream in retirement — a gap-year surplus is the "income kept in savings" funding line
         salaryIncome: workGrossSalary,
         takeHome: workTakeHome,
         ttrBenefit: 0,
