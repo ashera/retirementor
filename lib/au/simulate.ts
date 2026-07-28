@@ -121,6 +121,13 @@ export function simulate(
   // pool's value at the retirement boundary (pre-retirement growth is left untaxed,
   // matching the accumulation-phase treatment below), so it starts at 0.
   let unrealizedGain = 0;
+  // Debt recycling: the outstanding geared investment loan. The sleeve's SHARES live
+  // in `outside` (so they grow, pay taxed dividends and defer CGT like the rest of the
+  // pool); this liability is netted out of the reported pool + net worth, and unwound
+  // (repaid from the pool) from the retirement boundary on.
+  let drLoan = 0;
+  const drCfg = plan.debtRecycle;
+  const drRate = (drCfg?.loanRatePct ?? plan.mortgage?.interestRate ?? 6) / 100;
   const outsideIncomeYield = (config.outsideTax?.incomeYieldPct ?? 0) / 100;
   const cgtDiscount = 1 - (config.outsideTax?.cgtDiscountPct ?? 0) / 100;
   const cgtRegime = config.outsideTax?.cgtRegime ?? "indexed";
@@ -426,6 +433,7 @@ export function simulate(
     // data point plots, so the peak lands on the retirement age, not the year before.
     const startSuper = totalSuper();
     const startOutside = outside;
+    const drStart = drLoan; // opening investment-loan balance (for net reporting)
 
     // Life events due this year (fired once). Income adds to savings in either
     // phase; an expense is an extra draw — from savings while working, folded into
@@ -551,12 +559,51 @@ export function simulate(
       const careerBreakDraw = Math.min(breakSpend, Math.max(0, outside));
       outside -= careerBreakDraw;
 
+      // Debt recycling (working years): a geared share sleeve funded by a deductible
+      // investment loan, redrawn against the home loan. Each recycling year we borrow
+      // `perYear` (→ loan) and buy that in shares (→ outside pool, grown half a year
+      // like savings); interest on the opening loan is DEDUCTIBLE against work income
+      // (like a negatively-geared property), and the tax it saves is reinvested — the
+      // recycling accelerator. Needs a live home loan to recycle against. The loan is
+      // netted out of net worth (below) and repaid from the pool at retirement.
+      let drInterest = 0;
+      let drTaxSaving = 0;
+      if (
+        drCfg &&
+        anyoneWorking &&
+        mortgage &&
+        !mortgageCleared &&
+        mortgageActiveAtAge(mortgage, oldest) &&
+        oldest < drCfg.untilAge &&
+        drCfg.perYear > 0
+      ) {
+        drInterest = drStart * drRate; // interest on the opening loan balance
+        if (drInterest > 0) {
+          const per = drInterest / Math.max(1, plan.people.length);
+          drTaxSaving = taxables.reduce(
+            (s, tx) => s + Math.max(0, residentIncomeTax(tx) - residentIncomeTax(Math.max(0, tx - per))),
+            0,
+          );
+        }
+        outside += drCfg.perYear * outsideHalf; // borrowed funds, invested mid-year
+        drLoan += drCfg.perYear;
+        // Service the loan from the recycling surplus: pay the interest, then reinvest
+        // the tax refund the deduction generates. Net cost = interest − refund, so the
+        // sleeve's net equity grows at (return − AFTER-TAX loan cost) — leverage helps
+        // when returns beat the after-tax rate and hurts when they don't (the stress case).
+        outside -= drInterest;
+        outside += drTaxSaving;
+      }
+
       rows.push(
-        row(oldest, startSuper, startOutside, 0, 0, 0, 0, "accumulation", true, accumRentCash, accumPropertyEquity, {
+        row(oldest, startSuper, startOutside - drStart, 0, 0, 0, 0, "accumulation", true, accumRentCash, accumPropertyEquity, {
           openingSuper: startSuper,
-          openingOutside: startOutside,
+          openingOutside: startOutside - drStart,
           closingSuper: totalSuper(),
-          closingOutside: outside,
+          closingOutside: outside - drLoan,
+          investmentLoan: drLoan,
+          drInterest,
+          drTaxSaving,
           pensionSuper: 0, // all super is in accumulation while still working
           accumSuper: startSuper,
           accumDrawn: 0,
@@ -578,7 +625,7 @@ export function simulate(
           // Tax-analysis totals (consolidated per person — salary + net rent +
           // dividends taxed together with one LITO/SAPTO). No gains realised while
           // working, so no capital gains. `medicare` from the salary tax above.
-          incomeTax: accumTaxDetail.reduce((s, d) => s + d.incomeTax, 0),
+          incomeTax: Math.max(0, accumTaxDetail.reduce((s, d) => s + d.incomeTax, 0) - drTaxSaving),
           medicare,
           capitalGains: 0,
           taxDetail: accumTaxDetail,
@@ -612,9 +659,19 @@ export function simulate(
     }
 
     // --- Retirement year (at least one person has retired) ---
+    // Debt recycling: unwind the geared sleeve — repay the investment loan from the
+    // (now un-geared) savings pool. Normally cleared in the first retirement year; a
+    // bad market run can leave residual debt that keeps dragging net worth (the
+    // leverage downside the MC / stress views surface). Pre-retirement gains are
+    // untaxed (the CGT basis resets at this boundary), so the repayment realises no CGT.
+    if (drLoan > 0) {
+      const repay = Math.min(Math.max(0, outside), drLoan);
+      outside -= repay;
+      drLoan -= repay;
+    }
     if (t === earliestOffset) {
       superAtRetirement = startSuper;
-      totalAtRetirement = startSuper + startOutside;
+      totalAtRetirement = startSuper + startOutside - drStart;
     }
 
     // Capital gains realised this year by selling outside-super units (to fund
@@ -1168,11 +1225,12 @@ export function simulate(
           : "drawdown";
 
     rows.push(
-      row(oldest, startSuper, startOutside, agePensionAmt, fromSuper, outsideDrawn, spending, phase, funded, rentCash, propertyEquity, {
+      row(oldest, startSuper, startOutside - drStart, agePensionAmt, fromSuper, outsideDrawn, spending, phase, funded, rentCash, propertyEquity, {
         openingSuper: startSuper,
-        openingOutside: startOutside,
+        openingOutside: startOutside - drStart,
         closingSuper: totalSuper(),
-        closingOutside: outside,
+        closingOutside: outside - drLoan,
+        investmentLoan: drLoan,
         pensionSuper: openPension,
         accumSuper: openAccum,
         accumDrawn,

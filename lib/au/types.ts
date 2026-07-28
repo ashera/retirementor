@@ -202,6 +202,13 @@ export interface RetirementPlan {
   careerBreak?: { atAge: number; years: number; spendFromSavings: number }; // DEPRECATED single-person form (person 0); read via getCareerBreaks(). Kept so plans saved before careerBreaks[] still load.
   careerBreaks?: CareerBreak[]; // "gap years": each entry = person `who` takes `years` off from their age `atAge` — no salary or super contributions in that window, drawing `spendFromSavings`/yr from outside savings to live. Savings additions pause only when EVERY working member is on a break that year. Super keeps earning on the existing balance; the lost contributions + compounding are the main cost.
   lifeEvents?: LifeEvent[]; // committed one-off cashflows at an age: an income (windfall/inheritance) lands in outside savings untaxed; an expense is an extra draw that year (from savings while working, from the retirement drawdown once retired). Today's dollars. Flows through the means test, MC, stress test, failsafe and guardrails automatically.
+  // Debt recycling (What-If): while working, run a geared share sleeve funded by a
+  // deductible investment loan (redraw against the home loan). `perYear` is added to
+  // the loan + invested each working year until `untilAge`; interest is tax-deductible;
+  // the sleeve lives in the outside pool (dividends taxed, growth deferred) and is
+  // unwound (loan repaid from the pool) at retirement. Needs a home loan to recycle
+  // against. Flows through the projection, MC and stress test.
+  debtRecycle?: { perYear: number; loanRatePct: number; untilAge: number };
   investmentProperties?: PropertyDetail[]; // income-producing properties (source of truth)
   investmentProperty?: PropertyDetail; // DEPRECATED legacy single property — read via getInvestmentProperties()
   // Which optional sections the user has explicitly answered in the wizard (incl.
@@ -437,6 +444,9 @@ export interface YearBreakdown {
   capitalGains?: number;
   taxDetail?: PersonTaxDetail[]; // per-person income-tax reconciliation for the tax modal (gross → LITO → SAPTO → net)
   rentSaved?: number; // accumulation only: positive after-tax net rent reinvested into the outside pool (a geared loss isn't — it's a disposable drain)
+  investmentLoan?: number; // debt recycling: the outstanding geared investment-loan balance this year (a liability netted out of the outside pool + net worth); `drInterest` is its deductible interest, `drTaxSaving` the tax it saved
+  drInterest?: number; // debt recycling: deductible interest charged on the investment loan this year
+  drTaxSaving?: number; // debt recycling: income tax saved by deducting that interest (reinvested into the sleeve)
   careerBreakDraw?: number; // accumulation only: living costs drawn from outside savings during a career break ("gap years"), floored at the balance available
   onBreak?: boolean; // accumulation only: at least one member is on a career break ("gap year") this year — charts shade the span
   eventIncome?: number; // life-event windfall/inheritance received this year (added to outside savings, untaxed)
