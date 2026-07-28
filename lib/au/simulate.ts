@@ -1213,6 +1213,7 @@ export function simulate(
     let outsideTax = 0;
     let outsideDivTax = 0; // dividend portion (ordinary income) — for the tax analysis
     let outsideCgtTax = 0; // realised-gain portion (capital gains) — for the tax analysis
+    let superTaxDraw = 0; // super drawn to settle that tax when the outside pool emptied
     if (!accumPhase && (outsideIncome > 0 || realizedGain > 0)) {
       const incPer = outsideIncome / workers;
       const gainPer = Math.max(0, realizedGain) / workers;
@@ -1240,18 +1241,30 @@ export function simulate(
         }
       });
       outsideTax = outsideDivTax + outsideCgtTax;
-      // Can't pay more tax than the pool holds — in the year outside is drawn to $0
-      // to fund spending, the CGT on that final drawdown has nothing left to come
-      // from (a small edge understatement; the recorded tax matches what's deducted
-      // so the ledger reconciles). Apportion the cap across the two slices.
-      const capped = Math.min(outsideTax, Math.max(0, outside));
-      if (outsideTax > 0 && capped < outsideTax) {
-        const f = capped / outsideTax;
+      // The tax on this year's realised gains + dividends is a real liability. Pay it
+      // from the outside pool first; if that pool was drawn to $0 to fund spending, take
+      // the shortfall from super — drawing more is what a real household must do to
+      // settle the ATO bill — so the deducted tax matches what the tax analysis reports
+      // (previously the CGT on a pool-emptying draw was silently waived, understating
+      // lifetime tax and over-stating success). The super reduction is captured by the
+      // "Tax on savings" waterfall line, so superDrawn stays the spending figure.
+      const fromPool = Math.min(outsideTax, Math.max(0, outside));
+      outside -= fromPool;
+      let unpaid = outsideTax - fromPool;
+      if (unpaid > EPS) {
+        const drawn = drawSuper(accessibleIdx, unpaid);
+        superTaxDraw = drawn.accum + drawn.pension;
+        unpaid -= superTaxDraw;
+      }
+      // If super is inaccessible/empty too (a bridge-year corner where the household is
+      // already failing), the residual is genuinely unpayable this year — record only
+      // what was actually settled so the ledger and the tax modal still agree.
+      if (unpaid > EPS && outsideTax > EPS) {
+        const f = (outsideTax - unpaid) / outsideTax;
         outsideDivTax *= f;
         outsideCgtTax *= f;
+        outsideTax -= unpaid;
       }
-      outsideTax = capped;
-      outside -= outsideTax;
     }
 
     // Per-person consolidated tax for the tax modal (gap salary + part-time work +
@@ -1292,6 +1305,7 @@ export function simulate(
         accumSuper: openAccum,
         accumDrawn,
         pensionExtraDrawn,
+        superTaxDraw,
         contribGross: workContribGross,
         contribTax: workContribTax,
         contribNet: workContribNet,

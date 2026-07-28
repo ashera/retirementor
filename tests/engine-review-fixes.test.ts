@@ -476,3 +476,20 @@ describe("Engine audit — guardrails don't ratchet on a life-event expense (#2)
     for (const a of [72, 75, 80, 90]) expect(ls(withEvent, a)).toBeCloseTo(ls(p, a), 0);
   });
 });
+
+describe("Engine audit — CGT on a pool-emptying draw isn't waived (#4)", () => {
+  it("funds the outside-tax shortfall from super so the liability is really paid", () => {
+    const p = base({
+      people: [P({ currentAge: 67, superBalance: 300_000 })], retirementAge: 67,
+      outsideSuper: 250_000, targetSpending: 30_000, investmentReturn: 8, lifeExpectancy: 95,
+      lifeEvents: [{ id: "e", kind: "expense", atAge: 85, label: "Big spend", amount: 700_000 }],
+    });
+    const r = simulate(p, cfg);
+    const y = r.rows.find((x) => x.age === 85)!;
+    const b = y.breakdown;
+    expect(b.closingOutside).toBeCloseTo(0, 0); // the draw empties the outside pool
+    expect(b.superTaxDraw ?? 0).toBeGreaterThan(50_000); // the CGT is settled from super, not waived
+    // super pool still reconciles once the tax draw is counted
+    expect(b.openingSuper - b.mortgageCleared - y.superDrawn - (b.superTaxDraw ?? 0) - b.fees + b.superGrowth).toBeCloseTo(b.closingSuper, 0);
+  });
+});

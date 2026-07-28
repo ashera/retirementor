@@ -55,7 +55,7 @@ describe("Year breakdown ledger", () => {
     const ret = r.rows.filter((x) => x.phase !== "accumulation");
     for (const row of ret) {
       const b = row.breakdown;
-      expect(near(b.openingSuper - b.mortgageCleared - row.superDrawn - b.fees + b.superGrowth, b.closingSuper)).toBe(true);
+      expect(near(b.openingSuper - b.mortgageCleared - row.superDrawn - (b.superTaxDraw ?? 0) - b.fees + b.superGrowth, b.closingSuper)).toBe(true);
     }
   });
 

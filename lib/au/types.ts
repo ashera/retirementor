@@ -468,6 +468,7 @@ export interface YearBreakdown {
   rentCost: number; // rent paid this year after selling up (0 otherwise)
   mortgageCost: number;
   mortgageCleared: number; // one-off super lump sum used to clear the home loan
+  superTaxDraw?: number; // super drawn to settle outside-tax when the outside pool was emptied
   lumpSum: number; // one-off tax-free lump sum withdrawn from super this year (spent)
   recontribution: number; // after-tax amount moved from savings into super this year (non-concessional)
   // Investment property sale
