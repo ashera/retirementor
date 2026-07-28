@@ -341,6 +341,12 @@ export default function PlannerApp({
   const [notice, setNotice] = useState<string | null>(null);
   const [nudgeDismissed, setNudgeDismissed] = useState(false);
   const [newScenarioOpen, setNewScenarioOpen] = useState(false);
+  // Switching scenarios reloads + re-simulates the whole plan (a few seconds), so we
+  // lock the page behind a spinner until the transition settles.
+  const [switching, setSwitching] = useState(false);
+  useEffect(() => {
+    if (!pending) setSwitching(false);
+  }, [pending]);
 
   useEffect(() => {
     // Public share-link view: load the shared scenario straight in and stop —
@@ -815,6 +821,7 @@ export default function PlannerApp({
     if (id === savedId) return;
     const sp = savedPlans.find((p) => p.id === id);
     if (!sp) return;
+    setSwitching(true); // lock the page + spinner until the reload/re-simulate settles
     startTransition(async () => {
       await setActivePlan(id);
       handleLoad(sp);
@@ -954,6 +961,22 @@ export default function PlannerApp({
 
   return (
     <main className="mx-auto max-w-5xl px-5 py-10">
+      {/* Scenario-switch lock: reloading + re-simulating a plan takes a few seconds. */}
+      {switching && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-ink/70 backdrop-blur-sm"
+          role="status"
+          aria-live="polite"
+        >
+          <div className="flex flex-col items-center gap-3 rounded-2xl border border-line bg-panel px-7 py-6 shadow-2xl">
+            <svg className="h-8 w-8 animate-spin text-accent" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-90" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V0C5.4 0 0 5.4 0 12h4z" />
+            </svg>
+            <span className="text-sm font-medium text-slate-200">Loading scenario…</span>
+          </div>
+        </div>
+      )}
       {/* Top bar: brand left, auth right */}
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3 text-sm">
         <Logo />
