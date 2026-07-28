@@ -540,3 +540,17 @@ describe("Engine audit — investment-property IO loan deflates to today's $ (#6
     expect(eq(75)).toBeCloseTo(600_000 - 300_000 / 1.025 ** (75 - 55), -2); // value − deflated loan
   });
 });
+
+describe("Engine audit — gap-year pension modal reflects the halved payment (#8)", () => {
+  it("the stored per-test annual figures are the member-of-a-couple rate", () => {
+    const gap = base({
+      retirementAge: 60, outsideSuper: 20_000, targetSpending: 30_000, household: "couple", superMode: "individual",
+      people: [P({ currentAge: 67, superBalance: 80_000 }), P({ currentAge: 62, superBalance: 80_000 })],
+    });
+    const row = rowAt(gap, 67);
+    const b = row.breakdown.pension!;
+    expect(row.agePension).toBeGreaterThan(0);
+    // paid = the binding (lower) test figure, and both stored figures are already halved
+    expect(row.agePension).toBeCloseTo(Math.min(b.assetsTestAnnual, b.incomeTestAnnual), 0);
+  });
+});

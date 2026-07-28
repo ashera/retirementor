@@ -1029,7 +1029,8 @@ export function simulate(
       // the means test still uses combined assets/income, but the under-age partner
       // gets nothing until they too qualify. Paying the full couple rate here
       // overstated income by ~half for every age-gap couple through the gap.
-      agePensionAmt = plan.household === "couple" && pensionEligible < 2 ? ap.annual / 2 : ap.annual;
+      const coupleHalf = plan.household === "couple" && pensionEligible < 2 ? 0.5 : 1;
+      agePensionAmt = ap.annual * coupleHalf;
       pensionBreakdown = {
         outsideAssets: outside,
         accessibleSuper: assessedSuper,
@@ -1039,8 +1040,11 @@ export function simulate(
         financialAssets,
         deemedIncome: deemedIncome(financialAssets, plan.household, config),
         otherIncome: assessableOther,
-        assetsTestAnnual: ap.assetsTestAnnual,
-        incomeTestAnnual: ap.incomeTestAnnual,
+        // The modal's per-test annual figures must reflect the SAME member-of-a-couple
+        // rate the household is actually paid, or a gap-year pension breakdown would
+        // show the full couple amount while only half is received.
+        assetsTestAnnual: ap.assetsTestAnnual * coupleHalf,
+        incomeTestAnnual: ap.incomeTestAnnual * coupleHalf,
         bindingTest: ap.bindingTest,
       };
       if (agePensionAmt > 0 && firstAgePensionAge === null) {
