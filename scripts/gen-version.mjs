@@ -17,14 +17,18 @@ const git = (cmd) => {
   }
 };
 
-// Never let a shallow clone (commit count = 1) regress the committed number.
-let existing = 0;
+// Read the previously-committed version.ts so we can PRESERVE fields git can't supply
+// on this host. The build host may have no usable git — Railway's Nixpacks ships the
+// source WITHOUT .git, which is why `sha` falls back to RAILWAY_GIT_COMMIT_SHA below.
+// The committed values (generated locally, where git works) are the fallback.
+let prev = "";
 try {
-  const m = readFileSync(out, "utf8").match(/BUILD\s*=\s*(\d+)/);
-  if (m) existing = parseInt(m[1], 10) || 0;
+  prev = readFileSync(out, "utf8");
 } catch {
   /* first run — no file yet */
 }
+// Never let a shallow/absent clone regress the committed build number.
+const existing = parseInt(prev.match(/BUILD\s*=\s*(\d+)/)?.[1] ?? "0", 10) || 0;
 
 const count = parseInt(git("git rev-list --count HEAD") || "0", 10) || 0;
 const build = Math.max(existing, count);
@@ -33,17 +37,30 @@ const date = git("git log -1 --format=%cd --date=short") || new Date().toISOStri
 const version = `1.0.${build}`;
 
 // Recent commits (short sha + subject), newest-first, no merges — captured HERE at
-// build time (git is available) so the deploy seed step can auto-draft a release from
-// the commits since the last release WITHOUT needing git at deploy time. \x1f (unit
-// separator) can't appear in a subject, so it's a safe field delimiter.
+// build time so the deploy seed step can auto-draft a release from the commits since
+// the last release WITHOUT needing git at deploy time. \x1f (unit separator) can't
+// appear in a subject, so it's a safe field delimiter. CRITICAL: if this host has no
+// git (Railway), KEEP the committed array — otherwise this would wipe it to [] and the
+// deploy's release auto-draft would have nothing to work from.
 const RECENT = 80;
-const commits = git(`git log -n ${RECENT} --no-merges --format=%h%x1f%s`)
-  .split("\n")
-  .map((line) => {
-    const i = line.indexOf("\x1f");
-    return i < 0 ? null : { sha: line.slice(0, i), subject: line.slice(i + 1) };
-  })
-  .filter(Boolean);
+const logged = git(`git log -n ${RECENT} --no-merges --format=%h%x1f%s`);
+let commits;
+if (logged) {
+  commits = logged
+    .split("\n")
+    .map((line) => {
+      const i = line.indexOf("\x1f");
+      return i < 0 ? null : { sha: line.slice(0, i), subject: line.slice(i + 1) };
+    })
+    .filter(Boolean);
+} else {
+  const m = prev.match(/export const COMMITS[^=]*=\s*(\[[\s\S]*?\n\]);/);
+  try {
+    commits = m ? JSON.parse(m[1]) : [];
+  } catch {
+    commits = [];
+  }
+}
 
 writeFileSync(
   out,
