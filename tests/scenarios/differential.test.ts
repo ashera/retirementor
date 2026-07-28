@@ -103,7 +103,7 @@ describe("Differential — one-lever deltas match an independent delta", () => {
     // taxed at the ordinary (pre-67, no SAPTO) resident scale — an exact closed form.
     const first = rows.find((r) => r.age === 58)!;
     const income = (outside - spend) * (cfg.outsideTax.incomeYieldPct / 100); // draw is outside-first
-    const expected = ref.residentIncomeTax(income);
+    const expected = ref.residentIncomeTax(income) + ref.medicareLevy(income); // dividends: income tax + 2% levy (pre-67)
     expect(near(first.breakdown.outsideTax, expected, 2), `age 58: engine ${first.breakdown.outsideTax.toFixed(0)} vs ref ${expected.toFixed(0)}`).toBe(true);
 
     // Genuinely taxed pre-67 (the SAPTO-fix invariant) — income alone clears LITO.

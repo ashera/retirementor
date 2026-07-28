@@ -115,14 +115,29 @@ export function outsideAccumWithTax(
     // Dividend/distribution income tax — marginal, stacked on salary, split per owner.
     const divPer = (start * yld) / people;
     if (divPer > 0 && taxableSalaries.length > 0) {
-      value -= taxableSalaries.reduce((s, sal) => s + Math.max(0, residentIncomeTax(sal + divPer) - residentIncomeTax(sal)), 0);
+      value -= taxableSalaries.reduce(
+        (s, sal) =>
+          s +
+          Math.max(0, residentIncomeTax(sal + divPer) - residentIncomeTax(sal)) +
+          (medicareLevy(sal + divPer) - medicareLevy(sal)), // 2% levy on the dividend income
+        0,
+      );
     }
-    // Positive net rent reinvested (after its own marginal income tax); a geared
-    // loss is a disposable drain, not drawn from the pool.
+    // Positive net rent reinvested (after its own marginal income tax + levy); a
+    // geared loss is a disposable drain, not drawn from the pool.
     if (netRentAt) {
       const rent = netRentAt(i);
       const rentPer = rent / people;
-      const rentTax = rent === 0 ? 0 : taxableSalaries.reduce((s, sal) => s + (residentIncomeTax(sal + rentPer) - residentIncomeTax(sal)), 0);
+      const rentTax =
+        rent === 0
+          ? 0
+          : taxableSalaries.reduce(
+              (s, sal) =>
+                s +
+                (residentIncomeTax(sal + rentPer) - residentIncomeTax(sal)) +
+                (medicareLevy(sal + rentPer) - medicareLevy(sal)),
+              0,
+            );
       value += Math.max(0, rent - rentTax);
     }
   }
@@ -176,7 +191,8 @@ export function outsideBridgeWithCgt(
     const income = value * yld;
     unrealizedGain += value * r - income; // capital growth deferred
     value *= 1 + r;
-    value -= residentIncomeTax(income) + refGainTax(income, realized, cgt); // dividends + CGT
+    // dividends (income tax + 2% levy, pre-preservation so non-senior) + CGT
+    value -= residentIncomeTax(income) + medicareLevy(income) + refGainTax(income, realized, cgt);
   }
   return value;
 }
@@ -295,6 +311,18 @@ export function residentIncomeTax(taxable: number): number {
   return Math.max(0, incomeTax(taxable) - lito(taxable));
 }
 
+// ── Medicare levy ────────────────────────────────────────────────────────────
+// 2% on taxable ordinary income above the low-income threshold (shaded in at
+// 10c/$). Seniors/pensioners use the higher threshold. Re-stated from ATO figures.
+const MEDICARE_LOW = 27_222;
+const MEDICARE_SENIOR = 43_020;
+export function medicareLevy(taxable: number, senior = false): number {
+  const t = Math.max(0, taxable);
+  const threshold = senior ? MEDICARE_SENIOR : MEDICARE_LOW;
+  if (t <= threshold) return 0;
+  return Math.min(0.02 * t, 0.1 * (t - threshold));
+}
+
 // ── Seniors & Pensioners Tax Offset (SAPTO) ──────────────────────────────────
 // Max SAPTO per person (ATO), then a 12.5c/$ phase-out on rebate income above the
 // threshold — fully withdrawn by ~$50,119 (single) / ~$41,790 each (couple).
@@ -333,7 +361,11 @@ export function outsideEarningsTax(
   if (earnings <= 0) return 0;
   const workPer = grossWork / workers;
   const earnPer = earnings / workers;
-  return workers * Math.max(0, retireeIncomeTax(workPer + earnPer, household, senior) - retireeIncomeTax(workPer, household, senior));
+  const incomeTaxDelta = Math.max(0, retireeIncomeTax(workPer + earnPer, household, senior) - retireeIncomeTax(workPer, household, senior));
+  // 2% Medicare levy on the investment earnings above employment (senior threshold
+  // once at/over Age Pension age) — matches the engine's outsideMedicare term.
+  const levyDelta = medicareLevy(workPer + earnPer, senior) - medicareLevy(workPer, senior);
+  return workers * (incomeTaxDelta + levyDelta);
 }
 
 // ── Part-time work in retirement (Work Bonus + tax) ──────────────────────────

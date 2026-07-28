@@ -152,7 +152,6 @@ export function simulate(
         { key: "rent", amount: comps.rent },
         { key: "dividends", amount: comps.dividends },
       ],
-      comps.salary + comps.work,
       comps.gain,
       senior,
       plan.household,
@@ -500,7 +499,13 @@ export function simulate(
       const accumOutsideTax =
         outsideIncomeAccum === 0
           ? 0
-          : taxables.reduce((s, tx) => s + Math.max(0, residentIncomeTax(tx + outsidePerAccum) - residentIncomeTax(tx)), 0);
+          : taxables.reduce(
+              (s, tx) =>
+                s +
+                Math.max(0, residentIncomeTax(tx + outsidePerAccum) - residentIncomeTax(tx)) +
+                (medicareLevy(tx + outsidePerAccum) - medicareLevy(tx)), // 2% levy on the dividend income too
+              0,
+            );
       outside -= accumOutsideTax;
 
       // A property whose sale age falls in the WORKING years is sold then — its
@@ -542,7 +547,16 @@ export function simulate(
       // split equally across the household. A rental LOSS reduces income tax — this is
       // negative gearing (the working-years benefit). NEGATIVE rentTax = a tax saving.
       const accumRentPer = accumRentCash / Math.max(1, plan.people.length);
-      const accumRentTax = accumRentCash === 0 ? 0 : taxables.reduce((s, tx) => s + (residentIncomeTax(tx + accumRentPer) - residentIncomeTax(tx)), 0);
+      const accumRentTax =
+        accumRentCash === 0
+          ? 0
+          : taxables.reduce(
+              (s, tx) =>
+                s +
+                (residentIncomeTax(tx + accumRentPer) - residentIncomeTax(tx)) +
+                (medicareLevy(tx + accumRentPer) - medicareLevy(tx)), // levy tracks net rent (a loss reduces it — negative gearing)
+              0,
+            );
       // Per-person consolidated tax for the tax modal (all ordinary income together).
       const accumTaxDetail = plan.people.map((_, i) =>
         taxDetailFor(i, { salary: taxables[i], work: 0, rent: accumRentPer, dividends: outsidePerAccum, gain: 0 }, false, false),
@@ -1213,6 +1227,7 @@ export function simulate(
     let outsideTax = 0;
     let outsideDivTax = 0; // dividend portion (ordinary income) — for the tax analysis
     let outsideCgtTax = 0; // realised-gain portion (capital gains) — for the tax analysis
+    let outsideMedicare = 0; // 2% levy on retiree investment income above the (senior) threshold
     let superTaxDraw = 0; // super drawn to settle that tax when the outside pool emptied
     if (!accumPhase && (outsideIncome > 0 || realizedGain > 0)) {
       const incPer = outsideIncome / workers;
@@ -1227,6 +1242,12 @@ export function simulate(
         const ordBase = workPer + rentPer;
         // Dividends: ordinary income, marginal, stacked on employment + net rent.
         outsideDivTax += Math.max(0, taxAtAge(ordBase + incPer, ages[i]) - taxAtAge(ordBase, ages[i]));
+        // 2% Medicare levy on the investment income (net rent + dividends) above the
+        // person's employment — with the higher senior threshold once they reach Age
+        // Pension age. Employment's own levy is already deducted (contribute()/workTax),
+        // so subtract it out to avoid double-counting.
+        const senr = ages[i] >= pensionAge;
+        outsideMedicare += medicareLevy(rentPer + incPer + Math.max(0, workPer), senr) - medicareLevy(Math.max(0, workPer), senr);
         // Capital gain: stacked on top of employment + net rent + dividends.
         if (gainPer > 0) {
           const base = ordBase + incPer;
@@ -1240,7 +1261,7 @@ export function simulate(
           }
         }
       });
-      outsideTax = outsideDivTax + outsideCgtTax;
+      outsideTax = outsideDivTax + outsideCgtTax + Math.max(0, outsideMedicare);
       // The tax on this year's realised gains + dividends is a real liability. Pay it
       // from the outside pool first; if that pool was drawn to $0 to fund spending, take
       // the shortfall from super — drawing more is what a real household must do to

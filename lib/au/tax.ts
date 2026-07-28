@@ -48,17 +48,21 @@ export function residentIncomeTax(taxable: number): number {
   return Math.max(0, incomeTax(taxable) - lito(taxable));
 }
 
-// Medicare levy low-income threshold (single, ATO — indexed yearly).
+// Medicare levy low-income thresholds (single, ATO — indexed yearly). Seniors and
+// pensioners (SAPTO-eligible) get a materially higher threshold, so a self-funded
+// retiree on modest investment income is usually exempt.
 const MEDICARE_LOW_INCOME_THRESHOLD = 27_222;
+const MEDICARE_SENIOR_THRESHOLD = 43_020;
 
-/** The 2% Medicare levy on a working-age person's taxable income: nil below the
- *  low-income threshold, shaded in at 10c per $ over it, then a flat 2%. Kept
- *  SEPARATE from residentIncomeTax (which is also used for CGT, where we deliberately
- *  exclude the levy) — this is added only to a wage-earner's take-home. */
-export function medicareLevy(taxable: number): number {
+/** The 2% Medicare levy on a person's taxable income: nil below the low-income
+ *  threshold, shaded in at 10c per $ over it, then a flat 2%. Seniors/pensioners
+ *  use the higher senior threshold. Kept SEPARATE from residentIncomeTax (which is
+ *  also used for CGT, where we deliberately exclude the levy). */
+export function medicareLevy(taxable: number, senior = false): number {
   const t = Math.max(0, taxable);
-  if (t <= MEDICARE_LOW_INCOME_THRESHOLD) return 0;
-  return Math.min(0.02 * t, 0.1 * (t - MEDICARE_LOW_INCOME_THRESHOLD));
+  const threshold = senior ? MEDICARE_SENIOR_THRESHOLD : MEDICARE_LOW_INCOME_THRESHOLD;
+  if (t <= threshold) return 0;
+  return Math.min(0.02 * t, 0.1 * (t - threshold));
 }
 
 // SAPTO (Seniors & Pensioners Tax Offset), per person. Max offset makes modest
@@ -109,7 +113,7 @@ export interface PersonTax {
   lito: number; // Low Income Tax Offset applied
   sapto: number; // Seniors & Pensioners Tax Offset applied (0 if not a senior)
   incomeTax: number; // net ordinary income tax after LITO + SAPTO
-  medicare: number; // 2% Medicare levy on employment income
+  medicare: number; // 2% Medicare levy on total taxable ordinary income (senior threshold when applicable)
   cgt: number; // tax on the realised capital gain (regime + 30% minimum)
   bySource: Record<string, number>; // chained net-tax increment per ordinary source (sums to incomeTax)
   total: number; // incomeTax + medicare + cgt
@@ -117,9 +121,8 @@ export interface PersonTax {
 
 export function personTax(
   sources: { key: string; amount: number }[], // ordinary income, in chain order (e.g. salary, rent, dividends, work)
-  employment: number, // salary + part-time work (base for Medicare)
   realizedGain: number, // outside-super realised gain (full real; the regime is applied here)
-  senior: boolean, // at/over Age Pension age → SAPTO applies
+  senior: boolean, // at/over Age Pension age → SAPTO + senior Medicare threshold apply
   household: "single" | "couple",
   cgt: CgtParams,
 ): PersonTax {
@@ -139,7 +142,10 @@ export function personTax(
   const afterLito = gross - litoApplied;
   const saptoApplied = senior ? Math.min(sapto(O, household), afterLito) : 0;
   const incomeTaxNet = afterLito - saptoApplied; // == netTax(O)
-  const medicare = medicareLevy(Math.max(0, employment));
+  // Medicare levy is on the whole taxable ordinary income (salary + net rent +
+  // dividends + part-time work), not salary alone — with the senior threshold for
+  // those at/over Age Pension age.
+  const medicare = medicareLevy(O, senior);
   let cgtTax = 0;
   const g = Math.max(0, realizedGain);
   if (g > 0) {

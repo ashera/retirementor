@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { simulate } from "../lib/au/simulate";
 import { DEFAULT_CONFIG } from "../lib/au/config";
 import { DEFAULT_PLAN, type RetirementPlan } from "../lib/au/types";
-import { residentIncomeTax } from "../lib/au/scenarios/reference";
+import { residentIncomeTax, medicareLevy } from "../lib/au/scenarios/reference";
 
 // Deferred-CGT model for the outside-super (personal/brokerage) pool. An equity
 // return splits into a dividend YIELD (realised — taxed each year at marginal
@@ -52,7 +52,7 @@ function oracle(years: number) {
     value *= 1 + r;
     // 3. Tax: dividends (marginal) + CGT under the indexed regime — the whole real
     //    gain, marginal, with a 30% minimum (no Age Pension here → the minimum binds).
-    const divTax = residentIncomeTax(income);
+    const divTax = residentIncomeTax(income) + medicareLevy(income); // dividends: income tax + 2% levy (pre-67, non-senior)
     const marginalGain = residentIncomeTax(income + realized) - residentIncomeTax(income);
     const cgt = Math.max(marginalGain, MINRATE * realized);
     const tax = divTax + cgt;
@@ -76,7 +76,8 @@ describe("Outside-super deferred-CGT taxation", () => {
 
   it("first year realises no gain (fresh basis) — tax is pure dividend yield", () => {
     const y0 = rows.find((r) => r.age === 60)!;
-    expect(y0.breakdown.outsideTax).toBeCloseTo(residentIncomeTax((OUTSIDE0 - SPEND) * YIELD), 1);
+    const inc0 = (OUTSIDE0 - SPEND) * YIELD;
+    expect(y0.breakdown.outsideTax).toBeCloseTo(residentIncomeTax(inc0) + medicareLevy(inc0), 1);
   });
 
   it("taxes far less than taxing the whole return as income (the old model)", () => {

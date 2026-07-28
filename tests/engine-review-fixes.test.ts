@@ -189,7 +189,7 @@ describe("Review pass-2 #2 — retirement tax reconciles with the consolidated m
     });
     const r = simulate(plan, cfg).rows.find((x) => x.age === 70)!.breakdown;
     const charged = (r.rentTax ?? 0) + (r.outsideTax ?? 0); // actually deducted from the pools
-    const modal = (r.incomeTax ?? 0) + ((r.capitalGains ?? 0) - (r.propertyCgt ?? 0)); // consolidated personTax (excl property-sale CGT)
+    const modal = (r.incomeTax ?? 0) + (r.medicare ?? 0) + ((r.capitalGains ?? 0) - (r.propertyCgt ?? 0)); // consolidated personTax (excl property-sale CGT)
     expect(charged).toBeGreaterThan(1_000); // rent + a drawn outside pool → real tax
     expect(charged).toBeCloseTo(modal, 0); // was ~$5k apart when rent & outside stacked separately
   });
@@ -491,5 +491,18 @@ describe("Engine audit — CGT on a pool-emptying draw isn't waived (#4)", () =>
     expect(b.superTaxDraw ?? 0).toBeGreaterThan(50_000); // the CGT is settled from super, not waived
     // super pool still reconciles once the tax draw is counted
     expect(b.openingSuper - b.mortgageCleared - y.superDrawn - (b.superTaxDraw ?? 0) - b.fees + b.superGrowth).toBeCloseTo(b.closingSuper, 0);
+  });
+});
+
+describe("Engine audit — Medicare levy on all ordinary income, senior-aware (#7)", () => {
+  it("uses the higher senior Medicare threshold", () => {
+    expect(medicareLevy(40_000)).toBeGreaterThan(0); // non-senior: over $27,222
+    expect(medicareLevy(40_000, true)).toBe(0); // senior: under the $43,020 threshold
+    expect(medicareLevy(60_000, true)).toBeCloseTo(0.02 * 60_000, 0); // senior flat 2% well above shade-in
+  });
+  it("a self-funded retiree on modest dividends below the senior threshold pays no levy", () => {
+    const p = base({ people: [P({ currentAge: 67, superBalance: 200_000 })], retirementAge: 67, outsideSuper: 300_000, targetSpending: 30_000, investmentReturn: 5 });
+    const b = simulate(p, cfg).rows.find((r) => r.age === 70)!.breakdown;
+    expect(b.medicare ?? 0).toBe(0); // dividend income sits under the $43,020 senior threshold
   });
 });
