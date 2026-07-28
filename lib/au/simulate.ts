@@ -490,8 +490,11 @@ export function simulate(
       // savings continue (a documented simplification — their share isn't separated).
       const savings = anyoneWorking ? plan.annualOutsideSavings : 0;
       const outsideHalf = Math.pow(1 + realReturn, 0.5);
-      outside = startOutside * (1 + realReturn) + savings * outsideHalf;
-      const outsideGrowth = outside - startOutside - savings;
+      // A life-event windfall arrives mid-year, so it earns ~half a year's return
+      // (like savings) — weighted here rather than added post-growth (0 return, the
+      // old accumulation behaviour, inconsistent with the retirement phase).
+      outside = startOutside * (1 + realReturn) + (savings + eventIncomeNow) * outsideHalf;
+      const outsideGrowth = outside - startOutside - savings - eventIncomeNow;
 
       // Tax the dividend/distribution yield on money held OUTSIDE super during the
       // working years too — assessable at each owner's marginal rate on top of their
@@ -573,10 +576,10 @@ export function simulate(
       // funded from salary (its negative-gearing tax saving is already in accumRentTax).
       const rentSaved = Math.max(0, accumRentCash - accumRentTax);
       outside += rentSaved;
-      // Life events (working years): a windfall lands in savings untaxed; a one-off
-      // expense is drawn from savings — super is preserved and can't fund it — so it's
-      // floored at what the outside pool holds (an unaffordable expense just empties it).
-      outside += eventIncomeNow;
+      // Life events (working years): a windfall lands in savings untaxed (added with
+      // half-year growth above); a one-off expense is drawn from savings — super is
+      // preserved and can't fund it — so it's floored at what the outside pool holds
+      // (an unaffordable expense just empties it).
       const eventExpensePaid = Math.min(eventExpenseNow, Math.max(0, outside));
       outside -= eventExpensePaid;
       // Living costs funded from savings during a career break (summed if both
@@ -1223,13 +1226,19 @@ export function simulate(
         accum[i] *= 1 + superAccumReturn;
       }
     });
-    const outsideGrowth = outside * realReturn;
+    // A life-event windfall arrived mid-year, so its retained portion earns only ~half
+    // a year's return — weight it at half in the growth base (it took a full year
+    // before, inconsistent with the accumulation phase). The opening pool earns a full
+    // year as usual.
+    const eventRetained = Math.min(Math.max(0, eventIncomeNow), Math.max(0, outside));
+    const growthBase = Math.max(0, outside - 0.5 * eventRetained);
+    const outsideGrowth = growthBase * realReturn;
     // Split the year's return into an income yield (dividends — realised, taxed now)
     // and capital growth (unrealised — deferred until units are sold). The whole
     // return still compounds into the balance; only the tax treatment differs.
-    const outsideIncome = Math.max(0, outside * outsideIncomeYield);
+    const outsideIncome = Math.max(0, growthBase * outsideIncomeYield);
     unrealizedGain += outsideGrowth - outsideIncome; // capital growth accrues untaxed
-    outside *= 1 + realReturn;
+    outside += outsideGrowth;
 
     // Super's real edge: pension-phase super earnings are tax-free, but money held
     // OUTSIDE super is taxable. In retirement we tax the year's outside income — the

@@ -567,3 +567,31 @@ describe("Engine audit — SAPTO for a 67+ still-working partner in the gap (#9)
     expect(th).toBeGreaterThan(40_000 - residentIncomeTax(40_000) - medicareLevy(40_000)); // more than the resident scale
   });
 });
+
+describe("Engine audit — life-event windfall earns half a year's growth (#11)", () => {
+  it("accumulation: a windfall grows half a year in its arrival year, then fully", () => {
+    const p = base({
+      people: [P({ currentAge: 50, superBalance: 300_000, salary: 80_000 })], retirementAge: 67,
+      outsideSuper: 0, annualOutsideSavings: 0,
+      lifeEvents: [{ id: "w", kind: "income", atAge: 55, label: "Inheritance", amount: 100_000 }],
+    });
+    const rows = simulate(p, cfg).rows;
+    const arrival = rows.find((r) => r.age === 55)!.breakdown.closingOutside;
+    expect(arrival).toBeCloseTo(100_000 * 1.06 ** 0.5, -1); // half-year growth (not 100k, not 106k)
+    // full year thereafter (less the dividend tax on the now-invested balance)
+    const next = rows.find((r) => r.age === 56)!.breakdown.closingOutside;
+    expect(next).toBeGreaterThan(arrival * 1.05);
+    expect(next).toBeLessThan(arrival * 1.06);
+  });
+  it("retirement: a retained windfall grows less than a full year in its arrival year", () => {
+    // Pension + super cover spending, so the windfall stays invested. Compare against
+    // a plan with no event: the arrival-year gain is between 0 and a full year's return.
+    const common = { people: [P({ currentAge: 67, superBalance: 600_000 })], retirementAge: 67, outsideSuper: 50_000, targetSpending: 35_000 };
+    const withEvent = base({ ...common, lifeEvents: [{ id: "w", kind: "income", atAge: 70, label: "Windfall", amount: 100_000 }] });
+    const noEvent = base({ ...common });
+    const at = (p: RetirementPlan) => simulate(p, cfg).rows.find((r) => r.age === 70)!.breakdown.closingOutside;
+    const delta = at(withEvent) - at(noEvent);
+    expect(delta).toBeGreaterThan(100_000); // more than face (it earned some growth)
+    expect(delta).toBeLessThan(100_000 * 1.06); // but less than a full year's return
+  });
+});
