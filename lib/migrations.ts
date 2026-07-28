@@ -6,6 +6,7 @@ import { DEFAULT_CONFIG } from "./au/config";
 import { PARAM_DESCRIPTORS } from "./au/params";
 import { SOURCE_SEEDS } from "./au/sources";
 import { DEMO_SCENARIOS } from "./au/scenarios/demoScenarios";
+import { RELEASE_HISTORY } from "./releaseHistory";
 
 export const SCHEMA_SQL = `
 create table if not exists users (
@@ -301,6 +302,7 @@ create table if not exists releases (
   updated_at timestamptz not null default now()
 );
 create index if not exists releases_pub_idx on releases(published, released_at desc, build desc);
+create unique index if not exists releases_version_uidx on releases(version);
 `;
 
 /** Apply the schema. Safe to run repeatedly. */
@@ -581,6 +583,7 @@ export async function migrate(c: Client): Promise<void> {
   await seedSources(c);
   await seedMarketingAssets(c);
   await seedDemoScenarios(c);
+  await seedReleases(c);
 }
 
 /**
@@ -607,4 +610,24 @@ export async function seedDemoScenarios(c: Client): Promise<void> {
     );
   }
   console.log(`  demo-scenarios: upserted ${DEMO_SCENARIOS.length} scenario(s).`);
+}
+
+/**
+ * Backfill the release-notes changelog with the curated history (RELEASE_HISTORY).
+ * INSERT-if-absent by version — so it seeds the history once and NEVER overwrites a
+ * release that's since been edited in the backoffice, and new backoffice releases
+ * (different versions) are left alone. Idempotent across deploys.
+ */
+export async function seedReleases(c: Client): Promise<void> {
+  let added = 0;
+  for (const r of RELEASE_HISTORY) {
+    const res = await c.query(
+      `insert into releases (version, build, commit_hash, released_at, title, notes, published)
+       values ($1, $2, $3, $4, $5, $6, true)
+       on conflict (version) do nothing`,
+      [r.version, r.build, r.commit, r.date, r.title, JSON.stringify(r.notes)],
+    );
+    added += res.rowCount ?? 0;
+  }
+  console.log(`  releases: backfilled ${added} of ${RELEASE_HISTORY.length} historical release(s).`);
 }
