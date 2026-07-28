@@ -326,7 +326,11 @@ export function simulate(
       if (ttrEligible && plan.ttr && plan.ttr.extraSacrifice > 0) {
         const ttrSacrificed = Math.min(plan.ttr.extraSacrifice * scale, Math.max(0, cap - concessional));
         if (ttrSacrificed > 0) {
-          const taxSaved = netTax(taxable) - netTax(Math.max(0, taxable - ttrSacrificed));
+          // Sacrificing cuts taxable income, so it saves the marginal income tax AND
+          // the 2% Medicare levy on that slice — net of the 15% contributions tax.
+          const lower = Math.max(0, taxable - ttrSacrificed);
+          const taxSaved =
+            netTax(taxable) - netTax(lower) + (medicareLevy(taxable, senior) - medicareLevy(lower, senior));
           ttrBenefit = taxSaved - ttrSacrificed * config.contributionsTax;
         }
       }

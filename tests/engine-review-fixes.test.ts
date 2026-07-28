@@ -595,3 +595,17 @@ describe("Engine audit — life-event windfall earns half a year's growth (#11)"
     expect(delta).toBeLessThan(100_000 * 1.06); // but less than a full year's return
   });
 });
+
+describe("Engine audit — TTR benefit includes the 2% Medicare saving (#13)", () => {
+  it("counts the levy saved on the sacrificed slice, net of contributions tax", () => {
+    const p = base({ people: [P({ currentAge: 60, superBalance: 400_000, salary: 120_000 })], retirementAge: 65, ttr: { extraSacrifice: 15_000 } });
+    // concessional = 120k×SG (no voluntary) → nothing sacrificed yet, so taxable = 120k;
+    // the TTR swap then sacrifices 15k → taxable slice 120k → 105k.
+    const expected =
+      residentIncomeTax(120_000) - residentIncomeTax(105_000) + (medicareLevy(120_000) - medicareLevy(105_000)) - 15_000 * cfg.contributionsTax;
+    expect(rowAt(p, 61).breakdown.ttrBenefit).toBeCloseTo(expected, 0);
+    // and the levy piece is a real +$300 (2% of the $15k slice) over the income-tax-only figure
+    const incomeTaxOnly = residentIncomeTax(120_000) - residentIncomeTax(105_000) - 15_000 * cfg.contributionsTax;
+    expect(rowAt(p, 61).breakdown.ttrBenefit).toBeCloseTo(incomeTaxOnly + 300, 0);
+  });
+});

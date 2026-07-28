@@ -400,7 +400,10 @@ export function ttrBenefit(
   const taxable = Math.max(0, salary - sacrificed);
   const ttrSacrificed = Math.min(extraSacrifice, Math.max(0, concessionalCap - concessional));
   if (ttrSacrificed <= 0) return 0;
-  const taxSaved = residentIncomeTax(taxable) - residentIncomeTax(Math.max(0, taxable - ttrSacrificed));
+  // The swap saves the marginal income tax AND the 2% Medicare levy on the sacrificed
+  // slice (pre-67 TTR → non-senior threshold), net of the 15% contributions tax.
+  const lower = Math.max(0, taxable - ttrSacrificed);
+  const taxSaved = residentIncomeTax(taxable) - residentIncomeTax(lower) + (medicareLevy(taxable) - medicareLevy(lower));
   return taxSaved - ttrSacrificed * contribTax;
 }
 

@@ -9,7 +9,7 @@ import { getCareerBreaks, getInvestmentProperties, personRetirementOffset, start
 import { fmtCurrency } from "./format";
 import { propertyValueAt, capitalGainsTax, netSaleProceeds } from "./property";
 import { budgetSplit, presetCategories } from "./budget";
-import { incomeTax } from "./tax";
+import { incomeTax, medicareLevy } from "./tax";
 import { simulate } from "./simulate";
 import { runMonteCarlo } from "./montecarlo";
 import type { EngineConfig } from "./config";
@@ -807,7 +807,9 @@ export function buildStrategyCatalog(
       ],
       note: (v) => {
         const taxable = Math.max(0, p0.salary - p0.voluntaryConcessional);
-        const taxSaved = incomeTax(taxable) - incomeTax(Math.max(0, taxable - v.extra));
+        const lower = Math.max(0, taxable - v.extra);
+        // Income tax + 2% Medicare levy saved on the sacrificed slice, net of the 15% contributions tax.
+        const taxSaved = incomeTax(taxable) - incomeTax(lower) + (medicareLevy(taxable) - medicareLevy(lower));
         const benefit = Math.max(0, taxSaved - v.extra * 0.15);
         return `From age 60 until you retire: take-home unchanged, about ${fmtCurrency(benefit)}/yr of tax saving into super${isCouple ? " (for you; your partner isn't affected)" : ""} (capped at the concessional limit). Pairs with working past 60.`;
       },
