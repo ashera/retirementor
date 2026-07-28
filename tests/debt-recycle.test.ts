@@ -94,6 +94,26 @@ describe("Debt recycling — engine", () => {
     expect(large - none).toBeGreaterThan(small - none);
   });
 
+  it("recycles through a staggered-retirement gap, unwinding at the LAST retirement", () => {
+    const couple: RetirementPlan = {
+      ...base,
+      household: "couple",
+      people: [
+        { currentAge: 54, superBalance: 400_000, salary: 130_000, voluntaryConcessional: 0, voluntaryNonConcessional: 0, retirementAge: 63 },
+        { currentAge: 53, superBalance: 400_000, salary: 150_000, voluntaryConcessional: 0, voluntaryNonConcessional: 0, retirementAge: 60 },
+      ],
+      retirementAge: 63,
+      debtRecycle: { perYear: 20_000, loanRatePct: 6, untilAge: 63 },
+    };
+    const r = simulate(couple, cfg).rows;
+    const loan = (a: number) => r.find((x) => x.age === a)!.breakdown.investmentLoan ?? 0;
+    // The household "retires" when the FIRST partner does (oldest age 61); recycling
+    // must KEEP GOING while the other still earns, so the loan builds past it…
+    expect(loan(62)).toBeGreaterThan(loan(60));
+    // …and only unwinds once the last earner (retires at 63) stops.
+    expect(loan(63)).toBeLessThan(1);
+  });
+
   it("does nothing without a home loan to recycle against", () => {
     const noLoan: RetirementPlan = { ...base, mortgage: undefined };
     const off = simulate(noLoan, cfg).rows;

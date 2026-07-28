@@ -759,7 +759,7 @@ export function buildStrategyCatalog(
       blurb:
         "Redraw against your home loan to buy shares outside super. The investment-loan interest is tax-deductible, and the shares stay accessible before 60 — but it's leveraged.",
       params: [
-        { key: "perYear", label: "Recycle per year", min: 0, max: 60_000, step: 1_000, default: 20_000, prefix: "$", suffix: "/yr" },
+        { key: "perYear", label: "Recycle per year", min: 0, max: 150_000, step: 5_000, default: 20_000, prefix: "$", suffix: "/yr" },
         { key: "loanRatePct", label: "Investment-loan rate", min: 3, max: 10, step: 0.25, default: defaultRate, suffix: "%" },
       ],
       note: (v) =>

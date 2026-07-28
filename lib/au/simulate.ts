@@ -662,12 +662,23 @@ export function simulate(
     }
 
     // --- Retirement year (at least one person has retired) ---
-    // Debt recycling: unwind the geared sleeve — repay the investment loan from the
-    // (now un-geared) savings pool. Normally cleared in the first retirement year; a
-    // bad market run can leave residual debt that keeps dragging net worth (the
-    // leverage downside the MC / stress views surface). Pre-retirement gains are
-    // untaxed (the CGT basis resets at this boundary), so the repayment realises no CGT.
-    if (drLoan > 0) {
+    // Debt recycling can KEEP GOING through a staggered-retirement gap: the household
+    // "retires" when the FIRST partner does, but while the other still earns a salary
+    // (and the home loan is live and we're under `untilAge`) the recycling continues,
+    // deducting against that salary. Only once no one's earning do we unwind.
+    const drRecycling =
+      !!drCfg &&
+      drCfg.perYear > 0 &&
+      !!mortgage &&
+      !mortgageCleared &&
+      mortgageActiveAtAge(mortgage, oldest) &&
+      oldest < drCfg.untilAge &&
+      plan.people.some((_, i) => t < retireOffsets[i] && !onBreak(i));
+    // Unwind the geared sleeve once recycling has finished — repay the investment loan
+    // from the (now un-geared) savings pool. A bad market run can leave residual debt
+    // that keeps dragging net worth (the leverage downside the MC / stress views
+    // surface). Pre-retirement gains are untaxed (CGT basis resets here) → no CGT.
+    if (drLoan > 0 && !drRecycling) {
       const repay = Math.min(Math.max(0, outside), drLoan);
       outside -= repay;
       drLoan -= repay;
@@ -1028,6 +1039,32 @@ export function simulate(
     // unaffected. Deflated flat (today's $), like the accumulation stream.
     const stillEarning = plan.people.some((_, i) => t < retireOffsets[i] && !onBreak(i));
     if (stillEarning) outside += plan.annualOutsideSavings;
+    // Debt recycling through the staggered gap: borrow `perYear` (→ loan), buy that in
+    // shares (→ pool), and deduct the (real) interest against the STILL-WORKING
+    // partner's salary — the refund reinvested. Same mechanic as the accumulation
+    // sleeve; deflator is CPI here (post-household-retirement). Unwound once recycling
+    // ends (above). Only fires for staggered couples; singles/same-age are unaffected.
+    let drInterestRet = 0;
+    let drTaxSavingRet = 0;
+    if (drRecycling) {
+      const drRateReal = realRate(drCfg!.loanRatePct, cpi);
+      drInterestRet = drStart * drRateReal;
+      const earners = plan.people
+        .map((p, i) => ({ tx: t < retireOffsets[i] && !onBreak(i) ? p.salary * gapScale : 0, age: ages[i] }))
+        .filter((e) => e.tx > 0);
+      if (drInterestRet > 0 && earners.length) {
+        const per = drInterestRet / earners.length;
+        drTaxSavingRet = earners.reduce(
+          (s, e) => s + Math.max(0, taxAtAge(e.tx, e.age) - taxAtAge(Math.max(0, e.tx - per), e.age)),
+          0,
+        );
+      }
+      const half = Math.pow(1 + realReturn, 0.5);
+      outside += drCfg!.perYear * half; // borrowed funds, invested mid-year
+      drLoan += drCfg!.perYear;
+      outside -= drInterestRet; // service the interest from the recycling surplus
+      outside += drTaxSavingRet; // reinvest the deduction's tax refund
+    }
     // A life-event windfall lands in savings, available to fund this year's draw
     // (so it offsets what's taken from super) with any excess left in the pool.
     outside += eventIncomeNow;
@@ -1234,6 +1271,8 @@ export function simulate(
         closingSuper: totalSuper(),
         closingOutside: outside - drLoan,
         investmentLoan: drLoan,
+        drInterest: drInterestRet,
+        drTaxSaving: drTaxSavingRet,
         pensionSuper: openPension,
         accumSuper: openAccum,
         accumDrawn,
