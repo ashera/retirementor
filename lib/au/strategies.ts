@@ -50,6 +50,7 @@ const GOAL_BY_ID: Record<string, StrategyGoal> = {
   "adjust-spending": "spend",
   "retire-later": "last",
   "salary-sacrifice": "last",
+  "debt-recycle": "last",
   ttr: "last",
   guardrails: "risk",
   "part-time-work": "risk",
@@ -746,6 +747,34 @@ export function buildStrategyCatalog(
     });
   }
 
+  // Debt recycling — only when there's a live home loan to recycle against. The
+  // natural head-to-head with "Salary-sacrifice more": the same surplus, deployed
+  // as leveraged, liquid, deductible shares OUTSIDE super instead of locked inside it.
+  if (working && plan.people[0]?.salary > 0 && plan.mortgage && plan.mortgage.balance > 0) {
+    const defaultRate = Math.round(plan.mortgage.interestRate ?? 6);
+    cards.push({
+      id: "debt-recycle",
+      group: "mortgage",
+      label: "Debt recycling",
+      blurb:
+        "Redraw against your home loan to buy shares outside super. The investment-loan interest is tax-deductible, and the shares stay accessible before 60 — but it's leveraged.",
+      params: [
+        { key: "perYear", label: "Recycle per year", min: 0, max: 60_000, step: 1_000, default: 20_000, prefix: "$", suffix: "/yr" },
+        { key: "loanRatePct", label: "Investment-loan rate", min: 3, max: 10, step: 0.25, default: defaultRate, suffix: "%" },
+      ],
+      note: (v) =>
+        `Each working year, ${fmtCurrency(v.perYear)} pays down your home loan and is redrawn as a separate, ` +
+        `tax-deductible investment loan to buy shares OUTSIDE super. The interest (${v.loanRatePct}% p.a.) is deducted ` +
+        `against your salary and the refund reinvested. Unlike extra super, the shares are accessible before 60 — but ` +
+        `you're geared: it builds MORE wealth when returns beat the after-tax loan cost and LESS when they don't, so a ` +
+        `bad market run bites harder (see the likelihood and stress-test views). The loan is repaid at retirement.`,
+      apply: (p, v) => ({
+        ...p,
+        debtRecycle: { perYear: v.perYear, loanRatePct: v.loanRatePct, untilAge: p.retirementAge },
+      }),
+    });
+  }
+
   // Transition to Retirement — offered to any worker; the board only shows it
   // once the (composed) retirement age clears 60, so it also surfaces when the
   // Retire later lever opens a working-past-60 window. The engine applies it only
@@ -818,6 +847,7 @@ const STRATEGY_LABELS: Record<string, string> = {
   guardrails: "Flexible spending (guardrails)",
   "part-time-work": "Work part-time in early retirement",
   "salary-sacrifice": "Salary-sacrifice more",
+  "debt-recycle": "Debt recycling",
   ttr: "Transition to Retirement",
 };
 
@@ -837,6 +867,7 @@ export function stripStrategyFields(plan: RetirementPlan, activeIds: string[]): 
   if (has("recontribute")) p = { ...p, recontribute: undefined };
   if (has("lump-sum")) p = { ...p, lumpSum: undefined };
   if (has("ttr")) p = { ...p, ttr: undefined };
+  if (has("debt-recycle")) p = { ...p, debtRecycle: undefined };
   if (has("part-time-work")) p = { ...p, workIncome: undefined };
   if (has("downsize") && p.home) p = { ...p, home: { ...p.home, downsize: undefined } };
   if (has("sell-and-rent") && p.home) p = { ...p, home: { ...p.home, sellAndRent: undefined } };
@@ -872,6 +903,7 @@ export function appliedStrategies(plan: RetirementPlan, config: EngineConfig): A
   if (plan.recontribute) add("recontribute", "Recontribute savings to super");
   if (plan.lumpSum) add("lump-sum", "Take a lump sum");
   if (plan.ttr) add("ttr", "Transition to Retirement");
+  if (plan.debtRecycle) add("debt-recycle", "Debt recycling");
   if (plan.workIncome) add("part-time-work", "Work part-time in early retirement");
   const couple = plan.people.length > 1;
   getCareerBreaks(plan).forEach((brk) =>
