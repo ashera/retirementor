@@ -15,11 +15,16 @@ export function rowWithdrawalRate(row: YearRow): number {
   return row.totalSuper > 0 ? row.superDrawn / row.totalSuper : 0;
 }
 
-/** The net call on the whole portfolio that year — spend after the Age Pension and
- *  net rent, i.e. what your own investable assets (super + outside) must fund. */
+/** The net call on the whole portfolio that year — spend after the Age Pension, net
+ *  rent AND part-time work income, i.e. what your own investable assets (super +
+ *  outside) must fund. Part-time work funds part of the spend just like the pension
+ *  and rent, so leaving it in overstated the rate the moment work income appeared. */
 function rowNetSpend(row: YearRow): number {
   const b = row.breakdown;
-  return Math.max(0, b.livingSpend + b.mortgageCost - b.agePension - Math.max(0, b.rentIncome));
+  return Math.max(
+    0,
+    b.livingSpend + b.mortgageCost - b.agePension - Math.max(0, b.rentIncome) - Math.max(0, b.workIncome ?? 0),
+  );
 }
 
 /** Net spend ÷ (super + outside) — the whole-portfolio withdrawal rate, the true
@@ -44,6 +49,7 @@ export interface InitialWithdrawal {
   spend: number; // total spending that year
   agePension: number; // Age Pension funding part of the spend
   rent: number; // net investment-property rent funding part (≥ 0)
+  workIncome: number; // net part-time work income funding part (≥ 0)
   outsideDrawn: number; // drawn from outside-super savings
   minDriven: boolean; // true when the ATO minimum forces a draw above the spending need
   // When a MATERIAL outside-super buffer funds part of the early spend and then
@@ -70,7 +76,8 @@ export function initialWithdrawal(result: SimResult): InitialWithdrawal | null {
   const spend = b.livingSpend + b.mortgageCost;
   const agePension = b.agePension;
   const rent = Math.max(0, b.rentIncome);
-  const need = Math.max(0, spend - agePension - rent); // the slice super must fund
+  const workIncome = Math.max(0, b.workIncome ?? 0);
+  const need = Math.max(0, spend - agePension - rent - workIncome); // the slice super must fund
   const portfolio = row.totalSuper + row.outside;
 
   return {
@@ -84,6 +91,7 @@ export function initialWithdrawal(result: SimResult): InitialWithdrawal | null {
     spend,
     agePension,
     rent,
+    workIncome,
     outsideDrawn: row.outsideDrawn,
     minDriven: row.superDrawn > need + 1,
     bufferRunout: bufferRunout(result, row),

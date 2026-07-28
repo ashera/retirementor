@@ -2203,6 +2203,7 @@ export default function PlannerApp({
               central={central}
               iterations={mc.iterations}
               plan={plan}
+              pensionAge={config.agePensionAge}
               onClose={() => setFanAge(null)}
               onPrev={() => setFanAge((a) => (a != null ? Math.max(min, a - 1) : a))}
               onNext={() => setFanAge((a) => (a != null ? Math.min(max, a + 1) : a))}

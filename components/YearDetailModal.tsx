@@ -318,9 +318,14 @@ export default function YearDetailModal({
                 ) : (
                   <>
                     Your <span className="font-semibold text-amber-300">{fmtCurrency(Math.round(b.accumSuper))}</span> of
-                    super is in <span className="text-slate-300">accumulation</span>, its earnings taxed 15% — it moves to
-                    the tax-free <span className="text-slate-300">pension pool</span> when you retire
-                    {isCouple ? " (each of you, as you retire)" : ""}.
+                    super is in <span className="text-slate-300">accumulation</span>, its earnings taxed 15% —{" "}
+                    {stillWorking
+                      ? <>it moves to the tax-free <span className="text-slate-300">pension pool</span> when you retire{isCouple ? " (each of you, as you retire)" : ""}.</>
+                      : plan.keepSuperInAccumulation
+                        ? <>you&apos;ve chosen to keep it there, so it converts to the tax-free <span className="text-slate-300">pension pool</span> later (at Age Pension age).</>
+                        : row.phase === "bridge"
+                          ? <>it&apos;s preserved until you can access super (age 60), then converts to the tax-free <span className="text-slate-300">pension pool</span>.</>
+                          : <>it converts to the tax-free <span className="text-slate-300">pension pool</span> once you move it to an account-based pension.</>}
                   </>
                 )}
               </p>

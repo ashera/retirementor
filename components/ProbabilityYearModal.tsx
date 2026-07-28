@@ -2,7 +2,7 @@
 
 import { fmtCompact, fmtCurrency } from "@/lib/au/format";
 import type { FanPoint } from "@/lib/au/montecarlo";
-import type { RetirementPlan } from "@/lib/au/types";
+import { householdRetirementOffset, oldestCurrentAge, type RetirementPlan } from "@/lib/au/types";
 
 function NavBtn({ label, onClick, disabled }: { label: string; onClick: () => void; disabled: boolean }) {
   return (
@@ -27,6 +27,7 @@ export default function ProbabilityYearModal({
   central,
   iterations,
   plan,
+  pensionAge,
   onClose,
   onPrev,
   onNext,
@@ -38,6 +39,7 @@ export default function ProbabilityYearModal({
   central: number | null;
   iterations: number;
   plan: RetirementPlan;
+  pensionAge: number; // Age Pension age (config) — no pension floor exists before it
   onClose: () => void;
   onPrev: () => void;
   onNext: () => void;
@@ -47,7 +49,10 @@ export default function ProbabilityYearModal({
   const { p10, p50, p90, solvent } = point;
   const solventPct = Math.round(solvent * 100);
   const runShortPct = 100 - solventPct;
-  const retired = age >= plan.retirementAge;
+  // The household enters retirement when the FIRST partner does (staggered couples),
+  // not at person 0's age — so measure against that, not plan.retirementAge.
+  const retired = age >= oldestCurrentAge(plan) + householdRetirementOffset(plan);
+  const onPension = age >= pensionAge; // the Age Pension only starts here
   const yearsOut = Math.max(0, age - Math.max(...plan.people.map((pp) => pp.currentAge)));
 
   // Position markers within the p10–p90 range for the little spread bar.
@@ -162,8 +167,15 @@ export default function ProbabilityYearModal({
               <p className="text-slate-200">
                 <strong className="text-white">{solventPct}%</strong> of these futures still have
                 savings at age {age}. The other <strong className="text-amber-300">{runShortPct}%</strong>{" "}
-                have already run short — living on the Age Pension floor (still an income, just below
-                your target).
+                have already run short —{" "}
+                {onPension ? (
+                  "living on the Age Pension floor (still an income, just below your target)."
+                ) : (
+                  <>
+                    and at {age} that&apos;s <strong className="text-amber-300">before Age Pension age ({pensionAge})</strong>,
+                    so there&apos;s no pension to fall back on yet — those futures have little to no income until it starts.
+                  </>
+                )}
               </p>
             ) : (
               <p className="text-slate-200">

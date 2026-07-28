@@ -95,10 +95,11 @@ export default function TaxYearModal({
   const hasContent = hasPersonal || contrib > 0.5 || earnings > 0.5 || propertyCgt > 0.5;
   const litoZeroed = total < 1 && detail.some((d) => d.lito > 0.5 || d.sapto > 0.5);
   const anySapto = detail.some((d) => d.sapto > 0.5);
+  const stillWorking = (b.salaryIncome ?? 0) > 1; // a partner still earning in a staggered-retirement gap
   const phaseLabel =
     row.phase === "accumulation" ? "still working"
       : row.phase === "bridge" ? "retired — before super unlocks"
-      : row.phase === "drawdown" ? "retired — before the Age Pension"
+      : row.phase === "drawdown" ? (stillWorking ? "in retirement — a partner still working" : "retired — before the Age Pension")
       : "retired — Age Pension age";
 
   return (
@@ -179,8 +180,10 @@ export default function TaxYearModal({
         </div>
 
         <div className="border-t border-line px-6 py-3 text-[11px] leading-snug text-muted">
-          All ordinary income is taxed together on one marginal scale, with LITO (and SAPTO from Age Pension age)
-          applied once. Super pension drawdowns and the Age Pension are tax-free. Today&apos;s dollars.
+          {isCouple ? "Each person's" : "Your"} ordinary income (salary, net rent, dividends, gains) is taxed on{" "}
+          {isCouple ? "their" : "your"} own marginal scale — all sources stacked together, with LITO (and SAPTO from
+          Age Pension age) applied once{isCouple ? " per person" : ""}. Super pension drawdowns and the Age Pension are
+          tax-free. Today&apos;s dollars.
         </div>
       </div>
     </div>

@@ -584,7 +584,7 @@ export function buildStrategyCatalog(
         const whoTxt = whoLabel(v.who ?? whoDefault);
         return forever
           ? `${whoTxt} stays in accumulation for life — no forced minimum drawdown (nothing is pushed into taxable savings), but earnings are taxed 15%, and from Age-Pension age it's counted by the means test anyway.`
-          : `${whoTxt} stays in accumulation until Age-Pension age (67) — keeping it OUT of the Age Pension means test until then${isCouple ? " (most useful when one partner is younger)" : ""} — then converts to an account-based pension so its earnings become tax-free.`;
+          : `${whoTxt} stays in accumulation until Age-Pension age (67) — keeping it OUT of the Age Pension means test until then${isCouple ? " (most useful when one partner is younger)" : ""} — then converts to an account-based pension so its earnings become tax-free (up to the $2.1M transfer balance cap; any excess stays in accumulation, taxed 15%).`;
       },
       apply: (p, v) => {
         const whoVal = v.who ?? whoDefault;
@@ -666,8 +666,9 @@ export function buildStrategyCatalog(
         const bonus = 7_800 * people;
         return (
           `Earning ${fmtCurrency(v.perYear)}/yr until age ${v.untilAge} means you draw about that much less from savings in ` +
-          `each of those years. For the Age Pension income test the first ${fmtCurrency(bonus)}${people > 1 ? ` (${fmtCurrency(7_800)} each)` : ""} ` +
-          `is exempt (the Work Bonus); the rest counts as income and is taxed at the senior rate.`
+          `each of those years. It's taxed at your marginal rate (with the low-income offset). Once you're on the Age ` +
+          `Pension (from 67), the income test applies — but the first ${fmtCurrency(bonus)}${people > 1 ? ` (${fmtCurrency(7_800)} each)` : ""} ` +
+          `of work income is exempt under the Work Bonus.`
         );
       },
       apply: (p, v) => ({ ...p, workIncome: { perYear: v.perYear, untilAge: v.untilAge } }),

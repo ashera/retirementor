@@ -250,7 +250,7 @@ Pension = lower of the two = ${binding.toUpperCase()} test → ${money(pension)}
       <p className="mt-2 text-[11px] text-slate-500">
         {assess > cutoff
           ? `Assessable assets ${money(assess)} are above the ${money(cutoff)} cut-off, so no pension is paid until they fall below it.`
-          : `Assessable assets are below the ${money(cutoff)} cut-off, so a ${binding === "assets" ? "part" : ""} pension applies.`}
+          : `Assessable assets are below the ${money(cutoff)} cut-off, so a ${pension >= side.maxAnnual - 1 ? "full" : "part"} pension applies.`}
       </p>
     </MathBox>
   );

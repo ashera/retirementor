@@ -81,7 +81,8 @@ export default function IncomeYearModal({
   // The drawdown order beyond the pension minimum (see the ordered list below).
   const accumDrawn = row.breakdown.accumDrawn;
   const pensionExtraDrawn = row.breakdown.pensionExtraDrawn;
-  const hasAccum = row.breakdown.accumSuper > 1; // two-pool split active (super over the cap)
+  const hasAccum = row.breakdown.accumSuper > 1; // super in the taxed accumulation pool (over the cap, kept-in-accumulation, bridge, or a still-working partner)
+  const hasPension = row.breakdown.pensionSuper > 1; // a tax-free pension pool actually exists
   // Staggered-retirement gap year: a partner is still working, so their take-home
   // salary is household income too (on the retirement row as salaryIncome/takeHome).
   const partnerStillWorking = retired && row.salaryIncome > 1;
@@ -603,7 +604,9 @@ export default function IncomeYearModal({
                     <div className="border-t border-line pt-1.5 text-slate-300">
                       <div className="mb-1.5 text-[11px] text-muted">
                         {hasAccum
-                          ? "Then the shortfall is met in a tax-aware order — most-taxed money first, the tax-free pension preserved to last:"
+                          ? hasPension
+                            ? "Then the shortfall is met in a tax-aware order — most-taxed money first, the tax-free pension preserved to last:"
+                            : "Then the shortfall is met in a tax-aware order — savings outside super first, then your accumulation super (earnings taxed 15%):"
                           : "Then the shortfall is met in order — savings outside super first, so the tax-free pension keeps compounding:"}
                       </div>
                       {(() => {

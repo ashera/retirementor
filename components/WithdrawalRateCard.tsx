@@ -27,6 +27,8 @@ function reductions(w: InitialWithdrawal, goal: GoalBreakdown): { label: string;
     const label = hasPension ? `the Age Pension${hasRent ? " & rent" : ""}` : "rent";
     out.push({ label, amount: Math.round(w.agePension + w.rent) });
   }
+  // Part-time work income funds part of the spend too, so the ledger reconciles.
+  if (w.workIncome > 1) out.push({ label: "part-time work", amount: Math.round(w.workIncome) });
   if (loanErosion > 100) out.push({ label: "inflation eroding your fixed loan payment", amount: loanErosion });
   return out;
 }
@@ -248,11 +250,14 @@ function WithdrawalRateExplainer({
         </div>
         <p className="mt-2">
           We take what your own savings must fund — your spending
-          {w.agePension > 1
-            ? ` less the Age Pension${w.rent > 1 ? " and net rent" : ""}`
-            : w.rent > 1
-              ? " less net rent"
-              : ""}{" "}
+          {(() => {
+            const src = [
+              w.agePension > 1 && "the Age Pension",
+              w.rent > 1 && "net rent",
+              w.workIncome > 1 && "part-time work income",
+            ].filter(Boolean) as string[];
+            return src.length ? ` less ${joinAnd(src)}` : "";
+          })()}{" "}
           — and divide it by your total investable assets (super{hasBuffer && " + outside savings"}) at
           the start of that year.
         </p>
@@ -262,8 +267,8 @@ function WithdrawalRateExplainer({
         <div>
           <h3 className="mb-1 font-semibold text-white">Why it doesn&apos;t &ldquo;jump&rdquo; later</h3>
           <p>
-            Spending draws from your outside-super savings first (super&apos;s earnings are tax-free, so
-            it&apos;s worth preserving), so <em>super alone</em> is only drawing{" "}
+            Spending draws from your outside-super savings first (super is concessionally taxed now and
+            tax-free once it&apos;s in the pension pool, so it&apos;s worth preserving), so <em>super alone</em> is only drawing{" "}
             <strong className="text-white">{fmtCurrency(w.drawn)}</strong> ({superPct}% of super) so far.
             A super-only rate would look deceptively low now and appear to leap the year those savings
             run out{w.bufferRunout ? ` (around age ${w.bufferRunout.age})` : ""} — but nothing about

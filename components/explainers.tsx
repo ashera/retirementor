@@ -29,7 +29,9 @@ function AssetsSnapshot({
       <div className="mb-1.5 text-xs font-semibold text-slate-200">{heading}</div>
       <div className="space-y-1 text-[11px]">
         <div className="flex justify-between gap-4">
-          <span className="text-muted">Super (in pension phase)</span>
+          <span className="text-muted">
+            Super{(row.breakdown?.accumSuper ?? 0) > 1 ? " (pension + accumulation)" : " (in pension phase)"}
+          </span>
           <span className="tabular-nums text-slate-200">
             {fmtCurrency(row.totalSuper)}
           </span>
