@@ -12,7 +12,7 @@ import { fmtCurrency } from "@/lib/au/format";
 import { rowNetWorth } from "@/lib/au/networth";
 import { track } from "@/lib/analytics";
 import type { SavedPlan } from "@/app/actions/plans";
-import { createScenario, updatePlan, getOrCreateActiveScenario, setActivePlan } from "@/app/actions/plans";
+import { updatePlan, getOrCreateActiveScenario, setActivePlan } from "@/app/actions/plans";
 import {
   buildStrategyCatalog,
   applyStrategies,
@@ -143,8 +143,6 @@ export default function WhatIfView({
   const [values, setValues] = useState<Record<string, Record<string, number>>>({});
   const [savedName, setSavedName] = useState<string | null>(null); // the active scenario's name
   const [savedId, setSavedId] = useState<string | null>(null); // plans-row id the active scenario is (auto-save target)
-  const [saveMsg, setSaveMsg] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
   const [chartView, setChartView] = useState<"balance" | "networth" | "income" | "tax">("balance");
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
   const [assumptionsOpen, setAssumptionsOpen] = useState(false);
@@ -575,38 +573,6 @@ export default function WhatIfView({
   const setParam = (cardId: string, key: string, v: number) =>
     setValues((prev) => ({ ...prev, [cardId]: { ...prev[cardId], [key]: v } }));
 
-  // Branch: copy the current scenario (composed + strategy layer) into a fresh plan
-  // and make it active, so you can keep exploring without touching the one you were
-  // on. No naming prompt — "Copy of {name}" (deduped), renameable on the dashboard.
-  const branchScenario = async () => {
-    if (!baseline) return;
-    setSaving(true);
-    setSaveMsg(null);
-    const taken = initialSavedPlans.map((p) => p.name);
-    const base = `Copy of ${savedName ?? "scenario"}`;
-    let name = base;
-    for (let i = 2; taken.includes(name); i++) name = `${base} ${i}`;
-    const storable = fromActiveScenario(
-      { base: baseline, strategies: { active: [...active], values }, name, savedId: null, dirty: false },
-      config,
-    );
-    const res = await createScenario(name, storable);
-    setSaving(false);
-    if (res.error) {
-      setSaveMsg(res.error);
-      return;
-    }
-    if (res.id) {
-      setSavedId(res.id);
-      try {
-        localStorage.setItem(SAVED_ID_KEY, res.id);
-      } catch {}
-    }
-    setSavedName(name);
-    setSaveMsg(`Branched into “${name}” — you’re now editing it. Your previous scenario is untouched.`);
-    track("Scenario branched");
-  };
-
   // Show TTR only once the (composed) retirement age clears 60 — so it also
   // appears when the Retire later lever opens a working-past-60 window, and hides
   // again if retirement drops back to 60 or below.
@@ -751,8 +717,8 @@ export default function WhatIfView({
           <span>
             You&apos;re editing{" "}
             <strong className="text-white">{savedName ?? "your scenario"}</strong> — every strategy and life event
-            you add {signedIn ? "saves to it automatically" : "is kept on this device"}. To try something without
-            touching it, <strong className="text-white">New scenario</strong> below branches a copy.
+            you add {signedIn ? "saves to it automatically" : "is kept on this device"}. To try a variation without
+            touching this plan, create a <strong className="text-white">New scenario</strong> from the dashboard first.
           </span>
         </p>
         <button
@@ -1074,30 +1040,13 @@ export default function WhatIfView({
             Build your own →
           </Link>
         </div>
-      ) : (
-      <div className="mt-8 rounded-2xl border border-line bg-panel p-4">
-        <div className="flex flex-wrap items-center gap-3">
-          <span className="text-sm font-medium text-slate-200">
-            Editing <span className="font-semibold">{savedName ?? "your scenario"}</span>
-            {signedIn && <span className="font-normal text-muted"> — changes save automatically</span>}
-          </span>
-          <button
-            onClick={branchScenario}
-            disabled={saving || !signedIn}
-            title="Copy this scenario into a new one and switch to it — so you can explore without touching this plan"
-            className="rounded-lg border border-accent/40 bg-accent/10 px-4 py-2 text-sm font-semibold text-accent transition hover:bg-accent/20 disabled:opacity-50"
-          >
-            {saving ? "Working…" : "＋ New scenario"}
-          </button>
+      ) : !signedIn ? (
+        <div className="mt-8 rounded-2xl border border-line bg-panel p-4">
+          <p className="text-xs text-muted">
+            Your work is kept on this device. Sign in to save named scenarios to your account and sync them across devices.
+          </p>
         </div>
-        <p className="mt-2 text-xs text-muted">
-          {signedIn
-            ? "Want to keep this plan as-is and try a variation? New scenario branches a copy and switches you to it — the original is left untouched."
-            : "Your work is kept on this device. Sign in to save named scenarios to your account and sync them across devices."}
-        </p>
-        {saveMsg && <p className="mt-2 text-xs text-accent">{saveMsg}</p>}
-      </div>
-      )}
+      ) : null}
       </div>{/* ── /COLUMN 2 ── */}
       </div>{/* ── /two-column grid ── */}
 
