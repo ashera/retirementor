@@ -442,7 +442,7 @@ export default function StressTestView({
               </div>
               {longevityOpen && longevity && (
                 <div className="mt-4">
-                  <SurvivalOverlay lens={longevity.lens} retirementAge={longevity.startAge} ages={plan ? ageGapInfo(plan) : null} />
+                  <SurvivalOverlay lens={longevity.lens} retirementAge={longevity.startAge} ages={plan ? ageGapInfo(plan) : null} couple={plan.people.length > 1} />
                   <p className="mt-3 text-xs text-muted">
                     Survival from the ABS Australian Life Tables 2020–22 (a smooth calibrated approximation; period rates, no
                     future mortality improvement). This weights the same Monte-Carlo runs behind the scorecard — it doesn&apos;t
