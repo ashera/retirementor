@@ -5,6 +5,7 @@ import { minDrawdownRate, type EngineConfig } from "@/lib/au/config";
 import { getInvestmentProperties, getLifeEvents, type RetirementPlan, type YearRow } from "@/lib/au/types";
 import { netRentCash, propertyValueAt } from "@/lib/au/property";
 import { essentialsFloor } from "@/lib/au/strategies";
+import { retirementYearIncome } from "@/lib/au/yearIncome";
 
 const cur = (n: number) => fmtCurrency(Math.round(n));
 
@@ -120,10 +121,10 @@ export default function IncomeYearModal({
   // a still-working partner's salary). The ATO minimum can force super out beyond
   // that — the surplus is reinvested, not spent, so it isn't spendable income
   // this year. Count only the super that actually funds spending.
-  const need = Math.max(0, spend - pension - afterTaxRent - salaryTakeHome);
-  const superReinvested = Math.max(0, fromSuper - need);
-  const spendableSuper = fromSuper - superReinvested;
-  const total = pension + afterTaxRent + spendableSuper + fromOutside + salaryTakeHome + partTimeWork;
+  const inc = retirementYearIncome(row);
+  const superReinvested = inc.superReinvested;
+  const spendableSuper = inc.fromSuper;
+  const total = inc.total;
   const shortfall = Math.max(0, spend - total);
 
   // Per-person salary split for a couple's working years (salary is constant in
@@ -198,7 +199,7 @@ export default function IncomeYearModal({
 
   // Why is the super draw this amount? Uses the engine's actual minimum (summed
   // per person — a couple with an age gap has different rates each).
-  const privateNeed = Math.max(0, spend - pension - afterTaxRent - salaryTakeHome);
+  const privateNeed = inc.need;
   const minRate = minDrawdownRate(row.age, config);
   const minDraw = row.breakdown.minDrawdown;
   const parts = row.breakdown.minDrawdownParts;
