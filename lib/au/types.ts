@@ -15,6 +15,10 @@ export interface Person {
   // partner retires at the same TIME as person 0 (so age-gap couples that never
   // set this are unchanged from the single-retirement-age model).
   retirementAge?: number;
+  // Optional — used only by the longevity ("Rich, Broke or Dead") overlay to weight
+  // outcomes by survival. Male/female mortality differ ~3-4 yrs; unset → a 50/50
+  // blended life table. Not used anywhere in the projection maths.
+  sex?: "male" | "female";
 }
 
 // How retirement spending is modelled over time.

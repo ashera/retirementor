@@ -7,6 +7,11 @@ import type { RetirementPlan } from "@/lib/au/types";
 import { DEFAULT_PLAN } from "@/lib/au/types";
 import type { SavedPlan } from "@/app/actions/plans";
 import { runStressTest, failsafeSpend, STRESS_ERAS, type StressEraResult } from "@/lib/au/stresstest";
+import { runMonteCarlo } from "@/lib/au/montecarlo";
+import { householdSurvival } from "@/lib/au/mortality";
+import { survivalLens } from "@/lib/au/survivalLens";
+import { oldestCurrentAge, householdRetirementOffset } from "@/lib/au/types";
+import SurvivalOverlay from "@/components/SurvivalOverlay";
 import { essentialsFloor } from "@/lib/au/strategies";
 import { fmtCurrency } from "@/lib/au/format";
 import { stressNarrative } from "@/lib/au/stressNarrative";
@@ -208,6 +213,19 @@ export default function StressTestView({
   }, [plan, config, fixed, flex]);
   const life = plan?.lifeExpectancy ?? 90;
 
+  // Longevity ("Rich, Broke or Dead") overlay — weights the Monte-Carlo shortfall
+  // distribution by survival. Deferred behind a toggle: the MC run is heavier than
+  // the historical stress sims, so it only computes once opened.
+  const [longevityOpen, setLongevityOpen] = useState(false);
+  const longevity = useMemo(() => {
+    if (!plan || !longevityOpen) return null;
+    const mc = runMonteCarlo(plan, config, { iterations: 1000 });
+    const survival = householdSurvival(plan.people.map((p) => ({ currentAge: p.currentAge, sex: p.sex })));
+    const lens = survivalLens(mc, survival);
+    const startAge = oldestCurrentAge(plan) + Math.max(0, householdRetirementOffset(plan));
+    return { lens, startAge };
+  }, [plan, config, longevityOpen]);
+
   // Theatrical run: reveal the eras one at a time (chronologically), each taking a
   // random 5–10s to "test", with commentary in a modal. `step` = eras completed.
   const [step, setStep] = useState(0);
@@ -399,6 +417,38 @@ export default function StressTestView({
               <StressChart result={result} selectedId={selectedId} revealed={revealedIds} ages={plan ? ageGapInfo(plan) : null} />
             </div>
           </div>
+
+          {/* Longevity overlay — "Rich, Broke or Dead": the shortfall risk you'd
+              actually be alive to experience. Opt-in (heavier Monte-Carlo run). */}
+          {!running && plan && (
+            <div className="mt-5 rounded-2xl border border-line bg-panel p-5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-muted">Longevity view · Rich, Broke or Dead</div>
+                  <p className="mt-1 max-w-2xl text-sm text-muted">
+                    A run-to-{life} test treats every late shortfall as a failure — but you might not be there. This weights the
+                    outcome by your odds of survival{plan.people.length > 1 ? " (household — until the last survivor)" : ""}.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setLongevityOpen((v) => !v)}
+                  className="rounded-lg border border-line bg-panel-2 px-3 py-1.5 text-sm font-medium text-slate-200 transition hover:border-accent/50 hover:text-white"
+                >
+                  {longevityOpen ? "Hide" : "Show longevity view"}
+                </button>
+              </div>
+              {longevityOpen && longevity && (
+                <div className="mt-4">
+                  <SurvivalOverlay lens={longevity.lens} retirementAge={longevity.startAge} ages={plan ? ageGapInfo(plan) : null} />
+                  <p className="mt-3 text-xs text-muted">
+                    Survival from the ABS Australian Life Tables 2020–22 (a smooth calibrated approximation; period rates, no
+                    future mortality improvement). This weights the same Monte-Carlo runs behind the scorecard — it doesn&apos;t
+                    change spending. Set each person&apos;s sex in the planner for a sharper estimate; unset uses a blended table.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Flexibility ladder — how survival depends on how far you'd actually cut.
               Only meaningful for flexible spending. */}

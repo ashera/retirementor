@@ -270,6 +270,24 @@ export default function PlanWizard({
           max={75}
           suffix="yrs"
         />
+        <div>
+          <div className="mb-1.5 text-sm font-medium text-slate-200">Sex <span className="font-normal text-muted">(optional)</span></div>
+          <Segmented
+            value={draft.people[i].sex ?? ""}
+            options={[
+              { value: "female", label: "Female" },
+              { value: "male", label: "Male" },
+              { value: "", label: "Rather not say" },
+            ]}
+            onChange={(v) =>
+              setDraft((prev) => ({
+                ...prev,
+                people: prev.people.map((p, idx) => (idx === i ? { ...p, sex: v === "" ? undefined : (v as "male" | "female") } : p)),
+              }))
+            }
+          />
+          <p className="mt-1.5 text-xs text-muted">Only used for the longevity (&ldquo;Rich, Broke or Dead&rdquo;) survival view on the stress test — never for the projection itself.</p>
+        </div>
         {draft.superMode === "joint" && isCouple ? (
           i === 0 ? (
             <>

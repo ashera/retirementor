@@ -103,6 +103,8 @@ export interface MonteCarloResult {
   fan: FanPoint[]; // percentile balance paths by age
   medianDepletionAge: number | null; // median age money runs short among failures
   worstCaseDepletionAge: number | null; // 10th-percentile (early) depletion age
+  depletionAges: number[]; // depletion age of every FAILED run (oldest-person axis) — for the survival lens
+
   centralTerminalBalance: number; // deterministic ending balance at life expectancy (the central projection)
   medianTerminalBalance: number; // typical (p50) ending balance across runs
   aheadRate: number; // fraction of runs ending ahead of the central projection
@@ -199,6 +201,7 @@ export function runMonteCarlo(
     fan,
     medianDepletionAge: depSorted.length ? percentile(depSorted, 50) : null,
     worstCaseDepletionAge: depSorted.length ? percentile(depSorted, 10) : null,
+    depletionAges: depletionAges.slice(),
     centralTerminalBalance,
     medianTerminalBalance: percentile(terminalsSorted, 50),
     aheadRate,
