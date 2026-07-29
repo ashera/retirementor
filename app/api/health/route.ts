@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { pool } from "@/lib/db";
+import { APP_VERSION, BUILD, GIT_SHA, BUILD_DATE } from "@/lib/version";
 
 // Always evaluated per request — never statically cached or prerendered.
 export const dynamic = "force-dynamic";
@@ -37,11 +38,38 @@ export async function GET() {
     db = "down";
   }
 
+  // Non-secret ops diagnostics: which build is live + the release-notes table state
+  // (lets us confirm the deploy-time auto-draft is landing rows). Best-effort.
+  let releases: unknown = null;
+  if (db === "up") {
+    try {
+      const r = await withTimeout(
+        pool.query(
+          `select count(*)::int as total,
+                  count(*) filter (where published)::int as published,
+                  count(*) filter (where not published)::int as drafts,
+                  max(build) as max_build,
+                  (select version from releases order by build desc nulls last, created_at desc limit 1) as latest_version
+           from releases`,
+        ),
+        DB_TIMEOUT_MS,
+      );
+      releases = r.rows[0];
+    } catch {
+      releases = "unavailable";
+    }
+  }
+
   const ok = db === "up";
   return NextResponse.json(
     {
       status: ok ? "ok" : "degraded",
       db,
+      version: APP_VERSION,
+      build: BUILD,
+      sha: GIT_SHA,
+      builtOn: BUILD_DATE,
+      releases,
       uptime: Math.round(process.uptime()),
       ts: new Date().toISOString(),
     },
