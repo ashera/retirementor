@@ -1,18 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { fmtDate } from "@/lib/au/format";
-import { adminGetPlanData, adminDeletePlan, adminShareLink } from "@/app/actions/admin";
-
-// localStorage keys the planner dashboard reads on mount (see PlannerApp). Writing
-// the plan + a fresh timestamp makes the dashboard adopt it over any cloud draft.
-const KEY = {
-  plan: "au-retirement-plan",
-  baseline: "au-retirement-baseline",
-  baselineName: "au-retirement-baseline-name",
-  ts: "au-retirement-plan-ts",
-};
+import { adminDeletePlan, adminShareLink } from "@/app/actions/admin";
 
 interface PlanRow {
   id: string;
@@ -20,11 +12,11 @@ interface PlanRow {
   updated_at: string;
 }
 
-/** Admin: list a user's saved scenarios, load any one into the admin's own planner
- *  dashboard (for support / inspection), or delete it. */
+/** Admin: list a user's saved scenarios, open any one in a READ-ONLY preview (for
+ *  support / inspection) — a sandbox that never touches the admin's own plan — or
+ *  delete it. */
 export default function UserPlansList({ plans, email }: { plans: PlanRow[]; email?: string }) {
   const router = useRouter();
-  const [loadingId, setLoadingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [sharingId, setSharingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -63,33 +55,9 @@ export default function UserPlansList({ plans, email }: { plans: PlanRow[]; emai
     setDeletingId(null);
   };
 
-  const load = async (id: string, name: string) => {
-    if (!window.confirm(`Load “${name}” into your dashboard? This replaces your current working plan.`)) return;
-    setError(null);
-    setLoadingId(id);
-    const r = await adminGetPlanData(id);
-    if (!r.ok || !r.data) {
-      setError(r.error ?? "Couldn't load that plan.");
-      setLoadingId(null);
-      return;
-    }
-    try {
-      const json = JSON.stringify(r.data);
-      localStorage.setItem(KEY.plan, json);
-      localStorage.setItem(KEY.baseline, json);
-      localStorage.setItem(KEY.baselineName, r.name ?? name);
-      localStorage.setItem(KEY.ts, String(Date.now()));
-    } catch {
-      setError("Couldn't write to local storage.");
-      setLoadingId(null);
-      return;
-    }
-    window.location.href = "/"; // full navigation → planner mounts fresh and reads storage
-  };
-
   if (plans.length === 0) return <p className="text-sm text-muted">No saved scenarios.</p>;
 
-  const busy = loadingId != null || deletingId != null || sharingId != null;
+  const busy = deletingId != null || sharingId != null;
 
   return (
     <>
@@ -113,13 +81,14 @@ export default function UserPlansList({ plans, email }: { plans: PlanRow[]; emai
               >
                 {sharingId === p.id ? "Linking…" : "🔗 Link for Claude"}
               </button>
-              <button
-                onClick={() => load(p.id, p.name)}
-                disabled={busy}
-                className="rounded-md border border-line px-2.5 py-1 text-xs font-medium text-accent transition hover:border-accent disabled:opacity-40"
+              <Link
+                href={`/admin/scenario/${p.id}`}
+                target="_blank"
+                title="Open a read-only preview — a sandbox that never touches your own plan"
+                className="rounded-md border border-line px-2.5 py-1 text-xs font-medium text-accent transition hover:border-accent"
               >
-                {loadingId === p.id ? "Loading…" : "Load into my dashboard →"}
-              </button>
+                View scenario →
+              </Link>
               <button
                 onClick={() => remove(p.id, p.name)}
                 disabled={busy}
