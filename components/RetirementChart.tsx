@@ -239,6 +239,21 @@ export default function RetirementChart({
   } else {
     markerInputs.push({ key: "ap", x: pensionAge, color: "#a78bfa", name: "Age Pension" });
   }
+  // Per-person "super enters pension phase" — the accumulation→tax-free-pension flip
+  // that happens AFTER retirement (an early retiree turning 60, or a kept-in-accum
+  // member converting at Age-Pension age). Already in oldest-age-axis units, so plot
+  // directly. Only present when it's distinct from that person's Retire marker.
+  const isCouple = partnerRetirementAge != null;
+  (result.superUnlockAges ?? []).forEach((age, i) => {
+    if (age == null) return;
+    markerInputs.push({
+      key: `pp-${i}`,
+      x: age,
+      color: "#2dd4bf",
+      name: isCouple ? `${i === 0 ? "You" : "Partner"}: super → pension phase` : "Super → pension phase",
+      dash: "4 2",
+    });
+  });
   if (depletedAge !== null) {
     markerInputs.push({ key: "deplete", x: depletedAge, color: "#ef4444", name: `Depletes ${depletedAge}`, dash: "2 2" });
   }

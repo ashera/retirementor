@@ -198,6 +198,11 @@ export function simulate(
   // coincides with retirement (nothing to distinguish from the Retire marker).
   let superUnlockAge: number | null = null;
   let superUnlockIsPartner = false; // whose super it is — a partner's (index > 0) vs your own
+  // Per-person version of the above: the (oldest-person) age each member's preserved
+  // super first flips into the tax-free pension pool AFTER retirement began (an early
+  // retiree turning 60, or a kept-in-accumulation member converting at Age-Pension
+  // age). null when it coincided with their retirement (nothing distinct to mark).
+  const superUnlockAges: (number | null)[] = plan.people.map(() => null);
 
   // A home loan carried into retirement. `mortgageCleared` flips true once a
   // "clear at retirement" lump sum has been paid off from super.
@@ -801,9 +806,16 @@ export function simulate(
       // turning 60, or a kept-in-accumulation member converting at Age-Pension age)
       // flips the accumulation band to pension mid-retirement — flag the FIRST such
       // age so the chart can explain it.
-      if (t > earliestOffset && toPension > 1 && superUnlockAge === null) {
-        superUnlockAge = oldest;
-        superUnlockIsPartner = i > 0;
+      if (toPension > 1) {
+        // Singular (StressChart): first flip after the HOUSEHOLD retired.
+        if (t > earliestOffset && superUnlockAge === null) {
+          superUnlockAge = oldest;
+          superUnlockIsPartner = i > 0;
+        }
+        // Per-person: flag only when THIS member's flip is distinct from their own
+        // retirement (they retired before preservation age, or a keep-accum member
+        // converting later) — else it just coincides with their Retire marker.
+        if (t > retireOffsets[i] && superUnlockAges[i] === null) superUnlockAges[i] = oldest;
       }
       pension[i] += toPension;
       accum[i] -= toPension;
@@ -1433,6 +1445,7 @@ export function simulate(
     partnerRetirementAge: hasStaggeredRetirement(plan) ? personRetirementAge(plan, 1) : null,
     superUnlockAge,
     superUnlockIsPartner,
+    superUnlockAges,
     agePensionAge: pensionAge,
     superAtRetirement,
     totalAtRetirement,

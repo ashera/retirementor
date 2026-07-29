@@ -516,6 +516,9 @@ export interface SimResult {
   // flip; null when the transfer coincides with retirement.
   superUnlockAge: number | null;
   superUnlockIsPartner: boolean; // the unlocking super is a partner's (not "your" own)
+  // Per-person super-unlock age (index-aligned with people): when each member's super
+  // flips to pension phase after retirement, or null if it coincided with retirement.
+  superUnlockAges: (number | null)[];
   agePensionAge: number; // from the active config (used for chart markers)
   superAtRetirement: number; // combined super when retirement begins
   totalAtRetirement: number; // total investable assets when retirement begins

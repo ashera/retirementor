@@ -728,6 +728,95 @@ export default function PlannerApp({
     setNotice(`Loaded “${sp.name}”.`);
   };
 
+  // Export / import the plan as a JSON file — a portable backup that works with or
+  // without an account (the app is local-first). Export serialises the `storable`
+  // form (composed plan + any strategy bookmark); import validates and loads it.
+  const importInputRef = useRef<HTMLInputElement>(null);
+  const exportScenario = () => {
+    try {
+      const blob = new Blob([JSON.stringify(storable, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const safe =
+        (activeName || "retirement-plan").trim().replace(/[^\w.-]+/g, "-").replace(/^-+|-+$/g, "").toLowerCase() ||
+        "retirement-plan";
+      a.href = url;
+      a.download = `${safe}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      setNotice("Plan exported as a JSON file.");
+      track("Plan exported");
+    } catch {
+      setNotice("Couldn’t export the plan — please try again.");
+    }
+  };
+  const applyImported = (data: RetirementPlan, name: string) => {
+    const merged: RetirementPlan = { ...DEFAULT_PLAN, ...data };
+    if (user) {
+      // Import as a NEW named scenario so it never clobbers the current one.
+      startTransition(async () => {
+        const res = await createScenario(name, merged);
+        if (res.error) {
+          setNotice(res.error);
+          return;
+        }
+        setSavedId(res.id ?? null);
+        persistSavedId(res.id ?? null);
+        commit(merged, name);
+        setActiveName(name);
+        setConfigured(true);
+        setNotice(`Imported “${name}” as a new scenario.`);
+        track("Plan imported", { signed_in: true });
+        router.refresh();
+      });
+    } else {
+      // Guest: load into the working (localStorage) plan.
+      commit(merged, name);
+      setActiveName(name);
+      setConfigured(true);
+      setNotice(`Imported “${name}”.`);
+      track("Plan imported", { signed_in: false });
+    }
+  };
+  const onImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // reset so re-importing the same file fires onChange again
+    if (!file) return;
+    try {
+      const data = JSON.parse(await file.text());
+      if (!data || typeof data !== "object" || !Array.isArray(data.people) || !planIsBuilt(data)) {
+        setNotice("That file isn’t a valid RetireWiz plan export.");
+        return;
+      }
+      const stem = file.name.replace(/\.json$/i, "").trim();
+      applyImported(data as RetirementPlan, (stem ? `Imported: ${stem}` : "Imported plan").slice(0, 60));
+    } catch {
+      setNotice("Couldn’t read that file — is it a valid JSON export?");
+    }
+  };
+  const renderIOButtons = () => (
+    <>
+      <button
+        onClick={exportScenario}
+        disabled={pending}
+        title="Download this plan as a JSON file — a backup, or to move it to another device"
+        className="rounded-lg border border-line bg-panel-2 px-3 py-1.5 text-sm font-medium text-slate-200 transition hover:border-accent/50 hover:text-white disabled:opacity-60"
+      >
+        ⬇ Export
+      </button>
+      <button
+        onClick={() => importInputRef.current?.click()}
+        disabled={pending}
+        title="Load a plan from a JSON file you exported earlier"
+        className="rounded-lg border border-line bg-panel-2 px-3 py-1.5 text-sm font-medium text-slate-200 transition hover:border-accent/50 hover:text-white disabled:opacity-60"
+      >
+        ⬆ Import
+      </button>
+    </>
+  );
+
   // Wipe the guest's local data and return to the fresh first-visit state.
   const startOver = () => {
     if (!window.confirm("Clear your details and start over? This can't be undone.")) return;
@@ -1218,6 +1307,7 @@ export default function PlannerApp({
                 ⚖ Compare
                 <span aria-hidden>→</span>
               </Link>
+              {renderIOButtons()}
               <button
                 onClick={() => handleDelete(activePlan)}
                 aria-label={`Delete ${activePlan.name}`}
@@ -1228,10 +1318,23 @@ export default function PlannerApp({
               </button>
             </>
           ) : (
-            <span className="text-sm text-muted">Saving your scenario…</span>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted">Saving your scenario…</span>
+              {renderIOButtons()}
+            </div>
           )}
         </div>
       </div>
+      )}
+
+      {/* Export/import is offered to everyone (the app is local-first); signed-in users
+          get the buttons in the scenario bar above, guests get them here. */}
+      <input ref={importInputRef} type="file" accept="application/json,.json" hidden onChange={onImportFile} />
+      {!user && configured && (
+        <div className="mb-6 flex flex-wrap items-center gap-2">
+          {renderIOButtons()}
+          <span className="text-xs text-muted">Back up your plan or move it to another device.</span>
+        </div>
       )}
 
       {/* The projection only renders once the user has actually built a plan.

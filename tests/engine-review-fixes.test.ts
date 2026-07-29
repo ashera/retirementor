@@ -609,3 +609,19 @@ describe("Engine audit — TTR benefit includes the 2% Medicare saving (#13)", (
     expect(rowAt(p, 61).breakdown.ttrBenefit).toBeCloseTo(incomeTaxOnly + 300, 0);
   });
 });
+
+describe("Per-person super → pension-phase unlock ages (feature)", () => {
+  it("marks an early retiree's unlock at preservation age; a normal retirement isn't distinct", () => {
+    const early = base({ people: [P({ currentAge: 50, superBalance: 500_000, salary: 100_000 })], retirementAge: 55, outsideSuper: 400_000, targetSpending: 45_000 });
+    const normal = base({ people: [P({ currentAge: 50, superBalance: 600_000, salary: 100_000 })], retirementAge: 67, outsideSuper: 100_000, targetSpending: 45_000 });
+    expect(simulate(early, cfg).superUnlockAges).toEqual([60]); // super locked through the 55→60 bridge, then flips
+    expect(simulate(normal, cfg).superUnlockAges).toEqual([null]); // flips AT retirement → no separate marker
+  });
+  it("staggered couple: only the early retiree's unlock is distinct", () => {
+    const couple = base({
+      household: "couple", superMode: "individual", retirementAge: 55, outsideSuper: 500_000, targetSpending: 60_000,
+      people: [P({ currentAge: 52, superBalance: 500_000, salary: 100_000, retirementAge: 55 }), P({ currentAge: 50, superBalance: 400_000, salary: 90_000, retirementAge: 67 })],
+    });
+    expect(simulate(couple, cfg).superUnlockAges).toEqual([60, null]);
+  });
+});
