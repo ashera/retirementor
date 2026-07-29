@@ -426,8 +426,11 @@ export default function StressTestView({
                 <div>
                   <div className="text-xs font-semibold uppercase tracking-wide text-muted">Longevity view · Rich, Broke or Dead</div>
                   <p className="mt-1 max-w-2xl text-sm text-muted">
-                    A run-to-{life} test treats every late shortfall as a failure — but you might not be there. This weights the
-                    outcome by your odds of survival{plan.people.length > 1 ? " (household — until the last survivor)" : ""}.
+                    Most plans simply assume you live all the way to {life}, and count running low on money in your final years as
+                    a failure — even though you might not be here by then.
+                    {plan.people.length > 1 ? " And with two of you, what really matters is how long at least one of you is still around." : ""}{" "}
+                    This view takes into account how likely you are to still be alive at each age, so the number below is your true
+                    chance of running short of money while you are still here to spend it.
                   </p>
                 </div>
                 <button
