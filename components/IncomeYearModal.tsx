@@ -87,6 +87,10 @@ export default function IncomeYearModal({
   // salary is household income too (on the retirement row as salaryIncome/takeHome).
   const partnerStillWorking = retired && row.salaryIncome > 1;
   const salaryTakeHome = retired ? row.breakdown.takeHome : 0;
+  // Part-time work in retirement (the `workIncome` feature — e.g. an early retiree's
+  // online business). Net of tax, it offsets the drawdown. Distinct from a
+  // still-working partner's salary above.
+  const partTimeWork = retired ? Math.max(0, row.workIncome ?? 0) : 0;
   const spend = row.spending;
   // What makes up this year's spending goal, for the header subtext: essentials +
   // discretionary (the living-cost smile), plus any home loan, rent (after selling
@@ -119,7 +123,7 @@ export default function IncomeYearModal({
   const need = Math.max(0, spend - pension - afterTaxRent - salaryTakeHome);
   const superReinvested = Math.max(0, fromSuper - need);
   const spendableSuper = fromSuper - superReinvested;
-  const total = pension + afterTaxRent + spendableSuper + fromOutside + salaryTakeHome;
+  const total = pension + afterTaxRent + spendableSuper + fromOutside + salaryTakeHome + partTimeWork;
   const shortfall = Math.max(0, spend - total);
 
   // Per-person salary split for a couple's working years (salary is constant in
@@ -146,6 +150,7 @@ export default function IncomeYearModal({
   // echo a single row).
   const retirementSourceCount =
     (partnerStillWorking ? 1 : 0) +
+    (partTimeWork > 0 ? 1 : 0) +
     (pension > 0 ? 1 : 0) +
     (propertyCount > 1 || rent > 0 || rentShortfall > 0 ? 1 : 0) +
     (spendableSuper > 0 ? 1 : 0) +
@@ -412,6 +417,14 @@ export default function IncomeYearModal({
                       label="A partner's salary (take-home)"
                       sub="One of you is still working — their take-home pay funds most of the household's spending during the gap."
                       value={salaryTakeHome}
+                    />
+                  )}
+                  {partTimeWork > 0 && (
+                    <Row
+                      color="#f472b6"
+                      label="Part-time work"
+                      sub="What you earn from part-time work this year, after tax — it covers part of your spending, so you draw less from your savings."
+                      value={partTimeWork}
                     />
                   )}
                   {(pension > 0 || row.age >= config.agePensionAge) && (
