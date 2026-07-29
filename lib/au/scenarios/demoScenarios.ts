@@ -186,6 +186,34 @@ const retire52SequenceRisk: RetirementPlan = {
   lifeExpectancy: 90,
 };
 
+// A What-If prompt — "sell everything and become a global nomad, live cheap on
+// geoarbitrage." A 30yo on a good Sydney salary ($120k) with average super for the
+// age ($45k) quits at 35, sells up and lives in Vietnam on ~$24k/yr, earning
+// part-time from an online business. The question: how much must the business earn?
+// The binding constraint is the 35→60 bridge — super is LOCKED to preservation age,
+// so the online income has to cover the living costs the modest savings can't. ~$18k
+// /yr is the floor; ~$20k (a sixth of the Sydney salary) is comfortable. Below ~$15k
+// the ~$114k savings run dry before super unlocks. Homeowner=false (sold up).
+const nomadVietnam: RetirementPlan = {
+  ...DEFAULT_PLAN,
+  household: "single",
+  people: [
+    { ...DEFAULT_PLAN.people[0], currentAge: 30, superBalance: 45_000, salary: 120_000, voluntaryConcessional: 0, voluntaryNonConcessional: 0 },
+  ],
+  superMode: "individual",
+  homeowner: false,
+  outsideSuper: 25_000,
+  annualOutsideSavings: 15_000,
+  retirementAge: 35,
+  spendingMode: "flat",
+  targetSpending: 24_000,
+  investmentReturn: 7,
+  returnVolatility: 11,
+  inflation: 2.5,
+  lifeExpectancy: 90,
+  workIncome: { perYear: 20_000, untilAge: 60 },
+};
+
 export const DEMO_SCENARIOS: DemoScenario[] = [
   {
     slug: "fire-at-45",
@@ -263,5 +291,16 @@ export const DEMO_SCENARIOS: DemoScenario[] = [
     threadUrl: "",
     sortOrder: 70,
     data: retire52SequenceRisk,
+  },
+  {
+    slug: "nomad-vietnam",
+    title: "Global nomad · quit @35 · Vietnam",
+    blurb:
+      "A 30-year-old on $120k in Sydney with average super ($45k) sells up at 35 to live cheaply in Vietnam (~$24k/yr) on a part-time online income. How much must the business earn? About $20k/yr — a sixth of the Sydney salary — carries the plan to 90; below ~$15k the savings bridge runs dry before super unlocks.",
+    context:
+      "Modelled from a What-If prompt: 'sell everything and become a global nomad, live cheap on geoarbitrage.' 30yo, $120k Sydney salary, $45k super (≈ ASFA average for age 30-34), $25k savings + saving $15k/yr; quits at 35, sells up (homeowner=false), moves to Vietnam on $24k/yr. At 35 they hold ~$118k super (LOCKED to preservation age 60) and ~$114k savings. The finding: the binding constraint is the 25-year 35→60 bridge — super can't be touched, so the online business must cover the gap. ~$18k/yr is the floor, ~$20k comfortable (money lasts to 90); below ~$15k the savings deplete before 60 (fails ~52). The geoarbitrage upside: cheap living means you only replace a fraction of the salary, and the untouched super compounds (~$118k → ~$218k real at 60) into a comfortable retirement backed by the Age Pension from 67. Simplifications: taxes the part-time income at AU RESIDENT rates (a real nomad may be a non-resident — no tax-free threshold, but foreign-sourced income may fall outside AU tax entirely); Vietnam rent sits inside the $24k spend.",
+    threadUrl: "", // paste the thread URL once posted
+    sortOrder: 80,
+    data: nomadVietnam,
   },
 ];
