@@ -476,25 +476,28 @@ export default function PlannerApp({
   // active named scenario, so every edit is backed up server-side and follows them
   // to other devices / survives cleared browser storage.
   useEffect(() => {
-    if (!ready || !user || !configured) return;
+    // `shared` = viewing someone else's scenario (a /scenario or /s link): it's a
+    // read-only preview, so it must NEVER write to the viewer's own active scenario.
+    if (!ready || !user || !configured || shared) return;
     const t = setTimeout(() => {
       void autoSaveActive(storable);
     }, 1500);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [storable, ready, user, configured]);
+  }, [storable, ready, user, configured, shared]);
 
   // Best-effort flush when the tab is hidden, to catch edits made within the
-  // debounce window (localStorage already holds them for this device).
+  // debounce window (localStorage already holds them for this device). Never in the
+  // shared preview — that would overwrite the viewer's own scenario.
   useEffect(() => {
-    if (!user) return;
+    if (!user || shared) return;
     const flush = () => {
       if (document.visibilityState === "hidden" && configured) void autoSaveActive(storableRef.current);
     };
     document.addEventListener("visibilitychange", flush);
     return () => document.removeEventListener("visibilitychange", flush);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, configured]);
+  }, [user, configured, shared]);
 
   // Funnel top: tag each visit once we've read localStorage — did the visitor
   // land on the empty Get-started state (new) or straight onto results (has a

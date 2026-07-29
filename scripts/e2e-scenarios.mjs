@@ -190,6 +190,36 @@ try {
   ok("delete removes the active scenario", !remaining.some((p) => p.id === twoId));
   ok("delete falls back to another active scenario", remaining.some((p) => p.id === activeAfterDelete));
 
+  // J — a READ-ONLY shared link (/s/<token>) is a sandbox: viewing it (even while
+  //     signed in, even after the auto-save debounce + a tab-hide flush) must NEVER
+  //     write to the viewer's own active scenario.
+  const mine = await db.query(
+    "insert into plans (user_id, name, data) values ($1, 'Untouched', $2) returning id",
+    [uid, JSON.stringify({ ...PLAN, targetSpending: 55000 })],
+  );
+  const untouchedId = mine.rows[0].id;
+  await db.query("update users set active_plan_id=$1 where id=$2", [untouchedId, uid]);
+  const shareTok = randomBytes(16).toString("hex");
+  await db.query(
+    "insert into plans (user_id, name, data, share_token) values ($1, 'Shared Elsewhere', $2, $3)",
+    [uid, JSON.stringify({ ...PLAN, targetSpending: 24000 }), shareTok],
+  );
+  const untouchedSpend = async () =>
+    (await db.query("select data->>'targetSpending' as s from plans where id=$1", [untouchedId])).rows[0]?.s;
+  await page.goto(`${BASE}/s/${shareTok}`, { waitUntil: "networkidle" });
+  await page.waitForTimeout(3500); // past the 1.5s cloud-save debounce
+  await page.evaluate(() => {
+    try {
+      Object.defineProperty(document, "visibilityState", { value: "hidden", configurable: true });
+      document.dispatchEvent(new Event("visibilitychange")); // the tab-hide flush path
+    } catch {
+      /* ignore */
+    }
+  });
+  await page.waitForTimeout(1200);
+  ok("shared link leaves the active scenario's DATA untouched", (await untouchedSpend()) === "55000");
+  ok("shared link leaves active_plan_id unchanged", (await activePlanId()) === untouchedId);
+
   // E — historical stress test renders a scorecard + fixed/flex toggle for the plan.
   await page.goto(`${BASE}/stress-test`, { waitUntil: "networkidle" });
   await page.waitForTimeout(1000);
