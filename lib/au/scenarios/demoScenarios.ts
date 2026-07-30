@@ -214,6 +214,40 @@ const nomadVietnam: RetirementPlan = {
   workIncome: { perYear: 20_000, untilAge: 60 },
 };
 
+// The nomad's follow-up — his REAL, already-retired numbers. A Reddit responder
+// told us he'd retired at 60 with a $16.5k/yr defined-benefit pension + $14k/yr
+// US Social Security and had no way to enter them ("part-time work" cut out at 80).
+// This is the scenario the new income-streams feature was built for: two lifelong,
+// inflation-indexed pensions ($30.5k combined) modelled as first-class income. The
+// finding: those streams do the heavy lifting — they're tax-free from 67 (SAPTO
+// covers a modest single income), leave a partial Age Pension on top (~$14k at 67,
+// tapered by the income test), and turn a plan that would deplete at 74 on $250k
+// super + $100k savings alone into one that comfortably lasts past 90. Super/savings
+// only have to top the pensions up to a $45k lifestyle. (Illustrative super/savings/
+// spend — he can plug in his own on the live dashboard.)
+const nomadRetired60: RetirementPlan = {
+  ...DEFAULT_PLAN,
+  household: "single",
+  people: [
+    { ...DEFAULT_PLAN.people[0], currentAge: 60, superBalance: 250_000, salary: 0, voluntaryConcessional: 0, voluntaryNonConcessional: 0 },
+  ],
+  superMode: "individual",
+  homeowner: true,
+  outsideSuper: 100_000,
+  annualOutsideSavings: 0,
+  retirementAge: 60,
+  spendingMode: "flat",
+  targetSpending: 45_000,
+  investmentReturn: 7,
+  returnVolatility: 11,
+  inflation: 2.5,
+  lifeExpectancy: 90,
+  incomeStreams: [
+    { id: "db-pension", label: "Defined benefit pension", perYear: 16_500, fromAge: 60, indexed: true, taxable: true, assessable: true },
+    { id: "us-social-security", label: "US Social Security", perYear: 14_000, fromAge: 60, indexed: true, taxable: true, assessable: true },
+  ],
+};
+
 export const DEMO_SCENARIOS: DemoScenario[] = [
   {
     slug: "fire-at-45",
@@ -302,5 +336,16 @@ export const DEMO_SCENARIOS: DemoScenario[] = [
     threadUrl: "", // paste the thread URL once posted
     sortOrder: 80,
     data: nomadVietnam,
+  },
+  {
+    slug: "nomad-retired-60",
+    title: "Retired @60 · DB pension + US Social Security",
+    blurb:
+      "A retiree who quit at 60 with two lifelong, inflation-indexed pensions — a $16.5k/yr defined-benefit pension and $14k/yr US Social Security ($30.5k combined). Those streams do the heavy lifting: tax-free from 67, with a partial Age Pension (~$14k) on top, they carry the plan comfortably past 90. His $250k super + $100k savings only top the pensions up to a $45k lifestyle — without them the same savings would run dry at 74.",
+    context:
+      "Built from the Reddit responder who told us he'd retired at 60 with a $16.5k DB pension + $14k US Social Security and couldn't enter them (\"part-time work\" was the only fit and it cuts out at 80) — the scenario the income-streams feature was built for. Both modelled as indexed / taxable / assessable income streams. Findings: combined ~$30.5k/yr indexed for life; taxed only lightly before 67 (net ~$29.4k) then TAX-FREE from 67 (SAPTO covers a modest single income); a partial Age Pension survives the income test (~$14.3k at 67); money LASTS past 90 with the streams vs depletes at 74 without them (same $250k super + $100k savings, $45k spend). The lesson for the thread: a lifelong indexed pension is worth far more than an equivalent lump sum here — it's inflation-proof, tax-free from Age-Pension age, and only partially means-tested, so a relatively modest super balance is enough to top it up. Assumptions: super/savings/spend are illustrative (he only gave the two pension amounts — easily changed on the live dashboard); homeowner; Age Pension shown at standard rules (a retiree living permanently overseas faces residency/portability limits on the AU Age Pension — worth flagging if he's abroad).",
+    threadUrl: "", // paste the thread URL once posted
+    sortOrder: 90,
+    data: nomadRetired60,
   },
 ];

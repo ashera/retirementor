@@ -102,8 +102,8 @@ export default function IncomeStreamsEditor({
   const startAdd = () =>
     setDraft({
       id: newId(),
-      label: "Defined benefit pension",
-      perYear: 20_000,
+      label: "",
+      perYear: 0,
       fromAge: clampAge(defaultAge),
       untilAge: undefined,
       indexed: true,
