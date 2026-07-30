@@ -33,6 +33,7 @@ export function planCompleteness(plan: RetirementPlan): PlanCompleteness {
   const p1 = plan.people[1];
   const hasContrib = plan.people.some((p) => p.voluntaryConcessional > 0 || p.voluntaryNonConcessional > 0);
   const hasOutside = plan.outsideSuper > 0 || plan.annualOutsideSavings > 0;
+  const hasStreams = (plan.incomeStreams ?? []).some((s) => s.perYear > 0);
   const goalSet = plan.retirementAge > 0 && (plan.spendingMode === "stages" ? plan.spendingStages.goGo > 0 : plan.targetSpending > 0);
 
   const sections: CompSection[] = [
@@ -42,6 +43,7 @@ export function planCompleteness(plan: RetirementPlan): PlanCompleteness {
     { key: "contributions", label: "extra contributions", core: false, optional: true, complete: hasContrib || !!a.contributions },
     { key: "outside", label: "outside savings", core: false, optional: true, complete: hasOutside || !!a.outside },
     { key: "property", label: "a property", core: false, optional: true, complete: hasInvestmentProperty(plan) || !!a.property },
+    { key: "income", label: "other income", core: false, optional: true, complete: hasStreams || !!a.income },
     { key: "goal", label: "retirement goal", core: true, optional: false, complete: goalSet },
   ];
 

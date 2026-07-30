@@ -25,8 +25,9 @@ describe("planCompleteness", () => {
     expect(c.byKey.contributions.complete).toBe(false);
     expect(c.byKey.outside.complete).toBe(false);
     expect(c.byKey.property.complete).toBe(false);
+    expect(c.byKey.income.complete).toBe(false);
     expect(c.tier).toBe("Working model");
-    expect(c.pct).toBe(Math.round((3 / 6) * 100)); // 3 core of 6 sections
+    expect(c.pct).toBe(Math.round((3 / 7) * 100)); // 3 core of 7 sections
     expect(c.gapKey).toBe("contributions");
   });
 
@@ -34,10 +35,13 @@ describe("planCompleteness", () => {
     expect(planCompleteness(single({ outsideSuper: 50_000 })).byKey.outside.complete).toBe(true);
     expect(planCompleteness(single({ answered: { outside: true } })).byKey.outside.complete).toBe(true);
     expect(planCompleteness(single({ answered: { contributions: true } })).byKey.contributions.complete).toBe(true);
+    // an income stream marks the "other income" section complete (was always incomplete → "Needs info")
+    expect(planCompleteness(single()).byKey.income.complete).toBe(false);
+    expect(planCompleteness(single({ incomeStreams: [{ id: "db", perYear: 16_500, fromAge: 65 }] })).byKey.income.complete).toBe(true);
   });
 
   it("all sections answered → 100% Complete picture", () => {
-    const c = planCompleteness(single({ answered: { contributions: true, outside: true, property: true } }));
+    const c = planCompleteness(single({ answered: { contributions: true, outside: true, property: true, income: true } }));
     expect(c.pct).toBe(100);
     expect(c.tier).toBe("Complete picture");
     expect(c.gapKey).toBeNull();
@@ -58,7 +62,7 @@ describe("planCompleteness", () => {
         { currentAge: 38, superBalance: 100_000, salary: 70_000, voluntaryConcessional: 0, voluntaryNonConcessional: 0 },
       ],
     }));
-    expect(c.total).toBe(7);
+    expect(c.total).toBe(8);
     expect(c.byKey.partner.complete).toBe(true);
   });
 });

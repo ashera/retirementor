@@ -901,6 +901,12 @@ export default function PlanWizard({
       case "contributions": return contribMode === undefined ? "Not set yet" : contribMode === "no" ? "None" : `${fmtCurrency(contribTotal)}/yr`;
       case "outside": return outsideMode === undefined ? "Not set yet" : outsideMode === "no" ? "None" : fmtCurrency(draft.outsideSuper);
       case "property": return propMode === undefined ? "Not set yet" : propMode === "no" ? "None" : "Included";
+      case "income": {
+        const streams = (draft.incomeStreams ?? []).filter((s) => s.perYear > 0);
+        if (streams.length === 0) return "Not set yet";
+        const total = streams.reduce((s, x) => s + x.perYear, 0);
+        return `${fmtCurrency(total)}/yr${streams.length > 1 ? ` · ${streams.length} streams` : ""}`;
+      }
       case "goal": return Number.isFinite(previewSpend) ? `${fmtCurrency(previewSpend)}/yr · retire ${draft.retirementAge}` : "Not set yet";
       case "assumptions": return `${draft.investmentReturn}% · CPI ${draft.inflation}% · to ${draft.lifeExpectancy}`;
       default: return "";

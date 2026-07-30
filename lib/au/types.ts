@@ -239,7 +239,7 @@ export interface RetirementPlan {
   // Which optional sections the user has explicitly answered in the wizard (incl.
   // "none"), so plan-completeness can reach 100% honestly and the dashboard ring
   // matches the wizard. Not used by the engine.
-  answered?: { contributions?: boolean; outside?: boolean; property?: boolean };
+  answered?: { contributions?: boolean; outside?: boolean; property?: boolean; income?: boolean };
   // UI-only: the What-If board selection that produced this saved scenario, so it
   // can be reopened and tweaked ("Edit in What-If"). Ignored by the engine.
   whatIf?: WhatIfSaved;
