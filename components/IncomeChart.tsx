@@ -35,10 +35,11 @@ function IncomeTooltip({
   const salary = Math.max(0, r.salaryIncome ?? 0);
   const takeHome = Math.max(0, r.takeHome ?? 0);
   const work = Math.max(0, r.workIncome ?? 0);
+  const stream = Math.max(0, r.incomeStream ?? 0);
   // Net the after-tax rent so a geared property's shortfall isn't double-counted: the
   // extra drawdown that covers it is already in super/outside, so the household's
   // real income is that drawdown LESS the shortfall (i.e. it equals spending).
-  const total = takeHome + work + r.agePension + r.superDrawn + r.outsideDrawn + rentRaw;
+  const total = takeHome + work + stream + r.agePension + r.superDrawn + r.outsideDrawn + rentRaw;
   return (
     <div className="rounded-lg border border-line bg-panel px-3 py-2 text-sm shadow-xl">
       <div className="font-semibold text-white">{ages ? dualAgeLabel(ages, r.age) : `Age ${r.age}`}</div>
@@ -51,6 +52,11 @@ function IncomeTooltip({
       {work > 0 && (
         <div className="tabular-nums text-pink-400">
           Part-time work {fmtCurrency(work)}
+        </div>
+      )}
+      {stream > 0 && (
+        <div className="tabular-nums text-teal-300">
+          Pension / annuity {fmtCurrency(stream)}
         </div>
       )}
       {r.agePension > 0 && (
@@ -215,6 +221,16 @@ export default function IncomeChart({
           fill="#f472b6"
           fillOpacity={0.35}
           name="Part-time work"
+          isAnimationActive={animate}
+        />
+        <Area
+          type="stepAfter"
+          dataKey={(r: YearRow) => Math.max(0, r.incomeStream ?? 0)}
+          stackId="1"
+          stroke="#2dd4bf"
+          fill="#2dd4bf"
+          fillOpacity={0.35}
+          name="Pension / annuity"
           isAnimationActive={animate}
         />
         <Area

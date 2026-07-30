@@ -5,6 +5,7 @@ import Field from "@/components/Field";
 import CompletenessRing from "@/components/CompletenessRing";
 import BudgetBuilder from "@/components/BudgetBuilder";
 import PropertyCard from "@/components/PropertyCard";
+import IncomeStreamsEditor from "@/components/IncomeStreamsEditor";
 import { simulate } from "@/lib/au/simulate";
 import { runMonteCarlo, MC_CONFIDENCE_MC, MC_CONFIDENCE_TARGET } from "@/lib/au/montecarlo";
 import type { EngineConfig } from "@/lib/au/config";
@@ -513,6 +514,23 @@ export default function PlanWizard({
     ),
   };
 
+  const incomeStep = {
+    key: "income",
+    nav: "Other income",
+    title: "Other income",
+    subtitle:
+      "Any ongoing income for life — a defined-benefit pension, annuity, or foreign pension (e.g. US Social Security). It offsets your drawdown and is counted by the Age Pension income test. Most people can skip this.",
+    body: (
+      <IncomeStreamsEditor
+        streams={draft.incomeStreams ?? []}
+        minAge={Math.min(...draft.people.map((p) => p.currentAge).filter((a) => Number.isFinite(a) && a > 0), draft.retirementAge)}
+        maxAge={draft.lifeExpectancy}
+        defaultAge={draft.retirementAge}
+        onChange={(incomeStreams) => setDraft((prev) => ({ ...prev, incomeStreams }))}
+      />
+    ),
+  };
+
   const goalStep = {
     key: "goal",
     nav: "Goal",
@@ -834,6 +852,7 @@ export default function PlanWizard({
     contributionsStep,
     outsideStep,
     propertyStep,
+    incomeStep,
     goalStep,
     assumptionsStep,
   ];

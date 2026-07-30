@@ -1703,6 +1703,9 @@ export default function PlannerApp({
           <div className="flex flex-wrap items-center gap-4">
             <LegendDot color="#facc15" label="Take-home pay" />
             {plan.workIncome && <LegendDot color="#f472b6" label="Part-time work" />}
+            {result.rows.some((r) => (r.incomeStream ?? 0) > 0) && (
+              <LegendDot color="#2dd4bf" label="Pension / annuity" />
+            )}
             <LegendDot color="#a78bfa" label="Age Pension" />
             {/* Split the super legend only when accumulation is actually DRAWN as
                 income — an accumulation balance that's never tapped adds a legend

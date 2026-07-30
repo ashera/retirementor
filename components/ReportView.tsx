@@ -309,8 +309,11 @@ export default function ReportView({
                 : ","}{" "}
               then in retirement, tax-free super drawdowns (green), withdrawals
               from outside super (blue), any net property rent (orange), and from
-              Age Pension age the means-tested Age Pension (purple). As assets draw
-              down, the pension typically grows to fill the gap.
+              Age Pension age the means-tested Age Pension (purple).
+              {result.rows.some((r) => (r.incomeStream ?? 0) > 0)
+                ? " Any defined-benefit pension or annuity income (teal) runs alongside these."
+                : ""}{" "}
+              As assets draw down, the pension typically grows to fill the gap.
             </Lead>
             <div className="rounded-lg border border-slate-200 bg-slate-50 p-2">
               <IncomeChart result={result} animate={false} height={175} ages={ageGapInfo(plan)} />

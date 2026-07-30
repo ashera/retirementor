@@ -152,6 +152,7 @@ export default function IncomeYearModal({
   const retirementSourceCount =
     (partnerStillWorking ? 1 : 0) +
     (partTimeWork > 0 ? 1 : 0) +
+    (inc.incomeStream > 0 ? 1 : 0) +
     (pension > 0 ? 1 : 0) +
     (propertyCount > 1 || rent > 0 || rentShortfall > 0 ? 1 : 0) +
     (spendableSuper > 0 ? 1 : 0) +
@@ -426,6 +427,16 @@ export default function IncomeYearModal({
                       label="Part-time work"
                       sub="What you earn from part-time work this year, after tax — it covers part of your spending, so you draw less from your savings."
                       value={partTimeWork}
+                    />
+                  )}
+                  {inc.incomeStream > 0 && (
+                    <Row
+                      color="#2dd4bf"
+                      label="Pension / annuity income"
+                      sub={`Your defined-benefit / annuity / foreign-pension income, after tax${
+                        (row.breakdown.incomeStreamTax ?? 0) > 0.5 ? ` (${cur(row.breakdown.incomeStreamTax ?? 0)} income tax this year)` : ""
+                      }. It's counted under the Age Pension income test, so it also reduces any Age Pension above.`}
+                      value={inc.incomeStream}
                     />
                   )}
                   {(pension > 0 || row.age >= config.agePensionAge) && (

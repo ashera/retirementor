@@ -145,6 +145,26 @@ export interface LifeEvent {
   label?: string; // e.g. "Inheritance", "Big trip", "New car"
 }
 
+// A recurring income STREAM — a defined-benefit pension, annuity, or foreign
+// pension / social security (e.g. US Social Security). Runs from `fromAge` to
+// `untilAge` (default: for life), in today's dollars. `indexed` (default true) keeps
+// it constant in real terms (CPI-linked, "indexed for life"); non-indexed erodes
+// with inflation. Defaults model it as real, assessable, taxable income: it offsets
+// the drawdown, is counted under the Age Pension INCOME test (actual income — not
+// deemed, and NOT asset-tested, since a lifelong pension isn't a countable asset),
+// and is taxed as ordinary income (SAPTO applies from Age-Pension age). Ages are the
+// OLDEST person's age on the timeline (same axis as life events).
+export interface IncomeStream {
+  id: string; // stable id for add/edit/remove
+  label?: string; // e.g. "Defined benefit pension", "US Social Security"
+  perYear: number; // today's dollars
+  fromAge: number; // oldest person's age it starts
+  untilAge?: number; // oldest person's age it stops; omitted → for life
+  indexed?: boolean; // default true → constant real; false → erodes with CPI
+  taxable?: boolean; // default true → taxed as ordinary income
+  assessable?: boolean; // default true → counted in the Age Pension income test
+}
+
 // Per-person "keep super in accumulation" configuration (see RetirementPlan).
 export interface KeepAccumulation {
   who?: number[]; // person indices kept in accumulation (default: every member)
@@ -206,6 +226,7 @@ export interface RetirementPlan {
   careerBreak?: { atAge: number; years: number; spendFromSavings: number }; // DEPRECATED single-person form (person 0); read via getCareerBreaks(). Kept so plans saved before careerBreaks[] still load.
   careerBreaks?: CareerBreak[]; // "gap years": each entry = person `who` takes `years` off from their age `atAge` — no salary or super contributions in that window, drawing `spendFromSavings`/yr from outside savings to live. Savings additions pause only when EVERY working member is on a break that year. Super keeps earning on the existing balance; the lost contributions + compounding are the main cost.
   lifeEvents?: LifeEvent[]; // committed one-off cashflows at an age: an income (windfall/inheritance) lands in outside savings untaxed; an expense is an extra draw that year (from savings while working, from the retirement drawdown once retired). Today's dollars. Flows through the means test, MC, stress test, failsafe and guardrails automatically.
+  incomeStreams?: IncomeStream[]; // recurring income (defined-benefit / annuity / foreign pension e.g. US Social Security): offsets the drawdown, assessed under the Age Pension INCOME test (not deemed/not asset-tested) and taxed as ordinary income by default; indexed (constant real) unless flagged otherwise. See IncomeStream.
   // Debt recycling (What-If): while working, run a geared share sleeve funded by a
   // deductible investment loan (redraw against the home loan). `perYear` is added to
   // the loan + invested each working year until `untilAge`; interest is tax-deductible;
@@ -264,6 +285,23 @@ export function getLifeEvents(plan: RetirementPlan): LifeEvent[] {
   return (plan.lifeEvents ?? []).filter(
     (e) => e && e.amount > 0 && (e.kind === "income" || e.kind === "expense"),
   );
+}
+
+/** Valid recurring income streams (DB pension, annuity, foreign pension). Defaults:
+ *  indexed (constant real), taxable, and assessable under the Age Pension income test. */
+export function getIncomeStreams(plan: RetirementPlan): Required<IncomeStream>[] {
+  return (plan.incomeStreams ?? [])
+    .filter((s) => s && s.perYear > 0 && Number.isFinite(s.fromAge))
+    .map((s) => ({
+      id: s.id,
+      label: s.label ?? "Income stream",
+      perYear: s.perYear,
+      fromAge: s.fromAge,
+      untilAge: s.untilAge ?? Number.POSITIVE_INFINITY,
+      indexed: s.indexed ?? true,
+      taxable: s.taxable ?? true,
+      assessable: s.assessable ?? true,
+    }));
 }
 
 /** Resolve keepSuperInAccumulation into { who, mode }, or null when it's off.
@@ -429,6 +467,9 @@ export interface YearBreakdown {
   takeHome: number; // net pay after income tax + pre-tax salary sacrifice (working years; 0 in retirement)
   ttrBenefit: number; // net super gained this year from a Transition-to-Retirement swap (0 normally)
   workIncome: number; // net part-time work income this year (retirement only; after tax)
+  incomeStreamNet?: number; // net recurring income-stream income this year (after tax) — funds spending
+  incomeStreamGross?: number; // gross recurring income-stream income this year (before tax)
+  incomeStreamTax?: number; // income tax on the taxable income streams this year
   // Investment growth (super growth is net of accumulation earnings tax AND the
   // % investment/admin fee; the fixed $ fees + insurance are the `fees` line)
   superGrowth: number;
@@ -496,6 +537,7 @@ export interface YearRow {
   salaryIncome: number; // gross household salary this year (0 once retired)
   takeHome: number; // net pay after income tax + pre-tax salary sacrifice (working years; 0 in retirement)
   workIncome: number; // net part-time work income this year (0 outside the work years)
+  incomeStream: number; // net recurring income-stream income (DB/annuity/foreign pension), after tax; 0 outside retirement
   homeValue: number; // the home's (exempt) market value this year — for the net-worth view
   homeEquity: number; // homeValue less any outstanding mortgage — the net-worth band uses this
   superDrawn: number; // drawn from super this year

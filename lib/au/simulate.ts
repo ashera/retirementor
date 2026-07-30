@@ -15,6 +15,7 @@ import { minDrawdownRate, type EngineConfig } from "./config";
 import { agePension, deemedIncome } from "./agePension";
 import {
   getCareerBreaks,
+  getIncomeStreams,
   getInvestmentProperties,
   getLifeEvents,
   keepAccumConfig,
@@ -212,6 +213,7 @@ export function simulate(
   // Investment properties. `sold[i]` flips true once that property's "sell at age"
   // event has released its net proceeds into the outside-super pool.
   const properties = getInvestmentProperties(plan);
+  const incomeStreams = getIncomeStreams(plan);
   const sold = properties.map(() => false);
   // Career breaks ("gap years"), possibly one per partner (see getCareerBreaks).
   const careerBreaks = getCareerBreaks(plan);
@@ -1011,7 +1013,24 @@ export function simulate(
       (s, emp, i) => s + Math.max(0, emp - (ages[i] >= pensionAge ? Math.min(7_800, emp) : 0)),
       0,
     );
-    const assessableOther = rentAssessable + assessableEmployment;
+    // Recurring income streams (DB pension, annuity, foreign pension / US Social
+    // Security). On the oldest-person age axis: an INDEXED stream stays constant in
+    // real terms; a non-indexed one is a fixed nominal amount, so it erodes — deflate
+    // by (1+CPI)^t like a fixed repayment. ASSESSABLE streams count under the Age
+    // Pension INCOME test (actual income — not deemed, and NOT asset-tested, since a
+    // lifelong pension isn't a countable asset). TAXABLE streams are ordinary income.
+    const cpiPow = Math.pow(1 + plan.inflation / 100, t);
+    let streamGross = 0;
+    let streamAssessable = 0;
+    let streamTaxable = 0;
+    for (const s of incomeStreams) {
+      if (oldest < s.fromAge || oldest >= s.untilAge) continue;
+      const real = s.indexed ? s.perYear : s.perYear / cpiPow;
+      streamGross += real;
+      if (s.assessable) streamAssessable += real;
+      if (s.taxable) streamTaxable += real;
+    }
+    const assessableOther = rentAssessable + assessableEmployment + streamAssessable;
 
     // Age Pension (household level, from pension age). Financial assets are deemed;
     // an investment property's equity is assessable but NOT deemed, and its rent is
@@ -1091,10 +1110,26 @@ export function simulate(
     }
     const afterTaxRent = rentCash - rentTax;
 
+    // Income tax on the taxable income streams — marginal, senior-aware (SAPTO from
+    // pension age), stacked on each person's employment + net rent and split evenly
+    // across the household (a v1 simplification: streams aren't attributed to one
+    // owner, and the 2% Medicare levy on them isn't modelled — immaterial below the
+    // ~$43k senior threshold most retirees sit under).
+    let streamTax = 0;
+    if (streamTaxable > EPS) {
+      const streamPer = streamTaxable / workers;
+      streamTax = ages.reduce((s, a, i) => {
+        const workPer = (t < retireOffsets[i] ? plan.people[i].salary * gapScale : 0) + grossWork / workers;
+        const base = workPer + rentCash / workers;
+        return s + Math.max(0, taxAtAge(base + streamPer, a) - taxAtAge(base, a));
+      }, 0);
+    }
+    const streamNet = streamGross - streamTax;
+
     // External income offsets the spending the household must fund from
     // super/outside; any surplus (income beyond spending — e.g. a working
     // partner's salary covering the retiree's needs) is saved to outside super.
-    const externalIncome = agePensionAmt + afterTaxRent + netWork + workTakeHome;
+    const externalIncome = agePensionAmt + afterTaxRent + netWork + workTakeHome + streamNet;
     const privateNeed = Math.max(0, spending - externalIncome);
     if (externalIncome > spending) outside += externalIncome - spending;
     // Staggered gap: a partner still earning has their take-home ALREADY credited
@@ -1382,6 +1417,9 @@ export function simulate(
         takeHome: workTakeHome,
         ttrBenefit: 0,
         workIncome: netWork,
+        incomeStreamNet: streamNet,
+        incomeStreamGross: streamGross,
+        incomeStreamTax: streamTax,
         superGrowth,
         outsideGrowth,
         fees: feesPaid,
@@ -1484,6 +1522,7 @@ function row(
     salaryIncome: breakdown.salaryIncome,
     takeHome: breakdown.takeHome,
     workIncome: breakdown.workIncome,
+    incomeStream: breakdown.incomeStreamNet ?? 0,
     homeValue: breakdown.homeValue,
     homeEquity: breakdown.homeEquity,
     superDrawn,
