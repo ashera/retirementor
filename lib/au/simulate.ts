@@ -142,7 +142,7 @@ export function simulate(
   // + SAPTO, plus Medicare and CGT on any realised gain.
   const taxDetailFor = (
     i: number,
-    comps: { salary: number; work: number; rent: number; dividends: number; gain: number },
+    comps: { salary: number; work: number; rent: number; stream: number; dividends: number; gain: number },
     senior: boolean,
     onAgePension: boolean,
   ): PersonTaxDetail => {
@@ -156,6 +156,7 @@ export function simulate(
         { key: "salary", amount: comps.salary },
         { key: "work", amount: comps.work },
         { key: "rent", amount: comps.rent },
+        { key: "stream", amount: comps.stream },
         { key: "dividends", amount: div },
       ],
       gain,
@@ -166,7 +167,7 @@ export function simulate(
     );
     return {
       label: plan.people.length > 1 && i === 1 ? "Your partner" : "You",
-      salary: comps.salary, work: comps.work, rent: comps.rent, dividends: comps.dividends, gain: comps.gain,
+      salary: comps.salary, work: comps.work, rent: comps.rent, stream: comps.stream, dividends: comps.dividends, gain: comps.gain,
       gross: pt.gross, lito: pt.lito, sapto: pt.sapto, incomeTax: pt.incomeTax, medicare: pt.medicare, cgt: pt.cgt,
     };
   };
@@ -591,7 +592,7 @@ export function simulate(
             );
       // Per-person consolidated tax for the tax modal (all ordinary income together).
       const accumTaxDetail = plan.people.map((_, i) =>
-        taxDetailFor(i, { salary: taxables[i], work: 0, rent: accumRentPer, dividends: outsidePerAccum, gain: 0 }, false, false),
+        taxDetailFor(i, { salary: taxables[i], work: 0, rent: accumRentPer, stream: 0, dividends: outsidePerAccum, gain: 0 }, false, false),
       );
       // Positive net rent (after its income tax) is reinvested into the outside pool,
       // so a cash-flow-positive property visibly builds wealth over the working years.
@@ -1138,15 +1139,19 @@ export function simulate(
     // Income tax on the taxable income streams — marginal, senior-aware (SAPTO from
     // pension age), stacked on each person's employment + net rent and split evenly
     // across the household (a v1 simplification: streams aren't attributed to one
-    // owner, and the 2% Medicare levy on them isn't modelled — immaterial below the
-    // ~$43k senior threshold most retirees sit under).
+    // owner). Below Age Pension age a taxable stream also attracts the 2% Medicare
+    // levy above the low-income threshold ($27k, not the ~$43k senior one) — so a
+    // $30k stream at 60 does pay it; a senior on a modest income generally doesn't.
+    // Foreign residents pay no Medicare. This matches the consolidated tax analysis.
     let streamTax = 0;
     if (streamTaxable > EPS) {
       const streamPer = streamTaxable / workers;
       streamTax = ages.reduce((s, a, i) => {
         const workPer = (t < retireOffsets[i] ? plan.people[i].salary * gapScale : 0) + grossWork / workers;
         const base = workPer + rentCash / workers;
-        return s + Math.max(0, taxAtAge(base + streamPer, a) - taxAtAge(base, a));
+        const senr = a >= pensionAge;
+        const med = nonResident ? 0 : Math.max(0, medicareLevy(base + streamPer, senr) - medicareLevy(base, senr));
+        return s + Math.max(0, taxAtAge(base + streamPer, a) - taxAtAge(base, a)) + med;
       }, 0);
     }
     const streamNet = streamGross - streamTax;
@@ -1411,6 +1416,7 @@ export function simulate(
           salary: t < retireOffsets[i] ? p.salary * gapScale : 0,
           work: grossWork / workers,
           rent: rentCash / workers,
+          stream: streamTaxable / workers,
           dividends: outsideIncome / workers,
           gain: Math.max(0, realizedGain) / workers,
         },

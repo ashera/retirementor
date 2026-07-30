@@ -24,7 +24,8 @@ function Line({ label, value, sub, tone = "text-slate-200", strong = false, inde
 function PersonBlock({ d, showName }: { d: PersonTaxDetail; showName: boolean }) {
   const rentPos = Math.max(0, d.rent);
   const rentNeg = Math.max(0, -d.rent);
-  const ordinary = d.salary + d.work + d.rent + d.dividends;
+  const stream = d.stream ?? 0;
+  const ordinary = d.salary + d.work + d.rent + stream + d.dividends;
   const anyOrdinary = Math.abs(ordinary) > 0.5 || d.gross > 0.5;
   if (!anyOrdinary && d.cgt < 0.5) return null;
   return (
@@ -34,6 +35,7 @@ function PersonBlock({ d, showName }: { d: PersonTaxDetail; showName: boolean })
       {d.work > 0.5 && <Line label="Part-time work" value={cur(d.work)} />}
       {rentPos > 0.5 && <Line label="Net rent" value={cur(rentPos)} />}
       {rentNeg > 0.5 && <Line label="Net rental loss" value={cur(-rentNeg)} sub="negative gearing — reduces taxable income" />}
+      {stream > 0.5 && <Line label="Pension / annuity income" value={cur(stream)} />}
       {d.dividends > 0.5 && <Line label="Dividends / distributions" value={cur(d.dividends)} />}
       {anyOrdinary && (
         <div className="border-t border-line">
@@ -91,7 +93,7 @@ export default function TaxYearModal({
   const propertyCgt = b.propertyCgt ?? 0;
   const total = (b.incomeTax ?? 0) + (b.medicare ?? 0) + contrib + earnings + (b.capitalGains ?? 0);
   const isCouple = plan.people.length > 1;
-  const hasPersonal = detail.some((d) => Math.abs(d.salary + d.work + d.rent + d.dividends) > 0.5 || d.gross > 0.5 || d.cgt > 0.5);
+  const hasPersonal = detail.some((d) => Math.abs(d.salary + d.work + d.rent + (d.stream ?? 0) + d.dividends) > 0.5 || d.gross > 0.5 || d.cgt > 0.5);
   const hasContent = hasPersonal || contrib > 0.5 || earnings > 0.5 || propertyCgt > 0.5;
   const litoZeroed = total < 1 && detail.some((d) => d.lito > 0.5 || d.sapto > 0.5);
   const anySapto = detail.some((d) => d.sapto > 0.5);

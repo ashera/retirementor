@@ -434,7 +434,7 @@ export default function IncomeYearModal({
                       color="#2dd4bf"
                       label="Pension / annuity income"
                       sub={`Your defined-benefit / annuity / foreign-pension income, after tax${
-                        (row.breakdown.incomeStreamTax ?? 0) > 0.5 ? ` (${cur(row.breakdown.incomeStreamTax ?? 0)} income tax this year)` : ""
+                        (row.breakdown.incomeStreamTax ?? 0) > 0.5 ? ` (${cur(row.breakdown.incomeStreamTax ?? 0)} tax this year)` : ""
                       }. It's counted under the Age Pension income test, so it also reduces any Age Pension above.`}
                       value={inc.incomeStream}
                     />

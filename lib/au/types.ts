@@ -179,6 +179,7 @@ export interface PersonTaxDetail {
   salary: number; // taxable salary (after any sacrifice)
   work: number; // part-time work income
   rent: number; // net rent share (can be negative — negative gearing)
+  stream: number; // taxable income-stream share (DB / annuity / foreign pension)
   dividends: number; // outside-super dividend share
   gain: number; // realised capital gain share
   gross: number; // bracket tax on total ordinary income, before offsets
