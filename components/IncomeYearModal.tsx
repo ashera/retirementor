@@ -596,6 +596,8 @@ export default function IncomeYearModal({
                     {afterTaxRent > 0.5 && <DLine label="− Net rent (after tax)" value={afterTaxRent} />}
                     {afterTaxRent < -0.5 && <DLine label="+ Rental shortfall (after tax)" value={-afterTaxRent} />}
                     {salaryTakeHome > 1 && <DLine label="− A partner's salary (take-home)" value={salaryTakeHome} />}
+                    {partTimeWork > 0.5 && <DLine label="− Part-time work (after tax)" value={partTimeWork} />}
+                    {inc.incomeStream > 0.5 && <DLine label="− Pension / annuity income" value={inc.incomeStream} />}
                     <div className="border-t border-line pt-1.5">
                       <DLine label="= Shortfall to fund from savings" value={privateNeed} strong />
                     </div>
