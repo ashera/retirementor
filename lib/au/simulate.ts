@@ -1350,22 +1350,26 @@ export function simulate(
     if (!nonResident && !accumPhase && (outsideIncome > 0 || realizedGain > 0)) {
       const incPer = outsideIncome / workers;
       const gainPer = Math.max(0, realizedGain) / workers;
+      const streamPer = streamTaxable / workers; // taxable income-stream share sits below outside earnings in the stack
       const onAgePension = agePensionAmt > 0; // exemption from the 30% minimum
       const rentPer = rentCash / workers; // net rent already assessed this year (may be a loss)
       plan.people.forEach((p, i) => {
         // Outside earnings chain ON TOP of ALL this person's ordinary income already
-        // assessed — employment AND net rent — so the tax-free threshold / LITO / SAPTO
-        // aren't consumed separately by each source (matches personTax's single stack).
+        // assessed — employment, net rent AND any income stream (DB/annuity/foreign
+        // pension) — so the tax-free threshold / LITO / SAPTO aren't consumed separately
+        // by each source (matches personTax's single stack). Omitting the stream let a
+        // dividend slice fall back into the tax-free threshold and escape tax.
         const workPer = (t < retireOffsets[i] ? p.salary * gapScale : 0) + grossWork / workers;
-        const ordBase = workPer + rentPer;
-        // Dividends: ordinary income, marginal, stacked on employment + net rent.
+        const ordBase = workPer + rentPer + streamPer;
+        // Dividends: ordinary income, marginal, stacked on employment + net rent + stream.
         outsideDivTax += Math.max(0, taxAtAge(ordBase + incPer, ages[i]) - taxAtAge(ordBase, ages[i]));
         // 2% Medicare levy on the investment income (net rent + dividends) above the
-        // person's employment — with the higher senior threshold once they reach Age
-        // Pension age. Employment's own levy is already deducted (contribute()/workTax),
-        // so subtract it out to avoid double-counting.
+        // person's employment + stream — with the higher senior threshold once they reach
+        // Age Pension age. Employment's + the stream's own levy are deducted elsewhere
+        // (contribute()/workTax/streamTax), so subtract that base out to avoid double-counting.
         const senr = ages[i] >= pensionAge;
-        outsideMedicare += medicareLevy(rentPer + incPer + Math.max(0, workPer), senr) - medicareLevy(Math.max(0, workPer), senr);
+        const medBase = streamPer + Math.max(0, workPer);
+        outsideMedicare += medicareLevy(rentPer + incPer + medBase, senr) - medicareLevy(medBase, senr);
         // Capital gain: stacked on top of employment + net rent + dividends.
         if (gainPer > 0) {
           const base = ordBase + incPer;

@@ -462,8 +462,16 @@ export default function YearDetailModal({
           )}
 
           {/* Tax */}
-          {(b.contribTax > 0 || b.earningsTax > 0 || b.outsideTax > 0 || b.propertyCgt > 0) && (
+          {(b.contribTax > 0 || b.earningsTax > 0 || b.outsideTax > 0 || b.propertyCgt > 0 || (b.incomeStreamTax ?? 0) > 0.5) && (
             <Section title="Tax this year">
+              {(b.incomeStreamTax ?? 0) > 0.5 && (
+                <Line
+                  label="Tax on pension / annuity income"
+                  sub="your defined-benefit / annuity / foreign-pension income is ordinary taxable income (plus the 2% Medicare levy before Age Pension age); the seniors offset (SAPTO) makes a modest amount tax-free from 67"
+                  value={fmtCurrency(Math.round(b.incomeStreamTax ?? 0))}
+                  tone="text-amber-400"
+                />
+              )}
               {b.contribTax > 0 && (
                 <Line label="Contributions tax (15% on concessional)" value={fmtCurrency(Math.round(b.contribTax))} />
               )}
@@ -486,7 +494,7 @@ export default function YearDetailModal({
               )}
             </Section>
           )}
-          {!isWorking && b.propertyCgt === 0 && b.contribTax === 0 && b.earningsTax === 0 && b.outsideTax === 0 && (
+          {!isWorking && b.propertyCgt === 0 && b.contribTax === 0 && b.earningsTax === 0 && b.outsideTax === 0 && (b.incomeStreamTax ?? 0) < 0.5 && (
             <p className="text-center text-xs leading-relaxed text-muted">
               {b.outsideGrowth > 1 ? (
                 <>
