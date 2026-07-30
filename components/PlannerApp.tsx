@@ -1334,7 +1334,7 @@ export default function PlannerApp({
       {/* Export/import is offered to everyone (the app is local-first); signed-in users
           get the buttons in the scenario bar above, guests get them here. */}
       <input ref={importInputRef} type="file" accept="application/json,.json" hidden onChange={onImportFile} />
-      {!user && configured && (
+      {!user && !shared && configured && (
         <div className="mb-6 flex flex-wrap items-center gap-2">
           {renderIOButtons()}
           <span className="text-xs text-muted">Back up your plan or move it to another device.</span>
