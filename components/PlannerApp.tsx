@@ -822,6 +822,7 @@ export default function PlannerApp({
 
   // Wipe the guest's local data and return to the fresh first-visit state.
   const startOver = () => {
+    if (shared) return; // never wipe the viewer's data from a shared read-only view
     if (!window.confirm("Clear your details and start over? This can't be undone.")) return;
     try {
       [STORAGE_KEY, BASELINE_KEY, BASELINE_NAME_KEY, "au-retirement-compare"].forEach((k) =>
@@ -2343,8 +2344,11 @@ export default function PlannerApp({
         })()}
 
       {/* Guest reset — once a signed-out user has built a plan they can wipe it
-          and start fresh. Hidden in the empty first-visit state (nothing to clear). */}
-      {!user && configured && (
+          and start fresh. Hidden in the empty first-visit state (nothing to clear)
+          and in a SHARED view — it's someone else's read-only scenario, so clearing
+          here would wipe the viewer's OWN data and trap them on the shared route
+          (they should "Build your own →" to their real dashboard instead). */}
+      {!user && !shared && configured && (
         <div className="mt-10 border-t border-line pt-4 text-center">
           <button
             onClick={startOver}
