@@ -526,6 +526,7 @@ export default function PlanWizard({
         minAge={Math.min(...draft.people.map((p) => p.currentAge).filter((a) => Number.isFinite(a) && a > 0), draft.retirementAge)}
         maxAge={draft.lifeExpectancy}
         defaultAge={draft.retirementAge}
+        nonResident={draft.taxResidency === "non-resident"}
         onChange={(incomeStreams) => setDraft((prev) => ({ ...prev, incomeStreams }))}
       />
     ),
@@ -606,6 +607,7 @@ export default function PlanWizard({
     draft.inflation !== DEFAULT_PLAN.inflation ||
     draft.outsideReturn != null ||
     draft.outsideVolatility != null ||
+    draft.taxResidency === "non-resident" ||
     (!!draft.fees && JSON.stringify(draft.fees) !== JSON.stringify(config.fees));
   const resetAssumptions = () =>
     patch({
@@ -779,6 +781,40 @@ export default function PlanWizard({
             in accumulation instead — no forced minimum drawdown, but earnings are taxed 15%. Handy to model when your
             outside-super savings already cover your spending, though starting a pension is usually more tax-effective.
           </p>
+        </div>
+        <div className="space-y-3 rounded-xl border border-line bg-panel-2 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="text-xs font-semibold uppercase tracking-wide text-muted">
+              Tax residency (advanced)
+            </div>
+            <Segmented
+              value={draft.taxResidency === "non-resident" ? "non-resident" : "resident"}
+              onChange={(v) => patch({ taxResidency: v === "non-resident" ? "non-resident" : "resident" })}
+              options={[
+                { value: "resident", label: "Resident" },
+                { value: "non-resident", label: "Non-resident" },
+              ]}
+            />
+          </div>
+          <p className="text-xs text-muted">
+            Most people are <strong className="text-slate-300">Australian tax residents</strong>. Choose{" "}
+            <strong className="text-slate-300">Non-resident</strong> if you live permanently overseas: retirement income is
+            then taxed on the foreign-resident scale (no tax-free threshold, no Medicare or seniors offset), only{" "}
+            <strong className="text-slate-300">Australian-sourced</strong> income is taxed (a foreign pension or your
+            share portfolio falls outside Australian tax), and the Age Pension is treated as not claimable from abroad.
+            Non-resident tax is complex (source rules and tax treaties vary) — this is an estimate.
+          </p>
+          {draft.taxResidency === "non-resident" && (
+            <label className="flex items-center gap-2 text-xs text-slate-200">
+              <input
+                type="checkbox"
+                checked={!!draft.claimAgePensionAbroad}
+                onChange={(e) => patch({ claimAgePensionAbroad: e.target.checked })}
+                className="h-4 w-4 accent-teal-500"
+              />
+              I keep an Age Pension entitlement while abroad (portability varies)
+            </label>
+          )}
         </div>
       </div>
     ),

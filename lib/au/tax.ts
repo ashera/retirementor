@@ -31,6 +31,27 @@ export function incomeTax(taxable: number): number {
   return 0; // unreachable — last bracket is Infinity
 }
 
+// FY2026-27 FOREIGN-RESIDENT (non-resident) scale: no tax-free threshold — taxed
+// from the first dollar — 30% to $135k, 37% to $190k, 45% above. Foreign residents
+// pay NO Medicare levy and get NO LITO/SAPTO offsets. (ATO foreign-resident rates.)
+const NR_BRACKETS: Bracket[] = [
+  { upTo: 135_000, base: 0, rate: 0.3 },
+  { upTo: 190_000, base: 40_500, rate: 0.37 },
+  { upTo: Infinity, base: 60_850, rate: 0.45 },
+];
+
+/** Foreign-resident (non-resident) income tax on an AU-sourced taxable amount,
+ *  in today's dollars. No tax-free threshold, no Medicare, no offsets. */
+export function nonResidentIncomeTax(taxable: number): number {
+  const t = Math.max(0, taxable);
+  let lower = 0;
+  for (const b of NR_BRACKETS) {
+    if (t <= b.upTo) return b.base + (t - lower) * b.rate;
+    lower = b.upTo;
+  }
+  return 0; // unreachable — last bracket is Infinity
+}
+
 /** Low Income Tax Offset (LITO) — a non-refundable offset available to ALL
  *  residents. $700 up to $37,500, then withdrawn at 5c/$ to $325 at $45,000, then
  *  1.5c/$ to $0 at $66,667. (ATO, current rates.) */
@@ -125,8 +146,10 @@ export function personTax(
   senior: boolean, // at/over Age Pension age → SAPTO + senior Medicare threshold apply
   household: "single" | "couple",
   cgt: CgtParams,
+  residency: "resident" | "non-resident" = "resident", // foreign residents: flat scale, no Medicare/offsets
 ): PersonTax {
-  const netTax = (x: number) => (senior ? seniorIncomeTax(x, household) : residentIncomeTax(x));
+  const nr = residency === "non-resident";
+  const netTax = (x: number) => (nr ? nonResidentIncomeTax(x) : senior ? seniorIncomeTax(x, household) : residentIncomeTax(x));
   const bySource: Record<string, number> = {};
   let running = 0;
   let prev = 0; // netTax(0)
@@ -137,15 +160,15 @@ export function personTax(
     prev = tax;
   }
   const O = Math.max(0, running);
-  const gross = incomeTax(O);
-  const litoApplied = Math.min(lito(O), gross);
+  const gross = nr ? nonResidentIncomeTax(O) : incomeTax(O);
+  const litoApplied = nr ? 0 : Math.min(lito(O), gross);
   const afterLito = gross - litoApplied;
-  const saptoApplied = senior ? Math.min(sapto(O, household), afterLito) : 0;
+  const saptoApplied = !nr && senior ? Math.min(sapto(O, household), afterLito) : 0;
   const incomeTaxNet = afterLito - saptoApplied; // == netTax(O)
   // Medicare levy is on the whole taxable ordinary income (salary + net rent +
   // dividends + part-time work), not salary alone — with the senior threshold for
-  // those at/over Age Pension age.
-  const medicare = medicareLevy(O, senior);
+  // those at/over Age Pension age. Foreign residents pay no Medicare levy.
+  const medicare = nr ? 0 : medicareLevy(O, senior);
   let cgtTax = 0;
   const g = Math.max(0, realizedGain);
   if (g > 0) {

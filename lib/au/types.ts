@@ -163,6 +163,7 @@ export interface IncomeStream {
   indexed?: boolean; // default true → constant real; false → erodes with CPI
   taxable?: boolean; // default true → taxed as ordinary income
   assessable?: boolean; // default true → counted in the Age Pension income test
+  foreignSourced?: boolean; // default false. Only bites when taxResidency === "non-resident": a foreign-sourced stream (e.g. US Social Security) isn't taxed by Australia or counted in its income test; a resident is taxed on worldwide income regardless.
 }
 
 // Per-person "keep super in accumulation" configuration (see RetirementPlan).
@@ -227,6 +228,15 @@ export interface RetirementPlan {
   careerBreaks?: CareerBreak[]; // "gap years": each entry = person `who` takes `years` off from their age `atAge` — no salary or super contributions in that window, drawing `spendFromSavings`/yr from outside savings to live. Savings additions pause only when EVERY working member is on a break that year. Super keeps earning on the existing balance; the lost contributions + compounding are the main cost.
   lifeEvents?: LifeEvent[]; // committed one-off cashflows at an age: an income (windfall/inheritance) lands in outside savings untaxed; an expense is an extra draw that year (from savings while working, from the retirement drawdown once retired). Today's dollars. Flows through the means test, MC, stress test, failsafe and guardrails automatically.
   incomeStreams?: IncomeStream[]; // recurring income (defined-benefit / annuity / foreign pension e.g. US Social Security): offsets the drawdown, assessed under the Age Pension INCOME test (not deemed/not asset-tested) and taxed as ordinary income by default; indexed (constant real) unless flagged otherwise. See IncomeStream.
+  // Tax residency for the WHOLE projection. "non-resident" (foreign resident, e.g. a
+  // retiree living permanently overseas) uses the foreign-resident tax scale (no
+  // tax-free threshold, no Medicare, no LITO/SAPTO), taxes only AU-sourced income
+  // (foreign-sourced streams + the outside-super portfolio fall outside AU tax), and
+  // by default treats the Age Pension as not claimable from abroad (see
+  // claimAgePensionAbroad). Defaults to resident. Non-resident tax is genuinely
+  // complex (source rules, tax treaties) — this is an estimate.
+  taxResidency?: "resident" | "non-resident";
+  claimAgePensionAbroad?: boolean; // non-resident override: keep the Age Pension despite living abroad (portability varies; off by default).
   // Debt recycling (What-If): while working, run a geared share sleeve funded by a
   // deductible investment loan (redraw against the home loan). `perYear` is added to
   // the loan + invested each working year until `untilAge`; interest is tax-deductible;
@@ -301,6 +311,7 @@ export function getIncomeStreams(plan: RetirementPlan): Required<IncomeStream>[]
       indexed: s.indexed ?? true,
       taxable: s.taxable ?? true,
       assessable: s.assessable ?? true,
+      foreignSourced: s.foreignSourced ?? false,
     }));
 }
 

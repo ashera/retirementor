@@ -30,7 +30,7 @@ import {
 } from "./types";
 import { mortgageActiveAtAge, mortgageAnnualCost, outstandingBalance } from "./mortgage";
 import { budgetSplit, presetCategories } from "./budget";
-import { residentIncomeTax, seniorIncomeTax, medicareLevy, personTax, type CgtParams } from "./tax";
+import { residentIncomeTax, seniorIncomeTax, nonResidentIncomeTax, medicareLevy, personTax, type CgtParams } from "./tax";
 import { capitalGainsTax, netEquity, netRentCash, propertyValueAt } from "./property";
 import type { Person, PersonTaxDetail, Phase, RetirementPlan, SimResult, YearBreakdown, YearRow } from "./types";
 
@@ -146,17 +146,23 @@ export function simulate(
     senior: boolean,
     onAgePension: boolean,
   ): PersonTaxDetail => {
+    // Non-resident: the outside portfolio is treated as foreign-sourced (dividends +
+    // realised gains fall outside AU tax), matching the drawdown branch; AU rent and
+    // any AU-sourced income are still taxed on the foreign-resident scale.
+    const div = nonResident ? 0 : comps.dividends;
+    const gain = nonResident ? 0 : comps.gain;
     const pt = personTax(
       [
         { key: "salary", amount: comps.salary },
         { key: "work", amount: comps.work },
         { key: "rent", amount: comps.rent },
-        { key: "dividends", amount: comps.dividends },
+        { key: "dividends", amount: div },
       ],
-      comps.gain,
+      gain,
       senior,
       plan.household,
       { ...cgtParamsBase, onAgePension },
+      nonResident ? "non-resident" : "resident",
     );
     return {
       label: plan.people.length > 1 && i === 1 ? "Your partner" : "You",
@@ -214,6 +220,12 @@ export function simulate(
   // event has released its net proceeds into the outside-super pool.
   const properties = getInvestmentProperties(plan);
   const incomeStreams = getIncomeStreams(plan);
+  // Foreign tax residency (a retiree living permanently overseas): the foreign-
+  // resident scale, no Medicare/offsets, AU-sourced income only (foreign streams +
+  // the outside portfolio fall outside AU tax), and — unless overridden — no Age
+  // Pension (generally not claimable from abroad). See RetirementPlan.taxResidency.
+  const nonResident = plan.taxResidency === "non-resident";
+  const claimPensionAbroad = !!plan.claimAgePensionAbroad;
   const sold = properties.map(() => false);
   // Career breaks ("gap years"), possibly one per partner (see getCareerBreaks).
   const careerBreaks = getCareerBreaks(plan);
@@ -984,7 +996,11 @@ export function simulate(
     // taxed on the ordinary resident scale. Worked out per person: each of a
     // couple has their own threshold/offset, and their own age decides SAPTO.
     const taxAtAge = (inc: number, age: number) =>
-      age >= pensionAge ? seniorIncomeTax(inc, plan.household) : residentIncomeTax(inc);
+      nonResident
+        ? nonResidentIncomeTax(inc)
+        : age >= pensionAge
+          ? seniorIncomeTax(inc, plan.household)
+          : residentIncomeTax(inc);
 
     // Part-time work in early retirement: the AFTER-TAX amount offsets drawdown,
     // while the GROSS amount is assessable under the Age Pension income test, net
@@ -997,7 +1013,7 @@ export function simulate(
     // omit the levy). Pension-age (SAPTO) workers are generally levy-exempt on low
     // income, so we leave theirs out.
     const workTax = grossWork > 0
-      ? ages.reduce((s, a) => s + taxAtAge(grossWork / workers, a) + (a < pensionAge ? medicareLevy(grossWork / workers) : 0), 0)
+      ? ages.reduce((s, a) => s + taxAtAge(grossWork / workers, a) + (!nonResident && a < pensionAge ? medicareLevy(grossWork / workers) : 0), 0)
       : 0;
     const netWork = grossWork - workTax;
     // Per-person EMPLOYMENT income = this person's share of part-time work plus, for a
@@ -1027,8 +1043,12 @@ export function simulate(
       if (oldest < s.fromAge || oldest >= s.untilAge) continue;
       const real = s.indexed ? s.perYear : s.perYear / cpiPow;
       streamGross += real;
-      if (s.assessable) streamAssessable += real;
-      if (s.taxable) streamTaxable += real;
+      // A foreign-sourced stream (e.g. US Social Security) is outside Australia's tax
+      // net AND income test for a non-resident; a resident is taxed/assessed on it
+      // like any other income.
+      const outsideAuTax = nonResident && s.foreignSourced;
+      if (s.assessable && !outsideAuTax) streamAssessable += real;
+      if (s.taxable && !outsideAuTax) streamTaxable += real;
     }
     const assessableOther = rentAssessable + assessableEmployment + streamAssessable;
 
@@ -1037,7 +1057,12 @@ export function simulate(
     // counted as actual income — so these two are no longer the same figure.
     let agePensionAmt = 0;
     let pensionBreakdown: YearBreakdown["pension"] = null;
-    const pensionEligible = ages.filter((a) => a >= pensionAge).length;
+    // A foreign resident living permanently overseas generally can't claim the Age
+    // Pension (you must be an Australian resident and in Australia to claim; once
+    // granted it's portable but pro-rated after 26 weeks abroad). Default off; the
+    // claimAgePensionAbroad override keeps it for a genuinely portable entitlement.
+    const canClaimPension = !nonResident || claimPensionAbroad;
+    const pensionEligible = canClaimPension ? ages.filter((a) => a >= pensionAge).length : 0;
     if (pensionEligible > 0) {
       // Super assessed by the means test, per Services Australia:
       //   • from Age Pension age → ALL of that member's super (accumulation AND
@@ -1311,7 +1336,13 @@ export function simulate(
     let outsideCgtTax = 0; // realised-gain portion (capital gains) — for the tax analysis
     let outsideMedicare = 0; // 2% levy on retiree investment income above the (senior) threshold
     let superTaxDraw = 0; // super drawn to settle that tax when the outside pool emptied
-    if (!accumPhase && (outsideIncome > 0 || realizedGain > 0)) {
+    // A foreign resident's AU share/ETF portfolio largely falls outside AU tax:
+    // franked dividends carry their credit (no further tax), and capital gains on
+    // non-real-property assets are CGT-exempt for foreign residents. We treat the
+    // whole outside pool as foreign-sourced here (a stated simplification; AU rent
+    // is still taxed via taxAtAge/afterTaxRent above). Withholding on any unfranked
+    // slice isn't modelled.
+    if (!nonResident && !accumPhase && (outsideIncome > 0 || realizedGain > 0)) {
       const incPer = outsideIncome / workers;
       const gainPer = Math.max(0, realizedGain) / workers;
       const onAgePension = agePensionAmt > 0; // exemption from the 30% minimum

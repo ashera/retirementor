@@ -88,12 +88,14 @@ export default function IncomeStreamsEditor({
   minAge,
   maxAge,
   defaultAge,
+  nonResident = false,
   onChange,
 }: {
   streams: IncomeStream[];
   minAge: number;
   maxAge: number;
   defaultAge: number;
+  nonResident?: boolean; // plan is a foreign resident → show the AU-sourced/foreign toggle
   onChange: (streams: IncomeStream[]) => void;
 }) {
   const [draft, setDraft] = useState<IncomeStream | null>(null);
@@ -254,6 +256,14 @@ export default function IncomeStreamsEditor({
                 label="Counts for the Age Pension"
                 hint="Assessed under the income test (reduces any Age Pension). On for DB & foreign pensions."
               />
+              {nonResident && (
+                <Toggle
+                  on={draft.foreignSourced ?? false}
+                  onChange={(foreignSourced) => setDraft({ ...draft, foreignSourced })}
+                  label="Foreign-sourced"
+                  hint="A non-Australian pension (e.g. US Social Security). As a non-resident it's outside Australian tax and its income test. Off for an Australian pension."
+                />
+              )}
             </div>
 
             <div className="mt-4 flex items-center justify-between gap-2">
