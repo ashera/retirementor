@@ -453,7 +453,10 @@ export interface PensionBreakdown {
   financialAssets: number; // outsideAssets + accessibleSuper (the deemed base)
   // Assessable income, itemised.
   deemedIncome: number; // income deemed on financialAssets
-  otherIncome: number; // assessable rent counted in the income test
+  otherIncome: number; // total non-deemed assessable income = rentIncome + employmentIncome + streamIncome
+  rentIncome: number; // assessable investment-property rent (actual, not deemed)
+  employmentIncome: number; // assessable employment (part-time work + a still-working partner's salary), net of the Work Bonus
+  streamIncome: number; // assessable income streams (DB / annuity / foreign pension)
   assetsTestAnnual: number; // entitlement under the assets test
   incomeTestAnnual: number; // entitlement under the income test
   bindingTest: "assets" | "income"; // the lower (binding) test

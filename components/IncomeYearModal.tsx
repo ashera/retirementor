@@ -172,9 +172,8 @@ export default function IncomeYearModal({
   // "Investment property"), matching the wizard's naming.
   const propLabel = (part: { name?: string; index: number }) =>
     part.name?.trim() || (propertyCount > 1 ? `Property ${part.index + 1}` : "Investment property");
-  const rentLabel = plan.workIncome
-    ? "+ Rent & part-time work (assessable)"
-    : propertyCount === 1
+  const rentLabel =
+    propertyCount === 1
       ? `+ ${propsList[0].name?.trim() || "Investment property"} rent (actual)`
       : "+ Combined property rent (actual)";
 
@@ -555,7 +554,9 @@ export default function IncomeYearModal({
                       <div className="space-y-1">
                         <div className="mb-0.5 text-[11px] uppercase tracking-wide text-muted">What&apos;s counted</div>
                         <DLine label={`Deemed on ${cur(pb.financialAssets)} savings + super`} value={pb.deemedIncome} />
-                        {pb.otherIncome > 0 && <DLine label={rentLabel} value={pb.otherIncome} />}
+                        {(pb.rentIncome ?? 0) > 0 && <DLine label={rentLabel} value={pb.rentIncome} />}
+                        {(pb.employmentIncome ?? 0) > 0 && <DLine label="+ Part-time work / salary (assessable)" value={pb.employmentIncome} />}
+                        {(pb.streamIncome ?? 0) > 0 && <DLine label="+ Pension / annuity income (assessable)" value={pb.streamIncome} />}
                         {pb.otherIncome > 0 && (
                           <div className="border-t border-line pt-1">
                             <DLine label="= Assessable income" value={incomeTotal} strong />

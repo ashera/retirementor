@@ -1108,6 +1108,9 @@ export function simulate(
         financialAssets,
         deemedIncome: deemedIncome(financialAssets, plan.household, config),
         otherIncome: assessableOther,
+        rentIncome: rentAssessable,
+        employmentIncome: assessableEmployment,
+        streamIncome: streamAssessable,
         // The modal's per-test annual figures must reflect the SAME member-of-a-couple
         // rate the household is actually paid, or a gap-year pension breakdown would
         // show the full couple amount while only half is received.
