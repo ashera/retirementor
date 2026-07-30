@@ -190,10 +190,8 @@ export default function IncomeYearModal({
 
   // Per-test working for the breakdown (from the engine's stored inputs).
   const excessAssets = pb ? Math.max(0, pb.assessableAssets - freeArea) : 0;
-  const reductionAssets = excessAssets * assetsTaper;
   const incomeTotal = pb ? pb.deemedIncome + pb.otherIncome : 0;
   const excessIncome = pb ? Math.max(0, incomeTotal - side.incomeFreeAreaAnnual) : 0;
-  const reductionIncome = excessIncome * incomeTaper;
   const assetsPerK = Math.round(assetsTaper * 1000); // annual reduction per $1,000 over
   const incomeCentsPerDollar = Math.round(incomeTaper * 100); // cents per $1 over
 
@@ -537,9 +535,10 @@ export default function IncomeYearModal({
                         <div className="border-t border-line pt-1">
                           <DLine label="= Amount over the free area" value={excessAssets} strong />
                         </div>
-                        <DLine label={`− Taper ($${assetsPerK}/yr per $1,000 over)`} value={reductionAssets} />
                         <div className="border-t border-line pt-1">
-                          <DLine label="= Assets-test entitlement" value={pb.assetsTestAnnual} strong />
+                          <DLine label="Maximum pension" value={Math.round(side.maxAnnual)} />
+                          <DLine label={`− Reduction ($${assetsPerK}/yr per $1,000 over)`} value={Math.max(0, Math.round(side.maxAnnual) - Math.round(pb.assetsTestAnnual))} />
+                          <DLine label="= Assets-test entitlement" value={Math.round(pb.assetsTestAnnual)} strong />
                         </div>
                       </div>
                     </div>
@@ -566,9 +565,10 @@ export default function IncomeYearModal({
                         <div className="border-t border-line pt-1">
                           <DLine label="= Amount over the free area" value={excessIncome} strong />
                         </div>
-                        <DLine label={`− Taper (${incomeCentsPerDollar}c per $1 over)`} value={reductionIncome} />
                         <div className="border-t border-line pt-1">
-                          <DLine label="= Income-test entitlement" value={pb.incomeTestAnnual} strong />
+                          <DLine label="Maximum pension" value={Math.round(side.maxAnnual)} />
+                          <DLine label={`− Reduction (${incomeCentsPerDollar}c per $1 over)`} value={Math.max(0, Math.round(side.maxAnnual) - Math.round(pb.incomeTestAnnual))} />
+                          <DLine label="= Income-test entitlement" value={Math.round(pb.incomeTestAnnual)} strong />
                         </div>
                       </div>
                     </div>
