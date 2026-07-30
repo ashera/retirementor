@@ -202,7 +202,7 @@ export default function YearDetailModal({
   // super figure here is only the part that actually funded spending. A still-
   // working partner's take-home is household income too, so include it — otherwise
   // super/savings look like they must cover the whole spend (a phantom shortfall).
-  const external = b.agePension + b.rentIncome + row.workIncome + b.takeHome;
+  const external = b.agePension + b.rentIncome + row.workIncome + b.takeHome + (row.incomeStream ?? 0);
   const privateNeed = Math.max(0, spending - external);
   const drawnFromSuper = Math.max(0, Math.min(row.superDrawn, privateNeed));
   const drawnFromOutside = Math.max(0, row.outsideDrawn);
@@ -217,6 +217,7 @@ export default function YearDetailModal({
   if (b.agePension > 0) fundingParts.push(`Age Pension ${fmtCurrency(Math.round(b.agePension))}`);
   if (b.rentIncome > 0) fundingParts.push(`net rent ${fmtCurrency(Math.round(b.rentIncome))}`);
   if (row.workIncome > 0) fundingParts.push(`part-time work ${fmtCurrency(Math.round(row.workIncome))}`);
+  if ((row.incomeStream ?? 0) > 1) fundingParts.push(`pension / annuity income ${fmtCurrency(Math.round(row.incomeStream ?? 0))}`);
   if (drawnFromSuper > 1) fundingParts.push(`${fmtCurrency(Math.round(drawnFromSuper))} from super`);
   if (drawnFromOutside > 1) fundingParts.push(`${fmtCurrency(Math.round(drawnFromOutside))} from outside savings`);
   const fundingText = fundingParts.length
