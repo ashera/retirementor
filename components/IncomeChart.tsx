@@ -13,6 +13,7 @@ import {
 } from "recharts";
 import type { SimResult, YearRow } from "@/lib/au/types";
 import { fmtCompact, fmtCurrency } from "@/lib/au/format";
+import { incomeStreamLabel } from "@/lib/au/yearIncome";
 import { DualAgeTick, dualAgeLabel, type AgeGapInfo } from "@/components/ageAxis";
 import { breakSpans, breakSpanLabel } from "@/lib/au/breakSpans";
 
@@ -56,7 +57,7 @@ function IncomeTooltip({
       )}
       {stream > 0 && (
         <div className="tabular-nums text-teal-300">
-          Pension / annuity {fmtCurrency(stream)}
+          {incomeStreamLabel(r, "Pension / annuity")} {fmtCurrency(stream)}
         </div>
       )}
       {r.agePension > 0 && (

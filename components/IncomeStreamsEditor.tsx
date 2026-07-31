@@ -89,6 +89,7 @@ export default function IncomeStreamsEditor({
   maxAge,
   defaultAge,
   nonResident = false,
+  couple = false,
   onChange,
 }: {
   streams: IncomeStream[];
@@ -96,6 +97,7 @@ export default function IncomeStreamsEditor({
   maxAge: number;
   defaultAge: number;
   nonResident?: boolean; // plan is a foreign resident → show the AU-sourced/foreign toggle
+  couple?: boolean; // couple → show the whose-income (owner) selector
   onChange: (streams: IncomeStream[]) => void;
 }) {
   const [draft, setDraft] = useState<IncomeStream | null>(null);
@@ -186,6 +188,34 @@ export default function IncomeStreamsEditor({
               placeholder="e.g. US Social Security"
               className="mt-1 w-full rounded-lg border border-line bg-panel-2 px-3 py-2 text-sm text-white outline-none focus:border-accent"
             />
+
+            {couple && (
+              <div className="mt-3">
+                <label className="block text-xs font-medium text-muted">Whose income (for tax)</label>
+                <div className="mt-1 grid grid-cols-3 gap-1.5">
+                  {([
+                    ["You", 0],
+                    ["Partner", 1],
+                    ["Split", undefined],
+                  ] as const).map(([lbl, val]) => {
+                    const on = (draft.owner ?? undefined) === val || (val === undefined && (draft.owner == null || draft.owner < 0));
+                    return (
+                      <button
+                        key={lbl}
+                        type="button"
+                        onClick={() => setDraft({ ...draft, owner: val })}
+                        className={`rounded-lg border px-2 py-1.5 text-xs transition ${
+                          on ? "border-accent bg-accent/10 font-semibold text-accent" : "border-line bg-panel-2 text-muted hover:text-white"
+                        }`}
+                      >
+                        {lbl}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="mt-1 text-[11px] text-muted">Taxed at that person&apos;s rate (Australia taxes individuals). No effect on the Age Pension, which is assessed on your combined income.</p>
+              </div>
+            )}
 
             <div className="mt-3 grid grid-cols-2 gap-3">
               <div>

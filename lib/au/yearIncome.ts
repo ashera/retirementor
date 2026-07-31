@@ -7,6 +7,15 @@
 
 import type { YearRow } from "./types";
 
+/** Display label for a year's income stream(s): the actual name when there are one
+ *  or two (e.g. "US Social Security" or "DB pension + US Social Security"), else a
+ *  generic fallback. Used across the income/tax modals and the chart tooltip. */
+export function incomeStreamLabel(row: YearRow, fallback = "Pension / annuity income"): string {
+  const names = (row.breakdown?.incomeStreamNames ?? []).filter((n) => n && n.trim());
+  if (names.length === 0 || names.length > 2) return fallback;
+  return names.join(" + ");
+}
+
 export interface RetirementYearIncome {
   pension: number; // Age Pension received
   netRent: number; // investment-property net rent after its income tax (negative for a geared loss)

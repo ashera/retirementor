@@ -4,6 +4,7 @@ import { fmtCurrency } from "@/lib/au/format";
 import { mortgageAnnualCost } from "@/lib/au/mortgage";
 import { rowWithdrawalRate, withdrawalBand } from "@/lib/au/withdrawal";
 import { yearFlow } from "@/lib/au/yearFlow";
+import { incomeStreamLabel } from "@/lib/au/yearIncome";
 import { rowNetWorth } from "@/lib/au/networth";
 import { getLifeEvents, personRetirementOffset, type RetirementPlan, type YearRow } from "@/lib/au/types";
 
@@ -217,7 +218,7 @@ export default function YearDetailModal({
   if (b.agePension > 0) fundingParts.push(`Age Pension ${fmtCurrency(Math.round(b.agePension))}`);
   if (b.rentIncome > 0) fundingParts.push(`net rent ${fmtCurrency(Math.round(b.rentIncome))}`);
   if (row.workIncome > 0) fundingParts.push(`part-time work ${fmtCurrency(Math.round(row.workIncome))}`);
-  if ((row.incomeStream ?? 0) > 1) fundingParts.push(`pension / annuity income ${fmtCurrency(Math.round(row.incomeStream ?? 0))}`);
+  if ((row.incomeStream ?? 0) > 1) fundingParts.push(`${incomeStreamLabel(row, "pension / annuity income")} ${fmtCurrency(Math.round(row.incomeStream ?? 0))}`);
   if (drawnFromSuper > 1) fundingParts.push(`${fmtCurrency(Math.round(drawnFromSuper))} from super`);
   if (drawnFromOutside > 1) fundingParts.push(`${fmtCurrency(Math.round(drawnFromOutside))} from outside savings`);
   const fundingText = fundingParts.length
@@ -467,7 +468,7 @@ export default function YearDetailModal({
             <Section title="Tax this year">
               {(b.incomeStreamTax ?? 0) > 0.5 && (
                 <Line
-                  label="Tax on pension / annuity income"
+                  label={`Tax on ${incomeStreamLabel(row, "pension / annuity income")}`}
                   sub="your defined-benefit / annuity / foreign-pension income is ordinary taxable income (plus the 2% Medicare levy before Age Pension age); the seniors offset (SAPTO) makes a modest amount tax-free from 67"
                   value={fmtCurrency(Math.round(b.incomeStreamTax ?? 0))}
                   tone="text-amber-400"

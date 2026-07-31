@@ -593,28 +593,36 @@ export function simulate(
       // or not you've retired. Taxed at the marginal rate on top of salary + net rent
       // (working age → no SAPTO); it's extra disposable income and, like take-home
       // pay, it isn't auto-saved, so it doesn't feed the pool. Split across earners.
+      const streamWorkers = Math.max(1, plan.people.length);
       const cpiPowAccum = Math.pow(1 + plan.inflation / 100, t);
       let accumStreamGross = 0;
-      let accumStreamTaxable = 0;
+      const accumStreamTaxablePer = new Array(streamWorkers).fill(0) as number[];
+      const accumStreamNames: string[] = [];
       for (const s of incomeStreams) {
         if (oldest < s.fromAge || oldest >= s.untilAge) continue;
         const real = s.indexed ? s.perYear : s.perYear / cpiPowAccum;
         accumStreamGross += real;
-        if (s.taxable && !(nonResident && s.foreignSourced)) accumStreamTaxable += real;
+        accumStreamNames.push(s.label);
+        if (s.taxable && !(nonResident && s.foreignSourced)) {
+          const own = s.owner >= 0 && s.owner < streamWorkers ? s.owner : -1;
+          if (own >= 0) accumStreamTaxablePer[own] += real;
+          else for (let i = 0; i < streamWorkers; i++) accumStreamTaxablePer[i] += real / streamWorkers;
+        }
       }
-      const streamWorkers = Math.max(1, plan.people.length);
-      const accumStreamPer = accumStreamTaxable / streamWorkers;
+      const accumStreamTaxable = accumStreamTaxablePer.reduce((a, b) => a + b, 0);
       let accumStreamTax = 0;
       if (accumStreamTaxable > 0.5) {
-        accumStreamTax = taxables.reduce((sum, tx) => {
+        accumStreamTax = taxables.reduce((sum, tx, i) => {
+          const per = accumStreamTaxablePer[i] ?? 0;
+          if (per <= 0) return sum;
           const base = tx + accumRentPer;
-          return sum + Math.max(0, residentIncomeTax(base + accumStreamPer) - residentIncomeTax(base)) + (medicareLevy(base + accumStreamPer) - medicareLevy(base));
+          return sum + Math.max(0, residentIncomeTax(base + per) - residentIncomeTax(base)) + (medicareLevy(base + per) - medicareLevy(base));
         }, 0);
       }
       const accumStreamNet = accumStreamGross - accumStreamTax;
       // Per-person consolidated tax for the tax modal (all ordinary income together).
       const accumTaxDetail = plan.people.map((_, i) =>
-        taxDetailFor(i, { salary: taxables[i], work: 0, rent: accumRentPer, stream: accumStreamPer, dividends: outsidePerAccum, gain: 0 }, false, false),
+        taxDetailFor(i, { salary: taxables[i], work: 0, rent: accumRentPer, stream: accumStreamTaxablePer[i] ?? 0, dividends: outsidePerAccum, gain: 0 }, false, false),
       );
       // Positive net rent (after its income tax) is reinvested into the outside pool,
       // so a cash-flow-positive property visibly builds wealth over the working years.
@@ -702,6 +710,7 @@ export function simulate(
           incomeStreamGross: accumStreamGross,
           incomeStreamNet: accumStreamNet,
           incomeStreamTax: accumStreamTax,
+          incomeStreamNames: accumStreamNames,
           superGrowth,
           outsideGrowth,
           fees: feesPaid,
@@ -1067,18 +1076,29 @@ export function simulate(
     const cpiPow = Math.pow(1 + plan.inflation / 100, t);
     let streamGross = 0;
     let streamAssessable = 0;
-    let streamTaxable = 0;
+    // Taxable stream income is attributed PER PERSON (couples): a stream owned by one
+    // partner is taxed on their scale, not split — Australia taxes individuals. An
+    // unowned (split) stream divides evenly. The Age Pension income test is unaffected
+    // (assessed on combined household income → streamAssessable stays a single total).
+    const streamTaxablePer = new Array(workers).fill(0) as number[];
+    const streamNames: string[] = [];
     for (const s of incomeStreams) {
       if (oldest < s.fromAge || oldest >= s.untilAge) continue;
       const real = s.indexed ? s.perYear : s.perYear / cpiPow;
       streamGross += real;
+      streamNames.push(s.label);
       // A foreign-sourced stream (e.g. US Social Security) is outside Australia's tax
       // net AND income test for a non-resident; a resident is taxed/assessed on it
       // like any other income.
       const outsideAuTax = nonResident && s.foreignSourced;
       if (s.assessable && !outsideAuTax) streamAssessable += real;
-      if (s.taxable && !outsideAuTax) streamTaxable += real;
+      if (s.taxable && !outsideAuTax) {
+        const own = s.owner >= 0 && s.owner < workers ? s.owner : -1;
+        if (own >= 0) streamTaxablePer[own] += real;
+        else for (let i = 0; i < workers; i++) streamTaxablePer[i] += real / workers;
+      }
     }
+    const streamTaxable = streamTaxablePer.reduce((a, b) => a + b, 0);
     const assessableOther = rentAssessable + assessableEmployment + streamAssessable;
 
     // Age Pension (household level, from pension age). Financial assets are deemed;
@@ -1176,8 +1196,9 @@ export function simulate(
     // Foreign residents pay no Medicare. This matches the consolidated tax analysis.
     let streamTax = 0;
     if (streamTaxable > EPS) {
-      const streamPer = streamTaxable / workers;
       streamTax = ages.reduce((s, a, i) => {
+        const streamPer = streamTaxablePer[i];
+        if (streamPer <= 0) return s;
         const workPer = (t < retireOffsets[i] ? plan.people[i].salary * gapScale : 0) + grossWork / workers;
         const base = workPer + rentCash / workers;
         const senr = a >= pensionAge;
@@ -1381,15 +1402,15 @@ export function simulate(
     if (!nonResident && !accumPhase && (outsideIncome > 0 || realizedGain > 0)) {
       const incPer = outsideIncome / workers;
       const gainPer = Math.max(0, realizedGain) / workers;
-      const streamPer = streamTaxable / workers; // taxable income-stream share sits below outside earnings in the stack
       const onAgePension = agePensionAmt > 0; // exemption from the 30% minimum
       const rentPer = rentCash / workers; // net rent already assessed this year (may be a loss)
       plan.people.forEach((p, i) => {
         // Outside earnings chain ON TOP of ALL this person's ordinary income already
         // assessed — employment, net rent AND any income stream (DB/annuity/foreign
-        // pension) — so the tax-free threshold / LITO / SAPTO aren't consumed separately
-        // by each source (matches personTax's single stack). Omitting the stream let a
-        // dividend slice fall back into the tax-free threshold and escape tax.
+        // pension) attributed to THEM — so the tax-free threshold / LITO / SAPTO aren't
+        // consumed separately by each source (matches personTax's single stack). Omitting
+        // the stream let a dividend slice fall back into the tax-free threshold and escape tax.
+        const streamPer = streamTaxablePer[i] ?? 0;
         const workPer = (t < retireOffsets[i] ? p.salary * gapScale : 0) + grossWork / workers;
         const ordBase = workPer + rentPer + streamPer;
         // Dividends: ordinary income, marginal, stacked on employment + net rent + stream.
@@ -1451,7 +1472,7 @@ export function simulate(
           salary: t < retireOffsets[i] ? p.salary * gapScale : 0,
           work: grossWork / workers,
           rent: rentCash / workers,
-          stream: streamTaxable / workers,
+          stream: streamTaxablePer[i] ?? 0,
           dividends: outsideIncome / workers,
           gain: Math.max(0, realizedGain) / workers,
         },
@@ -1492,6 +1513,7 @@ export function simulate(
         incomeStreamNet: streamNet,
         incomeStreamGross: streamGross,
         incomeStreamTax: streamTax,
+        incomeStreamNames: streamNames,
         superGrowth,
         outsideGrowth,
         fees: feesPaid,

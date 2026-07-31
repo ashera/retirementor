@@ -5,7 +5,7 @@ import { minDrawdownRate, type EngineConfig } from "@/lib/au/config";
 import { getInvestmentProperties, getLifeEvents, type RetirementPlan, type YearRow } from "@/lib/au/types";
 import { netRentCash, propertyValueAt } from "@/lib/au/property";
 import { essentialsFloor } from "@/lib/au/strategies";
-import { retirementYearIncome } from "@/lib/au/yearIncome";
+import { retirementYearIncome, incomeStreamLabel } from "@/lib/au/yearIncome";
 
 const cur = (n: number) => fmtCurrency(Math.round(n));
 
@@ -347,7 +347,7 @@ export default function IncomeYearModal({
                   <div className="rounded-xl border border-line bg-panel px-4 py-1">
                     <Row
                       color="#2dd4bf"
-                      label="Pension / annuity income"
+                      label={incomeStreamLabel(row)}
                       sub={`Your defined-benefit / annuity / foreign-pension income — paid from its start age even while you're still working, after tax${
                         (row.breakdown.incomeStreamTax ?? 0) > 0.5 ? ` (${cur(row.breakdown.incomeStreamTax ?? 0)} tax this year)` : ""
                       }.`}
@@ -449,7 +449,7 @@ export default function IncomeYearModal({
                   {inc.incomeStream > 0 && (
                     <Row
                       color="#2dd4bf"
-                      label="Pension / annuity income"
+                      label={incomeStreamLabel(row)}
                       sub={`Your defined-benefit / annuity / foreign-pension income, after tax${
                         (row.breakdown.incomeStreamTax ?? 0) > 0.5 ? ` (${cur(row.breakdown.incomeStreamTax ?? 0)} tax this year)` : ""
                       }. It's counted under the Age Pension income test, so it also reduces any Age Pension above.`}
@@ -575,7 +575,7 @@ export default function IncomeYearModal({
                         <DLine label={`Deemed on ${cur(pb.financialAssets)} savings + super`} value={pb.deemedIncome} />
                         {(pb.rentIncome ?? 0) > 0 && <DLine label={rentLabel} value={pb.rentIncome} />}
                         {(pb.employmentIncome ?? 0) > 0 && <DLine label="+ Part-time work / salary (assessable)" value={pb.employmentIncome} />}
-                        {(pb.streamIncome ?? 0) > 0 && <DLine label="+ Pension / annuity income (assessable)" value={pb.streamIncome} />}
+                        {(pb.streamIncome ?? 0) > 0 && <DLine label={`+ ${incomeStreamLabel(row)} (assessable)`} value={pb.streamIncome} />}
                         {pb.otherIncome > 0 && (
                           <div className="border-t border-line pt-1">
                             <DLine label="= Assessable income" value={incomeTotal} strong />
@@ -618,7 +618,7 @@ export default function IncomeYearModal({
                     {afterTaxRent < -0.5 && <DLine label="+ Rental shortfall (after tax)" value={-afterTaxRent} />}
                     {salaryTakeHome > 1 && <DLine label="− A partner's salary (take-home)" value={salaryTakeHome} />}
                     {partTimeWork > 0.5 && <DLine label="− Part-time work (after tax)" value={partTimeWork} />}
-                    {inc.incomeStream > 0.5 && <DLine label="− Pension / annuity income" value={inc.incomeStream} />}
+                    {inc.incomeStream > 0.5 && <DLine label={`− ${incomeStreamLabel(row)}`} value={inc.incomeStream} />}
                     <div className="border-t border-line pt-1.5">
                       <DLine label="= Shortfall to fund from savings" value={privateNeed} strong />
                     </div>

@@ -527,6 +527,7 @@ export default function PlanWizard({
         maxAge={draft.lifeExpectancy}
         defaultAge={draft.retirementAge}
         nonResident={draft.taxResidency === "non-resident"}
+        couple={draft.household === "couple"}
         onChange={(incomeStreams) => setDraft((prev) => ({ ...prev, incomeStreams }))}
       />
     ),

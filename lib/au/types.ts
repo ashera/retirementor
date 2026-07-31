@@ -177,6 +177,7 @@ export interface IncomeStream {
   taxable?: boolean; // default true → taxed as ordinary income
   assessable?: boolean; // default true → counted in the Age Pension income test
   foreignSourced?: boolean; // default false. Only bites when taxResidency === "non-resident": a foreign-sourced stream (e.g. US Social Security) isn't taxed by Australia or counted in its income test; a resident is taxed on worldwide income regardless.
+  owner?: number; // couples only: which person the income belongs to for TAX (0 = you, 1 = partner). Omitted → split evenly. No effect on the Age Pension income test (assessed on combined household income) or for a single.
 }
 
 // Per-person "keep super in accumulation" configuration (see RetirementPlan).
@@ -326,6 +327,7 @@ export function getIncomeStreams(plan: RetirementPlan): Required<IncomeStream>[]
       taxable: s.taxable ?? true,
       assessable: s.assessable ?? true,
       foreignSourced: s.foreignSourced ?? false,
+      owner: typeof s.owner === "number" && s.owner >= 0 ? s.owner : -1, // -1 = split evenly
     }));
 }
 
@@ -498,6 +500,7 @@ export interface YearBreakdown {
   incomeStreamNet?: number; // net recurring income-stream income this year (after tax) — funds spending
   incomeStreamGross?: number; // gross recurring income-stream income this year (before tax)
   incomeStreamTax?: number; // income tax on the taxable income streams this year
+  incomeStreamNames?: string[]; // labels of the income streams active this year (for display)
   // Investment growth (super growth is net of accumulation earnings tax AND the
   // % investment/admin fee; the fixed $ fees + insurance are the `fees` line)
   superGrowth: number;

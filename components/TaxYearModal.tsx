@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { fmtCurrency } from "@/lib/au/format";
 import type { PersonTaxDetail, PropertySaleDetail, RetirementPlan, YearRow } from "@/lib/au/types";
+import { incomeStreamLabel } from "@/lib/au/yearIncome";
 
 const round = (n: number) => Math.round(n);
 const cur = (n: number) => (n < 0 ? `−${fmtCurrency(round(-n))}` : fmtCurrency(round(n)));
@@ -21,7 +22,7 @@ function Line({ label, value, sub, tone = "text-slate-200", strong = false, inde
   );
 }
 
-function PersonBlock({ d, showName }: { d: PersonTaxDetail; showName: boolean }) {
+function PersonBlock({ d, showName, streamLabel }: { d: PersonTaxDetail; showName: boolean; streamLabel: string }) {
   const rentPos = Math.max(0, d.rent);
   const rentNeg = Math.max(0, -d.rent);
   const stream = d.stream ?? 0;
@@ -35,7 +36,7 @@ function PersonBlock({ d, showName }: { d: PersonTaxDetail; showName: boolean })
       {d.work > 0.5 && <Line label="Part-time work" value={cur(d.work)} />}
       {rentPos > 0.5 && <Line label="Net rent" value={cur(rentPos)} />}
       {rentNeg > 0.5 && <Line label="Net rental loss" value={cur(-rentNeg)} sub="negative gearing — reduces taxable income" />}
-      {stream > 0.5 && <Line label="Pension / annuity income" value={cur(stream)} />}
+      {stream > 0.5 && <Line label={streamLabel} value={cur(stream)} />}
       {d.dividends > 0.5 && <Line label="Dividends / distributions" value={cur(d.dividends)} />}
       {anyOrdinary && (
         <div className="border-t border-line">
@@ -189,7 +190,7 @@ export default function TaxYearModal({
                   </h3>
                   <div className="space-y-2">
                     {detail.map((d, i) => (
-                      <PersonBlock key={i} d={d} showName={isCouple} />
+                      <PersonBlock key={i} d={d} showName={isCouple} streamLabel={incomeStreamLabel(row)} />
                     ))}
                   </div>
                 </section>
