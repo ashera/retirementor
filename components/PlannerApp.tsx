@@ -233,7 +233,7 @@ export default function PlannerApp({
   country = null,
   savedPlans,
   active = null,
-  config,
+  config: configProp,
   reviewDue = 0,
   userStats = null,
   sharedPlan = null,
@@ -257,6 +257,12 @@ export default function PlannerApp({
   const whatIfHref = sharedPlan ? `${sharedPlan.basePath}/what-if` : "/what-if";
   const stressHref = sharedPlan ? `${sharedPlan.basePath}/stress-test` : "/stress-test";
   const router = useRouter();
+  // Config arrives as a server prop, so every server re-render (e.g. after a save
+  // that revalidates "/") hands us a NEW object with the same VALUE. Left raw, that
+  // identity change would bust every downstream memo (simulate, Monte Carlo, the SWR
+  // solver…) and re-run them needlessly. Stabilise it by value so those memos only
+  // recompute when the config actually changes (an admin ref-data edit).
+  const config = useMemo(() => configProp, [JSON.stringify(configProp)]);
   // The active scenario: raw inputs (base) + an explicit strategy layer. Everything
   // downstream reads the COMPOSED plan, which is DERIVED — never edited directly.
   // Dashboard edits go to `base`; strategies win on any overlapping field.
@@ -452,7 +458,9 @@ export default function PlannerApp({
     if (!user) return;
     const id = savedIdRef.current;
     if (id) {
-      void updatePlan(id, activeNameRef.current || "My First Scenario", data);
+      // Background autosave: don't revalidate the page — doing so re-sends fresh
+      // server props, busting memos and re-arming this autosave (an endless loop).
+      void updatePlan(id, activeNameRef.current || "My First Scenario", data, false);
       return;
     }
     const res = await getOrCreateActiveScenario(data);

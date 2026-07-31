@@ -163,6 +163,12 @@ export async function updatePlan(
   id: string,
   name: string,
   data: RetirementPlan,
+  // Background auto-save passes false: it writes the SAME active scenario every ~1.5s
+  // and doesn't need the page re-rendered. Revalidating on every autosave re-sends
+  // fresh server props to PlannerApp, which busts its memos and RE-ARMS the autosave
+  // — an infinite save→revalidate→save loop (a POST every couple of seconds). Explicit
+  // saves (rename, save-as) still revalidate so the switcher/list picks up the change.
+  revalidate = true,
 ): Promise<ActionResult> {
   const user = await getCurrentUser();
   if (!user) return { error: "You need to be signed in to save plans." };
@@ -173,7 +179,7 @@ export async function updatePlan(
     [trimmed, JSON.stringify(data), id, user.id],
   );
   if (!r.rowCount) return { error: "Scenario not found." };
-  revalidatePath("/");
+  if (revalidate) revalidatePath("/");
   return { ok: true, id };
 }
 
