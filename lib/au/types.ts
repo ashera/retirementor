@@ -118,6 +118,19 @@ export interface PropertyDetail {
   sellAtAge: number; // oldest person's age at sale (when strategy === "sell")
 }
 
+/** The CGT working behind a single investment-property sale (today's dollars). */
+export interface PropertySaleDetail {
+  name: string; // property label ("Beach house" / "Property 2")
+  saleValue: number; // market value at sale
+  costBase: number; // purchase price (cost base)
+  gain: number; // saleValue − costBase (floored at 0)
+  regime: "discount" | "indexed"; // which CGT regime applied
+  discountPct: number; // % of the gain excluded (50 for the discount regime; 0 if indexed)
+  taxableGain: number; // gain after the discount (or full real gain under the indexed regime)
+  owners: number; // co-owners the gain is split across (couple = 2)
+  cgt: number; // CGT paid across all owners
+}
+
 // How a couple's super is held. "joint" = a single pooled SMSF balance entered as
 // one figure (still split across members internally so each member's contributions,
 // preservation-age access and means-test treatment apply).
@@ -534,6 +547,7 @@ export interface YearBreakdown {
   // Investment property sale
   propertyProceeds: number; // net proceeds added to outside super
   propertyCgt: number; // CGT paid on the sale
+  propertySales?: PropertySaleDetail[]; // per-property sale working behind propertyCgt (which one, gain, discount, CGT)
   // Home equity freed this year (downsize / sell-up-and-rent). Lands in the
   // opening balance, so it explains a step-up rather than a mid-year inflow.
   homeProceeds: number; // total equity freed (0 normally)

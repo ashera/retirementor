@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { fmtCurrency } from "@/lib/au/format";
-import type { PersonTaxDetail, RetirementPlan, YearRow } from "@/lib/au/types";
+import type { PersonTaxDetail, PropertySaleDetail, RetirementPlan, YearRow } from "@/lib/au/types";
 
 const round = (n: number) => Math.round(n);
 const cur = (n: number) => (n < 0 ? `−${fmtCurrency(round(-n))}` : fmtCurrency(round(n)));
@@ -61,6 +61,47 @@ function PersonBlock({ d, showName }: { d: PersonTaxDetail; showName: boolean })
       {d.cgt > 0.5 && (
         <Line label="Capital gains tax" value={cur(d.cgt)} tone="text-sky-300" sub={`on ${cur(d.gain)} of realised gains`} />
       )}
+    </div>
+  );
+}
+
+function PropertySaleBlock({ s }: { s: PropertySaleDetail }) {
+  const discounted = s.regime === "discount" && s.discountPct > 0;
+  return (
+    <div className="rounded-xl border border-line bg-panel px-4 py-2">
+      <div className="mb-1 flex items-center justify-between gap-2">
+        <span className="text-sm font-semibold text-white">{s.name}</span>
+        <span className="rounded-full bg-panel-2 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted">Sold</span>
+      </div>
+      <Line label="Sale value" value={cur(s.saleValue)} />
+      <Line label="− Cost base (purchase price)" value={cur(s.costBase)} />
+      <div className="border-t border-line">
+        <Line label="= Capital gain" value={cur(s.gain)} strong />
+      </div>
+      {discounted ? (
+        <>
+          <Line label={`− ${s.discountPct}% CGT discount (held > 12 months)`} value={`−${cur(s.gain - s.taxableGain)}`} tone="text-emerald-400" />
+          <div className="border-t border-line">
+            <Line label="= Taxable gain" value={cur(s.taxableGain)} strong />
+          </div>
+        </>
+      ) : (
+        <Line
+          label="Taxable gain"
+          value={cur(s.taxableGain)}
+          sub="indexed regime — the whole real gain is taxable (min. 30%)"
+        />
+      )}
+      {s.owners > 1 && (
+        <Line
+          label={`Split across ${s.owners} co-owners`}
+          value={`${cur(s.taxableGain / s.owners)} each`}
+          sub="each co-owner is taxed on their share at their own marginal rate"
+        />
+      )}
+      <div className="mt-0.5 border-t border-line">
+        <Line label="= Capital gains tax" value={cur(s.cgt)} tone="text-sky-300" strong />
+      </div>
     </div>
   );
 }
@@ -166,9 +207,16 @@ export default function TaxYearModal({
 
               {propertyCgt > 0.5 && (
                 <section>
-                  <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted">Property</h3>
-                  <div className="rounded-xl border border-line bg-panel px-4 py-1">
-                    <Line label="Capital gains tax (property sale)" value={cur(propertyCgt)} tone="text-sky-300" />
+                  <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted">Property sale — capital gains tax</h3>
+                  <div className="space-y-2">
+                    {(b.propertySales ?? []).map((s, i) => (
+                      <PropertySaleBlock key={i} s={s} />
+                    ))}
+                    {(b.propertySales ?? []).length === 0 && (
+                      <div className="rounded-xl border border-line bg-panel px-4 py-1">
+                        <Line label="Capital gains tax (property sale)" value={cur(propertyCgt)} tone="text-sky-300" />
+                      </div>
+                    )}
                   </div>
                 </section>
               )}

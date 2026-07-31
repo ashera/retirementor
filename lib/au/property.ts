@@ -5,7 +5,7 @@
 // The secured loan is modelled as interest-only (balance constant, value grows).
 
 import { incomeTax } from "./tax";
-import type { PropertyDetail } from "./types";
+import type { PropertyDetail, PropertySaleDetail } from "./types";
 
 /** Market value grown at its real rate, `yearsFromNow` years out (today's $). */
 export function propertyValueAt(p: PropertyDetail, yearsFromNow: number): number {
@@ -80,6 +80,31 @@ export function capitalGainsTax(
         ? incomeTax(gainPer) // real gain, fully taxable
         : Math.max(incomeTax(gainPer), (rules.minRatePct / 100) * gainPer);
   return perOwner * n;
+}
+
+/** The full CGT working behind a property sale — for the tax-breakdown modal.
+ *  Mirrors capitalGainsTax()'s maths so the figures reconcile exactly. */
+export function propertySaleDetail(
+  p: PropertyDetail,
+  value: number,
+  rules: CgtRules,
+  owners: number,
+  name: string,
+): PropertySaleDetail {
+  const gain = Math.max(0, value - p.purchasePrice);
+  const discountPct = rules.regime === "discount" ? rules.discountPct : 0;
+  const taxableGain = rules.regime === "discount" ? gain * (1 - rules.discountPct / 100) : gain;
+  return {
+    name,
+    saleValue: value,
+    costBase: p.purchasePrice,
+    gain,
+    regime: rules.regime,
+    discountPct,
+    taxableGain,
+    owners: Math.max(1, Math.round(owners)),
+    cgt: capitalGainsTax(p, value, rules, owners),
+  };
 }
 
 /** Cash released by a sale: value, less the loan repaid and CGT. */

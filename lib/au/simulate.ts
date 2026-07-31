@@ -31,8 +31,8 @@ import {
 import { mortgageActiveAtAge, mortgageAnnualCost, outstandingBalance } from "./mortgage";
 import { budgetSplit, presetCategories } from "./budget";
 import { residentIncomeTax, seniorIncomeTax, nonResidentIncomeTax, medicareLevy, personTax, type CgtParams } from "./tax";
-import { capitalGainsTax, netEquity, netRentCash, propertyValueAt } from "./property";
-import type { Person, PersonTaxDetail, Phase, RetirementPlan, SimResult, YearBreakdown, YearRow } from "./types";
+import { capitalGainsTax, propertySaleDetail, netEquity, netRentCash, propertyValueAt } from "./property";
+import type { Person, PersonTaxDetail, Phase, PropertySaleDetail, RetirementPlan, SimResult, YearBreakdown, YearRow } from "./types";
 
 const EPS = 1e-6;
 
@@ -546,15 +546,13 @@ export function simulate(
       // Pension in the working years, so the 30% indexed minimum binds).
       let accumPropertyProceeds = 0;
       let accumPropertyCgt = 0;
+      const accumPropertySales: PropertySaleDetail[] = [];
       properties.forEach((prop, pi) => {
         if (sold[pi] || prop.strategy !== "sell" || oldest < prop.sellAtAge) return;
         const value = propertyValueAt(prop, t);
-        const cgtPaid = capitalGainsTax(
-          prop,
-          value,
-          { regime: cgtRegime, discountPct: config.outsideTax?.cgtDiscountPct ?? 50, minRatePct: config.outsideTax?.cgtMinRatePct ?? 30, onAgePension: false },
-          plan.people.length,
-        );
+        const cgtRules = { regime: cgtRegime, discountPct: config.outsideTax?.cgtDiscountPct ?? 50, minRatePct: config.outsideTax?.cgtMinRatePct ?? 30, onAgePension: false } as const;
+        const cgtPaid = capitalGainsTax(prop, value, cgtRules, plan.people.length);
+        if (cgtPaid > 0.5) accumPropertySales.push(propertySaleDetail(prop, value, cgtRules, plan.people.length, prop.name?.trim() || `Property ${pi + 1}`));
         const loanReal = prop.loanBalance / Math.pow(1 + plan.inflation / 100, t); // nominal IO loan → today's $
         const proceeds = value - loanReal - cgtPaid;
         addCpiRealOutside(proceeds, t); // CPI-real sale proceeds → basis-corrected before the boundary
@@ -710,6 +708,7 @@ export function simulate(
           recontribution: 0,
           propertyProceeds: accumPropertyProceeds,
           propertyCgt: accumPropertyCgt,
+          propertySales: accumPropertySales,
           homeProceeds: 0,
           homeProceedsToSuper: 0,
           homeValue: homeValueThisYear,
@@ -954,6 +953,7 @@ export function simulate(
     let propertyEquity = 0; // combined assessable net equity (assets test)
     let propertyProceeds = 0; // combined net sale proceeds released this year
     let propertyCgt = 0; // combined CGT paid on sales this year
+    const propertySales: PropertySaleDetail[] = []; // per-sale CGT working (for the tax modal)
     const propertyParts: { name?: string; index: number; equity: number }[] = [];
     properties.forEach((prop, pi) => {
       if (sold[pi]) return;
@@ -978,6 +978,7 @@ export function simulate(
         const proceeds = value - propReal.loanBalance - cgtPaid;
         propertyProceeds += proceeds;
         propertyCgt += cgtPaid;
+        if (cgtPaid > 0.5) propertySales.push(propertySaleDetail(prop, value, cgtRules, plan.people.length, prop.name?.trim() || `Property ${pi + 1}`));
         outside += proceeds;
         sold[pi] = true;
       } else {
@@ -1494,6 +1495,7 @@ export function simulate(
         eventExpense: eventExpenseNow,
         propertyProceeds,
         propertyCgt,
+        propertySales,
         homeProceeds: homeProceedsThisYear,
         homeProceedsToSuper: homeToSuperThisYear,
         homeValue: homeValueThisYear,
