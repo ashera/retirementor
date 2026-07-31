@@ -341,6 +341,26 @@ export default function IncomeYearModal({
                 </section>
               )}
 
+              {(row.incomeStream ?? 0) > 0.5 && (
+                <section>
+                  <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted">Other income</h3>
+                  <div className="rounded-xl border border-line bg-panel px-4 py-1">
+                    <Row
+                      color="#2dd4bf"
+                      label="Pension / annuity income"
+                      sub={`Your defined-benefit / annuity / foreign-pension income — paid from its start age even while you're still working, after tax${
+                        (row.breakdown.incomeStreamTax ?? 0) > 0.5 ? ` (${cur(row.breakdown.incomeStreamTax ?? 0)} tax this year)` : ""
+                      }.`}
+                      value={row.incomeStream}
+                    />
+                  </div>
+                  <p className="mt-1 text-[11px] leading-snug text-muted">
+                    Income on top of your salary. Like your take-home pay it isn&apos;t automatically saved — set your
+                    yearly savings to put some of it away.
+                  </p>
+                </section>
+              )}
+
               {(row.breakdown.contribGross > 0 || afterTaxContrib > 0 || row.breakdown.ttrBenefit !== 0 || row.breakdown.savings > 0) && (
                 <section>
                   <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted">

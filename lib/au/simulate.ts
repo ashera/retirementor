@@ -588,9 +588,33 @@ export function simulate(
                 (medicareLevy(tx + accumRentPer) - medicareLevy(tx)), // levy tracks net rent (a loss reduces it — negative gearing)
               0,
             );
+      // Income streams that have STARTED but the household is still working — a
+      // defined-benefit / annuity / foreign pension is paid from its fromAge whether
+      // or not you've retired. Taxed at the marginal rate on top of salary + net rent
+      // (working age → no SAPTO); it's extra disposable income and, like take-home
+      // pay, it isn't auto-saved, so it doesn't feed the pool. Split across earners.
+      const cpiPowAccum = Math.pow(1 + plan.inflation / 100, t);
+      let accumStreamGross = 0;
+      let accumStreamTaxable = 0;
+      for (const s of incomeStreams) {
+        if (oldest < s.fromAge || oldest >= s.untilAge) continue;
+        const real = s.indexed ? s.perYear : s.perYear / cpiPowAccum;
+        accumStreamGross += real;
+        if (s.taxable && !(nonResident && s.foreignSourced)) accumStreamTaxable += real;
+      }
+      const streamWorkers = Math.max(1, plan.people.length);
+      const accumStreamPer = accumStreamTaxable / streamWorkers;
+      let accumStreamTax = 0;
+      if (accumStreamTaxable > 0.5) {
+        accumStreamTax = taxables.reduce((sum, tx) => {
+          const base = tx + accumRentPer;
+          return sum + Math.max(0, residentIncomeTax(base + accumStreamPer) - residentIncomeTax(base)) + (medicareLevy(base + accumStreamPer) - medicareLevy(base));
+        }, 0);
+      }
+      const accumStreamNet = accumStreamGross - accumStreamTax;
       // Per-person consolidated tax for the tax modal (all ordinary income together).
       const accumTaxDetail = plan.people.map((_, i) =>
-        taxDetailFor(i, { salary: taxables[i], work: 0, rent: accumRentPer, stream: 0, dividends: outsidePerAccum, gain: 0 }, false, false),
+        taxDetailFor(i, { salary: taxables[i], work: 0, rent: accumRentPer, stream: accumStreamPer, dividends: outsidePerAccum, gain: 0 }, false, false),
       );
       // Positive net rent (after its income tax) is reinvested into the outside pool,
       // so a cash-flow-positive property visibly builds wealth over the working years.
@@ -675,6 +699,9 @@ export function simulate(
           takeHome,
           ttrBenefit,
           workIncome: 0,
+          incomeStreamGross: accumStreamGross,
+          incomeStreamNet: accumStreamNet,
+          incomeStreamTax: accumStreamTax,
           superGrowth,
           outsideGrowth,
           fees: feesPaid,
