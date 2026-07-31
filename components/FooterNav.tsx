@@ -30,6 +30,7 @@ export default function FooterNav() {
         </>
       )}
       <Link href="/about" className="hover:text-white">About</Link>
+      <Link href="/learn" className="hover:text-white">Learn</Link>
       <Link href="/case-studies" className="hover:text-white">Case studies</Link>
       <Link href="/faq" className="hover:text-white">Retirement &amp; super FAQ</Link>
       <Link href="/releases" className="hover:text-white">What&apos;s new</Link>

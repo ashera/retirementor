@@ -36,6 +36,14 @@ export default function FaqPage() {
           only, not financial advice. To see the numbers for your own situation, use the{" "}
           <Link href="/" className="text-accent hover:underline">free planner</Link>.
         </p>
+        <p className="mt-3 rounded-xl border border-accent/25 bg-accent/5 px-4 py-3 text-sm text-slate-300">
+          Want the concepts explained in depth?{" "}
+          <Link href="/learn" className="font-medium text-accent hover:underline">
+            Browse the knowledge base →
+          </Link>{" "}
+          — searchable explainers for the Age Pension, safe withdrawal rates, Monte Carlo, flexible spending and more,
+          each with worked examples.
+        </p>
       </header>
 
       <div className="mt-8 space-y-4">
