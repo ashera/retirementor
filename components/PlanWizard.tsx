@@ -262,7 +262,7 @@ export default function PlanWizard({
     title,
     subtitle,
     body: (
-      <div className="space-y-6">
+      <div className="grid grid-cols-1 gap-x-5 gap-y-5 sm:grid-cols-2">
         <Field
           label="Current age"
           value={draft.people[i].currentAge}
@@ -271,24 +271,6 @@ export default function PlanWizard({
           max={75}
           suffix="yrs"
         />
-        <div>
-          <div className="mb-1.5 text-sm font-medium text-slate-200">Sex <span className="font-normal text-muted">(optional)</span></div>
-          <Segmented
-            value={draft.people[i].sex ?? ""}
-            options={[
-              { value: "female", label: "Female" },
-              { value: "male", label: "Male" },
-              { value: "", label: "Rather not say" },
-            ]}
-            onChange={(v) =>
-              setDraft((prev) => ({
-                ...prev,
-                people: prev.people.map((p, idx) => (idx === i ? { ...p, sex: v === "" ? undefined : (v as "male" | "female") } : p)),
-              }))
-            }
-          />
-          <p className="mt-1.5 text-xs text-muted">Only used for the longevity (&ldquo;Rich, Broke or Dead&rdquo;) survival view on the stress test — never for the projection itself.</p>
-        </div>
         {draft.superMode === "joint" && isCouple ? (
           i === 0 ? (
             <>
@@ -325,20 +307,40 @@ export default function PlanWizard({
             prefix="$"
           />
         )}
-        <Field
-          label="Annual salary (excluding super)"
-          value={draft.people[i].salary}
-          onChange={setPerson(i, "salary")}
-          min={0}
-          max={500_000}
-          step={1000}
-          prefix="$"
-          hint={
-            Number.isFinite(draft.people[i].salary)
-              ? `Enter your base salary — your employer pays ${fmtCurrency(draft.people[i].salary * config.sgRate)}/yr super on top (${(config.sgRate * 100).toFixed(0)}% SG), so don't include it here.`
-              : `Enter your base salary before super — your employer adds ${(config.sgRate * 100).toFixed(0)}% on top (the Super Guarantee). If your package is quoted "including super", exclude that part.`
-          }
-        />
+        <div className="sm:col-span-2">
+          <Field
+            label="Annual salary (excluding super)"
+            value={draft.people[i].salary}
+            onChange={setPerson(i, "salary")}
+            min={0}
+            max={500_000}
+            step={1000}
+            prefix="$"
+            hint={
+              Number.isFinite(draft.people[i].salary)
+                ? `Enter your base salary — your employer pays ${fmtCurrency(draft.people[i].salary * config.sgRate)}/yr super on top (${(config.sgRate * 100).toFixed(0)}% SG), so don't include it here.`
+                : `Enter your base salary before super — your employer adds ${(config.sgRate * 100).toFixed(0)}% on top (the Super Guarantee). If your package is quoted "including super", exclude that part.`
+            }
+          />
+        </div>
+        <div className="sm:col-span-2">
+          <div className="mb-1.5 text-sm font-medium text-slate-200">Sex <span className="font-normal text-muted">(optional)</span></div>
+          <Segmented
+            value={draft.people[i].sex ?? ""}
+            options={[
+              { value: "female", label: "Female" },
+              { value: "male", label: "Male" },
+              { value: "", label: "Rather not say" },
+            ]}
+            onChange={(v) =>
+              setDraft((prev) => ({
+                ...prev,
+                people: prev.people.map((p, idx) => (idx === i ? { ...p, sex: v === "" ? undefined : (v as "male" | "female") } : p)),
+              }))
+            }
+          />
+          <p className="mt-1.5 text-xs text-muted">Only used for the longevity (&ldquo;Rich, Broke or Dead&rdquo;) survival view on the stress test — never for the projection itself.</p>
+        </div>
       </div>
     ),
   });
@@ -360,31 +362,33 @@ export default function PlanWizard({
           <p className="text-xs text-muted">Just the employer Super Guarantee, then — you can change this anytime.</p>
         )}
         {contribMode === "yes" && draft.people.map((person, i) => (
-          <div key={i} className="space-y-6">
+          <div key={i} className="space-y-4">
             {isCouple && (
               <div className="text-xs font-semibold uppercase tracking-wide text-accent">
                 {i === 0 ? "You" : "Partner"}
               </div>
             )}
-            <Field
-              label="Salary sacrifice (before tax)"
-              value={person.voluntaryConcessional}
-              onChange={setPerson(i, "voluntaryConcessional")}
-              min={0}
-              max={config.concessionalCap}
-              step={500}
-              prefix="$"
-              hint={`Concessional cap is ${fmtCurrency(config.concessionalCap)}/yr incl. the SG.`}
-            />
-            <Field
-              label="After-tax contributions"
-              value={person.voluntaryNonConcessional}
-              onChange={setPerson(i, "voluntaryNonConcessional")}
-              min={0}
-              max={130_000}
-              step={1000}
-              prefix="$"
-            />
+            <div className="grid grid-cols-1 gap-x-5 gap-y-5 sm:grid-cols-2">
+              <Field
+                label="Salary sacrifice (before tax)"
+                value={person.voluntaryConcessional}
+                onChange={setPerson(i, "voluntaryConcessional")}
+                min={0}
+                max={config.concessionalCap}
+                step={500}
+                prefix="$"
+                hint={`Concessional cap is ${fmtCurrency(config.concessionalCap)}/yr incl. the SG.`}
+              />
+              <Field
+                label="After-tax contributions"
+                value={person.voluntaryNonConcessional}
+                onChange={setPerson(i, "voluntaryNonConcessional")}
+                min={0}
+                max={130_000}
+                step={1000}
+                prefix="$"
+              />
+            </div>
           </div>
         ))}
       </div>
@@ -409,7 +413,7 @@ export default function PlanWizard({
           <p className="text-xs text-muted">No outside-super savings recorded — you can add them anytime.</p>
         )}
         {outsideMode === "yes" && (
-          <>
+          <div className="grid grid-cols-1 gap-x-5 gap-y-5 sm:grid-cols-2">
             <Field
               label="Current outside-super investments"
               value={draft.outsideSuper}
@@ -428,7 +432,7 @@ export default function PlanWizard({
               step={500}
               prefix="$"
             />
-          </>
+          </div>
         )}
       </div>
     ),
@@ -540,30 +544,32 @@ export default function PlanWizard({
     subtitle: "When you want to stop working and how much you'll spend.",
     body: (
       <div className="space-y-6">
-        <Field
-          label={isCouple ? "Your retirement age" : "Retirement age"}
-          value={draft.retirementAge}
-          onChange={(v) => patch({ retirementAge: v })}
-          min={40}
-          max={75}
-          suffix="yrs"
-          hint={
-            draft.retirementAge < 60
-              ? "Before 60 you'll rely on outside-super until your super unlocks."
-              : "Super is accessible from age 60."
-          }
-        />
-        {isCouple && (
+        <div className="grid grid-cols-1 items-start gap-x-5 gap-y-5 sm:grid-cols-2">
           <Field
-            label="Partner's retirement age"
-            value={draft.people[1]?.retirementAge ?? personRetirementAge(draft, 1)}
-            onChange={(v) => setPerson(1, "retirementAge")(v)}
+            label={isCouple ? "Your retirement age" : "Retirement age"}
+            value={draft.retirementAge}
+            onChange={(v) => patch({ retirementAge: v })}
             min={40}
             max={75}
             suffix="yrs"
-            hint="Partners can retire at different ages. Whoever's still working keeps earning and paying into super, and their pay helps cover the household's spending until they retire too."
+            hint={
+              draft.retirementAge < 60
+                ? "Before 60 you'll rely on outside-super until your super unlocks."
+                : "Super is accessible from age 60."
+            }
           />
-        )}
+          {isCouple && (
+            <Field
+              label="Partner's retirement age"
+              value={draft.people[1]?.retirementAge ?? personRetirementAge(draft, 1)}
+              onChange={(v) => setPerson(1, "retirementAge")(v)}
+              min={40}
+              max={75}
+              suffix="yrs"
+              hint="Partners can retire at different ages. Whoever's still working keeps earning and paying into super, and their pay helps cover the household's spending until they retire too."
+            />
+          )}
+        </div>
 
         {/* Spending is set exclusively in the budget builder — one source of
             truth, so the wizard and budget can never disagree. */}
@@ -626,7 +632,7 @@ export default function PlanWizard({
     title: "Assumptions",
     subtitle: "The long-run numbers behind the projection.",
     body: (
-      <div className="space-y-6">
+      <div className="space-y-5">
         {assumptionsTuned && (
           <div className="flex justify-end">
             <button
@@ -638,6 +644,7 @@ export default function PlanWizard({
             </button>
           </div>
         )}
+        <div className="grid grid-cols-1 gap-x-5 gap-y-5 sm:grid-cols-2">
         {(() => {
           const feePct = draft.fees?.adminInvestmentPct ?? config.fees.adminInvestmentPct;
           const afterFees = +(draft.investmentReturn - feePct).toFixed(2);
@@ -672,6 +679,8 @@ export default function PlanWizard({
           max={105}
           suffix="yrs"
         />
+        </div>
+        <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2">
         {(() => {
           const fees = draft.fees ?? config.fees;
           const setFee = (patchFee: Partial<typeof fees>) => patch({ fees: { ...fees, ...patchFee } });
@@ -816,6 +825,7 @@ export default function PlanWizard({
               I keep an Age Pension entitlement while abroad (portability varies)
             </label>
           )}
+        </div>
         </div>
       </div>
     ),
@@ -984,7 +994,7 @@ export default function PlanWizard({
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
         onClick={onClose}
       />
-      <div key={view} className="wizfade relative z-10 flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-line bg-panel shadow-2xl">
+      <div key={view} className="wizfade relative z-10 flex max-h-[90vh] w-full max-w-lg sm:max-w-[720px] flex-col overflow-hidden rounded-2xl border border-line bg-panel shadow-2xl">
         {view === "summary" ? (
           <>
             {/* Overview header */}
