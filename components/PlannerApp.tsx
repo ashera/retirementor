@@ -31,6 +31,7 @@ import {
   SuperAtRetirementExplainer,
 } from "@/components/explainers";
 import { runMonteCarlo, MC_CONFIDENCE_TARGET, MC_CONFIDENCE_MC } from "@/lib/au/montecarlo";
+import { streamNamesLabel } from "@/lib/au/yearIncome";
 import { whatWillItTake, earliestRetirement } from "@/lib/au/goalseek";
 import { maxSpendForConfidence, withSpend, appliedStrategies } from "@/lib/au/strategies";
 import { composeScenario, toActiveScenario, EMPTY_LAYER, type StrategyLayer } from "@/lib/au/scenario";
@@ -1704,7 +1705,7 @@ export default function PlannerApp({
             <LegendDot color="#facc15" label="Take-home pay" />
             {plan.workIncome && <LegendDot color="#f472b6" label="Part-time work" />}
             {result.rows.some((r) => (r.incomeStream ?? 0) > 0) && (
-              <LegendDot color="#2dd4bf" label="Pension / annuity" />
+              <LegendDot color="#2dd4bf" label={streamNamesLabel((plan.incomeStreams ?? []).filter((s) => s.perYear > 0).map((s) => s.label ?? ""), "Pension / annuity")} />
             )}
             <LegendDot color="#a78bfa" label="Age Pension" />
             {/* Split the super legend only when accumulation is actually DRAWN as

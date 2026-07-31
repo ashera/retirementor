@@ -7,13 +7,18 @@
 
 import type { YearRow } from "./types";
 
-/** Display label for a year's income stream(s): the actual name when there are one
- *  or two (e.g. "US Social Security" or "DB pension + US Social Security"), else a
- *  generic fallback. Used across the income/tax modals and the chart tooltip. */
+/** Display label for income stream(s): the actual name when there are one or two
+ *  (e.g. "US Social Security" or "DB pension + US Social Security"), else a generic
+ *  fallback. Used across the income/tax modals, the chart tooltip and the legend. */
+export function streamNamesLabel(names: readonly string[] | undefined, fallback = "Pension / annuity income"): string {
+  const clean = (names ?? []).filter((n) => n && n.trim());
+  if (clean.length === 0 || clean.length > 2) return fallback;
+  return clean.join(" + ");
+}
+
+/** Same, for a single year's row (reads the active streams off its breakdown). */
 export function incomeStreamLabel(row: YearRow, fallback = "Pension / annuity income"): string {
-  const names = (row.breakdown?.incomeStreamNames ?? []).filter((n) => n && n.trim());
-  if (names.length === 0 || names.length > 2) return fallback;
-  return names.join(" + ");
+  return streamNamesLabel(row.breakdown?.incomeStreamNames, fallback);
 }
 
 export interface RetirementYearIncome {
