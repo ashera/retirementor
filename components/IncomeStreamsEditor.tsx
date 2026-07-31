@@ -178,7 +178,7 @@ export default function IncomeStreamsEditor({
       {draft && (
         <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto p-4" role="dialog" aria-modal="true">
           <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setDraft(null)} />
-          <div className="relative w-full max-w-sm rounded-2xl border border-line bg-panel p-4 shadow-2xl">
+          <div className="relative w-full max-w-lg rounded-2xl border border-line bg-panel p-4 shadow-2xl">
             <h4 className="mb-3 font-semibold text-white">Income stream</h4>
             <label className="block text-xs font-medium text-muted">Name</label>
             <input
@@ -267,7 +267,7 @@ export default function IncomeStreamsEditor({
               )}
             </div>
 
-            <div className="mt-3 space-y-1.5">
+            <div className="mt-3 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
               <Toggle
                 on={draft.indexed ?? true}
                 onChange={(indexed) => setDraft({ ...draft, indexed })}

@@ -1118,7 +1118,7 @@ export default function PlanWizard({
 
         {/* Body — fixed height so the modal doesn't resize between steps; scrolls
             internally when a step's content is taller. */}
-        <div className="h-[420px] max-h-[calc(90vh-340px)] overflow-y-auto px-6 py-6">
+        <div className="h-[470px] max-h-[calc(90vh-320px)] overflow-y-auto px-6 py-6">
           <p className="mb-5 text-sm text-muted">{current.subtitle}</p>
           {current.body}
         </div>

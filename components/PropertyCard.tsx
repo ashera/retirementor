@@ -113,37 +113,39 @@ export default function PropertyCard({
       {expanded && (
         <>
       {/* Essentials */}
-      <Field
-        label="What you paid (cost base for CGT)"
-        value={p.purchasePrice}
-        onChange={(v) => onChange({ purchasePrice: v })}
-        min={0}
-        max={5_000_000}
-        step={10_000}
-        prefix="$"
-        hint="The cost base for capital gains tax if you sell. In today's dollars."
-      />
-      <Field label="Current market value" value={p.value} onChange={(v) => onChange({ value: v })} min={0} max={5_000_000} step={10_000} prefix="$" />
-      <Field
-        label="Loan secured against it"
-        value={p.loanBalance}
-        onChange={(v) => onChange({ loanBalance: v })}
-        min={0}
-        max={5_000_000}
-        step={5_000}
-        prefix="$"
-        hint="Only a loan against THIS property reduces its assessed value (interest-only)."
-      />
-      <Field
-        label="Gross rental yield"
-        value={p.grossYield}
-        onChange={(v) => onChange({ grossYield: v })}
-        min={0}
-        max={12}
-        step={0.1}
-        suffix="%"
-        hint={`about ${fmtCurrency(Math.round((p.value * p.grossYield) / 100))}/yr gross rent`}
-      />
+      <div className="grid grid-cols-1 items-start gap-x-4 gap-y-4 sm:grid-cols-2">
+        <Field
+          label="What you paid (cost base for CGT)"
+          value={p.purchasePrice}
+          onChange={(v) => onChange({ purchasePrice: v })}
+          min={0}
+          max={5_000_000}
+          step={10_000}
+          prefix="$"
+          hint="The cost base for capital gains tax if you sell. In today's dollars."
+        />
+        <Field label="Current market value" value={p.value} onChange={(v) => onChange({ value: v })} min={0} max={5_000_000} step={10_000} prefix="$" />
+        <Field
+          label="Loan secured against it"
+          value={p.loanBalance}
+          onChange={(v) => onChange({ loanBalance: v })}
+          min={0}
+          max={5_000_000}
+          step={5_000}
+          prefix="$"
+          hint="Only a loan against THIS property reduces its assessed value (interest-only)."
+        />
+        <Field
+          label="Gross rental yield"
+          value={p.grossYield}
+          onChange={(v) => onChange({ grossYield: v })}
+          min={0}
+          max={12}
+          step={0.1}
+          suffix="%"
+          hint={`about ${fmtCurrency(Math.round((p.value * p.grossYield) / 100))}/yr gross rent`}
+        />
+      </div>
 
       <div>
         <div className="mb-2 text-sm font-semibold text-slate-200">In retirement, will you…</div>
@@ -186,7 +188,7 @@ export default function PropertyCard({
         {advanced ? "▾ Advanced" : "▸ Advanced — loan rate, running costs, growth"}
       </button>
       {advanced && (
-        <div className="space-y-4 border-t border-line pt-4">
+        <div className="grid grid-cols-1 items-start gap-x-4 gap-y-4 border-t border-line pt-4 sm:grid-cols-2">
           <Field label="Loan interest rate" value={p.loanRate} onChange={(v) => onChange({ loanRate: v })} min={0} max={12} step={0.1} suffix="%" />
           <Field label="Running costs & vacancy" value={p.costRatio} onChange={(v) => onChange({ costRatio: v })} min={0} max={60} step={1} suffix="% of rent" />
           <Field label="Capital growth (real, after inflation)" value={p.growthReal} onChange={(v) => onChange({ growthReal: v })} min={-2} max={6} step={0.5} suffix="% p.a." />
