@@ -469,7 +469,7 @@ export default function YearDetailModal({
               {(b.incomeStreamTax ?? 0) > 0.5 && (
                 <Line
                   label={`Tax on ${incomeStreamLabel(row, "pension / annuity income")}`}
-                  sub="your defined-benefit / annuity / foreign-pension income is ordinary taxable income (plus the 2% Medicare levy before Age Pension age); the seniors offset (SAPTO) makes a modest amount tax-free from 67"
+                  sub="ordinary taxable income (plus the 2% Medicare levy before Age Pension age); the seniors offset (SAPTO) makes a modest amount tax-free from 67"
                   value={fmtCurrency(Math.round(b.incomeStreamTax ?? 0))}
                   tone="text-amber-400"
                 />

@@ -348,7 +348,7 @@ export default function IncomeYearModal({
                     <Row
                       color="#2dd4bf"
                       label={incomeStreamLabel(row)}
-                      sub={`Your defined-benefit / annuity / foreign-pension income — paid from its start age even while you're still working, after tax${
+                      sub={`Paid from its start age even while you're still working, after tax${
                         (row.breakdown.incomeStreamTax ?? 0) > 0.5 ? ` (${cur(row.breakdown.incomeStreamTax ?? 0)} tax this year)` : ""
                       }.`}
                       value={row.incomeStream}
@@ -450,7 +450,7 @@ export default function IncomeYearModal({
                     <Row
                       color="#2dd4bf"
                       label={incomeStreamLabel(row)}
-                      sub={`Your defined-benefit / annuity / foreign-pension income, after tax${
+                      sub={`Ongoing income, after tax${
                         (row.breakdown.incomeStreamTax ?? 0) > 0.5 ? ` (${cur(row.breakdown.incomeStreamTax ?? 0)} tax this year)` : ""
                       }. It's counted under the Age Pension income test, so it also reduces any Age Pension above.`}
                       value={inc.incomeStream}
