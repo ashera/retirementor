@@ -231,24 +231,23 @@ export default function PlanWizard({
     setOpenProp(null);
   }, [step, view]);
 
-  // Save progress continuously — mirror the working draft back to the plan as the
-  // user edits (debounced), and flush the latest on unmount. So a section's inputs
-  // are saved the moment they're entered; nothing is lost if the user navigates via
-  // the section pills or closes the wizard without clicking the final button.
+  // Save progress when the user changes PAGE — the step or the overview view —
+  // rather than on every keystroke. Editing a page stays fully local (snappy, no
+  // server chatter); the current draft is mirrored to the plan only when they move
+  // between pages, plus a flush on close so the last page's edits are never lost.
   const progressRef = useRef(onProgress);
   progressRef.current = onProgress;
   const liveDraftRef = useRef(draft);
   liveDraftRef.current = draft;
-  const draftMounted = useRef(false);
+  const pageMounted = useRef(false);
   useEffect(() => {
-    if (!draftMounted.current) {
-      draftMounted.current = true; // skip the initial (unchanged) draft
+    if (!pageMounted.current) {
+      pageMounted.current = true; // skip the initial page (nothing to save on open)
       return;
     }
-    const t = setTimeout(() => progressRef.current?.(liveDraftRef.current), 500);
-    return () => clearTimeout(t);
-  }, [draft]);
-  // Flush on close (covers ✕ / Cancel / backdrop / navigating away).
+    progressRef.current?.(liveDraftRef.current);
+  }, [step, view]);
+  // Flush on close (covers ✕ / Close / backdrop / finishing).
   useEffect(() => () => progressRef.current?.(liveDraftRef.current), []);
 
   const patch = (p: Partial<RetirementPlan>) =>
@@ -1333,8 +1332,8 @@ export default function PlanWizard({
                 finish();
                 return;
               }
-              onProgress?.(draft); // save progress as they advance
-              setStep(safeStep + 1);
+              setStep(safeStep + 1); // the page-change effect saves the draft
+
             }}
             className="rounded-lg bg-accent px-5 py-2 text-sm font-semibold text-ink transition hover:bg-accent-soft"
           >
