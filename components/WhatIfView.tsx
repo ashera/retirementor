@@ -10,6 +10,8 @@ import { runMonteCarlo, MC_CONFIDENCE_TARGET as SAFE_TARGET, MC_CONFIDENCE_MC as
 import { guardrailsOutlook, type GuardrailsOutlook } from "@/lib/au/guardrails";
 import { fmtCurrency } from "@/lib/au/format";
 import { rowNetWorth } from "@/lib/au/networth";
+import { ttrFlowFromRow } from "@/lib/au/ttrFlow";
+import TtrFlowButton from "@/components/TtrFlowButton";
 import { track } from "@/lib/analytics";
 import type { SavedPlan } from "@/app/actions/plans";
 import { updatePlan, getOrCreateActiveScenario, setActivePlan } from "@/app/actions/plans";
@@ -304,6 +306,13 @@ export default function WhatIfView({
   }, [active, values, baseline, shared, signedIn]);
 
   const compRes = useMemo(() => (composed ? simulate(composed, config) : null), [composed, config]);
+
+  // First TTR-active year of the composed plan → the flow-of-funds diagram for the
+  // TTR strategy modal (only present when the lever is on).
+  const ttrFlow = useMemo(() => {
+    const r = compRes?.rows.find((x) => (x.breakdown.ttrPension ?? 0) > 0);
+    return r ? { flow: ttrFlowFromRow(r, config.contributionsTax ?? 0.15), age: r.age } : null;
+  }, [compRes, config]);
 
   // Monte Carlo success %. A FIXED seed means baseline and composed run against the
   // same market paths, so the comparison is fair and doesn't jitter as you toggle.
@@ -1086,6 +1095,11 @@ export default function WhatIfView({
               </div>
             </div>
             <StrategyCardRow {...detailProps(detailCard)} />
+            {detailCard.id === "ttr" && ttrFlow?.flow && (
+              <div className="mt-3 border-t border-line px-1 pt-3">
+                <TtrFlowButton flow={ttrFlow.flow} age={ttrFlow.age} label="See the flow of funds →" />
+              </div>
+            )}
           </div>
         </div>
       )}

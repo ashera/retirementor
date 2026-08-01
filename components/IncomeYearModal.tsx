@@ -3,6 +3,8 @@
 import { fmtCurrency } from "@/lib/au/format";
 import { minDrawdownRate, type EngineConfig } from "@/lib/au/config";
 import { getInvestmentProperties, getLifeEvents, type RetirementPlan, type YearRow } from "@/lib/au/types";
+import { ttrFlowFromRow } from "@/lib/au/ttrFlow";
+import TtrFlowButton from "@/components/TtrFlowButton";
 import { netRentCash, propertyValueAt } from "@/lib/au/property";
 import { essentialsFloor } from "@/lib/au/strategies";
 import { retirementYearIncome, incomeStreamLabel } from "@/lib/au/yearIncome";
@@ -323,6 +325,11 @@ export default function IncomeYearModal({
                   Employer Super Guarantee ({cur(sgTotal)}) is paid on top of your salary, straight into super — it
                   doesn&apos;t come out of your pay.
                 </p>
+                {ttrPension > 0 && (
+                  <div className="mt-3">
+                    <TtrFlowButton flow={ttrFlowFromRow(row)} age={row.age} label="See the Transition to Retirement flow →" />
+                  </div>
+                )}
               </section>
 
               {(rent > 0 || rentShortfall > 0 || rentByProperty.length > 0) && (

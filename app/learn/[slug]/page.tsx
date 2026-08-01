@@ -4,6 +4,8 @@ import { notFound } from "next/navigation";
 import { SITE_URL } from "@/lib/site";
 import { KB_ARTICLES, getArticle } from "@/lib/knowledgeBase";
 import KbContent from "@/components/KbContent";
+import TtrFlowButton from "@/components/TtrFlowButton";
+import { TTR_FLOW_EXAMPLE } from "@/lib/au/ttrFlow";
 
 export function generateStaticParams() {
   return KB_ARTICLES.map((a) => ({ slug: a.slug }));
@@ -56,6 +58,17 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
       <article className="mt-8">
         <KbContent sections={a.sections} />
       </article>
+
+      {a.slug === "transition-to-retirement" && (
+        <section className="mt-8 rounded-2xl border border-accent/25 bg-accent/5 p-5">
+          <div className="text-sm font-semibold text-white">See it visually</div>
+          <p className="mb-3 mt-1 text-sm text-muted">
+            Follow one year&apos;s money — the slice you sacrifice, the tax-free pension that returns it, and the tax
+            you save — in an interactive flow-of-funds diagram.
+          </p>
+          <TtrFlowButton flow={TTR_FLOW_EXAMPLE} label="See the flow of funds →" />
+        </section>
+      )}
 
       {a.examples && a.examples.length > 0 && (
         <section className="mt-10">

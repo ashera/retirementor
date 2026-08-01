@@ -511,6 +511,46 @@ export const KB_ARTICLES: KbArticle[] = [
     related: ["todays-dollars", "contribution-caps"],
   },
   {
+    slug: "transition-to-retirement",
+    title: "Transition to Retirement: same take-home, more super, less tax",
+    category: "Super, tax & contributions",
+    summary:
+      "From age 60 you can salary-sacrifice more and draw a tax-free TTR pension to replace the pay you give up — shifting income from your marginal rate down to super's 15%. Your take-home holds; the tax you save builds super.",
+    keywords: ["ttr", "transition to retirement", "ttr pension", "salary sacrifice", "preservation age", "60", "contribution swap", "tax-free pension", "still working"],
+    sections: [
+      {
+        body: [
+          { p: "**Transition to Retirement (TTR)** lets you start a super pension while you're still working, from your **preservation age of 60**. Paired with extra salary sacrifice, it becomes a tax play: you push more of your pay into super (taxed at **15%** instead of your marginal rate) and draw a **tax-free TTR pension** to top your take-home back up. Your pay packet doesn't change — but more lands in super and the tax office takes less." },
+        ],
+      },
+      {
+        heading: "How the swap works",
+        body: [
+          { p: "Say you sacrifice an extra **$15,000** of salary. Instead of being taxed at your marginal rate (say 32% incl. Medicare = ~$4,800), it's taxed at super's flat **15%** ($2,250). To keep your take-home whole, you draw a **tax-free pension** from super equal to the pay you gave up. The tax you saved — net of the 15% — simply stays in super." },
+          { formula: "Extra super = income tax saved on the slice − 15% contributions tax" },
+          { note: "The higher your marginal rate, the bigger the gap between it and 15% — so TTR is worth more to higher earners, right up to your concessional contributions cap." },
+        ],
+      },
+      {
+        heading: "What it doesn't do",
+        body: [
+          { p: "Since 2017 a TTR pension's **earnings are taxed at 15%**, the same as accumulation — so there's **no earnings advantage**, only the contribution swap. TTR pension payments must be between **4% and 10%** of the pension balance each year. And the extra sacrifice is capped by your **[concessional contributions cap](/learn/contribution-caps)** (~$32,500/yr including the Super Guarantee)." },
+          { p: "It's most powerful in the years just before you retire, while you're still on a high marginal rate. Once you stop work, an ordinary account-based pension takes over." },
+        ],
+      },
+      {
+        heading: "How the planner models it",
+        body: [
+          { p: "Add **Transition to Retirement** as a What-If lever (or set it up while you refine your plan). In each year you're 60+ and still working, the engine raises your concessional contribution, lowers your assessable income (so income tax and the 2% Medicare levy fall), and draws a tax-free TTR pension to hold your take-home exactly. In a couple, each partner still working past 60 can run their own. Open the **flow-of-funds diagram** below to see exactly where one year's money goes." },
+        ],
+      },
+    ],
+    examples: [
+      { href: "/what-if", label: "Try it in What-If", note: "Toggle Transition to Retirement and watch super at retirement rise at no cost to your take-home." },
+    ],
+    related: ["contribution-caps", "super-vs-outside", "todays-dollars"],
+  },
+  {
     slug: "income-streams",
     title: "Other income streams (DB pensions, annuities, foreign pensions)",
     category: "Super, tax & contributions",
