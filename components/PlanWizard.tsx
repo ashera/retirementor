@@ -80,6 +80,32 @@ const WIZARD_QUOTES: { text: string; author: string }[] = [
   { text: "Financial peace is learning to live on less than you make.", author: "Dave Ramsey" },
 ];
 
+// Persona silhouette for a person, by sex — reusing the Persona-test avatars. We
+// don't know the sex yet on the Household step, so it defaults to the neutral
+// agent-2; You and Partner use different faces so a couple reads as two people.
+function personaAvatarSrc(sex: "male" | "female" | undefined, isPartner: boolean): string {
+  if (sex === "male") return `/avatars/agent-${isPartner ? 4 : 0}.jpg`;
+  if (sex === "female") return `/avatars/agent-${isPartner ? 3 : 1}.jpg`;
+  return "/avatars/agent-2.jpg";
+}
+
+// Interesting financial facts for the Household card, tagged by who they're for.
+const HOUSEHOLD_FACTS: { audience: "single" | "couple" | "both"; text: string }[] = [
+  { audience: "both", text: "Your family home doesn't count towards the Age Pension assets test — no matter what it's worth." },
+  { audience: "both", text: "The Age Pension is indexed twice a year (March and September), so it keeps pace with the cost of living." },
+  { audience: "both", text: "Super earnings become completely tax-free once you start a retirement pension from age 60." },
+  { audience: "both", text: "A 65-year-old Australian today can, on average, expect to live into their mid-80s — plan for a long retirement." },
+  { audience: "single", text: "A single homeowner can hold around $314,000 in assets (on top of the home) and still get the full Age Pension." },
+  { audience: "single", text: "Singles get a higher Age Pension rate per person than each half of a couple — the rules assume couples share costs." },
+  { audience: "single", text: "The maximum Age Pension for a single is around $31,000 a year, including the supplements." },
+  { audience: "single", text: "As a solo retiree you set every date and dial yourself — no need to sync two retirement ages or risk appetites." },
+  { audience: "couple", text: "Couples can retire at different ages — whoever's still working keeps earning and topping up super." },
+  { audience: "couple", text: "A couple's combined Age Pension is worth around $47,000 a year at the full rate." },
+  { audience: "couple", text: "Two tax-free thresholds beat one: splitting income across a couple can cut your retirement tax bill." },
+  { audience: "couple", text: "A couple's plan only needs to last while EITHER partner is alive — a quiet but powerful longevity buffer." },
+  { audience: "couple", text: "If you both downsize, each partner can put up to $300,000 into super — $600,000 tax-free between you." },
+];
+
 function StepIcon({ stepKey, size = 22 }: { stepKey: string; size?: number }) {
   const color = STEP_META[stepKey]?.color ?? "#94a3b8";
   const paths: Record<string, ReactNode> = {
@@ -192,6 +218,13 @@ export default function PlanWizard({
   const [openProp, setOpenProp] = useState<number | null>(null);
   // One inspirational quote per wizard open, for the overview hero.
   const [quote] = useState(() => WIZARD_QUOTES[Math.floor(Math.random() * WIZARD_QUOTES.length)]);
+  // A random financial fact for the Household card — re-rolled when single⇄couple
+  // changes so it always fits the household.
+  const pickFact = (household: RetirementPlan["household"]) => {
+    const pool = HOUSEHOLD_FACTS.filter((f) => f.audience === "both" || f.audience === household);
+    return pool[Math.floor(Math.random() * pool.length)]?.text ?? "";
+  };
+  const [householdFact, setHouseholdFact] = useState(() => pickFact(initial.household));
   useEffect(() => {
     setOpenProp(null);
   }, [step, view]);
@@ -245,7 +278,8 @@ export default function PlanWizard({
         return { ...prev, people };
       });
 
-  const setHousehold = (household: Household) =>
+  const setHousehold = (household: Household) => {
+    if (household !== draft.household) setHouseholdFact(pickFact(household)); // fresh fact for the new household
     setDraft((prev) => {
       if (household === "couple" && prev.people.length === 1) {
         return { ...prev, household, people: [prev.people[0], { ...DEFAULT_PARTNER }] };
@@ -256,6 +290,7 @@ export default function PlanWizard({
       }
       return { ...prev, household };
     });
+  };
 
   const setSuperMode = (mode: SuperMode) =>
     setDraft((prev) => {
@@ -899,6 +934,23 @@ export default function PlanWizard({
     subtitle: "Age Pension rates and means-test thresholds differ for singles and couples.",
     body: (
       <div className="space-y-6">
+        {/* Persona + a household-appropriate financial fact */}
+        <div className="flex items-center gap-4 rounded-2xl border border-line bg-panel-2/60 p-4">
+          <div className="min-w-0 flex-1">
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-accent">Did you know?</div>
+            <p className="mt-1 text-sm leading-relaxed text-slate-200">{householdFact}</p>
+          </div>
+          <div className="flex shrink-0 items-center" aria-hidden>
+            {draft.household === "couple" ? (
+              <>
+                <img src={personaAvatarSrc(draft.people[0]?.sex, false)} alt="" className="h-14 w-14 rounded-full object-cover ring-2 ring-panel-2" />
+                <img src={personaAvatarSrc(draft.people[1]?.sex, true)} alt="" className="-ml-5 h-14 w-14 rounded-full object-cover ring-2 ring-panel-2" />
+              </>
+            ) : (
+              <img src={personaAvatarSrc(draft.people[0]?.sex, false)} alt="" className="h-16 w-16 rounded-full object-cover ring-1 ring-line" />
+            )}
+          </div>
+        </div>
         <div className="flex items-center justify-between">
           <span className="text-sm font-medium text-slate-200">Household</span>
           <Segmented
