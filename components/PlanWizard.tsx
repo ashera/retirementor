@@ -214,6 +214,9 @@ export default function PlanWizard({
   const [contribMode, setContribMode] = useState<OptMode | undefined>(hasContrib ? "yes" : initial.answered?.contributions ? "no" : undefined);
   const [outsideMode, setOutsideMode] = useState<OptMode | undefined>(hasOutside ? "yes" : initial.answered?.outside ? "no" : undefined);
   const [propMode, setPropMode] = useState<OptMode | undefined>(hasInvestmentProperty(initial) ? "yes" : initial.answered?.property ? "no" : undefined);
+  const [incomeMode, setIncomeMode] = useState<OptMode | undefined>(
+    (initial.incomeStreams ?? []).some((s) => s.perYear > 0) ? "yes" : initial.answered?.income ? "no" : undefined,
+  );
   // Accordion: which property card is expanded (index), or null when all are
   // collapsed to summary rows. Reset to collapsed whenever the step/view changes
   // so arriving at the Property section always starts collapsed; adding a
@@ -268,6 +271,14 @@ export default function PlanWizard({
       ...prev,
       answered: { ...prev.answered, outside: true },
       ...(v === "no" ? { outsideSuper: 0, annualOutsideSavings: 0 } : {}),
+    }));
+  };
+  const answerIncome = (v: OptMode) => {
+    setIncomeMode(v);
+    setDraft((prev) => ({
+      ...prev,
+      answered: { ...prev.answered, income: true },
+      ...(v === "no" ? { incomeStreams: [] } : {}),
     }));
   };
 
@@ -637,17 +648,28 @@ export default function PlanWizard({
         <WizardHeaderCard
           page="income"
           eyebrow="Other income"
-          blurb="Ongoing income for life — a defined-benefit pension, annuity, or foreign pension (e.g. US Social Security). It offsets what you draw from savings. Most people can skip this."
+          blurb="Income beyond your super and savings — a pension, annuity, dividend, or foreign pension (e.g. US Social Security), for life or a set period. It offsets what you draw from savings. Most people can skip this."
         />
-        <IncomeStreamsEditor
-          streams={draft.incomeStreams ?? []}
-          minAge={Math.min(...draft.people.map((p) => p.currentAge).filter((a) => Number.isFinite(a) && a > 0), draft.retirementAge)}
-          maxAge={draft.lifeExpectancy}
-          defaultAge={draft.retirementAge}
-          nonResident={draft.taxResidency === "non-resident"}
-          couple={draft.household === "couple"}
-          onChange={(incomeStreams) => setDraft((prev) => ({ ...prev, incomeStreams }))}
+        <OptionalAnswer
+          question="Any other income to include?"
+          hint="A pension, annuity, dividend, or foreign pension — for life or a set period (e.g. dividends until you retire)."
+          mode={incomeMode}
+          onChange={answerIncome}
         />
+        {incomeMode === "no" && (
+          <p className="text-xs text-muted">No other income streams — you can add them anytime.</p>
+        )}
+        {incomeMode === "yes" && (
+          <IncomeStreamsEditor
+            streams={draft.incomeStreams ?? []}
+            minAge={Math.min(...draft.people.map((p) => p.currentAge).filter((a) => Number.isFinite(a) && a > 0), draft.retirementAge)}
+            maxAge={draft.lifeExpectancy}
+            defaultAge={draft.retirementAge}
+            nonResident={draft.taxResidency === "non-resident"}
+            couple={draft.household === "couple"}
+            onChange={(incomeStreams) => setDraft((prev) => ({ ...prev, incomeStreams }))}
+          />
+        )}
       </div>
     ),
   };
@@ -707,7 +729,7 @@ export default function PlanWizard({
               min={40}
               max={75}
               suffix="yrs"
-              hint="Partners can retire at different ages. Whoever's still working keeps earning and paying into super, and their pay helps cover the household's spending until they retire too."
+              hint="Partners can retire at different ages — whoever keeps working still earns, contributes, and helps cover spending."
             />
           )}
         </div>
@@ -1115,11 +1137,11 @@ export default function PlanWizard({
       case "property": return propMode === undefined ? "Not set yet" : propMode === "no" ? "None" : "Included";
       case "income": {
         const streams = (draft.incomeStreams ?? []).filter((s) => s.perYear > 0);
-        if (streams.length === 0) return "Not set yet";
+        if (streams.length === 0) return incomeMode === undefined ? "Not set yet" : "None";
         const total = streams.reduce((s, x) => s + x.perYear, 0);
         return `${fmtCurrency(total)}/yr${streams.length > 1 ? ` · ${streams.length} streams` : ""}`;
       }
-      case "goal": return Number.isFinite(previewSpend) ? `${fmtCurrency(previewSpend)}/yr · retire ${draft.retirementAge}` : "Not set yet";
+      case "goal": return Number.isFinite(previewSpend) ? `${fmtCurrency(Math.round(goalTotalSpend))}/yr · retire ${draft.retirementAge}` : "Not set yet";
       case "assumptions": return `${draft.investmentReturn}% · CPI ${draft.inflation}% · to ${draft.lifeExpectancy}`;
       default: return "";
     }
