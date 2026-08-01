@@ -191,6 +191,8 @@ export default function IncomeYearModal({
   const showTtrPerPerson =
     couple && ttrSlice > 0.5 && perPersonTtr.filter((x) => x > 0.5).length > 1 &&
     Math.abs(perPersonTtr.reduce((s, x) => s + x, 0) - ttrSlice) < 2;
+  const ttrOnly = ttrSlice > 0.5 && voluntarySac <= 0.5; // TTR is the whole sacrifice → no redundant sub-line
+  const ttrTipText = `Extra pay sacrificed into super via Transition to Retirement${couple ? ", summed across each partner running it" : ""}. Each person's amount is capped at their remaining concessional cap (${cur(config.concessionalCap)}/yr — which already counts their Super Guarantee and any regular salary sacrifice), so the total can be less than the ${cur(plan.ttr?.extraSacrifice ?? 0)}${couple ? " per person" : ""} you set.`;
   const afterTaxContrib = plan.people.reduce((s, p) => s + Math.min(p.voluntaryNonConcessional, config.nonConcessionalCap), 0);
   const leftToSpend = Math.max(0, row.takeHome - afterTaxContrib);
   // Label for a property line: its custom name, else "Property N" (or a lone
@@ -290,39 +292,42 @@ export default function IncomeYearModal({
                       <div className="flex items-baseline justify-between gap-4">
                         <span className="text-muted">
                           Salary sacrifice
-                          <span className="block text-[11px] leading-snug">before tax → into super (concessional)</span>
+                          <span className="block text-[11px] leading-snug">
+                            {ttrOnly ? (
+                              <>all via Transition to Retirement<InfoTip className="ml-1" text={ttrTipText} /></>
+                            ) : (
+                              "before tax → into super (concessional)"
+                            )}
+                          </span>
                         </span>
                         <span className="shrink-0 tabular-nums text-amber-400">−{cur(salarySacrifice)}</span>
                       </div>
-                      {ttrSlice > 0.5 && (
+                      {/* Component sub-lines only when the sacrifice is BOTH voluntary AND TTR. */}
+                      {ttrSlice > 0.5 && voluntarySac > 0.5 && (
                         <div className="mt-1 space-y-0.5 border-l border-line pl-3 text-[11px] text-muted">
-                          {voluntarySac > 0.5 && (
-                            <div className="flex items-baseline justify-between gap-4">
-                              <span>Voluntary salary sacrifice</span>
-                              <span className="shrink-0 tabular-nums">−{cur(voluntarySac)}</span>
-                            </div>
-                          )}
+                          <div className="flex items-baseline justify-between gap-4">
+                            <span>Voluntary salary sacrifice</span>
+                            <span className="shrink-0 tabular-nums">−{cur(voluntarySac)}</span>
+                          </div>
                           <div className="flex items-baseline justify-between gap-4">
                             <span className="text-emerald-300">
                               Transition to Retirement top-up
-                              <InfoTip
-                                className="ml-1"
-                                text={`Extra pay sacrificed into super via Transition to Retirement${couple ? ", summed across each partner running it" : ""}. Each person's amount is capped at their remaining concessional cap (${cur(config.concessionalCap)}/yr — which already counts their Super Guarantee and any regular salary sacrifice), so the total can be less than the ${cur(plan.ttr?.extraSacrifice ?? 0)}${couple ? " per person" : ""} you set.`}
-                              />
+                              <InfoTip className="ml-1" text={ttrTipText} />
                             </span>
                             <span className="shrink-0 tabular-nums text-emerald-300">−{cur(ttrSlice)}</span>
                           </div>
-                          {showTtrPerPerson && (
-                            <div className="flex flex-wrap gap-x-3 gap-y-0.5 pl-1 text-[10.5px] text-muted">
-                              {perPersonTtr.map((amt, i) =>
-                                amt > 0.5 ? (
-                                  <span key={i} className="tabular-nums">
-                                    {i === 0 ? "You" : "Partner"} {cur(amt)}
-                                    {plan.ttr && amt < plan.ttr.extraSacrifice - 0.5 ? " (capped)" : ""}
-                                  </span>
-                                ) : null,
-                              )}
-                            </div>
+                        </div>
+                      )}
+                      {/* Per-person split of the TTR amount (couples). */}
+                      {showTtrPerPerson && (
+                        <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 border-l border-line pl-3 text-[10.5px] text-muted">
+                          {perPersonTtr.map((amt, i) =>
+                            amt > 0.5 ? (
+                              <span key={i} className="tabular-nums">
+                                {i === 0 ? "You" : "Partner"} {cur(amt)}
+                                {plan.ttr && amt < plan.ttr.extraSacrifice - 0.5 ? " (capped)" : ""}
+                              </span>
+                            ) : null,
                           )}
                         </div>
                       )}
