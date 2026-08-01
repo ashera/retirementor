@@ -1006,16 +1006,18 @@ export default function PlanWizard({
             {/* Big progress donut + a card per section (budget-builder style).
                 Height matches the step pages so the modal doesn't jump. */}
             <div className="h-[622px] max-h-[calc(90vh-150px)] overflow-y-auto px-6 py-5">
-              <div className="flex flex-col items-center text-center">
-                <CompletenessRing pct={pct} size={88} />
-                <div className="mt-2 text-sm font-semibold text-accent">{tier}</div>
-                <div className="text-xs text-muted">
-                  {completeCount} of {total} details provided{tuned ? " · ★ fine-tuned" : ""}
+              <div className="flex items-center gap-4">
+                <CompletenessRing pct={pct} size={60} />
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold text-accent">{tier}</div>
+                  <div className="text-xs text-muted">
+                    {completeCount} of {total} details provided{tuned ? " · ★ fine-tuned" : ""}
+                  </div>
+                  <p className="mt-0.5 text-xs text-muted">Tap a section to add detail.</p>
                 </div>
-                <p className="mt-1 text-xs text-muted">Tap a section to add detail.</p>
               </div>
 
-              <div className="mt-4 space-y-1.5">
+              <div className="mt-4 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
                 {steps.map((s, i) => {
                   const st = stepStatus(s.key);
                   return (
