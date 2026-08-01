@@ -63,6 +63,22 @@ const STEP_META: Record<string, { color: string; desc: string }> = {
   assumptions: { color: "#22d3ee", desc: "Long-run return, inflation and fees." },
 };
 
+// A little inspiration on the overview — one is picked at random each time it opens.
+const WIZARD_QUOTES: { text: string; author: string }[] = [
+  { text: "The question isn't at what age I want to retire, it's at what income.", author: "George Foreman" },
+  { text: "Do not save what is left after spending, but spend what is left after saving.", author: "Warren Buffett" },
+  { text: "Someone's sitting in the shade today because someone planted a tree a long time ago.", author: "Warren Buffett" },
+  { text: "The best time to plant a tree was 20 years ago. The second best time is now.", author: "Chinese proverb" },
+  { text: "A goal without a plan is just a wish.", author: "Antoine de Saint-Exupéry" },
+  { text: "It's not how much money you make, but how much money you keep.", author: "Robert Kiyosaki" },
+  { text: "The goal isn't more money. The goal is living life on your terms.", author: "Chris Brogan" },
+  { text: "Don't simply retire from something; have something to retire to.", author: "Harry Emerson Fosdick" },
+  { text: "Time is more valuable than money. You can get more money, but you cannot get more time.", author: "Jim Rohn" },
+  { text: "Plan for the future, because that's where you're going to spend the rest of your life.", author: "Mark Twain" },
+  { text: "Retirement is not the end of the road; it's the beginning of the open highway.", author: "Unknown" },
+  { text: "Financial peace is learning to live on less than you make.", author: "Dave Ramsey" },
+];
+
 function StepIcon({ stepKey, size = 22 }: { stepKey: string; size?: number }) {
   const color = STEP_META[stepKey]?.color ?? "#94a3b8";
   const paths: Record<string, ReactNode> = {
@@ -173,6 +189,8 @@ export default function PlanWizard({
   // so arriving at the Property section always starts collapsed; adding a
   // property (same step) opens just that one.
   const [openProp, setOpenProp] = useState<number | null>(null);
+  // One inspirational quote per wizard open, for the overview hero.
+  const [quote] = useState(() => WIZARD_QUOTES[Math.floor(Math.random() * WIZARD_QUOTES.length)]);
   useEffect(() => {
     setOpenProp(null);
   }, [step, view]);
@@ -1008,18 +1026,26 @@ export default function PlanWizard({
             {/* Big progress donut + a card per section (budget-builder style).
                 Height matches the step pages so the modal doesn't jump. */}
             <div className="h-[622px] max-h-[calc(90vh-150px)] overflow-y-auto px-6 py-5">
-              <div className="flex items-center gap-4">
-                <CompletenessRing pct={pct} size={60} />
-                <div className="min-w-0">
-                  <div className="text-sm font-semibold text-accent">{tier}</div>
+              <div className="grid grid-cols-1 items-center gap-5 sm:grid-cols-2">
+                <div className="flex flex-col items-center text-center">
+                  <CompletenessRing pct={pct} size={148} />
+                  <div className="mt-2 text-base font-semibold text-accent">{tier}</div>
                   <div className="text-xs text-muted">
                     {completeCount} of {total} details provided{tuned ? " · ★ fine-tuned" : ""}
                   </div>
-                  <p className="mt-0.5 text-xs text-muted">Tap a section to add detail.</p>
                 </div>
+                <figure className="relative rounded-2xl border border-line bg-panel-2/60 p-5">
+                  <span aria-hidden className="absolute left-3 top-1 select-none text-4xl leading-none text-accent/30">&ldquo;</span>
+                  <blockquote className="relative pl-3 text-sm italic leading-relaxed text-slate-200">
+                    {quote.text}
+                  </blockquote>
+                  <figcaption className="mt-2 pl-3 text-xs font-medium text-muted">— {quote.author}</figcaption>
+                </figure>
               </div>
 
-              <div className="mt-4 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+              <p className="mt-4 text-center text-xs text-muted sm:text-left">Tap a section to add detail, or jump straight to your plan.</p>
+
+              <div className="mt-3 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
                 {steps.map((s, i) => {
                   const st = stepStatus(s.key);
                   return (
