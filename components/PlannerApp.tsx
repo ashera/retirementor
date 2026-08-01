@@ -2230,10 +2230,17 @@ export default function PlannerApp({
           config={config}
           onComplete={handleComplete}
           onProgress={(d) => {
-            // Only mirror progress into the live dashboard once there's a real plan —
-            // a blank first-run wizard shouldn't push NaN fields into the (still
-            // empty) dashboard. Edits the base; the strategy layer stays on top.
-            if (configured) setBase(d);
+            // Continuous save: mirror the wizard's progress into the live plan so it's
+            // never lost if the user closes without finishing. Editing an existing plan
+            // just updates the base (the strategy layer stays on top). A first-run wizard
+            // only adopts once the plan is actually BUILT — until then it would push NaN
+            // fields into the still-empty Get-started dashboard.
+            if (configured) {
+              setBase(d);
+            } else if (planIsBuilt(d)) {
+              commit(d);
+              setConfigured(true);
+            }
           }}
           onClose={() => {
             setWizardOpen(false);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Field from "@/components/Field";
 import CompletenessRing from "@/components/CompletenessRing";
 import BudgetBuilder from "@/components/BudgetBuilder";
@@ -195,6 +195,26 @@ export default function PlanWizard({
   useEffect(() => {
     setOpenProp(null);
   }, [step, view]);
+
+  // Save progress continuously — mirror the working draft back to the plan as the
+  // user edits (debounced), and flush the latest on unmount. So a section's inputs
+  // are saved the moment they're entered; nothing is lost if the user navigates via
+  // the section pills or closes the wizard without clicking the final button.
+  const progressRef = useRef(onProgress);
+  progressRef.current = onProgress;
+  const liveDraftRef = useRef(draft);
+  liveDraftRef.current = draft;
+  const draftMounted = useRef(false);
+  useEffect(() => {
+    if (!draftMounted.current) {
+      draftMounted.current = true; // skip the initial (unchanged) draft
+      return;
+    }
+    const t = setTimeout(() => progressRef.current?.(liveDraftRef.current), 500);
+    return () => clearTimeout(t);
+  }, [draft]);
+  // Flush on close (covers ✕ / Cancel / backdrop / navigating away).
+  useEffect(() => () => progressRef.current?.(liveDraftRef.current), []);
 
   const patch = (p: Partial<RetirementPlan>) =>
     setDraft((prev) => ({ ...prev, ...p }));
@@ -1094,7 +1114,7 @@ export default function PlanWizard({
             {/* Overview footer */}
             <div className="flex items-center justify-between gap-3 border-t border-line px-6 py-4">
               <button onClick={onClose} className="rounded-lg px-4 py-2 text-sm font-medium text-muted transition hover:text-white">
-                Cancel
+                Close
               </button>
               <button
                 onClick={() => (gapStepIndex >= 0 ? goToStep(gapStepIndex) : finish())}
