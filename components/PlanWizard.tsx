@@ -12,6 +12,7 @@ import type { EngineConfig } from "@/lib/au/config";
 import { fmtCompact, fmtCurrency } from "@/lib/au/format";
 import { planCompleteness } from "@/lib/au/completeness";
 import { essentialsFloor } from "@/lib/au/strategies";
+import InfoTip from "@/components/InfoTip";
 import { track } from "@/lib/analytics";
 import {
   DEFAULT_PARTNER,
@@ -362,7 +363,10 @@ export default function PlanWizard({
           suffix="yrs"
         />
         <div>
-          <div className="mb-1.5 text-sm font-medium text-slate-200">Sex <span className="font-normal text-muted">(optional)</span></div>
+          <div className="mb-1.5 flex items-center gap-1.5 text-sm font-medium text-slate-200">
+            Sex <span className="font-normal text-muted">(optional)</span>
+            <InfoTip text="Only for the longevity (“Rich, Broke or Dead”) survival view on the stress test — never the projection." />
+          </div>
           <Segmented
             value={draft.people[i].sex ?? ""}
             options={[
@@ -377,7 +381,6 @@ export default function PlanWizard({
               }))
             }
           />
-          <p className="mt-1.5 text-xs text-muted">Only for the longevity (&ldquo;Rich, Broke or Dead&rdquo;) survival view on the stress test — never the projection.</p>
         </div>
         <div className="sm:col-span-2">
           <Field
