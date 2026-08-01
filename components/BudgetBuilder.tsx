@@ -67,6 +67,18 @@ const STEP_TITLES: Record<string, string> = {
   goal: "Your goal",
 };
 
+/** Debounce a value so heavy derived work (full projections / Monte-Carlo solvers)
+ *  runs only after the user pauses — keeping sliders and numeric fields responsive
+ *  while typing/dragging, instead of re-simulating on every keystroke or frame. */
+function useDebounced<T>(value: T, ms: number): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(value), ms);
+    return () => clearTimeout(t);
+  }, [value, ms]);
+  return debounced;
+}
+
 export default function BudgetBuilder({ plan, config, onApply, onProgress, onClose }: BudgetBuilderProps) {
   const household = plan.household;
   const oldestAtRetire =
@@ -122,8 +134,15 @@ export default function BudgetBuilder({ plan, config, onApply, onProgress, onClo
     return { ...base, homeowner, mortgage: activeMortgage, home: activeHome };
   }, [plan, stages, total, applyPhases, homeowner, activeMortgage, activeHome]);
 
-  // Live "money lasts" impact of the current budget (+ mortgage).
-  const impact = useMemo(() => simulate(workingPlan, config), [workingPlan, config]);
+  // The heavy simulations (impact / boost / strategy compare) run off a DEBOUNCED
+  // plan, so dragging a slider or typing a figure stays responsive. boostSpending in
+  // particular runs a Monte-Carlo binary search (~thousands of simulate() calls,
+  // ~250ms) — far too expensive to run on every keystroke/drag frame; debouncing
+  // recomputes these once, ~300ms after the user pauses.
+  const debouncedWorkingPlan = useDebounced(workingPlan, 300);
+
+  // "Money lasts" impact of the current budget (+ mortgage).
+  const impact = useMemo(() => simulate(debouncedWorkingPlan, config), [debouncedWorkingPlan, config]);
 
   // The working plan carrying the in-progress budget, so the trim can scale the
   // discretionary categories (and we apply the result straight back into them).
@@ -134,17 +153,21 @@ export default function BudgetBuilder({ plan, config, onApply, onProgress, onClo
     [workingPlan, tenure, lifestyle, categories, applyPhases],
   );
   // Cheap when the budget doesn't last (boostSpending short-circuits after one
-  // sim); the ~binary-search cost is only paid when there's genuine headroom.
-  const boost = useMemo(() => boostSpending(budgetPlan, config), [budgetPlan, config]);
+  // sim); the ~binary-search cost is only paid when there's genuine headroom. Also
+  // debounced — a slider drag shouldn't run the MC solver every frame.
+  const debouncedBudgetPlan = useDebounced(budgetPlan, 300);
+  const boost = useMemo(() => boostSpending(debouncedBudgetPlan, config), [debouncedBudgetPlan, config]);
   const applyBudgetPatch = (patch: Partial<RetirementPlan>) => {
     if (patch.budget?.categories) setCategories(patch.budget.categories);
   };
 
-  // Compare carry vs clear-at-retirement so we can show the pension uplift.
+  // Compare carry vs clear-at-retirement so we can show the pension uplift. Debounced
+  // (via debouncedWorkingPlan, which carries the mortgage) — two more full sims that
+  // must not run on every drag frame.
   const strategyCompare = useMemo(() => {
-    if (tenure !== "mortgage") return null;
+    if (tenure !== "mortgage" || !debouncedWorkingPlan.mortgage) return null;
     const run = (strategy: MortgageDetail["strategy"]) =>
-      simulate({ ...workingPlan, mortgage: { ...mortgage, strategy } }, config);
+      simulate({ ...debouncedWorkingPlan, mortgage: { ...debouncedWorkingPlan.mortgage!, strategy } }, config);
     const firstPension = (r: ReturnType<typeof simulate>) =>
       r.rows.find((x) => x.phase === "pension")?.agePension ?? 0;
     const carry = run("carry");
@@ -154,7 +177,7 @@ export default function BudgetBuilder({ plan, config, onApply, onProgress, onClo
       clearLasts: clear.lastsToLifeExpectancy ? null : clear.depletedAge,
       pensionUplift: Math.round(firstPension(clear) - firstPension(carry)),
     };
-  }, [tenure, workingPlan, mortgage, config]);
+  }, [tenure, debouncedWorkingPlan, config]);
 
   const setCat = (key: string, annual: number) =>
     setCategories((prev) => ({ ...prev, [key]: Math.max(0, Math.round(annual)) }));
