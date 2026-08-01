@@ -11,6 +11,7 @@ import { runMonteCarlo, MC_CONFIDENCE_MC, MC_CONFIDENCE_TARGET } from "@/lib/au/
 import type { EngineConfig } from "@/lib/au/config";
 import { fmtCompact, fmtCurrency } from "@/lib/au/format";
 import { planCompleteness } from "@/lib/au/completeness";
+import { essentialsFloor } from "@/lib/au/strategies";
 import { track } from "@/lib/analytics";
 import {
   DEFAULT_PARTNER,
@@ -557,6 +558,24 @@ export default function PlanWizard({
     ),
   };
 
+  // First retirement year's spending, for the Goal card — matches the income modal:
+  // total = living (essentials + discretionary) + any home loan + any rent. The
+  // spending "smile" only tapers the LIVING part; the home loan sits on top until
+  // it's paid off, so the headline total is more than the go-go living figure.
+  const goalFirstRow = preview.rows.find((r) => (r.spending ?? 0) > 0);
+  const goalLiving = goalFirstRow?.breakdown.livingSpend ?? (Number.isFinite(previewSpend) ? previewSpend : 0);
+  const goalEssentials = Math.min(essentialsFloor(draft, config), goalLiving);
+  const goalDiscretionary = Math.max(0, goalLiving - goalEssentials);
+  const goalMortgage = goalFirstRow?.breakdown.mortgageCost ?? 0;
+  const goalRent = goalFirstRow?.breakdown.rentCost ?? 0;
+  const goalTotalSpend = goalLiving + goalMortgage + goalRent;
+  const goalBreakdownParts = [
+    goalEssentials > 0 ? `${fmtCurrency(Math.round(goalEssentials))} essentials` : null,
+    goalDiscretionary > 0 ? `${fmtCurrency(Math.round(goalDiscretionary))} discretionary` : null,
+    goalMortgage > 0 ? `${fmtCurrency(Math.round(goalMortgage))} home loan` : null,
+    goalRent > 0 ? `${fmtCurrency(Math.round(goalRent))} rent` : null,
+  ].filter(Boolean);
+
   const goalStep = {
     key: "goal",
     nav: "Goal",
@@ -598,13 +617,15 @@ export default function PlanWizard({
           <div className="mt-1 text-lg font-bold text-white">
             {!Number.isFinite(previewSpend)
               ? "Not set yet"
-              : draft.spendingMode === "stages"
-                ? `${fmtCurrency(draft.spendingStages.goGo)}/yr go-go`
-                : `${fmtCurrency(draft.targetSpending)}/yr`}
+              : `${fmtCurrency(Math.round(goalTotalSpend))}/yr${draft.spendingMode === "stages" ? " go-go" : ""}`}
           </div>
+          {Number.isFinite(previewSpend) && goalBreakdownParts.length > 0 && (
+            <div className="mt-0.5 text-xs text-muted">{goalBreakdownParts.join(" · ")}</div>
+          )}
           {draft.spendingMode === "stages" && (
             <div className="mt-0.5 text-xs text-muted">
-              {fmtCurrency(draft.spendingStages.goGo)} → {fmtCurrency(draft.spendingStages.slowGo)} → {fmtCurrency(draft.spendingStages.noGo)} as you age
+              Living costs ease {fmtCurrency(draft.spendingStages.goGo)} → {fmtCurrency(draft.spendingStages.slowGo)} → {fmtCurrency(draft.spendingStages.noGo)} as you age
+              {goalMortgage > 0 ? "; the home loan sits on top until it's paid off" : ""}
             </div>
           )}
           <p className="mt-2 text-xs text-muted">
