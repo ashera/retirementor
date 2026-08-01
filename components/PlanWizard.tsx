@@ -1284,6 +1284,7 @@ export default function PlanWizard({
             setDraft((prev) => ({ ...prev, ...update }));
             setBudgetOpen(false);
           }}
+          onProgress={(update) => setDraft((prev) => ({ ...prev, ...update }))}
           onClose={() => setBudgetOpen(false)}
         />
       )}

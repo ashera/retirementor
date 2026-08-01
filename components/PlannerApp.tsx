@@ -2254,6 +2254,7 @@ export default function PlannerApp({
           plan={plan}
           config={config}
           onApply={handleBudgetApply}
+          onProgress={(update) => quickAdjust(update)}
           onClose={() => setBudgetOpen(false)}
         />
       )}

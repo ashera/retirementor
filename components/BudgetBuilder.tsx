@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Cell, Pie, PieChart } from "recharts";
 import type { EngineConfig } from "@/lib/au/config";
 import { fmtCurrency } from "@/lib/au/format";
@@ -48,6 +48,7 @@ interface BudgetBuilderProps {
   plan: RetirementPlan;
   config: EngineConfig;
   onApply: (update: Partial<RetirementPlan>) => void;
+  onProgress?: (update: Partial<RetirementPlan>) => void; // continuous save — apply without closing
   onClose: () => void;
 }
 
@@ -66,7 +67,7 @@ const STEP_TITLES: Record<string, string> = {
   goal: "Your goal",
 };
 
-export default function BudgetBuilder({ plan, config, onApply, onClose }: BudgetBuilderProps) {
+export default function BudgetBuilder({ plan, config, onApply, onProgress, onClose }: BudgetBuilderProps) {
   const household = plan.household;
   const oldestAtRetire =
     Math.max(...plan.people.map((p) => p.currentAge)) +
@@ -207,18 +208,41 @@ export default function BudgetBuilder({ plan, config, onApply, onClose }: Budget
       return next;
     });
 
-  const handleApply = () => {
-    const budget: RetirementBudget = { tenure, lifestyle, categories, applyPhases };
-    onApply({
-      targetSpending: total,
-      spendingMode: applyPhases ? "stages" : "flat",
-      ...(applyPhases ? { spendingStages: stages } : {}),
-      homeowner,
-      budget,
-      mortgage: activeMortgage,
-      home: activeHome,
-    });
+  // The plan patch this budget produces — used both by the explicit Apply button
+  // and the continuous auto-save below, so they can never disagree.
+  const budgetUpdate: Partial<RetirementPlan> = {
+    targetSpending: total,
+    spendingMode: applyPhases ? "stages" : "flat",
+    ...(applyPhases ? { spendingStages: stages } : {}),
+    homeowner,
+    budget: { tenure, lifestyle, categories, applyPhases } as RetirementBudget,
+    mortgage: activeMortgage,
+    home: activeHome,
   };
+  const handleApply = () => onApply(budgetUpdate);
+
+  // Save progress continuously — mirror the current budget back to the plan as the
+  // user edits (debounced) and flush on close, so nothing is lost if they close via
+  // ✕ / the backdrop / backing out before clicking the final Apply button.
+  const progressRef = useRef(onProgress);
+  progressRef.current = onProgress;
+  const updateRef = useRef(budgetUpdate);
+  updateRef.current = budgetUpdate;
+  const budgetKey = JSON.stringify(budgetUpdate);
+  // The budget as it was when the builder opened. Comparing against this (rather than
+  // skipping the first effect run, which React StrictMode double-invokes) means a
+  // peek-and-close saves nothing, and only genuine edits are mirrored/flushed.
+  const initialKey = useRef(budgetKey).current;
+  useEffect(() => {
+    if (budgetKey === initialKey) return; // nothing changed yet
+    const t = setTimeout(() => progressRef.current?.(updateRef.current), 500);
+    return () => clearTimeout(t);
+  }, [budgetKey, initialKey]);
+  // Flush the latest on unmount (covers ✕ / backdrop / back-out close), but only if
+  // the budget actually changed from what they opened with.
+  useEffect(() => () => {
+    if (JSON.stringify(updateRef.current) !== initialKey) progressRef.current?.(updateRef.current);
+  }, [initialKey]);
 
   const essentials = BUDGET_CATEGORY_META.filter((m) => m.essential);
   const discretionaries = BUDGET_CATEGORY_META.filter((m) => !m.essential);
