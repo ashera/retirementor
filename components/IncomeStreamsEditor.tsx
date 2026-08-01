@@ -140,8 +140,8 @@ export default function IncomeStreamsEditor({
         <span className="rounded-full bg-panel-2 px-2 py-0.5 text-[11px] font-medium text-muted">committed</span>
       </h3>
       <p className="mt-0.5 text-xs text-muted">
-        Ongoing income for life — a <span className="text-slate-200">defined-benefit pension</span>, annuity, or foreign
-        pension (e.g. US Social Security). Counts toward the Age Pension income test.
+        Income beyond super and savings — a <span className="text-slate-200">pension</span>, annuity, dividend, or foreign
+        pension (e.g. US Social Security), for life or a set period. Counts toward the Age Pension income test.
       </p>
 
       {shown.length > 0 && (
