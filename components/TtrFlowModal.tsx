@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import type { TtrFlow } from "@/lib/au/ttrFlow";
 import { fmtCurrency } from "@/lib/au/format";
 
@@ -19,13 +19,60 @@ type Span = { l0: number; l1: number; r0: number; r1: number };
 /** The Sankey — salary splits into the sacrificed slice + taxable pay; the slice
  *  mostly returns as a tax-free TTR pension (mint) to take-home, a little stays in
  *  super (green), a sliver is tax (rose); the rest of pay funds tax + take-home. */
-function FlowDiagram({ f }: { f: TtrFlow }) {
+function FlowDiagram({ f, mode }: { f: TtrFlow; mode: "with" | "without" }) {
   const W = 720, H = 344, top = 56, bottom = 22, gap = 16;
   const usable = H - top - bottom;
-  const scale = (usable - 2 * gap) / f.salary;
+  const scale = (usable - 2 * gap) / f.salary; // same scale both modes → take-home node stays put
   const LX = 132, LW = 15, RX = 566, RW = 15;
   const mx = (LX + LW + RX) / 2;
 
+  const path = (s: Span) =>
+    `M${LX + LW},${s.l0} C${mx},${s.l0} ${mx},${s.r0} ${RX},${s.r0} L${RX},${s.r1} C${mx},${s.r1} ${mx},${s.l1} ${LX + LW},${s.l1} Z`;
+  const ribbon = (s: Span, fill: string, op: number, key: string) => (
+    <path key={key} d={path(s)} fill={fill} fillOpacity={op} />
+  );
+  const bar = (x: number, y0: number, y1: number, fill: string, key: string) => (
+    <rect key={key} x={x} y={y0} width={LW} height={Math.max(1, y1 - y0)} rx={3} fill={fill} />
+  );
+  const lab = (x: number, y: number, t: string, o: { size?: number; w?: number; fill?: string; anchor?: string } = {}) => (
+    <text key={`l${x}-${y}-${t}`} x={x} y={y} fontSize={o.size ?? 12.5} fontWeight={o.w ?? 700}
+      fill={o.fill ?? "#e2e8f0"} textAnchor={o.anchor ?? "start"} style={{ letterSpacing: "-0.01em" }}>{t}</text>
+  );
+  const rLab = (yTop: number, h: number, big: string, small: string, fill: string) => [
+    lab(RX + RW + 9, yTop + h / 2 - 1, big, { size: 13, w: 800, fill }),
+    lab(RX + RW + 9, yTop + h / 2 + 13, small, { size: 10.5, w: 600, fill: "#94a3b8" }),
+  ];
+  const salaryHeader = [
+    lab(LX + LW / 2, top - 26, "YOUR SALARY", { size: 10.5, w: 700, fill: "#94a3b8", anchor: "middle" }),
+    lab(LX + LW / 2, top - 11, cur(f.salary), { size: 14, w: 800, anchor: "middle" }),
+  ];
+  const svgProps = { viewBox: `0 0 ${W} ${H}`, className: "h-auto w-full", style: { minWidth: 480 }, role: "img" as const };
+
+  // ── WITHOUT TTR: the whole salary is taxable — it splits into tax + take-home. ──
+  if (mode === "without") {
+    const taxWithout = f.incomeTax + f.taxSaved;
+    const salH = f.salary * scale, thH = f.takeHome * scale, txH = taxWithout * scale;
+    const thTop = top, txTop = thTop + thH + gap;
+    let ly = top;
+    const th: Span = { l0: ly, l1: (ly += thH), r0: thTop, r1: thTop + thH };
+    const tx: Span = { l0: ly, l1: (ly += txH), r0: txTop, r1: txTop + txH };
+    return (
+      <svg {...svgProps} aria-label={`Without TTR: ${cur(f.salary)} salary → ${cur(f.takeHome)} take-home, ${cur(taxWithout)} tax`}>
+        {ribbon(th, C.cash, 0.5, "r-th")}
+        {ribbon(tx, C.tax, 0.5, "r-tx")}
+        {bar(LX, top, top + salH, C.rest, "b-sal")}
+        {bar(RX, thTop, thTop + thH, C.cash, "b-th")}
+        {bar(RX, txTop, txTop + txH, C.tax, "b-tx")}
+        {salaryHeader}
+        {lab(LX - 8, top + salH / 2 - 1, cur(f.salary), { anchor: "end", size: 12 })}
+        {lab(LX - 8, top + salH / 2 + 12, "all taxable", { anchor: "end", size: 10, w: 600, fill: "#94a3b8" })}
+        {rLab(thTop, thH, cur(f.takeHome), "take-home", C.cash)}
+        {rLab(txTop, txH, cur(taxWithout), "tax paid", C.tax)}
+      </svg>
+    );
+  }
+
+  // ── WITH TTR ──
   const sliceH = f.slice * scale, restH = f.taxablePay * scale;
   const sliceTop = top, restTop = top + sliceH;
   const thH = f.takeHome * scale, spH = Math.max(2, f.superKept * scale), txH = (f.incomeTax + f.contribTax) * scale;
@@ -44,23 +91,10 @@ function FlowDiagram({ f }: { f: TtrFlow }) {
   kept.r0 = spTop; kept.r1 = spTop + spH;
   itax.r0 = ryTx; itax.r1 = ryTx += f.incomeTax * scale;
   ctax.r0 = ryTx; ctax.r1 = ryTx += f.contribTax * scale;
-
-  const path = (s: Span) =>
-    `M${LX + LW},${s.l0} C${mx},${s.l0} ${mx},${s.r0} ${RX},${s.r0} L${RX},${s.r1} C${mx},${s.r1} ${mx},${s.l1} ${LX + LW},${s.l1} Z`;
-  const ribbon = (s: Span, fill: string, op: number, key: string) => (
-    <path key={key} d={path(s)} fill={fill} fillOpacity={op} />
-  );
-  const bar = (x: number, y0: number, y1: number, fill: string, key: string) => (
-    <rect key={key} x={x} y={y0} width={LW} height={Math.max(1, y1 - y0)} rx={3} fill={fill} />
-  );
-  const lab = (x: number, y: number, t: string, o: { size?: number; w?: number; fill?: string; anchor?: string } = {}) => (
-    <text key={`l${x}${y}${t}`} x={x} y={y} fontSize={o.size ?? 12.5} fontWeight={o.w ?? 700}
-      fill={o.fill ?? "#e2e8f0"} textAnchor={o.anchor ?? "start"} style={{ letterSpacing: "-0.01em" }}>{t}</text>
-  );
   const penMidY = (pen.l0 + pen.l1 + pen.r0 + pen.r1) / 4;
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full" style={{ minWidth: 480 }} role="img"
+    <svg {...svgProps}
       aria-label={`Flow of ${cur(f.salary)} salary: ${cur(f.takeHome)} take-home, ${cur(f.superKept)} extra super, ${cur(f.incomeTax + f.contribTax)} tax`}>
       {/* ribbons first, nodes + labels on top */}
       {ribbon(th, C.cash, 0.5, "r-th")}
@@ -131,6 +165,8 @@ export default function TtrFlowModal({ flow, age, onClose }: { flow: TtrFlow; ag
 
   const f = flow;
   const asSalaryKeep = f.slice - f.taxSaved; // in-pocket if taken as salary (= the pension amount)
+  const [mode, setMode] = useState<"with" | "without">("with");
+  const taxWithout = f.incomeTax + f.taxSaved;
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" role="dialog" aria-modal="true">
@@ -165,13 +201,33 @@ export default function TtrFlowModal({ flow, age, onClose }: { flow: TtrFlow; ag
 
           {/* flow */}
           <div>
-            <div className="mb-1 flex items-baseline justify-between">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
               <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">Where the money goes</h3>
-              <span className="text-[11px] text-muted">ribbon width = dollars</span>
+              <div className="flex gap-1 rounded-lg border border-line bg-panel-2 p-1 text-xs">
+                {([["without", "Without TTR"], ["with", "With TTR"]] as const).map(([v, label]) => (
+                  <button
+                    key={v}
+                    onClick={() => setMode(v)}
+                    aria-pressed={mode === v}
+                    className={`rounded-md px-2.5 py-1 font-semibold transition ${
+                      mode === v ? "bg-accent text-ink" : "text-muted hover:text-white"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
             </div>
             <div className="overflow-x-auto rounded-xl border border-line bg-panel-2 p-2">
-              <FlowDiagram f={f} />
+              <FlowDiagram f={f} mode={mode} />
             </div>
+            <p className="mt-2 text-[11px] leading-snug text-muted">
+              {mode === "without" ? (
+                <>Without TTR the whole {cur(f.salary)} is taxable — {cur(taxWithout)} goes to tax. Switch to <b className="text-white">With TTR</b> to see {cur(f.taxSaved - f.contribTax)} of it redirected into super instead.</>
+              ) : (
+                <>The {cur(f.slice)} slice is taxed at 15% and mostly returns as a tax-free pension — so tax drops by {cur(taxWithout - (f.incomeTax + f.contribTax))} and that lands in super, take-home unchanged.</>
+              )}
+            </p>
           </div>
 
           {/* two ways */}
