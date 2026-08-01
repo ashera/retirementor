@@ -468,7 +468,7 @@ export default function BudgetBuilder({ plan, config, onApply, onProgress, onClo
             onClick={() => (safeStep === 0 ? onClose() : setStep(safeStep - 1))}
             className="rounded-lg px-4 py-2 text-sm font-medium text-muted transition hover:text-white"
           >
-            {safeStep === 0 ? "Cancel" : "← Previous"}
+            {safeStep === 0 ? "Cancel" : currentKey === "goal" ? "← Edit budget details" : "← Previous"}
           </button>
           <button
             onClick={() => (isLast ? handleApply() : setStep(safeStep + 1))}
