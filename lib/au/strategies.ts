@@ -795,25 +795,68 @@ export function buildStrategyCatalog(
   // once the (composed) retirement age clears 60, so it also surfaces when the
   // Retire later lever opens a working-past-60 window. The engine applies it only
   // in years the person is 60+ and still working.
-  if (working && plan.people[0]?.salary > 0) {
-    const p0 = plan.people[0];
+  // Workers who could run a TTR (still earning AND with working years ahead of their
+  // own retirement age). In a couple this may be one or both — a partner who keeps
+  // earning past 60 can run their own TTR even after the other has retired.
+  const ttrRetireAge = (i: number) => plan.people[i]?.retirementAge ?? plan.retirementAge;
+  const ttrWorkers = plan.people
+    .map((p, i) => (p.salary > 0 && p.currentAge < ttrRetireAge(i) ? i : -1))
+    .filter((i) => i >= 0);
+  if (ttrWorkers.length > 0) {
+    const bothWork = isCouple && ttrWorkers.length > 1;
+    const soloWho = ttrWorkers[0]; // the only earner when just one works
+    // For a couple, offer You / Your partner / Both; the amount is per person (each
+    // named earner sacrifices it). Default to Both so the lever includes the partner.
+    const resolveWho = (v: Record<string, number>): number[] => {
+      if (!bothWork) return [soloWho];
+      const choice = v.who ?? 2;
+      return choice === 2 ? ttrWorkers : [choice];
+    };
+    const perPersonBenefit = (i: number, extra: number) => {
+      const pp = plan.people[i];
+      const taxable = Math.max(0, pp.salary - pp.voluntaryConcessional);
+      const lower = Math.max(0, taxable - extra);
+      // Income tax + 2% Medicare levy saved on the sacrificed slice, net of the 15% contributions tax.
+      const taxSaved = incomeTax(taxable) - incomeTax(lower) + (medicareLevy(taxable) - medicareLevy(lower));
+      return Math.max(0, taxSaved - extra * 0.15);
+    };
     cards.push({
       id: "ttr",
       group: "timing",
       label: "Transition to Retirement",
-      blurb: "From age 60 you can salary-sacrifice more and draw a tax-free TTR pension to replace the pay you give up — shifting income from your marginal rate down to 15% tax. Your take-home holds; the tax saved builds your super.",
+      blurb: "From age 60 you can salary-sacrifice more and draw a tax-free TTR pension to replace the pay you give up — shifting income from your marginal rate down to 15% tax. Take-home holds; the tax saved builds super. In a couple, each partner who keeps working past 60 can run their own.",
       params: [
         { key: "extra", label: "Extra sacrifice via TTR", min: 0, max: 30_000, step: 1_000, default: 15_000, prefix: "$", suffix: "/yr" },
+        ...(bothWork
+          ? [
+              {
+                key: "who",
+                label: "Who runs a TTR",
+                min: 0,
+                max: 2,
+                step: 1,
+                default: 2,
+                options: [
+                  { value: 0, label: "You" },
+                  { value: 1, label: "Your partner" },
+                  { value: 2, label: "Both" },
+                ],
+              },
+            ]
+          : []),
       ],
       note: (v) => {
-        const taxable = Math.max(0, p0.salary - p0.voluntaryConcessional);
-        const lower = Math.max(0, taxable - v.extra);
-        // Income tax + 2% Medicare levy saved on the sacrificed slice, net of the 15% contributions tax.
-        const taxSaved = incomeTax(taxable) - incomeTax(lower) + (medicareLevy(taxable) - medicareLevy(lower));
-        const benefit = Math.max(0, taxSaved - v.extra * 0.15);
-        return `From age 60 until you retire: take-home unchanged, about ${fmtCurrency(benefit)}/yr of tax saving into super${isCouple ? " (for you; your partner isn't affected)" : ""} (capped at the concessional limit). Pairs with working past 60.`;
+        const who = resolveWho(v);
+        const benefit = who.reduce((s, i) => s + perPersonBenefit(i, v.extra), 0);
+        // Who + the "until … retire" clause, framed from the resolved selection so a
+        // couple where only the partner works reads correctly too.
+        const both = who.length > 1;
+        const partnerOnly = !both && who[0] === 1;
+        const whoTxt = !isCouple ? "" : both ? " (both of you)" : partnerOnly ? " (your partner)" : " (you)";
+        const retireTxt = both ? "each of you retires" : partnerOnly ? "your partner retires" : "you retire";
+        return `From age 60 until ${retireTxt}: take-home unchanged, about ${fmtCurrency(benefit)}/yr of tax saving into super${whoTxt} (each capped at the concessional limit). Pairs with working past 60.`;
       },
-      apply: (p, v) => ({ ...p, ttr: { extraSacrifice: v.extra } }),
+      apply: (p, v) => ({ ...p, ttr: { extraSacrifice: v.extra, who: resolveWho(v) } }),
     });
   }
 

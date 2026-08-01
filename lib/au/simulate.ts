@@ -496,7 +496,10 @@ export function simulate(
       plan.people.forEach((p, i) => {
         const brk = onBreak(i);
         const person = brk ? { ...p, salary: 0, voluntaryConcessional: 0 } : p;
-        const r = contribute(person, accum[i], 1, i === 0 && ages[i] >= preservationAge && !brk, ages[i] >= pensionAge);
+        // TTR applies to each person named in plan.ttr.who (defaults to [0]) — in the
+        // years they are 60+ (preservation age) and still working.
+        const ttrPerson = (plan.ttr?.who ?? [0]).includes(i);
+        const r = contribute(person, accum[i], 1, ttrPerson && ages[i] >= preservationAge && !brk, ages[i] >= pensionAge);
         accum[i] = r.newBalance;
         contribGross += r.contribGross;
         contribTax += r.contribTax;
@@ -807,6 +810,7 @@ export function simulate(
     let workEarningsTax = 0;
     let workTakeHome = 0; // still-working partners' net salary → offsets spending
     let workGrossSalary = 0; // gross → Age Pension income test
+    let workTtrBenefit = 0; // net super gained from a partner running TTR through the gap
     let workOnBreak = false; // any still-working partner on a career break this year
     plan.people.forEach((p, i) => {
       if (t >= retireOffsets[i]) return; // already retired — drawn down below
@@ -817,7 +821,10 @@ export function simulate(
       const brk = onBreak(i);
       if (brk) workOnBreak = true;
       const person = brk ? { ...p, salary: 0, voluntaryConcessional: 0 } : p;
-      const r = contribute(person, accum[i], gapScale, i === 0 && ages[i] >= preservationAge && !brk, ages[i] >= pensionAge);
+      // TTR applies to a partner still working through a staggered gap too (they're
+      // 60+ and earning) — same who-list as the accumulation branch.
+      const ttrGap = (plan.ttr?.who ?? [0]).includes(i);
+      const r = contribute(person, accum[i], gapScale, ttrGap && ages[i] >= preservationAge && !brk, ages[i] >= pensionAge);
       accum[i] = r.newBalance;
       workContribGross += r.contribGross;
       workContribTax += r.contribTax;
@@ -827,6 +834,7 @@ export function simulate(
       workEarningsTax += r.earningsTax;
       workTakeHome += r.takeHome;
       workGrossSalary += brk ? 0 : p.salary * gapScale;
+      workTtrBenefit += r.ttrBenefit;
     });
 
     // Only RETIRED members at/over preservation age can draw down (and are
@@ -1508,7 +1516,7 @@ export function simulate(
         savings: 0, // no separate savings stream in retirement — a gap-year surplus is the "income kept in savings" funding line
         salaryIncome: workGrossSalary,
         takeHome: workTakeHome,
-        ttrBenefit: 0,
+        ttrBenefit: workTtrBenefit,
         workIncome: netWork,
         incomeStreamNet: streamNet,
         incomeStreamGross: streamGross,

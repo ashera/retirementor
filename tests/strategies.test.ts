@@ -129,6 +129,63 @@ describe("What-If strategies", () => {
     expect(simulate(ttr, cfg).superAtRetirement).toBeGreaterThan(simulate(b, cfg).superAtRetirement);
   });
 
+  it("Transition to Retirement includes the partner: 'Both' benefits each earner over 60", () => {
+    // A couple, both 60 and still working to 65 — so both are in the TTR window now.
+    const couple = base({
+      household: "couple",
+      superMode: "individual",
+      people: [
+        { currentAge: 60, superBalance: 400_000, salary: 120_000, voluntaryConcessional: 0, voluntaryNonConcessional: 0, retirementAge: 65 },
+        { currentAge: 60, superBalance: 400_000, salary: 120_000, voluntaryConcessional: 0, voluntaryNonConcessional: 0, retirementAge: 65 },
+      ],
+      retirementAge: 65,
+    });
+    const at = (rows: ReturnType<typeof simulate>["rows"], age: number) => rows.find((r) => r.age === age)!;
+    const baseRows = simulate(couple, cfg).rows;
+
+    // "You" only (who = 0) vs "Both" (who = 2). The card exposes the who control
+    // because both partners earn; default is Both.
+    const youOnly = applyOne(couple, "ttr", { extra: 15_000, who: 0 });
+    const both = applyOne(couple, "ttr", { extra: 15_000, who: 2 });
+    expect(both.ttr?.who).toEqual([0, 1]);
+    expect(youOnly.ttr?.who).toEqual([0]);
+
+    const youRows = simulate(youOnly, cfg).rows;
+    const bothRows = simulate(both, cfg).rows;
+    // Symmetric earners → Both is ~2× the single-person TTR benefit, at no take-home cost.
+    const youBen = at(youRows, 61).breakdown.ttrBenefit;
+    const bothBen = at(bothRows, 61).breakdown.ttrBenefit;
+    expect(youBen).toBeGreaterThan(0);
+    expect(bothBen).toBeCloseTo(youBen * 2, 0);
+    expect(at(bothRows, 61).takeHome).toBeCloseTo(at(baseRows, 61).takeHome, 0);
+    expect(simulate(both, cfg).superAtRetirement).toBeGreaterThan(simulate(youOnly, cfg).superAtRetirement);
+  });
+
+  it("Transition to Retirement can apply to the partner alone when only they still earn", () => {
+    // Person 0 already retired / not earning; the partner keeps working past 60.
+    const couple = base({
+      household: "couple",
+      superMode: "individual",
+      people: [
+        { currentAge: 66, superBalance: 500_000, salary: 0, voluntaryConcessional: 0, voluntaryNonConcessional: 0, retirementAge: 60 },
+        { currentAge: 61, superBalance: 400_000, salary: 110_000, voluntaryConcessional: 0, voluntaryNonConcessional: 0, retirementAge: 65 },
+      ],
+      retirementAge: 65,
+    });
+    const card = cardById(couple, "ttr");
+    // Only one earner → no who control, and it targets the earning partner.
+    expect(card.params.some((p) => p.key === "who")).toBe(false);
+    const applied = applyOne(couple, "ttr", { extra: 12_000 });
+    expect(applied.ttr?.who).toEqual([1]);
+    const base0 = simulate(couple, cfg).rows[0];
+    const rows = simulate(applied, cfg).rows;
+    // The household is already in the retirement branch (person 0 retired), but the
+    // partner (person 1) is 61 and still working through the staggered gap → a
+    // positive TTR benefit this first year, at no cost to their take-home.
+    expect(rows[0].breakdown.ttrBenefit).toBeGreaterThan(0);
+    expect(rows[0].breakdown.takeHome).toBeCloseTo(base0.breakdown.takeHome, 0);
+  });
+
   it("Transition to Retirement is offered to any worker (the board hides it until retirement clears 60)", () => {
     const worker = base({ people: [{ currentAge: 58, superBalance: 400_000, salary: 120_000, voluntaryConcessional: 0, voluntaryNonConcessional: 0 }], retirementAge: 65 });
     expect(buildStrategyCatalog(worker).some((c) => c.id === "ttr")).toBe(true);
