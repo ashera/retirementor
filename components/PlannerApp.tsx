@@ -78,6 +78,7 @@ const BASELINE_KEY = "au-retirement-baseline";
 const BASELINE_NAME_KEY = "au-retirement-baseline-name"; // label for the ghost line
 const WORKING_TS_KEY = "au-retirement-plan-ts"; // when the local working plan was last saved
 const SAVED_ID_KEY = "au-retirement-saved-id"; // the plans-row id the active scenario is (for in-place Save)
+const PLAN_OWNER_KEY = "au-retirement-plan-owner"; // whose account last wrote the local plan ("" = built while signed out)
 const NUDGE_KEY = "au-retirement-nudge-dismissed"; // signed-out "save your work" banner dismissed
 
 // A blank starting point for a first-time visitor's "Enter my details" wizard:
@@ -377,8 +378,20 @@ export default function PlannerApp({
       const raw = localStorage.getItem(STORAGE_KEY);
       const localTs = Number(localStorage.getItem(WORKING_TS_KEY) || 0);
       const activeTs = active ? new Date(active.updated_at).getTime() : 0;
+      const localId = localStorage.getItem(SAVED_ID_KEY);
+      // Whose work is the local copy? `PLAN_OWNER_KEY` is stamped on every persist
+      // (empty string = built while signed out). A fresher local plan may overwrite
+      // the signed-in user's active scenario ONLY if it's theirs; work built while
+      // signed out — or under another account — is "foreign" and must never clobber a
+      // saved scenario (repro: create scenario → log out → clear details → build as a
+      // guest → log back in silently destroyed it). Legacy copies (no owner stamp yet)
+      // fall back to the old rule: trusted iff they carry a saved id.
+      const localOwner = localStorage.getItem(PLAN_OWNER_KEY);
+      const localForeign =
+        active != null &&
+        (localOwner != null ? localOwner !== (user?.email ?? "") : localId == null);
 
-      if (active && activeTs >= localTs) {
+      if (active && (activeTs >= localTs || localForeign)) {
         // Cloud scenario is at least as fresh (newer work from another device, a
         // first sign-in here, or no local copy) → adopt it and mirror to this device.
         const working = { ...DEFAULT_PLAN, ...active.data };
@@ -397,9 +410,12 @@ export default function PlannerApp({
         if (built) {
           localStorage.setItem(STORAGE_KEY, JSON.stringify(working));
           localStorage.setItem(WORKING_TS_KEY, String(activeTs));
+          localStorage.setItem(PLAN_OWNER_KEY, user?.email ?? "");
           localStorage.setItem(BASELINE_KEY, JSON.stringify(working));
           localStorage.setItem(BASELINE_NAME_KEY, active.name);
-          if (raw && localTs < activeTs) setNotice(`Loaded “${active.name}” from your account.`);
+          // Tell the user their saved scenario loaded — whether the local copy was
+          // just older, or was foreign work (built signed-out) we declined to keep.
+          if (raw && (localTs < activeTs || localForeign)) setNotice(`Loaded “${active.name}” from your account.`);
         } else {
           [STORAGE_KEY, WORKING_TS_KEY, BASELINE_KEY, BASELINE_NAME_KEY].forEach((k) => localStorage.removeItem(k));
         }
@@ -412,7 +428,6 @@ export default function PlannerApp({
         const working = { ...DEFAULT_PLAN, ...JSON.parse(raw) };
         const built = planIsBuilt(working); // defensive — blank plans are never persisted here
         const rawBase = localStorage.getItem(BASELINE_KEY);
-        const localId = localStorage.getItem(SAVED_ID_KEY);
         splitInto(built ? working : DEFAULT_PLAN);
         setBaseline(built ? (rawBase ? { ...DEFAULT_PLAN, ...JSON.parse(rawBase) } : working) : DEFAULT_PLAN);
         const nm = localId
@@ -646,6 +661,9 @@ export default function PlannerApp({
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
       localStorage.setItem(WORKING_TS_KEY, String(Date.now()));
+      // Stamp who owns this working copy, so a signed-in user's saved scenario is
+      // never overwritten by work built while signed out (or under another account).
+      localStorage.setItem(PLAN_OWNER_KEY, user?.email ?? "");
     } catch {
       /* ignore */
     }
@@ -834,7 +852,7 @@ export default function PlannerApp({
     if (shared) return; // never wipe the viewer's data from a shared read-only view
     if (!window.confirm("Clear your details and start over? This can't be undone.")) return;
     try {
-      [STORAGE_KEY, BASELINE_KEY, BASELINE_NAME_KEY, "au-retirement-compare"].forEach((k) =>
+      [STORAGE_KEY, BASELINE_KEY, BASELINE_NAME_KEY, PLAN_OWNER_KEY, "au-retirement-compare"].forEach((k) =>
         localStorage.removeItem(k),
       );
     } catch {
