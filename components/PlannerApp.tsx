@@ -320,6 +320,9 @@ export default function PlannerApp({
   const [trimOpen, setTrimOpen] = useState(false);
   const [boostOpen, setBoostOpen] = useState(false);
   const [selectedAge, setSelectedAge] = useState<number | null>(null);
+  // The main balance chart toggles between "balance" (super + outside) and
+  // "networth" (also folds in home equity + investment property), like What-If.
+  const [balanceView, setBalanceView] = useState<"balance" | "networth">("balance");
   const [incomeAge, setIncomeAge] = useState<number | null>(null);
   const [taxAge, setTaxAge] = useState<number | null>(null);
   const [fanAge, setFanAge] = useState<number | null>(null);
@@ -1544,24 +1547,46 @@ export default function PlannerApp({
       <div className="rounded-2xl border border-line bg-panel p-6">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
           <h2 className="font-semibold text-white">
-            Balance over time (today&apos;s dollars)
+            {balanceView === "networth" ? "Net worth (incl. your home)" : "Balance over time"}{" "}
+            <span className="text-sm font-normal text-muted">(today&apos;s dollars)</span>
           </h2>
-          <div className="flex flex-wrap items-center gap-4">
-            {result.rows.some((r) => (r.breakdown?.accumSuper ?? 0) > 1) ? (
-              <>
-                <LegendDot color="#34d399" label="Super — pension" />
-                <LegendDot color="#eab308" label="Super — accumulation" />
-              </>
-            ) : (
-              <LegendDot color="#34d399" label="Super" />
-            )}
-            <LegendDot color="#38bdf8" label="Outside super" />
-            {tweaked && <LegendDot color="#94a3b8" label={baselineLabel} />}
+          <div className="flex gap-1 rounded-lg border border-line bg-panel-2 p-1 text-xs">
+            {([
+              ["balance", "Balance"],
+              ["networth", "Net worth"],
+            ] as const).map(([v, label]) => (
+              <button
+                key={v}
+                onClick={() => setBalanceView(v)}
+                className={`rounded-md px-2.5 py-1 font-medium transition ${
+                  balanceView === v ? "bg-accent text-ink" : "text-muted hover:text-white"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
           </div>
+        </div>
+        <div className="mb-4 flex flex-wrap items-center gap-4">
+          {result.rows.some((r) => (r.breakdown?.accumSuper ?? 0) > 1) ? (
+            <>
+              <LegendDot color="#34d399" label="Super — pension" />
+              <LegendDot color="#eab308" label="Super — accumulation" />
+            </>
+          ) : (
+            <LegendDot color="#34d399" label="Super" />
+          )}
+          <LegendDot color="#38bdf8" label="Outside super" />
+          {balanceView === "networth" && <LegendDot color="#64748b" label="Home equity" />}
+          {balanceView === "networth" && hasInvestmentProperty(plan) && (
+            <LegendDot color="#fb923c" label="Investment property" />
+          )}
+          {tweaked && <LegendDot color="#94a3b8" label={baselineLabel} />}
         </div>
         <RetirementChart
           result={result}
           bands={stageBands}
+          showHome={balanceView === "networth"}
           baseline={baselineResult}
           baselineLabel={baselineLabel}
           onSelectYear={(age) => {

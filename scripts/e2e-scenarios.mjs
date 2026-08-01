@@ -91,7 +91,7 @@ try {
     localStorage.removeItem("au-retirement-baseline-name");
   }, PLAN);
   await page.reload({ waitUntil: "networkidle" });
-  await page.waitForTimeout(3500); // debounced auto-save (1.5s) + create + round-trip
+  await page.waitForTimeout(6000); // debounced auto-save (1.5s) + heavy first-render + create + round-trip
   let ps = await plans();
   ok("auto-save creates exactly 1 active scenario", ps.length === 1);
   ok("it is named 'My First Scenario'", ps[0]?.name === "My First Scenario");
