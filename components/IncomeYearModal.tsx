@@ -172,6 +172,11 @@ export default function IncomeYearModal({
   const ttrPension = row.breakdown.ttrPension ?? 0;
   const salaryOnlyTakeHome = Math.max(0, row.takeHome - ttrPension);
   const incomeTaxAmt = Math.max(0, taxableIncome - salaryOnlyTakeHome);
+  // Split the salary sacrifice into its sources: your regular voluntary sacrifice and
+  // any extra sacrificed via Transition to Retirement (contribGross − SG = both).
+  const ttrFlow = ttrFlowFromRow(row);
+  const ttrSlice = ttrFlow?.slice ?? 0;
+  const voluntarySac = Math.max(0, salarySacrifice - ttrSlice);
   const afterTaxContrib = plan.people.reduce((s, p) => s + Math.min(p.voluntaryNonConcessional, config.nonConcessionalCap), 0);
   const leftToSpend = Math.max(0, row.takeHome - afterTaxContrib);
   // Label for a property line: its custom name, else "Property N" (or a lone
@@ -267,14 +272,28 @@ export default function IncomeYearModal({
                     </div>
                   )}
                   {salarySacrifice > 0 && (
-                    <div className="flex items-baseline justify-between gap-4 py-1.5">
-                      <span className="text-muted">
-                        Salary sacrifice
-                        <span className="block text-[11px] leading-snug">
-                          before tax → into super (concessional){ttrPension > 0 ? " — includes your extra TTR sacrifice" : ""}
+                    <div className="py-1.5">
+                      <div className="flex items-baseline justify-between gap-4">
+                        <span className="text-muted">
+                          Salary sacrifice
+                          <span className="block text-[11px] leading-snug">before tax → into super (concessional)</span>
                         </span>
-                      </span>
-                      <span className="shrink-0 tabular-nums text-amber-400">−{cur(salarySacrifice)}</span>
+                        <span className="shrink-0 tabular-nums text-amber-400">−{cur(salarySacrifice)}</span>
+                      </div>
+                      {ttrSlice > 0.5 && (
+                        <div className="mt-1 space-y-0.5 border-l border-line pl-3 text-[11px] text-muted">
+                          {voluntarySac > 0.5 && (
+                            <div className="flex items-baseline justify-between gap-4">
+                              <span>Voluntary salary sacrifice</span>
+                              <span className="shrink-0 tabular-nums">−{cur(voluntarySac)}</span>
+                            </div>
+                          )}
+                          <div className="flex items-baseline justify-between gap-4">
+                            <span className="text-emerald-300">Transition to Retirement top-up</span>
+                            <span className="shrink-0 tabular-nums text-emerald-300">−{cur(ttrSlice)}</span>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                   <div className={`flex items-baseline justify-between gap-4 ${ttrPension > 0 ? "" : "border-b border-line "}py-1.5`}>
@@ -327,7 +346,7 @@ export default function IncomeYearModal({
                 </p>
                 {ttrPension > 0 && (
                   <div className="mt-3">
-                    <TtrFlowButton flow={ttrFlowFromRow(row)} age={row.age} label="See the Transition to Retirement flow →" />
+                    <TtrFlowButton flow={ttrFlow} age={row.age} label="See the Transition to Retirement flow →" />
                   </div>
                 )}
               </section>
