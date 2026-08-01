@@ -13,6 +13,7 @@ import { fmtCompact, fmtCurrency } from "@/lib/au/format";
 import { planCompleteness } from "@/lib/au/completeness";
 import { essentialsFloor } from "@/lib/au/strategies";
 import InfoTip from "@/components/InfoTip";
+import { WizardHeaderCard } from "@/components/WizardArt";
 import { track } from "@/lib/analytics";
 import {
   DEFAULT_PARTNER,
@@ -444,9 +445,14 @@ export default function PlanWizard({
     key: "contributions",
     nav: "Super",
     title: "Extra super contributions",
-    subtitle: "Voluntary contributions on top of the 12% your employer pays.",
+    subtitle: "",
     body: (
       <div className="space-y-6">
+        <WizardHeaderCard
+          page="contributions"
+          eyebrow="Boost your super"
+          blurb="Voluntary contributions on top of the 12% your employer pays — small, regular top-ups compound into a lot over a working life."
+        />
         <OptionalAnswer
           question="Do you add extra to super?"
           hint="On top of the 12% Super Guarantee your employer pays."
@@ -494,10 +500,14 @@ export default function PlanWizard({
     key: "outside",
     nav: "Savings",
     title: "Savings outside super",
-    subtitle:
-      "Investments you can access any time — these fund an early-retirement bridge before super unlocks at 60.",
+    subtitle: "",
     body: (
       <div className="space-y-6">
+        <WizardHeaderCard
+          page="outside"
+          eyebrow="Savings outside super"
+          blurb="Investments you can reach any time — shares, savings, an offset. They fund the early-retirement years before super unlocks at 60."
+        />
         <OptionalAnswer
           question="Any savings outside super?"
           hint="Shares, savings, an offset — anything you can access before 60."
@@ -566,10 +576,14 @@ export default function PlanWizard({
     key: "property",
     nav: "Property",
     title: "Investment property",
-    subtitle:
-      "Unlike your home, an investment property is counted by the Age Pension — its net equity as an asset, and its actual rent as income.",
+    subtitle: "",
     body: (
       <div className="space-y-5">
+        <WizardHeaderCard
+          page="property"
+          eyebrow="Investment property"
+          blurb="Unlike your home, an investment property counts for the Age Pension — its net equity as an asset, its actual rent as income."
+        />
         <Segmented
           value={(propMode ?? "") as "no" | "yes"}
           options={[
@@ -617,18 +631,24 @@ export default function PlanWizard({
     key: "income",
     nav: "Other income",
     title: "Other income",
-    subtitle:
-      "Any ongoing income for life — a defined-benefit pension, annuity, or foreign pension (e.g. US Social Security). It offsets your drawdown and is counted by the Age Pension income test. Most people can skip this.",
+    subtitle: "",
     body: (
-      <IncomeStreamsEditor
-        streams={draft.incomeStreams ?? []}
-        minAge={Math.min(...draft.people.map((p) => p.currentAge).filter((a) => Number.isFinite(a) && a > 0), draft.retirementAge)}
-        maxAge={draft.lifeExpectancy}
-        defaultAge={draft.retirementAge}
-        nonResident={draft.taxResidency === "non-resident"}
-        couple={draft.household === "couple"}
-        onChange={(incomeStreams) => setDraft((prev) => ({ ...prev, incomeStreams }))}
-      />
+      <div className="space-y-6">
+        <WizardHeaderCard
+          page="income"
+          eyebrow="Other income"
+          blurb="Ongoing income for life — a defined-benefit pension, annuity, or foreign pension (e.g. US Social Security). It offsets what you draw from savings. Most people can skip this."
+        />
+        <IncomeStreamsEditor
+          streams={draft.incomeStreams ?? []}
+          minAge={Math.min(...draft.people.map((p) => p.currentAge).filter((a) => Number.isFinite(a) && a > 0), draft.retirementAge)}
+          maxAge={draft.lifeExpectancy}
+          defaultAge={draft.retirementAge}
+          nonResident={draft.taxResidency === "non-resident"}
+          couple={draft.household === "couple"}
+          onChange={(incomeStreams) => setDraft((prev) => ({ ...prev, incomeStreams }))}
+        />
+      </div>
     ),
   };
 
@@ -654,9 +674,14 @@ export default function PlanWizard({
     key: "goal",
     nav: "Goal",
     title: "Your retirement goal",
-    subtitle: "When you want to stop working and how much you'll spend.",
+    subtitle: "",
     body: (
       <div className="space-y-6">
+        <WizardHeaderCard
+          page="goal"
+          eyebrow="Your retirement goal"
+          blurb="When you'll stop working and how much you'll spend each year — the target the whole plan is built to reach."
+        />
         <div className="grid grid-cols-1 items-start gap-x-5 gap-y-5 sm:grid-cols-2">
           <Field
             label={isCouple ? "Your retirement age" : "Retirement age"}
@@ -745,9 +770,14 @@ export default function PlanWizard({
     key: "assumptions",
     nav: "Assumptions",
     title: "Assumptions",
-    subtitle: "The long-run numbers behind the projection.",
+    subtitle: "",
     body: (
       <div className="space-y-5">
+        <WizardHeaderCard
+          page="assumptions"
+          eyebrow="The long-run numbers"
+          blurb="Returns, inflation and fees behind the projection. Sensible defaults are set — tweak them only if you want to."
+        />
         {assumptionsTuned && (
           <div className="flex justify-end">
             <button
