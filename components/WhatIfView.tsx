@@ -1063,12 +1063,27 @@ export default function WhatIfView({
               <span className="text-xs font-medium uppercase tracking-wide text-muted">
                 {active.has(detailCard.id) ? "Applied to this scenario" : "Explore this strategy"}
               </span>
-              <button
-                onClick={() => setDetailCard(null)}
-                className="rounded-lg bg-accent px-4 py-1 text-sm font-semibold text-ink transition hover:bg-accent-soft"
-              >
-                Save
-              </button>
+              <div className="flex items-center gap-2">
+                {active.has(detailCard.id) && (
+                  // One-click "turn this strategy off and close" — no need to toggle
+                  // the switch then Save.
+                  <button
+                    onClick={() => {
+                      toggle(detailCard);
+                      setDetailCard(null);
+                    }}
+                    className="rounded-lg border border-line px-4 py-1 text-sm font-semibold text-rose-300 transition hover:border-rose-400/60 hover:bg-rose-500/10"
+                  >
+                    Remove
+                  </button>
+                )}
+                <button
+                  onClick={() => setDetailCard(null)}
+                  className="rounded-lg bg-accent px-4 py-1 text-sm font-semibold text-ink transition hover:bg-accent-soft"
+                >
+                  Save
+                </button>
+              </div>
             </div>
             <StrategyCardRow {...detailProps(detailCard)} />
           </div>
