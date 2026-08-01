@@ -337,6 +337,22 @@ export default function PlanWizard({
     subtitle,
     body: (
       <div className="grid grid-cols-1 gap-x-5 gap-y-5 sm:grid-cols-2">
+        <div className="flex items-center gap-4 rounded-2xl border border-line bg-panel-2/60 p-4 sm:col-span-2">
+          <div className="min-w-0 flex-1">
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-accent">Where you&apos;re starting from</div>
+            <p className="mt-1 text-sm leading-relaxed text-slate-200">
+              {i === 0
+                ? "Your age, super balance and salary today — the starting point the whole projection is built on."
+                : "Your partner's age, super and salary today — so we can project your retirement together."}
+            </p>
+          </div>
+          <img
+            src={personaAvatarSrc(draft.people[i]?.sex, i === 1)}
+            alt=""
+            aria-hidden
+            className="h-16 w-16 shrink-0 rounded-full object-cover ring-1 ring-line"
+          />
+        </div>
         <Field
           label="Current age"
           value={draft.people[i].currentAge}
@@ -1007,8 +1023,8 @@ export default function PlanWizard({
 
   const steps: { key: string; nav: string; title: string; subtitle: string; body: ReactNode }[] = [
     householdStep,
-    personStep(0, isCouple ? "About you" : "About you", "Where you're starting from today."),
-    ...(isCouple ? [personStep(1, "About your partner", "Your partner's starting point.")] : []),
+    personStep(0, isCouple ? "About you" : "About you", ""),
+    ...(isCouple ? [personStep(1, "About your partner", "")] : []),
     contributionsStep,
     outsideStep,
     propertyStep,
@@ -1242,33 +1258,9 @@ export default function PlanWizard({
         {/* Body — fixed height so the modal doesn't resize between steps; scrolls
             internally when a step's content is taller. */}
         <div className="h-[470px] max-h-[calc(90vh-320px)] overflow-y-auto px-6 py-6">
-          <p className="mb-5 text-sm text-muted">{current.subtitle}</p>
+          {current.subtitle && <p className="mb-5 text-sm text-muted">{current.subtitle}</p>}
           {current.body}
         </div>
-
-        {/* Completeness nudge — celebrate at 100%, else point at the next gap */}
-        {pct === 100 ? (
-          <div className="mx-6 mb-2 rounded-xl border border-accent/30 bg-accent/10 px-4 py-2.5 text-center text-xs font-medium text-accent">
-            ✓ Complete picture — that&apos;s as detailed as your model gets.
-          </div>
-        ) : gap ? (
-          <div className="mx-6 mb-2">
-            <button
-              type="button"
-              onClick={() => gapStepIndex >= 0 && setStep(gapStepIndex)}
-              className="flex w-full items-center justify-between gap-2 rounded-xl border border-line bg-panel-2 px-4 py-2.5 text-left text-xs transition hover:border-accent/40"
-            >
-              <span className="min-w-0 truncate text-slate-300">
-                {gap.core ? (
-                  <>Add <span className="font-semibold text-white">{gap.label}</span> to finish the essentials</>
-                ) : (
-                  <>＋ Add <span className="font-semibold text-white">{gap.label}</span> for a sharper model</>
-                )}
-              </span>
-              <span className="shrink-0 font-semibold text-accent">→</span>
-            </button>
-          </div>
-        ) : null}
 
         {/* Live preview */}
         {previewReady ? (
