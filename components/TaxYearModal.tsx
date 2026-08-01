@@ -140,6 +140,7 @@ export default function TaxYearModal({
   const litoZeroed = total < 1 && detail.some((d) => d.lito > 0.5 || d.sapto > 0.5);
   const anySapto = detail.some((d) => d.sapto > 0.5);
   const stillWorking = (b.salaryIncome ?? 0) > 1; // a partner still earning in a staggered-retirement gap
+  const ttrPension = b.ttrPension ?? 0; // TTR active → assessable income (and tax) is lower this year
   const phaseLabel =
     row.phase === "accumulation" ? "still working"
       : row.phase === "bridge" ? "retired — before super unlocks"
@@ -181,6 +182,13 @@ export default function TaxYearModal({
                   {litoZeroed
                     ? `Your taxable income is fully covered by the tax-free threshold and the low-income (LITO)${anySapto ? " and seniors (SAPTO)" : ""} offset${anySapto ? "s" : ""} — see the working below.`
                     : "Your taxable income sits within the tax-free threshold — see the working below."}
+                </div>
+              )}
+              {ttrPension > 0 && (
+                <div className="rounded-xl border border-accent/25 bg-accent/5 px-4 py-2.5 text-sm text-slate-200">
+                  <span className="font-semibold text-accent">Transition to Retirement is lowering your tax.</span>{" "}
+                  Salary-sacrificing an extra slice cuts the assessable salary below, so income tax and the Medicare
+                  levy fall; a tax-free TTR pension of {cur(ttrPension)} replaces the pay given up (see the income breakdown).
                 </div>
               )}
               {hasPersonal && (

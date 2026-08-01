@@ -332,28 +332,37 @@ export function simulate(
       const cap = config.concessionalCap * scale;
       const nccCap = config.nonConcessionalCap * scale;
       const div293Threshold = config.div293Threshold * scale;
-      const concessional = Math.min(salary * config.sgRate + p.voluntaryConcessional * scale, cap);
-      const sacrificed = Math.max(0, concessional - salary * config.sgRate);
-      const taxable = Math.max(0, salary - sacrificed);
+      // Base concessional contributions (SG + any voluntary salary sacrifice), capped.
+      const baseConcessional = Math.min(salary * config.sgRate + p.voluntaryConcessional * scale, cap);
+      const sacrificed = Math.max(0, baseConcessional - salary * config.sgRate);
+      const preTtrTaxable = Math.max(0, salary - sacrificed);
       // Personal income tax on the salary: a still-working partner who has reached Age
       // Pension age (a staggered gap) gets SAPTO, so use the senior scale — matching
       // taxAtAge in the retirement branch (the old flat resident scale over-taxed them).
       const netTax = senior ? (x: number) => seniorIncomeTax(x, plan.household) : residentIncomeTax;
+      // Transition to Retirement: sacrifice an extra slice into super and draw a
+      // tax-free TTR pension to replace the pay given up. FAITHFUL ledger — the slice
+      // RAISES concessional contributions and LOWERS assessable income (so income tax
+      // AND the 2% Medicare levy fall, visible in the tax analysis), and the tax-free
+      // pension equals the after-tax value of the slice, restoring take-home exactly.
+      // The NET effect on super is identical to booking a lump benefit (taxSaved−15%),
+      // so balances/oracle are unchanged — only the ledger attribution differs.
+      const ttrSacrificed =
+        ttrEligible && plan.ttr && plan.ttr.extraSacrifice > 0
+          ? Math.min(plan.ttr.extraSacrifice * scale, Math.max(0, cap - baseConcessional))
+          : 0;
+      const concessional = baseConcessional + ttrSacrificed; // TTR lifts the pre-tax contribution
+      const taxable = Math.max(0, preTtrTaxable - ttrSacrificed); // assessable income after the TTR slice
       // Take-home is real cash the household spends/banks, so it must include the 2%
       // Medicare levy (unlike the income-tax fns, which omit it for the CGT use).
-      const takeHome = taxable - netTax(taxable) - medicareLevy(taxable, senior);
-      let ttrBenefit = 0;
-      if (ttrEligible && plan.ttr && plan.ttr.extraSacrifice > 0) {
-        const ttrSacrificed = Math.min(plan.ttr.extraSacrifice * scale, Math.max(0, cap - concessional));
-        if (ttrSacrificed > 0) {
-          // Sacrificing cuts taxable income, so it saves the marginal income tax AND
-          // the 2% Medicare levy on that slice — net of the 15% contributions tax.
-          const lower = Math.max(0, taxable - ttrSacrificed);
-          const taxSaved =
-            netTax(taxable) - netTax(lower) + (medicareLevy(taxable, senior) - medicareLevy(lower, senior));
-          ttrBenefit = taxSaved - ttrSacrificed * config.contributionsTax;
-        }
-      }
+      const takeHomePreTtr = preTtrTaxable - netTax(preTtrTaxable) - medicareLevy(preTtrTaxable, senior);
+      const takeHomeFromSalary = taxable - netTax(taxable) - medicareLevy(taxable, senior);
+      // The tax-free TTR pension exactly restores the take-home the slice gave up.
+      const ttrPension = Math.max(0, takeHomePreTtr - takeHomeFromSalary);
+      const takeHome = takeHomePreTtr; // held: reduced salary take-home + the tax-free TTR pension
+      // Net super gain from the swap (extra contribution net of 15%, less the pension
+      // drawn to hold take-home) — a summary figure; == taxSaved − 15%×slice.
+      const ttrBenefit = ttrSacrificed > 0 ? ttrSacrificed * (1 - config.contributionsTax) - ttrPension : 0;
       // Non-concessional cap falls to $0 once the person's total super balance is at
       // or above the threshold (~$2.1M). During accumulation `opening` is the whole
       // super balance, so it's the right gauge for a working-age contributor.
@@ -367,10 +376,12 @@ export function simulate(
       // can't go NEGATIVE — matching the retirement branch, which already floors the
       // fee. For any funded account this is byte-identical to `fee * superHalf`.
       const feeNominal = fixedAdmin + insurance;
-      const preFee = opening * (1 + superAccumReturn) + (added + ttrBenefit) * superHalf;
+      // The extra TTR contribution goes in and the tax-free TTR pension comes out —
+      // netting to the same super movement as the old lump benefit (added + ttrBenefit).
+      const preFee = opening * (1 + superAccumReturn) + (added - ttrPension) * superHalf;
       const feeImpact = Math.max(0, Math.min(feeNominal * superHalf, preFee));
       const fee = superHalf > 0 ? feeImpact / superHalf : 0;
-      const net = added - fee + ttrBenefit;
+      const net = added - fee - ttrPension;
       const newBalance = preFee - feeImpact;
       return {
         newBalance,
@@ -381,10 +392,11 @@ export function simulate(
         earningsTax: opening * (superPensionReturn - superAccumReturn),
         superGrowth: newBalance - opening - net,
         takeHome,
-        taxable, // taxable salary (after sacrifice) — the base a rental loss/gain stacks on
+        taxable, // assessable salary after sacrifice AND any TTR slice — the base a rental loss/gain stacks on
         salaryIncomeTax: netTax(taxable), // personal income tax on the salary (after LITO/SAPTO), surfaced for the tax analysis
         medicareLevyPaid: medicareLevy(taxable),
         ttrBenefit,
+        ttrPension,
       };
     };
 
@@ -491,6 +503,7 @@ export function simulate(
       let feesPaid = 0;
       let takeHome = 0; // net cash from salary after income tax and pre-tax sacrifice
       let ttrBenefit = 0; // net super gained from a Transition-to-Retirement swap this year
+      let ttrPension = 0; // tax-free TTR pension drawn from super to hold take-home
       let medicare = 0; // Medicare levy on salary
       const taxables: number[] = []; // per-person taxable salary — base for the rental tax/deduction
       plan.people.forEach((p, i) => {
@@ -509,6 +522,7 @@ export function simulate(
         earningsTax += r.earningsTax;
         takeHome += r.takeHome;
         ttrBenefit += r.ttrBenefit;
+        ttrPension += r.ttrPension;
         medicare += r.medicareLevyPaid;
         taxables.push(r.taxable);
       });
@@ -709,6 +723,7 @@ export function simulate(
           salaryIncome: plan.people.reduce((s, p, i) => s + (onBreak(i) ? 0 : p.salary), 0),
           takeHome,
           ttrBenefit,
+          ttrPension,
           workIncome: 0,
           incomeStreamGross: accumStreamGross,
           incomeStreamNet: accumStreamNet,
@@ -811,6 +826,7 @@ export function simulate(
     let workTakeHome = 0; // still-working partners' net salary → offsets spending
     let workGrossSalary = 0; // gross → Age Pension income test
     let workTtrBenefit = 0; // net super gained from a partner running TTR through the gap
+    let workTtrPension = 0; // tax-free TTR pension drawn to hold a gap-worker's take-home
     let workOnBreak = false; // any still-working partner on a career break this year
     plan.people.forEach((p, i) => {
       if (t >= retireOffsets[i]) return; // already retired — drawn down below
@@ -835,6 +851,7 @@ export function simulate(
       workTakeHome += r.takeHome;
       workGrossSalary += brk ? 0 : p.salary * gapScale;
       workTtrBenefit += r.ttrBenefit;
+      workTtrPension += r.ttrPension;
     });
 
     // Only RETIRED members at/over preservation age can draw down (and are
@@ -1517,6 +1534,7 @@ export function simulate(
         salaryIncome: workGrossSalary,
         takeHome: workTakeHome,
         ttrBenefit: workTtrBenefit,
+        ttrPension: workTtrPension,
         workIncome: netWork,
         incomeStreamNet: streamNet,
         incomeStreamGross: streamGross,

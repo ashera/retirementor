@@ -30,7 +30,9 @@ export function yearFlow(row: YearRow): YearFlow {
   const retired = row.phase !== "accumulation";
 
   const growth = b.superGrowth + b.outsideGrowth;
-  const contributions = b.contribNet + b.ttrBenefit;
+  // contribNet now includes any extra TTR salary sacrifice; the tax-free TTR pension
+  // that holds take-home is drawn back out of super below (net effect: taxSaved−15%).
+  const contributions = b.contribNet;
 
   // Net effect of income & spending on the portfolio. While working, salary is
   // spent on living (not tracked) and only explicit `savings` is added. In
@@ -56,6 +58,9 @@ export function yearFlow(row: YearRow): YearFlow {
     { key: "growth", label: "Investment growth", amount: growth },
     { key: "fees", label: "Super fees", amount: -b.fees },
     { key: "contrib", label: "Super contributions", amount: contributions },
+    // TTR pension drawn (tax-free) from super to hold take-home while sacrificing more.
+    // A working-years outflow; in retirement it's inside the funding term above.
+    { key: "ttrPension", label: "Tax-free TTR pension drawn", amount: retired ? 0 : -(b.ttrPension ?? 0) },
     { key: "savings", label: "Savings added", amount: b.savings },
     {
       key: "funding",

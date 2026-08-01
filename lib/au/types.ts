@@ -496,6 +496,7 @@ export interface YearBreakdown {
   salaryIncome: number; // gross household salary this year (accumulation only; 0 in retirement)
   takeHome: number; // net pay after income tax + pre-tax salary sacrifice (working years; 0 in retirement)
   ttrBenefit: number; // net super gained this year from a Transition-to-Retirement swap (0 normally)
+  ttrPension?: number; // tax-free TTR pension drawn from super to hold take-home while sacrificing more (0 normally)
   workIncome: number; // net part-time work income this year (retirement only; after tax)
   incomeStreamNet?: number; // net recurring income-stream income this year (after tax) — funds spending
   incomeStreamGross?: number; // gross recurring income-stream income this year (before tax)

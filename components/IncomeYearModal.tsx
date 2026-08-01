@@ -165,7 +165,11 @@ export default function IncomeYearModal({
   const sgTotal = plan.people.reduce((s, p) => s + p.salary * config.sgRate, 0);
   const salarySacrifice = Math.max(0, row.breakdown.contribGross - sgTotal);
   const taxableIncome = Math.max(0, row.salaryIncome - salarySacrifice);
-  const incomeTaxAmt = Math.max(0, taxableIncome - row.takeHome);
+  // A tax-free TTR pension (if any) is part of take-home but doesn't come from salary,
+  // so back it out to recover the salary take-home the income tax is a residual of.
+  const ttrPension = row.breakdown.ttrPension ?? 0;
+  const salaryOnlyTakeHome = Math.max(0, row.takeHome - ttrPension);
+  const incomeTaxAmt = Math.max(0, taxableIncome - salaryOnlyTakeHome);
   const afterTaxContrib = plan.people.reduce((s, p) => s + Math.min(p.voluntaryNonConcessional, config.nonConcessionalCap), 0);
   const leftToSpend = Math.max(0, row.takeHome - afterTaxContrib);
   // Label for a property line: its custom name, else "Property N" (or a lone
@@ -264,18 +268,37 @@ export default function IncomeYearModal({
                     <div className="flex items-baseline justify-between gap-4 py-1.5">
                       <span className="text-muted">
                         Salary sacrifice
-                        <span className="block text-[11px] leading-snug">before tax → into super (concessional)</span>
+                        <span className="block text-[11px] leading-snug">
+                          before tax → into super (concessional){ttrPension > 0 ? " — includes your extra TTR sacrifice" : ""}
+                        </span>
                       </span>
                       <span className="shrink-0 tabular-nums text-amber-400">−{cur(salarySacrifice)}</span>
                     </div>
                   )}
-                  <div className="flex items-baseline justify-between gap-4 border-b border-line py-1.5">
+                  <div className={`flex items-baseline justify-between gap-4 ${ttrPension > 0 ? "" : "border-b border-line "}py-1.5`}>
                     <span className="text-muted">
                       Income tax
-                      <span className="block text-[11px] leading-snug">on {cur(taxableIncome)} taxable income</span>
+                      <span className="block text-[11px] leading-snug">
+                        on {cur(taxableIncome)} taxable income{ttrPension > 0 ? " — lowered by your TTR sacrifice" : ""}
+                      </span>
                     </span>
                     <span className="shrink-0 tabular-nums text-amber-400">−{cur(incomeTaxAmt)}</span>
                   </div>
+                  {ttrPension > 0 && (
+                    <>
+                      <div className="flex items-baseline justify-between gap-4 py-1.5">
+                        <span className="text-slate-200">Salary take-home</span>
+                        <span className="shrink-0 tabular-nums text-slate-200">{cur(salaryOnlyTakeHome)}</span>
+                      </div>
+                      <div className="flex items-baseline justify-between gap-4 border-b border-line py-1.5">
+                        <span className="text-emerald-300">
+                          Transition to Retirement pension
+                          <span className="block text-[11px] leading-snug text-muted">tax-free from age 60 — replaces the sacrificed pay</span>
+                        </span>
+                        <span className="shrink-0 tabular-nums text-emerald-400">+{cur(ttrPension)}</span>
+                      </div>
+                    </>
+                  )}
                   <div className="flex items-baseline justify-between gap-4 py-2">
                     <span className="font-semibold text-slate-200">Take-home pay</span>
                     <span className="shrink-0 font-semibold tabular-nums text-yellow-400">{cur(row.takeHome)}</span>
@@ -361,25 +384,17 @@ export default function IncomeYearModal({
                 </section>
               )}
 
-              {(row.breakdown.contribGross > 0 || afterTaxContrib > 0 || row.breakdown.ttrBenefit !== 0 || row.breakdown.savings > 0) && (
+              {(row.breakdown.contribGross > 0 || afterTaxContrib > 0 || row.breakdown.savings > 0) && (
                 <section>
                   <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted">
                     What you&apos;re putting away this year
                   </h3>
                   <div className="rounded-xl border border-line bg-panel px-3 py-1">
-                    {row.breakdown.ttrBenefit !== 0 && (
-                      <Row
-                        color="#a78bfa"
-                        label="Transition to Retirement — tax saved"
-                        sub="Extra sacrificed via a tax-free TTR pension, so your take-home holds. This is the income tax saved (net of the 15% contributions tax) added to super."
-                        value={row.breakdown.ttrBenefit}
-                      />
-                    )}
                     {row.breakdown.contribGross > 0 && (
                       <Row
                         color="#34d399"
                         label="Into super — concessional"
-                        sub={`Employer Super Guarantee${salarySacrifice > 0 ? ` (${cur(sgTotal)}) plus ${cur(salarySacrifice)} salary sacrifice` : ""}, before the 15% contributions tax.`}
+                        sub={`Employer Super Guarantee${salarySacrifice > 0 ? ` (${cur(sgTotal)}) plus ${cur(salarySacrifice)} salary sacrifice${ttrPension > 0 ? " incl. TTR" : ""}` : ""}, before the 15% contributions tax.`}
                         value={row.breakdown.contribGross}
                       />
                     )}

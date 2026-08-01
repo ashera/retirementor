@@ -125,7 +125,7 @@ describe(`Stress matrix — ${PLANS.length} plans, universal invariants`, () => 
         const b = row.breakdown;
         if (!near(row.total, row.totalSuper + row.outside)) fails.push(`${name} @${row.age}: total≠super+outside`);
         if (row.phase === "accumulation") {
-          if (!near(b.openingSuper + b.contribNet + b.ttrBenefit - b.fees + b.superGrowth, b.closingSuper)) fails.push(`${name} @${row.age}: accum super`);
+          if (!near(b.openingSuper + b.contribNet - (b.ttrPension ?? 0) - b.fees + b.superGrowth, b.closingSuper)) fails.push(`${name} @${row.age}: accum super`);
           if (!near(b.openingOutside + b.savings + b.outsideGrowth - b.outsideTax + (b.rentSaved ?? 0), b.closingOutside)) fails.push(`${name} @${row.age}: accum outside`);
         } else {
           if (!near(b.openingSuper - b.mortgageCleared - row.superDrawn - (b.superTaxDraw ?? 0) - b.fees + b.superGrowth, b.closingSuper)) fails.push(`${name} @${row.age}: ret super`);
