@@ -727,12 +727,6 @@ export default function PlanWizard({
               {goalMortgage > 0 ? "; the home loan sits on top until it's paid off" : ""}
             </div>
           )}
-          <p className="mt-2 text-xs text-muted">
-            {draft.budget
-              ? "From the detailed budget you built."
-              : "Pick a lifestyle preset or fine-tune each category in the budget builder."}{" "}
-            Spending lives in one place, so it stays consistent across the app.
-          </p>
         </div>
         <button
           type="button"
