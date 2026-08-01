@@ -12,6 +12,7 @@ import type { EngineConfig } from "@/lib/au/config";
 import { fmtCompact, fmtCurrency } from "@/lib/au/format";
 import { planCompleteness } from "@/lib/au/completeness";
 import { essentialsFloor } from "@/lib/au/strategies";
+import { mortgageAnnualCost } from "@/lib/au/mortgage";
 import InfoTip from "@/components/InfoTip";
 import { WizardHeaderCard } from "@/components/WizardArt";
 import { track } from "@/lib/analytics";
@@ -651,15 +652,18 @@ export default function PlanWizard({
     ),
   };
 
-  // First retirement year's spending, for the Goal card — matches the income modal:
-  // total = living (essentials + discretionary) + any home loan + any rent. The
-  // spending "smile" only tapers the LIVING part; the home loan sits on top until
-  // it's paid off, so the headline total is more than the go-go living figure.
+  // Retirement-goal spending, for the Goal card: living (essentials + discretionary)
+  // + any home loan + any rent. The spending "smile" only tapers the LIVING part.
+  // The home loan is shown as its NOMINAL annual payment (mirroring the budget
+  // builder, the single source of truth for the goal) — NOT the simulation's
+  // today's-dollars-at-retirement value, so the two goal cards always agree. Because
+  // it's a fixed dollar payment its REAL cost eases over the retirement years, which
+  // the per-year income view reflects (a note below explains this).
   const goalFirstRow = preview.rows.find((r) => (r.spending ?? 0) > 0);
   const goalLiving = goalFirstRow?.breakdown.livingSpend ?? (Number.isFinite(previewSpend) ? previewSpend : 0);
   const goalEssentials = Math.min(essentialsFloor(draft, config), goalLiving);
   const goalDiscretionary = Math.max(0, goalLiving - goalEssentials);
-  const goalMortgage = goalFirstRow?.breakdown.mortgageCost ?? 0;
+  const goalMortgage = draft.mortgage && draft.mortgage.strategy === "carry" ? mortgageAnnualCost(draft.mortgage) : 0;
   const goalRent = goalFirstRow?.breakdown.rentCost ?? 0;
   const goalTotalSpend = goalLiving + goalMortgage + goalRent;
   const goalBreakdownParts = [
@@ -723,7 +727,13 @@ export default function PlanWizard({
           {draft.spendingMode === "stages" && (
             <div className="mt-0.5 text-xs text-muted">
               Living costs ease {fmtCurrency(draft.spendingStages.goGo)} → {fmtCurrency(draft.spendingStages.slowGo)} → {fmtCurrency(draft.spendingStages.noGo)} as you age
-              {goalMortgage > 0 ? "; the home loan sits on top until it's paid off" : ""}
+              {goalMortgage > 0 ? "; the home loan sits on top" : ""}
+            </div>
+          )}
+          {goalMortgage > 0 && (
+            <div className="mt-1 text-[11px] leading-snug text-muted">
+              Your {fmtCurrency(Math.round(goalMortgage))}/yr home loan is a fixed dollar payment, so its
+              real cost eases over the years — the year-by-year projection shows it a little lower.
             </div>
           )}
         </div>
