@@ -271,6 +271,40 @@ export default function PlanWizard({
           max={75}
           suffix="yrs"
         />
+        <div>
+          <div className="mb-1.5 text-sm font-medium text-slate-200">Sex <span className="font-normal text-muted">(optional)</span></div>
+          <Segmented
+            value={draft.people[i].sex ?? ""}
+            options={[
+              { value: "female", label: "Female" },
+              { value: "male", label: "Male" },
+              { value: "", label: "Rather not say" },
+            ]}
+            onChange={(v) =>
+              setDraft((prev) => ({
+                ...prev,
+                people: prev.people.map((p, idx) => (idx === i ? { ...p, sex: v === "" ? undefined : (v as "male" | "female") } : p)),
+              }))
+            }
+          />
+          <p className="mt-1.5 text-xs text-muted">Only for the longevity (&ldquo;Rich, Broke or Dead&rdquo;) survival view on the stress test — never the projection.</p>
+        </div>
+        <div className="sm:col-span-2">
+          <Field
+            label="Annual salary (excluding super)"
+            value={draft.people[i].salary}
+            onChange={setPerson(i, "salary")}
+            min={0}
+            max={500_000}
+            step={1000}
+            prefix="$"
+            hint={
+              Number.isFinite(draft.people[i].salary)
+                ? `Enter your base salary — your employer pays ${fmtCurrency(draft.people[i].salary * config.sgRate)}/yr super on top (${(config.sgRate * 100).toFixed(0)}% SG), so don't include it here.`
+                : `Enter your base salary before super — your employer adds ${(config.sgRate * 100).toFixed(0)}% on top (the Super Guarantee). If your package is quoted "including super", exclude that part.`
+            }
+          />
+        </div>
         {draft.superMode === "joint" && isCouple ? (
           i === 0 ? (
             <>
@@ -297,50 +331,18 @@ export default function PlanWizard({
             </>
           ) : null
         ) : (
-          <Field
-            label="Current super balance"
-            value={draft.people[i].superBalance}
-            onChange={setPerson(i, "superBalance")}
-            min={0}
-            max={3_000_000}
-            step={1000}
-            prefix="$"
-          />
+          <div className="sm:col-span-2">
+            <Field
+              label="Current super balance"
+              value={draft.people[i].superBalance}
+              onChange={setPerson(i, "superBalance")}
+              min={0}
+              max={3_000_000}
+              step={1000}
+              prefix="$"
+            />
+          </div>
         )}
-        <div className="sm:col-span-2">
-          <Field
-            label="Annual salary (excluding super)"
-            value={draft.people[i].salary}
-            onChange={setPerson(i, "salary")}
-            min={0}
-            max={500_000}
-            step={1000}
-            prefix="$"
-            hint={
-              Number.isFinite(draft.people[i].salary)
-                ? `Enter your base salary — your employer pays ${fmtCurrency(draft.people[i].salary * config.sgRate)}/yr super on top (${(config.sgRate * 100).toFixed(0)}% SG), so don't include it here.`
-                : `Enter your base salary before super — your employer adds ${(config.sgRate * 100).toFixed(0)}% on top (the Super Guarantee). If your package is quoted "including super", exclude that part.`
-            }
-          />
-        </div>
-        <div className="sm:col-span-2">
-          <div className="mb-1.5 text-sm font-medium text-slate-200">Sex <span className="font-normal text-muted">(optional)</span></div>
-          <Segmented
-            value={draft.people[i].sex ?? ""}
-            options={[
-              { value: "female", label: "Female" },
-              { value: "male", label: "Male" },
-              { value: "", label: "Rather not say" },
-            ]}
-            onChange={(v) =>
-              setDraft((prev) => ({
-                ...prev,
-                people: prev.people.map((p, idx) => (idx === i ? { ...p, sex: v === "" ? undefined : (v as "male" | "female") } : p)),
-              }))
-            }
-          />
-          <p className="mt-1.5 text-xs text-muted">Only used for the longevity (&ldquo;Rich, Broke or Dead&rdquo;) survival view on the stress test — never for the projection itself.</p>
-        </div>
       </div>
     ),
   });
