@@ -465,7 +465,13 @@ export default function BudgetBuilder({ plan, config, onApply, onProgress, onClo
         {/* Footer */}
         <div className="flex items-center justify-between gap-3 border-t border-line px-6 py-4">
           <button
-            onClick={() => (safeStep === 0 ? onClose() : setStep(safeStep - 1))}
+            onClick={() =>
+              safeStep === 0
+                ? onClose()
+                : currentKey === "goal"
+                  ? setStep(stepKeys.indexOf("setup")) // jump back to the start to edit the details
+                  : setStep(safeStep - 1)
+            }
             className="rounded-lg px-4 py-2 text-sm font-medium text-muted transition hover:text-white"
           >
             {safeStep === 0 ? "Cancel" : currentKey === "goal" ? "← Edit budget details" : "← Previous"}
