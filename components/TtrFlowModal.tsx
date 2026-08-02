@@ -130,13 +130,13 @@ function FlowDiagram({ f, mode }: { f: TtrFlow; mode: "with" | "without" }) {
   );
 }
 
-function WayBar({ label, sub, tax, taxColor, segs }: {
-  label: string; sub: string; tax: string; taxColor: string;
+function WayBar({ label, sub, tax, taxColor, segs, active = true }: {
+  label: string; sub: string; tax: string; taxColor: string; active?: boolean;
   segs: { w: number; fill: string; text: string; short?: string }[];
 }) {
   const total = segs.reduce((s, x) => s + x.w, 0) || 1;
   return (
-    <div className="rounded-xl border border-line bg-panel px-4 py-3">
+    <div className={`rounded-xl border bg-panel px-4 py-3 transition ${active ? "border-accent/50 ring-1 ring-accent/25" : "border-line opacity-45"}`}>
       <div className="flex items-baseline justify-between gap-3">
         <div className="text-sm font-semibold text-white">
           {label}
@@ -224,13 +224,20 @@ export default function TtrFlowModal({
         </div>
 
         <div className="space-y-5 overflow-y-auto px-6 py-5">
-          {/* outcome chips */}
+          {/* outcome chips — aligned to the selected mode */}
           <div className="grid grid-cols-3 gap-2.5">
-            {[
-              { k: "Take-home", v: cur(f.takeHome), s: "unchanged", c: C.cash },
-              { k: "Extra super", v: "+" + cur(f.superKept), s: "at no cost to pay", c: C.super },
-              { k: "Net tax saved", v: cur(f.taxSaved - f.contribTax), s: `${cur(f.taxSaved)} without TTR - ${cur(f.contribTax)} with TTR`, c: C.tax },
-            ].map((o) => (
+            {(mode === "with"
+              ? [
+                  { k: "Take-home", v: cur(f.takeHome), s: "unchanged", c: C.cash },
+                  { k: "Extra super", v: "+" + cur(f.superKept), s: "at no cost to pay", c: C.super },
+                  { k: "Net tax saved", v: cur(f.taxSaved - f.contribTax), s: `${cur(f.taxSaved)} without TTR - ${cur(f.contribTax)} with TTR`, c: C.tax },
+                ]
+              : [
+                  { k: "Take-home", v: cur(f.takeHome), s: "your pay", c: C.cash },
+                  { k: "Extra super", v: "$0", s: "nothing extra without TTR", c: C.super },
+                  { k: "Tax on the slice", v: cur(f.taxSaved), s: `at your ${f.marginalPct}% marginal rate`, c: C.tax },
+                ]
+            ).map((o) => (
               <div key={o.k} className="relative overflow-hidden rounded-xl border border-line bg-panel-2 px-3 py-2.5">
                 <span className="absolute inset-y-0 left-0 w-1" style={{ background: o.c }} />
                 <div className="text-[10.5px] font-semibold uppercase tracking-wide text-muted">{o.k}</div>
@@ -282,9 +289,11 @@ export default function TtrFlowModal({
             </div>
             <div className="space-y-2.5">
               <WayBar label="If you took it as salary" sub={`Taxed at your ${f.marginalPct}% marginal rate`}
+                active={mode === "without"}
                 tax={`${cur(f.taxSaved)} tax`} taxColor={C.tax}
                 segs={[{ w: f.taxSaved, fill: C.tax, text: `${cur(f.taxSaved)} tax` }, { w: asSalaryKeep, fill: C.cash, text: `${cur(asSalaryKeep)} in pocket` }]} />
               <WayBar label="Sacrificed via TTR" sub="Taxed at super's flat 15%"
+                active={mode === "with"}
                 tax={`${cur(f.contribTax)} tax`} taxColor={C.tax}
                 segs={[
                   { w: f.contribTax, fill: C.tax, text: `${cur(f.contribTax)} tax` },
