@@ -242,7 +242,11 @@ export default function TtrFlowModal({ flow, age, onClose }: { flow: TtrFlow; ag
                 segs={[{ w: f.taxSaved, fill: C.tax, text: `${cur(f.taxSaved)} tax` }, { w: asSalaryKeep, fill: C.cash, text: `${cur(asSalaryKeep)} in pocket` }]} />
               <WayBar label="Sacrificed via TTR" sub="Taxed at super's flat 15%"
                 tax={`${cur(f.contribTax)} tax`} taxColor={C.tax}
-                segs={[{ w: f.contribTax, fill: C.tax, text: `${cur(f.contribTax)} tax` }, { w: f.netToSuper, fill: C.super, text: `${cur(f.netToSuper)} into super` }]} />
+                segs={[
+                  { w: f.contribTax, fill: C.tax, text: `${cur(f.contribTax)} tax` },
+                  { w: f.pension, fill: C.cash, text: `${cur(f.pension)} in pocket` },
+                  { w: f.superKept, fill: C.super, text: `${cur(f.superKept)} super` },
+                ]} />
             </div>
             <p className="mt-3 rounded-xl border px-4 py-3 text-sm text-slate-200"
               style={{ borderColor: "#34d39955", background: "#34d39914" }}>
