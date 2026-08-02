@@ -16,6 +16,7 @@ import MonteCarloMark from "@/components/MonteCarloMark";
 import ReturnSeriesModal from "@/components/ReturnSeriesModal";
 import PlanWizard from "@/components/PlanWizard";
 import BudgetBuilder from "@/components/BudgetBuilder";
+import ScenarioNotesModal from "@/components/ScenarioNotesModal";
 import Field from "@/components/Field";
 import Logo from "@/components/Logo";
 import Disclosures from "@/components/Disclosures";
@@ -352,6 +353,10 @@ export default function PlannerApp({
   const [notice, setNotice] = useState<string | null>(null);
   const [nudgeDismissed, setNudgeDismissed] = useState(false);
   const [newScenarioOpen, setNewScenarioOpen] = useState(false);
+  const [notesOpen, setNotesOpen] = useState(false);
+  // Latest notes per saved scenario, so the modal reflects saves without a full
+  // router refresh (which would re-simulate). Keyed by plans-row id.
+  const [notesOverride, setNotesOverride] = useState<Record<string, string>>({});
   // Switching scenarios reloads + re-simulates the whole plan (a few seconds), so we
   // lock the page behind a spinner until the transition settles.
   const [switching, setSwitching] = useState(false);
@@ -1341,6 +1346,13 @@ export default function PlannerApp({
                 ⚖ Compare
                 <span aria-hidden>→</span>
               </Link>
+              <button
+                onClick={() => setNotesOpen(true)}
+                title="A summary of this scenario + your own notes"
+                className="rounded-lg border border-line bg-panel-2 px-3 py-1.5 text-sm font-medium text-slate-200 transition hover:border-accent/50 hover:text-white"
+              >
+                📝 Notes
+              </button>
               {renderIOButtons()}
               <button
                 onClick={() => handleDelete(activePlan)}
@@ -2299,6 +2311,21 @@ export default function PlannerApp({
           onApply={handleBudgetApply}
           onProgress={(update) => quickAdjust(update)}
           onClose={() => setBudgetOpen(false)}
+        />
+      )}
+
+      {notesOpen && activePlan && (
+        <ScenarioNotesModal
+          plan={plan}
+          config={config}
+          result={result}
+          successPct={successPct}
+          applied={applied}
+          scenarioId={activePlan.id}
+          scenarioName={activeName ?? activePlan.name}
+          initialNotes={notesOverride[activePlan.id] ?? activePlan.notes ?? ""}
+          onSaved={(notes) => setNotesOverride((m) => ({ ...m, [activePlan.id]: notes }))}
+          onClose={() => setNotesOpen(false)}
         />
       )}
 

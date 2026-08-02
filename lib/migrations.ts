@@ -68,6 +68,9 @@ create table if not exists plans (
 -- not shared). Anyone with the link can view; the owner revokes by nulling it.
 -- ALTER (not part of the create above) so existing databases pick it up too.
 alter table plans add column if not exists share_token text;
+-- Free-text notes the owner keeps on a scenario (kept OUT of share links / plan data,
+-- so they stay private). Edited from the "Scenario notes" modal on the scenario card.
+alter table plans add column if not exists notes text;
 
 -- The user's ACTIVE scenario — the named plan that continuous auto-save writes to,
 -- and which follows them across devices (replaces the per-user draft). Nulled if that

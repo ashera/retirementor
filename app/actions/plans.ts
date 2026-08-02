@@ -12,6 +12,7 @@ export interface SavedPlan {
   data: RetirementPlan;
   updated_at: string;
   share_token: string | null; // set → a public read-only link exists; null → not shared
+  notes?: string | null; // owner's private free-text notes (never included in share links)
 }
 
 export interface ActionResult {
@@ -24,7 +25,7 @@ export async function listPlans(): Promise<SavedPlan[]> {
   const user = await getCurrentUser();
   if (!user) return [];
   const r = await query<SavedPlan>(
-    "select id, name, data, updated_at, share_token from plans where user_id = $1 order by updated_at desc",
+    "select id, name, data, updated_at, share_token, notes from plans where user_id = $1 order by updated_at desc",
     [user.id],
   );
   return r.rows;
@@ -68,7 +69,7 @@ export async function getActivePlan(): Promise<SavedPlan | null> {
   const user = await getCurrentUser();
   if (!user) return null;
   const r = await query<SavedPlan>(
-    `select p.id, p.name, p.data, p.updated_at, p.share_token
+    `select p.id, p.name, p.data, p.updated_at, p.share_token, p.notes
        from users u join plans p on p.id = u.active_plan_id
       where u.id = $1`,
     [user.id],
@@ -196,6 +197,21 @@ export async function renameScenario(id: string, name: string): Promise<ActionRe
   );
   if (!r.rowCount) return { error: "Scenario not found." };
   revalidatePath("/");
+  return { ok: true, id };
+}
+
+/** Save the owner's private free-text notes for a scenario. Owner-scoped; does NOT
+ *  touch updated_at (notes aren't plan content, so they mustn't reorder scenarios or
+ *  shadow fresher local edits) and does NOT revalidate (background save from the
+ *  notes modal). Notes are never returned by the public share query. */
+export async function updateScenarioNotes(id: string, notes: string): Promise<ActionResult> {
+  const user = await getCurrentUser();
+  if (!user) return { error: "You need to be signed in." };
+  const r = await query(
+    "update plans set notes = $1 where id = $2 and user_id = $3",
+    [notes, id, user.id],
+  );
+  if (!r.rowCount) return { error: "Scenario not found." };
   return { ok: true, id };
 }
 
