@@ -131,7 +131,8 @@ function FlowDiagram({ f, mode }: { f: TtrFlow; mode: "with" | "without" }) {
 }
 
 function WayBar({ label, sub, tax, taxColor, segs }: {
-  label: string; sub: string; tax: string; taxColor: string; segs: { w: number; fill: string; text: string }[];
+  label: string; sub: string; tax: string; taxColor: string;
+  segs: { w: number; fill: string; text: string; short?: string }[];
 }) {
   const total = segs.reduce((s, x) => s + x.w, 0) || 1;
   return (
@@ -144,12 +145,18 @@ function WayBar({ label, sub, tax, taxColor, segs }: {
         <div className="shrink-0 text-sm font-bold tabular-nums" style={{ color: taxColor }}>{tax}</div>
       </div>
       <div className="mt-2.5 flex h-7 overflow-hidden rounded-lg border border-line">
-        {segs.map((s, i) => (
-          <div key={i} className="flex items-center whitespace-nowrap px-2 text-[11px] font-semibold text-black/85"
-            style={{ flexGrow: s.w, flexBasis: 0, background: s.fill }}>
-            {(s.w / total) * 100 > 13 ? s.text : ""}
-          </div>
-        ))}
+        {segs.map((s, i) => {
+          const pct = (s.w / total) * 100;
+          // Use the full label only when the segment is wide enough to fit it; fall
+          // back to a short label (or nothing) so text never clips.
+          const shown = pct <= 12 ? "" : s.short && pct < 21 ? s.short : s.text;
+          return (
+            <div key={i} className="flex items-center overflow-hidden whitespace-nowrap px-1.5 text-[10px] font-semibold text-black/85"
+              style={{ flexGrow: s.w, flexBasis: 0, background: s.fill }}>
+              {shown}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -188,7 +195,7 @@ export default function TtrFlowModal({ flow, age, onClose }: { flow: TtrFlow; ag
             {[
               { k: "Take-home", v: cur(f.takeHome), s: "unchanged", c: C.cash },
               { k: "Extra super", v: "+" + cur(f.superKept), s: "at no cost to pay", c: C.super },
-              { k: "Net tax saved", v: cur(f.taxSaved - f.contribTax), s: `${cur(f.taxSaved)} − ${cur(f.contribTax)} super tax`, c: C.tax },
+              { k: "Net tax saved", v: cur(f.taxSaved - f.contribTax), s: `${cur(f.taxSaved)} without TTR - ${cur(f.contribTax)} with TTR`, c: C.tax },
             ].map((o) => (
               <div key={o.k} className="relative overflow-hidden rounded-xl border border-line bg-panel-2 px-3 py-2.5">
                 <span className="absolute inset-y-0 left-0 w-1" style={{ background: o.c }} />
@@ -244,8 +251,8 @@ export default function TtrFlowModal({ flow, age, onClose }: { flow: TtrFlow; ag
                 tax={`${cur(f.contribTax)} tax`} taxColor={C.tax}
                 segs={[
                   { w: f.contribTax, fill: C.tax, text: `${cur(f.contribTax)} tax` },
-                  { w: f.pension, fill: C.cash, text: `${cur(f.pension)} in pocket` },
-                  { w: f.superKept, fill: C.super, text: `${cur(f.superKept)} super` },
+                  { w: f.pension, fill: C.cash, text: `${cur(f.pension)} in pocket from TTR pension`, short: `${cur(f.pension)} in pocket` },
+                  { w: f.superKept, fill: C.super, text: `${cur(f.superKept)} stays in super`, short: `${cur(f.superKept)} super` },
                 ]} />
             </div>
             <p className="mt-3 rounded-xl border px-4 py-3 text-sm text-slate-200"
