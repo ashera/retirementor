@@ -20,7 +20,7 @@ type Span = { l0: number; l1: number; r0: number; r1: number };
  *  mostly returns as a tax-free TTR pension (mint) to take-home, a little stays in
  *  super (green), a sliver is tax (rose); the rest of pay funds tax + take-home. */
 function FlowDiagram({ f, mode }: { f: TtrFlow; mode: "with" | "without" }) {
-  const W = 720, H = 344, top = 56, bottom = 22, gap = 16;
+  const W = 720, H = 216, top = 42, bottom = 13, gap = 12;
   const usable = H - top - bottom;
   const scale = (usable - 2 * gap) / f.salary; // same scale both modes → take-home node stays put
   const LX = 132, LW = 15, RX = 566, RW = 15;
@@ -130,21 +130,18 @@ function FlowDiagram({ f, mode }: { f: TtrFlow; mode: "with" | "without" }) {
   );
 }
 
-function WayBar({ label, sub, tax, taxColor, segs, active = true }: {
-  label: string; sub: string; tax: string; taxColor: string; active?: boolean;
+function WayBar({ label, tax, taxColor, segs, active = true }: {
+  label: string; tax: string; taxColor: string; active?: boolean;
   segs: { w: number; fill: string; text: string; short?: string }[];
 }) {
   const total = segs.reduce((s, x) => s + x.w, 0) || 1;
   return (
-    <div className={`rounded-xl border bg-panel px-4 py-3 transition ${active ? "border-accent/50 ring-1 ring-accent/25" : "border-line opacity-45"}`}>
+    <div className={`rounded-xl border bg-panel px-4 py-1.5 transition ${active ? "border-accent/50 ring-1 ring-accent/25" : "border-line opacity-45"}`}>
       <div className="flex items-baseline justify-between gap-3">
-        <div className="text-sm font-semibold text-white">
-          {label}
-          <span className="block text-[11px] font-normal text-muted">{sub}</span>
-        </div>
+        <div className="text-sm font-semibold text-white">{label}</div>
         <div className="shrink-0 text-sm font-bold tabular-nums" style={{ color: taxColor }}>{tax}</div>
       </div>
-      <div className="mt-2.5 flex h-7 overflow-hidden rounded-lg border border-line">
+      <div className="mt-1 flex h-6 overflow-hidden rounded-lg border border-line">
         {segs.map((s, i) => {
           const pct = (s.w / total) * 100;
           // Use the full label only when the segment is wide enough to fit it; fall
@@ -197,13 +194,12 @@ export default function TtrFlowModal({
 
   const asSalaryKeep = f.slice - f.taxSaved; // in-pocket if taken as salary (= the pension amount)
   const [mode, setMode] = useState<"with" | "without">("with");
-  const taxWithout = f.incomeTax + f.taxSaved;
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" role="dialog" aria-modal="true">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
       <div className="relative z-10 flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-line bg-panel shadow-2xl">
-        <div className="flex items-start justify-between gap-4 border-b border-line px-6 py-4">
+        <div className="flex items-start justify-between gap-4 border-b border-line px-6 py-3">
           <div>
             <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-accent">Transition to Retirement</div>
             <h2 className="mt-0.5 text-lg font-bold text-white">
@@ -223,9 +219,9 @@ export default function TtrFlowModal({
           </div>
         </div>
 
-        <div className="space-y-5 overflow-y-auto px-6 py-5">
+        <div className="space-y-3 overflow-y-auto px-6 py-3.5">
           {/* outcome chips — aligned to the selected mode */}
-          <div className="grid grid-cols-3 gap-2.5">
+          <div className="grid grid-cols-3 gap-2">
             {(mode === "with"
               ? [
                   { k: "Take-home", v: cur(f.takeHome), s: "unchanged", c: C.cash },
@@ -238,28 +234,30 @@ export default function TtrFlowModal({
                   { k: "Tax on the slice", v: cur(f.taxSaved), s: `at your ${f.marginalPct}% marginal rate`, c: C.tax },
                 ]
             ).map((o) => (
-              <div key={o.k} className="relative overflow-hidden rounded-xl border border-line bg-panel-2 px-3 py-2.5">
+              <div key={o.k} className="relative overflow-hidden rounded-xl border border-line bg-panel-2 px-3 py-1.5">
                 <span className="absolute inset-y-0 left-0 w-1" style={{ background: o.c }} />
                 <div className="text-[10.5px] font-semibold uppercase tracking-wide text-muted">{o.k}</div>
-                <div className="mt-1 text-lg font-extrabold tabular-nums text-white">{o.v}</div>
-                <div className="text-[11px] text-muted">{o.s}</div>
+                <div className="mt-0.5 text-lg font-extrabold tabular-nums text-white">{o.v}</div>
+                <div className="text-[11px] leading-tight text-muted">{o.s}</div>
               </div>
             ))}
           </div>
 
           {/* flow */}
           <div>
-            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Where the money goes</h3>
+            <div className="mb-1.5 flex items-center justify-between gap-2">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">Where the money goes</h3>
+            </div>
             {/* Prominent compare toggle — both options styled as real buttons so it's
                 obvious you can switch the flow between with / without TTR. */}
-            <div className="mb-2 flex items-center gap-1.5 rounded-xl border border-accent/40 bg-accent/[0.06] p-1.5">
+            <div className="mb-1.5 flex items-center gap-1.5 rounded-xl border border-accent/40 bg-accent/[0.06] p-1">
               <span className="hidden pl-1 pr-0.5 text-[11px] font-semibold uppercase tracking-wide text-accent sm:inline">Compare</span>
               {([["without", "Without TTR"], ["with", "With TTR"]] as const).map(([v, label]) => (
                 <button
                   key={v}
                   onClick={() => setMode(v)}
                   aria-pressed={mode === v}
-                  className={`flex-1 rounded-lg px-3 py-2 text-sm font-bold transition ${
+                  className={`flex-1 rounded-lg px-3 py-1.5 text-sm font-bold transition ${
                     mode === v
                       ? "bg-accent text-ink shadow"
                       : "border border-line bg-panel-2 text-slate-200 hover:border-accent/60 hover:text-white"
@@ -269,30 +267,23 @@ export default function TtrFlowModal({
                 </button>
               ))}
             </div>
-            <div className="overflow-x-auto rounded-xl border border-line bg-panel-2 p-2">
+            <div className="overflow-x-auto rounded-xl border border-line bg-panel-2 p-1.5">
               <FlowDiagram f={f} mode={mode} />
             </div>
-            <p className="mt-2 text-[11px] leading-snug text-muted">
-              {mode === "without" ? (
-                <>Without TTR the whole {cur(f.salary)} is taxable — {cur(taxWithout)} goes to tax. Switch to <b className="text-white">With TTR</b> to see {cur(f.taxSaved - f.contribTax)} of it redirected into super instead.</>
-              ) : (
-                <>The {cur(f.slice)} slice is taxed at 15% and mostly returns as a tax-free pension — so tax drops by {cur(taxWithout - (f.incomeTax + f.contribTax))} and that lands in super, take-home unchanged.</>
-              )}
-            </p>
           </div>
 
           {/* two ways */}
           <div>
-            <div className="mb-1.5 flex items-baseline justify-between">
+            <div className="mb-1 flex items-baseline justify-between">
               <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">The {cur(f.slice)} slice, two ways</h3>
               <span className="text-[11px] text-muted">your {f.marginalPct}% rate vs super's 15%</span>
             </div>
-            <div className="space-y-2.5">
-              <WayBar label="If you took it as salary" sub={`Taxed at your ${f.marginalPct}% marginal rate`}
+            <div className="space-y-2">
+              <WayBar label="If you took it as salary"
                 active={mode === "without"}
                 tax={`${cur(f.taxSaved)} tax`} taxColor={C.tax}
                 segs={[{ w: f.taxSaved, fill: C.tax, text: `${cur(f.taxSaved)} tax` }, { w: asSalaryKeep, fill: C.cash, text: `${cur(asSalaryKeep)} in pocket` }]} />
-              <WayBar label="Sacrificed via TTR" sub="Taxed at super's flat 15%"
+              <WayBar label="Sacrificed via TTR"
                 active={mode === "with"}
                 tax={`${cur(f.contribTax)} tax`} taxColor={C.tax}
                 segs={[
@@ -301,19 +292,13 @@ export default function TtrFlowModal({
                   { w: f.superKept, fill: C.super, text: `${cur(f.superKept)} stays in super`, short: `${cur(f.superKept)} super` },
                 ]} />
             </div>
-            <p className="mt-3 rounded-xl border px-4 py-3 text-sm text-slate-200"
+            <p className="mt-2 rounded-xl border px-4 py-2 text-[12.5px] leading-snug text-slate-200"
               style={{ borderColor: "#34d39955", background: "#34d39914" }}>
-              Same <b style={{ color: C.cash }}>{cur(f.slice)}</b> either way — but the tax drops from {cur(f.taxSaved)} to {cur(f.contribTax)}.
-              That <b style={{ color: C.super }}>{cur(f.taxSaved - f.contribTax)}</b> gap is exactly the extra that stays in super, while a
-              {" "}{cur(f.pension)} tax-free pension keeps your take-home whole.
+              Same <b style={{ color: C.cash }}>{cur(f.slice)}</b> either way — tax drops from {cur(f.taxSaved)} to {cur(f.contribTax)}; that{" "}
+              <b style={{ color: C.super }}>{cur(f.taxSaved - f.contribTax)}</b> stays in super and a {cur(f.pension)} tax-free pension holds your take-home.
+              <span className="text-muted"> Today&apos;s dollars; general info, not advice.</span>
             </p>
           </div>
-
-          <p className="text-[11px] leading-snug text-muted">
-            The sacrificed slice raises your concessional super contribution (taxed 15%) and lowers your assessable income, so income tax and
-            the 2% Medicare levy fall. A tax-free TTR pension equal to the slice's after-tax value is drawn from super to hold your take-home,
-            leaving the tax saved (net of the 15%) as extra super. Today's dollars; general information, not financial advice.
-          </p>
         </div>
       </div>
     </div>
