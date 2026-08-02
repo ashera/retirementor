@@ -147,7 +147,7 @@ function WayBar({ label, sub, tax, taxColor, segs }: {
         {segs.map((s, i) => (
           <div key={i} className="flex items-center whitespace-nowrap px-2 text-[11px] font-semibold text-black/85"
             style={{ flexGrow: s.w, flexBasis: 0, background: s.fill }}>
-            {(s.w / total) * 100 > 17 ? s.text : ""}
+            {(s.w / total) * 100 > 13 ? s.text : ""}
           </div>
         ))}
       </div>
@@ -239,10 +239,10 @@ export default function TtrFlowModal({ flow, age, onClose }: { flow: TtrFlow; ag
             <div className="space-y-2.5">
               <WayBar label="If you took it as salary" sub={`Taxed at your ${f.marginalPct}% marginal rate`}
                 tax={`${cur(f.taxSaved)} tax`} taxColor={C.tax}
-                segs={[{ w: f.taxSaved, fill: C.tax, text: `tax ${cur(f.taxSaved)}` }, { w: asSalaryKeep, fill: C.cash, text: `${cur(asSalaryKeep)} in pocket` }]} />
+                segs={[{ w: f.taxSaved, fill: C.tax, text: `${cur(f.taxSaved)} tax` }, { w: asSalaryKeep, fill: C.cash, text: `${cur(asSalaryKeep)} in pocket` }]} />
               <WayBar label="Sacrificed via TTR" sub="Taxed at super's flat 15%"
-                tax={`${cur(f.contribTax)} tax`} taxColor={C.super}
-                segs={[{ w: f.contribTax, fill: C.tax, text: `tax ${cur(f.contribTax)}` }, { w: f.netToSuper, fill: C.super, text: `${cur(f.netToSuper)} into super` }]} />
+                tax={`${cur(f.contribTax)} tax`} taxColor={C.tax}
+                segs={[{ w: f.contribTax, fill: C.tax, text: `${cur(f.contribTax)} tax` }, { w: f.netToSuper, fill: C.super, text: `${cur(f.netToSuper)} into super` }]} />
             </div>
             <p className="mt-3 rounded-xl border px-4 py-3 text-sm text-slate-200"
               style={{ borderColor: "#34d39955", background: "#34d39914" }}>
