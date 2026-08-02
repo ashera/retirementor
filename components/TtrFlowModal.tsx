@@ -208,22 +208,25 @@ export default function TtrFlowModal({ flow, age, onClose }: { flow: TtrFlow; ag
 
           {/* flow */}
           <div>
-            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">Where the money goes</h3>
-              <div className="flex gap-1 rounded-lg border border-line bg-panel-2 p-1 text-xs">
-                {([["without", "Without TTR"], ["with", "With TTR"]] as const).map(([v, label]) => (
-                  <button
-                    key={v}
-                    onClick={() => setMode(v)}
-                    aria-pressed={mode === v}
-                    className={`rounded-md px-2.5 py-1 font-semibold transition ${
-                      mode === v ? "bg-accent text-ink" : "text-muted hover:text-white"
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
+            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Where the money goes</h3>
+            {/* Prominent compare toggle — both options styled as real buttons so it's
+                obvious you can switch the flow between with / without TTR. */}
+            <div className="mb-2 flex items-center gap-1.5 rounded-xl border border-accent/40 bg-accent/[0.06] p-1.5">
+              <span className="hidden pl-1 pr-0.5 text-[11px] font-semibold uppercase tracking-wide text-accent sm:inline">Compare</span>
+              {([["without", "Without TTR"], ["with", "With TTR"]] as const).map(([v, label]) => (
+                <button
+                  key={v}
+                  onClick={() => setMode(v)}
+                  aria-pressed={mode === v}
+                  className={`flex-1 rounded-lg px-3 py-2 text-sm font-bold transition ${
+                    mode === v
+                      ? "bg-accent text-ink shadow"
+                      : "border border-line bg-panel-2 text-slate-200 hover:border-accent/60 hover:text-white"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
             <div className="overflow-x-auto rounded-xl border border-line bg-panel-2 p-2">
               <FlowDiagram f={f} mode={mode} />
