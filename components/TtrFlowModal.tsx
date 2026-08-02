@@ -188,7 +188,7 @@ export default function TtrFlowModal({ flow, age, onClose }: { flow: TtrFlow; ag
             {[
               { k: "Take-home", v: cur(f.takeHome), s: "unchanged", c: C.cash },
               { k: "Extra super", v: "+" + cur(f.superKept), s: "at no cost to pay", c: C.super },
-              { k: "Income tax saved", v: cur(f.taxSaved), s: `on the slice`, c: C.tax },
+              { k: "Net tax saved", v: cur(f.taxSaved - f.contribTax), s: `${cur(f.taxSaved)} − ${cur(f.contribTax)} super tax`, c: C.tax },
             ].map((o) => (
               <div key={o.k} className="relative overflow-hidden rounded-xl border border-line bg-panel-2 px-3 py-2.5">
                 <span className="absolute inset-y-0 left-0 w-1" style={{ background: o.c }} />
