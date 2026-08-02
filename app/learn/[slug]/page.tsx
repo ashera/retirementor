@@ -66,7 +66,7 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
             Follow one year&apos;s money — the slice you sacrifice, the tax-free pension that returns it, and the tax
             you save — in an interactive flow-of-funds diagram.
           </p>
-          <TtrFlowButton flow={TTR_FLOW_EXAMPLE} label="See the flow of funds →" />
+          <TtrFlowButton flows={[{ age: 60, flow: TTR_FLOW_EXAMPLE }]} label="See the flow of funds →" />
         </section>
       )}
 

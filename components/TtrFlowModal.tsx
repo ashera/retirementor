@@ -162,15 +162,39 @@ function WayBar({ label, sub, tax, taxColor, segs }: {
   );
 }
 
-/** Reusable modal explaining the flow of funds + tax advantage of a TTR year. */
-export default function TtrFlowModal({ flow, age, onClose }: { flow: TtrFlow; age?: number; onClose: () => void }) {
+/** Reusable modal explaining the flow of funds + tax advantage of a TTR year. Given
+ *  a list of TTR-active years, the user can step ← / → between them (like the income
+ *  and balance year modals). */
+export default function TtrFlowModal({
+  flows,
+  initialAge,
+  onClose,
+}: {
+  flows: { age?: number; flow: TtrFlow }[];
+  initialAge?: number;
+  onClose: () => void;
+}) {
+  const [i, setI] = useState(() => {
+    const idx = flows.findIndex((x) => x.age === initialAge);
+    return idx >= 0 ? idx : 0;
+  });
+  const idx = Math.min(i, flows.length - 1);
+  const f = flows[idx].flow;
+  const age = flows[idx].age;
+  const canPrev = idx > 0;
+  const canNext = idx < flows.length - 1;
+  const go = (d: number) => setI((n) => Math.max(0, Math.min(flows.length - 1, n + d)));
+
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+      else if (e.key === "ArrowLeft" && canPrev) go(-1);
+      else if (e.key === "ArrowRight" && canNext) go(1);
+    };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, [onClose, canPrev, canNext]);
 
-  const f = flow;
   const asSalaryKeep = f.slice - f.taxSaved; // in-pocket if taken as salary (= the pension amount)
   const [mode, setMode] = useState<"with" | "without">("with");
   const taxWithout = f.incomeTax + f.taxSaved;
@@ -183,10 +207,20 @@ export default function TtrFlowModal({ flow, age, onClose }: { flow: TtrFlow; ag
           <div>
             <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-accent">Transition to Retirement</div>
             <h2 className="mt-0.5 text-lg font-bold text-white">
-              Same take-home. More super. Less tax.{age ? <span className="text-sm font-normal text-muted"> · age {age}</span> : null}
+              Same take-home. More super. Less tax.{age != null ? <span className="text-sm font-normal text-muted"> · age {age}</span> : null}
             </h2>
           </div>
-          <button onClick={onClose} className="rounded-lg px-2 py-1 text-xl leading-none text-muted transition hover:text-white" aria-label="Close">×</button>
+          <div className="flex items-center gap-1">
+            {flows.length > 1 && (
+              <>
+                <button onClick={() => go(-1)} disabled={!canPrev} title="Previous year" aria-label="Previous TTR year"
+                  className="rounded-lg px-2 py-1 text-muted transition hover:text-white disabled:opacity-30">←</button>
+                <button onClick={() => go(1)} disabled={!canNext} title="Next year" aria-label="Next TTR year"
+                  className="rounded-lg px-2 py-1 text-muted transition hover:text-white disabled:opacity-30">→</button>
+              </>
+            )}
+            <button onClick={onClose} className="rounded-lg px-2 py-1 text-xl leading-none text-muted transition hover:text-white" aria-label="Close">×</button>
+          </div>
         </div>
 
         <div className="space-y-5 overflow-y-auto px-6 py-5">

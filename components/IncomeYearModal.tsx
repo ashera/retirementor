@@ -2,8 +2,8 @@
 
 import { fmtCurrency } from "@/lib/au/format";
 import { minDrawdownRate, type EngineConfig } from "@/lib/au/config";
-import { getInvestmentProperties, getLifeEvents, type RetirementPlan, type YearRow } from "@/lib/au/types";
-import { ttrFlowFromRow } from "@/lib/au/ttrFlow";
+import { getInvestmentProperties, getLifeEvents, type RetirementPlan, type SimResult, type YearRow } from "@/lib/au/types";
+import { ttrFlowFromRow, ttrFlowsFromResult } from "@/lib/au/ttrFlow";
 import TtrFlowButton from "@/components/TtrFlowButton";
 import InfoTip from "@/components/InfoTip";
 import { netRentCash, propertyValueAt } from "@/lib/au/property";
@@ -48,6 +48,7 @@ export default function IncomeYearModal({
   row,
   plan,
   config,
+  result,
   onClose,
   onPrev,
   onNext,
@@ -57,6 +58,7 @@ export default function IncomeYearModal({
   row: YearRow;
   plan: RetirementPlan;
   config: EngineConfig;
+  result: SimResult;
   onClose: () => void;
   onPrev: () => void;
   onNext: () => void;
@@ -383,7 +385,7 @@ export default function IncomeYearModal({
                 </p>
                 {ttrPension > 0 && (
                   <div className="mt-3">
-                    <TtrFlowButton flow={ttrFlow} age={row.age} label="See the Transition to Retirement flow →" />
+                    <TtrFlowButton flows={ttrFlowsFromResult(result, config.contributionsTax)} initialAge={row.age} label="See the Transition to Retirement flow →" />
                   </div>
                 )}
               </section>

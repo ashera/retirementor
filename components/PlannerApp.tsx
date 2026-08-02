@@ -2368,6 +2368,7 @@ export default function PlannerApp({
               row={row}
               plan={plan}
               config={config}
+              result={result}
               onClose={() => setIncomeAge(null)}
               onPrev={() => setIncomeAge((a) => (a != null ? Math.max(min, a - 1) : a))}
               onNext={() => setIncomeAge((a) => (a != null ? Math.min(max, a + 1) : a))}

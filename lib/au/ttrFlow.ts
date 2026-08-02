@@ -4,7 +4,7 @@
 // sacrificed slice: the net contribution into super is (1 − 15%)·slice, and that
 // equals ttrBenefit (kept in super) + ttrPension (drawn back out to hold take-home).
 
-import type { YearRow } from "./types";
+import type { SimResult, YearRow } from "./types";
 
 export interface TtrFlow {
   salary: number; // gross wage(s) the year is built on (household in a couple)
@@ -40,6 +40,17 @@ export function ttrFlowFromRow(row: YearRow, contribTaxRate: number = DEFAULT_CO
   const incomeTax = Math.max(0, taxablePay - salaryTakeHome);
   const marginalPct = slice > 0 ? Math.round((taxSaved / slice) * 100) : 0;
   return { salary, slice, contribTax, netToSuper, taxablePay, incomeTax, salaryTakeHome, pension, superKept, takeHome, taxSaved, marginalPct };
+}
+
+/** Every TTR-active year of a projection, oldest→youngest by age, as navigable
+ *  flows for the flow-of-funds modal (so the user can step ← / → through the years). */
+export function ttrFlowsFromResult(result: SimResult, contribTaxRate?: number): { age: number; flow: TtrFlow }[] {
+  const out: { age: number; flow: TtrFlow }[] = [];
+  for (const row of result.rows) {
+    const flow = ttrFlowFromRow(row, contribTaxRate);
+    if (flow) out.push({ age: row.age, flow });
+  }
+  return out;
 }
 
 /** A representative example (a $130k earner sacrificing $15k at 60), for the

@@ -4,21 +4,22 @@ import { useState } from "react";
 import type { TtrFlow } from "@/lib/au/ttrFlow";
 import TtrFlowModal from "@/components/TtrFlowModal";
 
-/** A button that opens the reusable TTR flow-of-funds diagram. Renders nothing when
- *  there's no TTR flow to show (e.g. a year with no active TTR). */
+/** A button that opens the reusable TTR flow-of-funds diagram. Pass the TTR-active
+ *  years' flows; the modal opens on `initialAge` and lets the user step between them.
+ *  Renders nothing when there are no TTR flows to show. */
 export default function TtrFlowButton({
-  flow,
-  age,
+  flows,
+  initialAge,
   label = "See the flow of funds →",
   className,
 }: {
-  flow: TtrFlow | null | undefined;
-  age?: number;
+  flows: { age?: number; flow: TtrFlow }[] | null | undefined;
+  initialAge?: number;
   label?: string;
   className?: string;
 }) {
   const [open, setOpen] = useState(false);
-  if (!flow) return null;
+  if (!flows || flows.length === 0) return null;
   return (
     <>
       <button
@@ -31,7 +32,7 @@ export default function TtrFlowButton({
       >
         {label}
       </button>
-      {open && <TtrFlowModal flow={flow} age={age} onClose={() => setOpen(false)} />}
+      {open && <TtrFlowModal flows={flows} initialAge={initialAge} onClose={() => setOpen(false)} />}
     </>
   );
 }
