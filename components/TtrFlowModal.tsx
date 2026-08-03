@@ -225,7 +225,7 @@ export default function TtrFlowModal({
             {(mode === "with"
               ? [
                   { k: "Take-home", v: cur(f.takeHome), s: "unchanged", c: C.cash },
-                  { k: "Extra super", v: "+" + cur(f.superKept), s: "at no cost to pay", c: C.super },
+                  { k: "Extra super", v: "+" + cur(f.superKept), s: "at no cost to take home pay", c: C.super },
                   { k: "Net tax saved", v: cur(f.taxSaved - f.contribTax), s: `${cur(f.taxSaved)} without TTR - ${cur(f.contribTax)} with TTR`, c: C.tax },
                 ]
               : [
