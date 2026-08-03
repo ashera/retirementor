@@ -205,6 +205,9 @@ export default function TtrFlowModal({
             <h2 className="mt-0.5 text-lg font-bold text-white">
               Same take-home. More super. Less tax.{age != null ? <span className="text-sm font-normal text-muted"> · age {age}</span> : null}
             </h2>
+            <p className="mt-0.5 text-xs text-muted">
+              The <b className="font-semibold text-slate-200">{cur(f.slice)} slice</b> is the extra you salary-sacrifice into super (a concessional contribution) via TTR.
+            </p>
           </div>
           <div className="flex items-center gap-1">
             {flows.length > 1 && (
