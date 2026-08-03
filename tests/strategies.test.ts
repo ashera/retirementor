@@ -194,6 +194,21 @@ describe("What-If strategies", () => {
     expect(buildStrategyCatalog(retired).some((c) => c.id === "ttr")).toBe(false);
   });
 
+  it("TTR extra-sacrifice is capped at the remaining concessional room, and the note states it", () => {
+    // $130k salary, no voluntary → SG uses part of the cap; the rest is the max TTR top-up.
+    const p = base({ people: [{ currentAge: 60, superBalance: 400_000, salary: 130_000, voluntaryConcessional: 0, voluntaryNonConcessional: 0 }], retirementAge: 65 });
+    const ttr = cardById(p, "ttr");
+    const extra = ttr.params.find((x) => x.key === "extra")!;
+    const room = cfg.concessionalCap - 130_000 * cfg.sgRate; // cap − SG
+    expect(extra.dynamicMax!({ extra: 30_000 })).toBeCloseTo(room, 0);
+    expect(ttr.note({ extra: 15_000 })).toMatch(/concessional room left|most you can add/i);
+
+    // Voluntary salary sacrifice eats further into the cap → less TTR room.
+    const p2 = base({ people: [{ currentAge: 60, superBalance: 400_000, salary: 130_000, voluntaryConcessional: 5_000, voluntaryNonConcessional: 0 }], retirementAge: 65 });
+    const extra2 = cardById(p2, "ttr").params.find((x) => x.key === "extra")!;
+    expect(extra2.dynamicMax!({ extra: 30_000 })).toBeCloseTo(room - 5_000, 0);
+  });
+
   it("maxSustainableSpend finds the highest spend that still lasts to life expectancy", () => {
     const b = base({ targetSpending: 90_000, lifeExpectancy: 90 });
     const s = maxSustainableSpend(b, cfg);

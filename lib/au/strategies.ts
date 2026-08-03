@@ -12,7 +12,7 @@ import { budgetSplit, presetCategories } from "./budget";
 import { incomeTax, medicareLevy } from "./tax";
 import { simulate } from "./simulate";
 import { runMonteCarlo } from "./montecarlo";
-import type { EngineConfig } from "./config";
+import { DEFAULT_CONFIG, type EngineConfig } from "./config";
 
 export type StrategyGroup = "home" | "mortgage" | "property" | "timing" | "work";
 
@@ -820,13 +820,22 @@ export function buildStrategyCatalog(
       const taxSaved = incomeTax(taxable) - incomeTax(lower) + (medicareLevy(taxable) - medicareLevy(lower));
       return Math.max(0, taxSaved - extra * 0.15);
     };
+    // Remaining concessional-cap room this year for a person = cap − (SG + any
+    // voluntary sacrifice). The TTR top-up can't exceed it, so it's the max they can
+    // add — used to cap the slider and shown in the note.
+    const ttrCfg = opts?.config ?? DEFAULT_CONFIG;
+    const cap = ttrCfg.concessionalCap;
+    const roomLeft = (i: number) =>
+      Math.max(0, cap - Math.min(plan.people[i].salary * ttrCfg.sgRate + plan.people[i].voluntaryConcessional, cap));
     cards.push({
       id: "ttr",
       group: "timing",
       label: "Transition to Retirement",
       blurb: "From age 60 you can salary-sacrifice more and draw a tax-free TTR pension to replace the pay you give up — shifting income from your marginal rate down to 15% tax. Take-home holds; the tax saved builds super. In a couple, each partner who keeps working past 60 can run their own.",
       params: [
-        { key: "extra", label: "Extra sacrifice via TTR", min: 0, max: 30_000, step: 1_000, default: 15_000, prefix: "$", suffix: "/yr" },
+        { key: "extra", label: "Extra sacrifice via TTR", min: 0, max: 30_000, step: 1_000, default: 15_000, prefix: "$", suffix: "/yr",
+          // Can't exceed the largest remaining concessional room among the TTR earners.
+          dynamicMax: (v) => Math.max(0, ...resolveWho(v).map(roomLeft)) },
         ...(bothWork
           ? [
               {
@@ -854,7 +863,10 @@ export function buildStrategyCatalog(
         const partnerOnly = !both && who[0] === 1;
         const whoTxt = !isCouple ? "" : both ? " (both of you)" : partnerOnly ? " (your partner)" : " (you)";
         const retireTxt = both ? "each of you retires" : partnerOnly ? "your partner retires" : "you retire";
-        return `From age 60 until ${retireTxt}: take-home unchanged, about ${fmtCurrency(benefit)}/yr of tax saving into super${whoTxt} (each capped at the concessional limit). Pairs with working past 60.`;
+        const roomTxt = both
+          ? `Concessional room left this year — you ${fmtCurrency(roomLeft(who[0]))}, partner ${fmtCurrency(roomLeft(who[1]))} (of the ${fmtCurrency(cap)} cap, after SG).`
+          : `${who[0] === 1 ? "Your partner has" : "You have"} ${fmtCurrency(roomLeft(who[0]))} of concessional room left (of the ${fmtCurrency(cap)} cap, after SG${plan.people[who[0]].voluntaryConcessional > 0 ? " + salary sacrifice" : ""}) — the most you can add via TTR.`;
+        return `From age 60 until ${retireTxt}: take-home unchanged, about ${fmtCurrency(benefit)}/yr of tax saving into super${whoTxt}. ${roomTxt} Pairs with working past 60.`;
       },
       apply: (p, v) => ({ ...p, ttr: { extraSacrifice: v.extra, who: resolveWho(v) } }),
     });
