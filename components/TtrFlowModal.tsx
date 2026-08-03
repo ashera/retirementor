@@ -20,7 +20,7 @@ type Span = { l0: number; l1: number; r0: number; r1: number };
  *  mostly returns as a tax-free TTR pension (mint) to take-home, a little stays in
  *  super (green), a sliver is tax (rose); the rest of pay funds tax + take-home. */
 function FlowDiagram({ f, mode }: { f: TtrFlow; mode: "with" | "without" }) {
-  const W = 720, H = 216, top = 42, bottom = 13, gap = 12;
+  const W = 720, H = 262, top = 44, bottom = 14, gap = 13;
   const usable = H - top - bottom;
   const scale = (usable - 2 * gap) / f.salary; // same scale both modes → take-home node stays put
   const LX = 132, LW = 15, RX = 566, RW = 15;
@@ -234,11 +234,13 @@ export default function TtrFlowModal({
                   { k: "Tax on the slice", v: cur(f.taxSaved), s: `at your ${f.marginalPct}% marginal rate`, c: C.tax },
                 ]
             ).map((o) => (
-              <div key={o.k} className="relative overflow-hidden rounded-xl border border-line bg-panel-2 px-3 py-1.5">
+              <div key={o.k} className="relative overflow-hidden rounded-xl border border-line bg-panel-2 py-1.5 pl-3.5 pr-3">
                 <span className="absolute inset-y-0 left-0 w-1" style={{ background: o.c }} />
-                <div className="text-[10.5px] font-semibold uppercase tracking-wide text-muted">{o.k}</div>
-                <div className="mt-0.5 text-lg font-extrabold tabular-nums text-white">{o.v}</div>
-                <div className="text-[11px] leading-tight text-muted">{o.s}</div>
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-muted">{o.k}</span>
+                  <span className="text-[17px] font-extrabold leading-none tabular-nums text-white">{o.v}</span>
+                </div>
+                <div className="mt-0.5 text-[10px] leading-tight text-muted">{o.s}</div>
               </div>
             ))}
           </div>
