@@ -825,15 +825,18 @@ export function buildStrategyCatalog(
     // add — used to cap the slider and shown in the note.
     const ttrCfg = opts?.config ?? DEFAULT_CONFIG;
     const cap = ttrCfg.concessionalCap;
-    const roomLeft = (i: number) =>
-      Math.max(0, cap - Math.min(plan.people[i].salary * ttrCfg.sgRate + plan.people[i].voluntaryConcessional, cap));
+    const TTR_STEP = 100; // the slider step; round the room to it so the max is reachable and the note matches
+    const roomLeft = (i: number) => {
+      const raw = Math.max(0, cap - Math.min(plan.people[i].salary * ttrCfg.sgRate + plan.people[i].voluntaryConcessional, cap));
+      return Math.floor(raw / TTR_STEP) * TTR_STEP;
+    };
     cards.push({
       id: "ttr",
       group: "timing",
       label: "Transition to Retirement",
       blurb: "From age 60 you can salary-sacrifice more and draw a tax-free TTR pension to replace the pay you give up — shifting income from your marginal rate down to 15% tax. Take-home holds; the tax saved builds super. In a couple, each partner who keeps working past 60 can run their own.",
       params: [
-        { key: "extra", label: "Extra sacrifice via TTR", min: 0, max: 30_000, step: 1_000, default: 15_000, prefix: "$", suffix: "/yr",
+        { key: "extra", label: "Extra sacrifice via TTR", min: 0, max: 30_000, step: TTR_STEP, default: 15_000, prefix: "$", suffix: "/yr",
           // Can't exceed the largest remaining concessional room among the TTR earners.
           dynamicMax: (v) => Math.max(0, ...resolveWho(v).map(roomLeft)) },
         ...(bothWork

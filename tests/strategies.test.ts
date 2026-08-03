@@ -201,7 +201,7 @@ describe("What-If strategies", () => {
     const extra = ttr.params.find((x) => x.key === "extra")!;
     const room = cfg.concessionalCap - 130_000 * cfg.sgRate; // cap − SG
     expect(extra.dynamicMax!({ extra: 30_000 })).toBeCloseTo(room, 0);
-    expect(ttr.note({ extra: 15_000 })).toMatch(/concessional room left|most you can add/i);
+    expect(ttr.note!({ extra: 15_000 })).toMatch(/concessional room left|most you can add/i);
 
     // Voluntary salary sacrifice eats further into the cap → less TTR room.
     const p2 = base({ people: [{ currentAge: 60, superBalance: 400_000, salary: 130_000, voluntaryConcessional: 5_000, voluntaryNonConcessional: 0 }], retirementAge: 65 });
