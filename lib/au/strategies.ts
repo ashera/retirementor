@@ -382,6 +382,10 @@ export function buildStrategyCatalog(
           step: 1,
           default: Math.min(plan.lifeExpectancy, plan.retirementAge + 5),
           suffix: "yrs",
+          hint:
+            "Timing matters: until you sell, the property's value is locked up and your super funds your spending alone. " +
+            "Hold it too long and there are fewer years left to draw the proceeds — so “Extra you could spend” tends to " +
+            "peak at a mid-range age, then fall. Slide through a few ages to find the sweet spot.",
         },
       ],
       // Live tax read-out at the chosen sale age: sale price, CGT and what's left.
