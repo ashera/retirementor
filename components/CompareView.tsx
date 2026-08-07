@@ -26,7 +26,7 @@ const COLORS = ["#34d399", "#38bdf8", "#f59e0b", "#a78bfa", "#f472b6", "#22d3ee"
 const STORE = "au-retirement-compare";
 const PLAN_KEY = "au-retirement-plan";
 
-export default function CompareView({ config, savedPlans, activeName }: { config: EngineConfig; savedPlans: SavedPlan[]; activeName?: string | null }) {
+export default function CompareView({ config, savedPlans, activeName, activeId }: { config: EngineConfig; savedPlans: SavedPlan[]; activeName?: string | null; activeId?: string | null }) {
   const [current, setCurrent] = useState<RetirementPlan | null>(null);
   const [added, setAdded] = useState<CompareColumn[]>([]);
   const idRef = useRef(1);
@@ -106,7 +106,10 @@ export default function CompareView({ config, savedPlans, activeName }: { config
     { label: "Age Pension from", cell: (c) => (c.result.firstAgePensionAge === null ? "—" : `age ${c.result.firstAgePensionAge}`) },
   ];
 
-  const availableSaved = savedPlans.filter((sp) => !added.some((a) => a.kind === "saved" && a.label === sp.name));
+  const availableSaved = savedPlans.filter(
+    // Exclude the active plan (already shown as the "Your plan" column) and anything already added.
+    (sp) => sp.id !== activeId && !added.some((a) => a.kind === "saved" && a.label === sp.name),
+  );
 
   if (!current) return <div className="min-h-screen bg-ink" />;
 

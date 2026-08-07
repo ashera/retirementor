@@ -17,7 +17,7 @@ export default async function ComparePage() {
   return (
     <>
       {!user && <VisitorActivity />}
-      <CompareView config={config} savedPlans={savedPlans} activeName={active?.name ?? null} />
+      <CompareView config={config} savedPlans={savedPlans} activeName={active?.name ?? null} activeId={active?.id ?? null} />
     </>
   );
 }
