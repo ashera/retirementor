@@ -20,7 +20,7 @@ const COLORS = ["#34d399", "#38bdf8", "#f59e0b", "#a78bfa", "#f472b6", "#22d3ee"
 const STORE = "au-retirement-compare";
 const PLAN_KEY = "au-retirement-plan";
 
-export default function CompareView({ config, savedPlans }: { config: EngineConfig; savedPlans: SavedPlan[] }) {
+export default function CompareView({ config, savedPlans, activeName }: { config: EngineConfig; savedPlans: SavedPlan[]; activeName?: string | null }) {
   const [current, setCurrent] = useState<RetirementPlan | null>(null);
   const [added, setAdded] = useState<CompareColumn[]>([]);
   const [variantOpen, setVariantOpen] = useState(false);
@@ -51,9 +51,9 @@ export default function CompareView({ config, savedPlans }: { config: EngineConf
   };
 
   const columns: CompareColumn[] = useMemo(() => {
-    const cur: CompareColumn[] = current ? [{ id: "current", label: "Current", plan: current, kind: "current" }] : [];
+    const cur: CompareColumn[] = current ? [{ id: "current", label: activeName || "Current", plan: current, kind: "current" }] : [];
     return [...cur, ...added].slice(0, 5);
-  }, [current, added]);
+  }, [current, added, activeName]);
 
   const computed = useMemo(
     () =>
