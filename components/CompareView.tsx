@@ -14,7 +14,13 @@ import { track } from "@/lib/analytics";
 import type { SavedPlan } from "@/app/actions/plans";
 import CompareChart, { type CompareSeries } from "@/components/CompareChart";
 import { ageGapInfo } from "@/components/ageAxis";
-import VariantEditor, { type CompareColumn } from "@/components/VariantEditor";
+
+export interface CompareColumn {
+  id: string;
+  label: string;
+  plan: RetirementPlan;
+  kind: "current" | "saved";
+}
 
 const COLORS = ["#34d399", "#38bdf8", "#f59e0b", "#a78bfa", "#f472b6", "#22d3ee"];
 const STORE = "au-retirement-compare";
@@ -23,7 +29,6 @@ const PLAN_KEY = "au-retirement-plan";
 export default function CompareView({ config, savedPlans, activeName }: { config: EngineConfig; savedPlans: SavedPlan[]; activeName?: string | null }) {
   const [current, setCurrent] = useState<RetirementPlan | null>(null);
   const [added, setAdded] = useState<CompareColumn[]>([]);
-  const [variantOpen, setVariantOpen] = useState(false);
   const idRef = useRef(1);
 
   useEffect(() => {
@@ -35,7 +40,11 @@ export default function CompareView({ config, savedPlans, activeName }: { config
     }
     try {
       const raw = localStorage.getItem(STORE);
-      if (raw) setAdded(JSON.parse(raw));
+      if (raw) {
+        const parsed = JSON.parse(raw) as CompareColumn[];
+        // Drop any "what-if variant" columns saved before that feature was removed.
+        if (Array.isArray(parsed)) setAdded(parsed.filter((c) => c.kind === "saved"));
+      }
     } catch {
       /* ignore */
     }
@@ -77,11 +86,6 @@ export default function CompareView({ config, savedPlans, activeName }: { config
     persist([...added, { id, label: sp.name, plan: { ...DEFAULT_PLAN, ...sp.data }, kind: "saved" }]);
     track("Compare: saved added");
   };
-  const addVariant = (label: string, plan: RetirementPlan) => {
-    const id = `v${idRef.current++}`;
-    persist([...added, { id, label, plan, kind: "variant" }]);
-    track("Compare: variant added");
-  };
   const remove = (id: string) => persist(added.filter((c) => c.id !== id));
 
   const series: CompareSeries[] = computed.map((c) => ({ id: c.id, label: c.label, color: c.color, result: c.result }));
@@ -115,36 +119,32 @@ export default function CompareView({ config, savedPlans, activeName }: { config
       <header className="mb-6">
         <h1 className="text-3xl font-bold text-white">Compare scenarios</h1>
         <p className="mt-2 max-w-2xl text-muted">
-          Put plans side by side — your current plan, any saved scenarios, and quick &ldquo;what-if&rdquo;
-          variants (retire later, spend less, a different return). The best value in each row is highlighted.
+          Put plans side by side — your current plan and any saved scenarios. The best value in each row is
+          highlighted.
         </p>
       </header>
 
       {/* Add controls */}
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <button
-          onClick={() => setVariantOpen(true)}
-          className="rounded-lg border border-accent/40 bg-accent/10 px-3 py-1.5 text-sm font-semibold text-accent transition hover:bg-accent/20"
-        >
-          + What-if variant
-        </button>
-        {availableSaved.length > 0 && (
-          <select
-            value=""
-            onChange={(e) => {
-              const sp = savedPlans.find((s) => s.id === e.target.value);
-              if (sp) addSaved(sp);
-            }}
-            className="rounded-lg border border-line bg-panel-2 px-3 py-1.5 text-sm font-medium text-slate-200"
-          >
-            <option value="">+ Add a saved scenario…</option>
-            {availableSaved.map((sp) => (
-              <option key={sp.id} value={sp.id}>{sp.name}</option>
-            ))}
-          </select>
-        )}
-        {columns.length >= 5 && <span className="text-xs text-muted">Up to 5 scenarios.</span>}
-      </div>
+      {(availableSaved.length > 0 || columns.length >= 5) && (
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          {availableSaved.length > 0 && (
+            <select
+              value=""
+              onChange={(e) => {
+                const sp = savedPlans.find((s) => s.id === e.target.value);
+                if (sp) addSaved(sp);
+              }}
+              className="rounded-lg border border-line bg-panel-2 px-3 py-1.5 text-sm font-medium text-slate-200"
+            >
+              <option value="">+ Add a saved scenario…</option>
+              {availableSaved.map((sp) => (
+                <option key={sp.id} value={sp.id}>{sp.name}</option>
+              ))}
+            </select>
+          )}
+          {columns.length >= 5 && <span className="text-xs text-muted">Up to 5 scenarios.</span>}
+        </div>
+      )}
 
       {/* Metrics table */}
       <div className="mb-6 overflow-x-auto rounded-2xl border border-line bg-panel">
@@ -207,10 +207,6 @@ export default function CompareView({ config, savedPlans, activeName }: { config
           ))}
         </div>
       </div>
-
-      {variantOpen && (
-        <VariantEditor bases={columns} onSave={addVariant} onClose={() => setVariantOpen(false)} />
-      )}
     </div>
   );
 }
