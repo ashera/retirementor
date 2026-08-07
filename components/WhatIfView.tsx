@@ -1239,7 +1239,7 @@ function ImpactBreakdown({ delta, incomeDelta, life }: { delta: Marginal; income
   const nwDiffers = Math.abs(delta.netWorth - delta.moneyLeft) >= 2_000;
   const incomeStr = incomeDelta != null ? fmtDeltaYr(incomeDelta) : null;
   const rows = [
-    ...(incomeStr ? [{ label: "Income you could afford", sub: "most you could safely spend / yr", str: incomeStr, v: incomeDelta! }] : []),
+    ...(incomeStr ? [{ label: "Extra you could spend", sub: "and still have it last / yr", str: incomeStr, v: incomeDelta! }] : []),
     { label: `Spendable funds at ${life}`, sub: "liquid super + savings", v: delta.moneyLeft },
     { label: "Spending shortfall avoided", sub: "spending you can now cover", v: delta.shortfallAvoided },
     ...(nwDiffers ? [{ label: `Net worth at ${life}`, sub: "adds your home & property", v: delta.netWorth }] : []),
@@ -1259,7 +1259,7 @@ function ImpactBreakdown({ delta, incomeDelta, life }: { delta: Marginal; income
       ))}
       {incomeStr && incomeDelta! > 0 && (
         <p className="mt-1.5 border-t border-line pt-1.5 text-[10px] leading-snug text-muted/80">
-          “Income you could afford” is <span className="text-slate-300">headroom, not automatic income</span> — until you lift
+          “Extra you could spend” is <span className="text-slate-300">headroom, not automatic income</span> — until you lift
           your spending goal it just builds up as extra balance. Raise it with “Adjust discretionary spending” to draw it.
         </p>
       )}
@@ -1302,11 +1302,11 @@ function DeltaChip({
       {yStr && <Line label="Money lasts" value={yStr} v={years} title="On its own, how much longer your super + savings cover your spending." />}
       {incStr && (
         <Line
-          label="Income you could afford"
+          label="Extra you could spend"
           value={incStr}
           v={incomeDelta!}
           pending={incomePending}
-          title={`On its own, how much this lever changes the most you could sustainably spend each year — the yearly income headroom it buys (central projection, to age ${life}).`}
+          title={`On its own, how much this lever changes the most you could sustainably spend each year — the yearly spending headroom it buys (central projection, to age ${life}).`}
         />
       )}
       {mlStr && (
