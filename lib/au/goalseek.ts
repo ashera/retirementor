@@ -159,8 +159,15 @@ export function earliestRetirement(
   const lo = Math.max(oldestCurrentAge(plan), 40);
   const hi = 75;
 
-  const successAt = (age: number) =>
-    runMonteCarlo({ ...plan, retirementAge: Math.round(age) }, config, mc).successRate;
+  // Retire EVERYONE at the candidate age — for a couple this is "the earliest age
+  // you could BOTH stop work", not just the primary (whose partner would otherwise
+  // keep earning and mask the true cost). Person 0 retires via plan.retirementAge;
+  // each other person via their own retirementAge override.
+  const planAt = (age: number): RetirementPlan => {
+    const a = Math.round(age);
+    return { ...plan, retirementAge: a, people: plan.people.map((p, i) => (i === 0 ? p : { ...p, retirementAge: a })) };
+  };
+  const successAt = (age: number) => runMonteCarlo(planAt(age), config, mc).successRate;
 
   if (lo >= hi) {
     return { age: null, currentRetireAge, currentClears: successAt(lo) >= target, successAtEarliest: 0, targetPct };

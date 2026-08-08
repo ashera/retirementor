@@ -732,6 +732,16 @@ export default function PlannerApp({
   const quickAdjust = (patch: Partial<RetirementPlan>) =>
     setBase((prev) => ({ ...prev, ...patch }));
 
+  // Apply the "earliest retirement" age to EVERYONE (so a couple both retire at it,
+  // matching the both-retire basis the figure is computed on) — person 0 via
+  // retirementAge, each partner via their own override.
+  const retireEveryoneAt = (age: number) =>
+    setBase((prev) => ({
+      ...prev,
+      retirementAge: age,
+      people: prev.people.map((p, i) => (i === 0 ? p : { ...p, retirementAge: age })),
+    }));
+
   const resetToBaseline = () => {
     splitInto(baseline);
   };
@@ -1673,10 +1683,10 @@ export default function PlannerApp({
               />
               {!retireOverridden && earliest.age != null && earliest.age < plan.retirementAge && (
                 <button
-                  onClick={() => quickAdjust({ retirementAge: earliest.age! })}
+                  onClick={() => retireEveryoneAt(earliest.age!)}
                   className="mt-1.5 text-xs font-medium text-accent transition hover:underline"
                 >
-                  ⌁ retire as early as {earliest.age} at {earliest.targetPct}% →
+                  ⌁ {isCouple ? "both retire" : "retire"} as early as {earliest.age} at {earliest.targetPct}% →
                 </button>
               )}
             </div>
@@ -1911,21 +1921,22 @@ export default function PlannerApp({
                 }
                 const SetAge = () => (
                   <button
-                    onClick={() => quickAdjust({ retirementAge: e.age! })}
+                    onClick={() => retireEveryoneAt(e.age!)}
                     className="font-bold text-accent underline-offset-2 hover:underline"
                   >
                     {e.age}
                   </button>
                 );
+                const both = isCouple ? "both " : "";
                 return (
                   <p className="mt-2.5 text-sm text-slate-200">
                     <span aria-hidden className="mr-1 text-accent">⌁</span>
                     {e.age < e.currentRetireAge ? (
-                      <>You could retire as early as <SetAge /> and still clear {e.targetPct}% — you&apos;re planning {e.currentRetireAge}.</>
+                      <>You could {both}retire as early as <SetAge /> and still clear {e.targetPct}% — you&apos;re planning {e.currentRetireAge}.</>
                     ) : e.age === e.currentRetireAge ? (
-                      <>Age {e.age} is about the earliest you can retire and still clear {e.targetPct}%.</>
+                      <>Age {e.age} is about the earliest you can {both}retire and still clear {e.targetPct}%.</>
                     ) : (
-                      <>To clear {e.targetPct}% you&apos;d need to retire around{" "}
+                      <>To clear {e.targetPct}% you&apos;d {both ? "both " : ""}need to retire around{" "}
                         <span className="font-bold text-amber-300">{e.age}</span> — you&apos;re planning {e.currentRetireAge}.</>
                     )}
                   </p>
