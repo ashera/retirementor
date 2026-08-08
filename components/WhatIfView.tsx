@@ -966,6 +966,11 @@ export default function WhatIfView({
                   <>Right at your {fmtCurrency(spendMix.total)} goal — little spare headroom.</>
                 )}
               </p>
+              <p className="mt-1 text-[10px] leading-snug text-muted/70">
+                “Last” here is on the central projection — a steady {composed.investmentReturn}% return every year,
+                not the Monte Carlo “likely to last” test. For the prudent, market-tested (85%-confidence) figure,
+                use the Adjust discretionary spending lever.
+              </p>
             </div>
           )}
         </div>
