@@ -414,6 +414,13 @@ export default function WhatIfView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [baseline, catalog, active, otherValsKey, config]);
 
+  // The same central sustainable-spend figure for the BARE baseline (no strategies),
+  // so the "Your spending" card can show how much extra headroom the active levers add.
+  const baseSustainable = useMemo(
+    () => (baseline ? maxSustainableSpend({ ...baseline, guardrails: undefined }, config) : null),
+    [baseline, config],
+  );
+
   // Essentials floor held by the Adjust discretionary spending lever (from the
   // plan's budget, or an ASFA 'modest' fallback). The spend slider can't go below it.
   const essentials = useMemo(() => (baseline ? essentialsFloor(baseline, config) : 0), [baseline, config]);
@@ -913,6 +920,49 @@ export default function WhatIfView({
             loan={spendMix.loan}
             estimated={spendMix.estimated}
           />
+          {spendSustainable != null && (
+            <div className="mt-3 border-t border-line pt-2.5">
+              <div className="flex items-baseline justify-between gap-2">
+                <span
+                  className="text-[11px] font-medium uppercase tracking-wide text-muted"
+                  title="The most you could spend each year and still have your money last, on the central projection — the same basis as each strategy's “Extra you could spend”. The prudent (85% confidence) figure lives on the Adjust discretionary spending lever."
+                >
+                  Headroom to spend
+                </span>
+                <span className="flex flex-wrap items-baseline justify-end gap-x-1.5 tabular-nums">
+                  {changed && baseSustainable != null && Math.abs(baseSustainable - spendSustainable) >= 500 ? (
+                    <>
+                      <span className="text-sm text-muted line-through">{fmtCurrency(baseSustainable)}</span>
+                      <span aria-hidden className="text-muted">→</span>
+                      <span className="text-lg font-bold text-white">{fmtCurrency(spendSustainable)}</span>
+                      <span className={`text-xs font-semibold ${spendSustainable >= baseSustainable ? "text-accent" : "text-amber-400"}`}>
+                        {fmtDelta(spendSustainable - baseSustainable)}
+                      </span>
+                    </>
+                  ) : (
+                    <span className="text-lg font-bold text-white">{fmtCurrency(spendSustainable)}</span>
+                  )}
+                  <span className="text-xs font-medium text-muted">/yr</span>
+                </span>
+              </div>
+              <p className="mt-0.5 text-[11px] leading-snug text-muted">
+                {spendSustainable - spendMix.total >= 500 ? (
+                  <>
+                    <span className="font-semibold text-accent">{fmtCurrency(spendSustainable - spendMix.total)}/yr</span> above
+                    your {fmtCurrency(spendMix.total)} goal — extra you could spend and still have it last
+                    {changed ? " (with these strategies)" : ""}.
+                  </>
+                ) : spendSustainable - spendMix.total <= -500 ? (
+                  <>
+                    <span className="font-semibold text-amber-400">{fmtCurrency(spendMix.total - spendSustainable)}/yr</span> short
+                    of your {fmtCurrency(spendMix.total)} goal at a sustainable level.
+                  </>
+                ) : (
+                  <>Right at your {fmtCurrency(spendMix.total)} goal — little spare headroom.</>
+                )}
+              </p>
+            </div>
+          )}
         </div>
       )}
 
