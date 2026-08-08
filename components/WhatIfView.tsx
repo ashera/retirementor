@@ -957,9 +957,9 @@ export default function WhatIfView({
               <div className="flex items-baseline justify-between gap-2">
                 <span
                   className="text-[11px] font-medium uppercase tracking-wide text-muted"
-                  title={`The most you could spend each year (including your home loan) with at least an ${Math.round(SAFE_TARGET * 100)}% chance your money lasts across thousands of market up-and-down scenarios (Monte Carlo). The same 85% basis as each strategy's “Extra you could spend”.`}
+                  title={`Your safe spending level — the most you could spend each year (including your home loan) with at least an ${Math.round(SAFE_TARGET * 100)}% chance your money lasts across thousands of market up-and-down scenarios (Monte Carlo). The same 85% basis as each strategy's “Extra you could spend”.`}
                 >
-                  Headroom to spend
+                  Safe spending
                   <span className="ml-1 rounded bg-panel-2 px-1 py-0.5 text-[9px] font-semibold text-muted">{Math.round(SAFE_TARGET * 100)}% confidence</span>
                 </span>
                 <span className="flex flex-wrap items-baseline justify-end gap-x-1.5 tabular-nums">
