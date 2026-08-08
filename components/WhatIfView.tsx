@@ -986,13 +986,13 @@ export default function WhatIfView({
               <p className="mt-0.5 text-[11px] leading-snug text-muted">
                 {safeSpendTotal - spendMix.total >= 500 ? (
                   <>
-                    <span className="font-semibold text-accent">{fmtCurrency(safeSpendTotal - spendMix.total)}/yr</span> above
-                    your {fmtCurrency(spendMix.total)} goal — extra you could spend with your money still very likely to last
+                    You have headroom of <span className="font-semibold text-accent">{fmtCurrency(safeSpendTotal - spendMix.total)}/yr</span> above
+                    your {fmtCurrency(spendMix.total)} goal — this is extra you could spend annually with your money still very likely to last
                     {changed ? " (with these strategies)" : ""}.
                   </>
                 ) : safeSpendTotal - spendMix.total <= -500 ? (
                   <>
-                    <span className="font-semibold text-amber-400">{fmtCurrency(spendMix.total - safeSpendTotal)}/yr</span> above
+                    No headroom, you are currently spending <span className="font-semibold text-amber-400">{fmtCurrency(spendMix.total - safeSpendTotal)}/yr</span> above
                     a prudently sustainable level — your {fmtCurrency(spendMix.total)} goal carries more risk of running short.
                   </>
                 ) : (
