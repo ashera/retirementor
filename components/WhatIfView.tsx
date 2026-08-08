@@ -965,12 +965,12 @@ export default function WhatIfView({
                 <span className="flex flex-wrap items-baseline justify-end gap-x-1.5 tabular-nums">
                   {changed && baseSafeTotal != null && Math.abs(baseSafeTotal - safeSpendTotal) >= 500 ? (
                     <>
-                      <span className="text-sm text-muted line-through" title="Your base plan — the most it safely sustains before any strategies are applied">{fmtCurrency(baseSafeTotal)}</span>
-                      <span aria-hidden className="text-muted">→</span>
-                      <span className="text-lg font-bold text-white" title="With your active strategies applied">{fmtCurrency(safeSpendTotal)}</span>
+                      <span className="text-sm text-muted" title="Your base plan — the most it safely sustains before any strategies are applied">{fmtCurrency(baseSafeTotal)}</span>
                       <span className={`text-xs font-semibold ${safeSpendTotal >= baseSafeTotal ? "text-accent" : "text-amber-400"}`}>
                         {fmtDelta(safeSpendTotal - baseSafeTotal)}
                       </span>
+                      <span aria-hidden className="text-muted">→</span>
+                      <span className="text-lg font-bold text-white" title="With your active strategies applied">{fmtCurrency(safeSpendTotal)}</span>
                     </>
                   ) : (
                     <span className="text-lg font-bold text-white">{fmtCurrency(safeSpendTotal)}</span>
