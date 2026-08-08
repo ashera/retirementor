@@ -566,6 +566,14 @@ export default function WhatIfView({
 
   const changed = active.size > 0;
 
+  // Safe-spend is a LIVING figure (maxSpendForConfidence solves for living spend; the
+  // home loan is a separate engine cashflow). The goal on the card INCLUDES the loan,
+  // so add each plan's loan cost back to compare like-for-like.
+  const compLoan = spendMix?.loan ?? 0;
+  const baseLoan = retirementGoal(baseline).loanCost;
+  const safeSpendTotal = safeSpend != null ? safeSpend + compLoan : null;
+  const baseSafeTotal = baseSafeSpend != null ? baseSafeSpend + baseLoan : null;
+
   // Net worth trajectory: total wealth (super + outside + home + property) across
   // retirement, plus the terminal estate at life expectancy. The sparkline spans
   // the retirement window (earliest retirement age → life) on one CPI basis.
@@ -944,47 +952,47 @@ export default function WhatIfView({
             loan={spendMix.loan}
             estimated={spendMix.estimated}
           />
-          {safeSpend != null && (
+          {safeSpendTotal != null && (
             <div className={`mt-3 border-t border-line pt-2.5 ${safePending ? "animate-pulse opacity-60" : ""}`}>
               <div className="flex items-baseline justify-between gap-2">
                 <span
                   className="text-[11px] font-medium uppercase tracking-wide text-muted"
-                  title={`The most you could spend each year with at least an ${Math.round(SAFE_TARGET * 100)}% chance your money lasts across thousands of market up-and-down scenarios (Monte Carlo). The same 85% basis as each strategy's “Extra you could spend”.`}
+                  title={`The most you could spend each year (including your home loan) with at least an ${Math.round(SAFE_TARGET * 100)}% chance your money lasts across thousands of market up-and-down scenarios (Monte Carlo). The same 85% basis as each strategy's “Extra you could spend”.`}
                 >
                   Headroom to spend
                   <span className="ml-1 rounded bg-panel-2 px-1 py-0.5 text-[9px] font-semibold text-muted">{Math.round(SAFE_TARGET * 100)}% confidence</span>
                 </span>
                 <span className="flex flex-wrap items-baseline justify-end gap-x-1.5 tabular-nums">
-                  {changed && baseSafeSpend != null && Math.abs(baseSafeSpend - safeSpend) >= 500 ? (
+                  {changed && baseSafeTotal != null && Math.abs(baseSafeTotal - safeSpendTotal) >= 500 ? (
                     <>
-                      <span className="text-sm text-muted line-through" title="Your base plan — the most it safely sustains before any strategies are applied">{fmtCurrency(baseSafeSpend)}</span>
+                      <span className="text-sm text-muted line-through" title="Your base plan — the most it safely sustains before any strategies are applied">{fmtCurrency(baseSafeTotal)}</span>
                       <span aria-hidden className="text-muted">→</span>
-                      <span className="text-lg font-bold text-white" title="With your active strategies applied">{fmtCurrency(safeSpend)}</span>
-                      <span className={`text-xs font-semibold ${safeSpend >= baseSafeSpend ? "text-accent" : "text-amber-400"}`}>
-                        {fmtDelta(safeSpend - baseSafeSpend)}
+                      <span className="text-lg font-bold text-white" title="With your active strategies applied">{fmtCurrency(safeSpendTotal)}</span>
+                      <span className={`text-xs font-semibold ${safeSpendTotal >= baseSafeTotal ? "text-accent" : "text-amber-400"}`}>
+                        {fmtDelta(safeSpendTotal - baseSafeTotal)}
                       </span>
                     </>
                   ) : (
-                    <span className="text-lg font-bold text-white">{fmtCurrency(safeSpend)}</span>
+                    <span className="text-lg font-bold text-white">{fmtCurrency(safeSpendTotal)}</span>
                   )}
                   <span className="text-xs font-medium text-muted">/yr</span>
                 </span>
               </div>
-              {changed && baseSafeSpend != null && Math.abs(baseSafeSpend - safeSpend) >= 500 && (
+              {changed && baseSafeTotal != null && Math.abs(baseSafeTotal - safeSpendTotal) >= 500 && (
                 <p className="mt-0.5 text-right text-[10px] uppercase tracking-wide text-muted/70">
                   base plan <span aria-hidden>→</span> with your strategies
                 </p>
               )}
               <p className="mt-0.5 text-[11px] leading-snug text-muted">
-                {safeSpend - spendMix.total >= 500 ? (
+                {safeSpendTotal - spendMix.total >= 500 ? (
                   <>
-                    <span className="font-semibold text-accent">{fmtCurrency(safeSpend - spendMix.total)}/yr</span> above
+                    <span className="font-semibold text-accent">{fmtCurrency(safeSpendTotal - spendMix.total)}/yr</span> above
                     your {fmtCurrency(spendMix.total)} goal — extra you could spend with your money still very likely to last
                     {changed ? " (with these strategies)" : ""}.
                   </>
-                ) : safeSpend - spendMix.total <= -500 ? (
+                ) : safeSpendTotal - spendMix.total <= -500 ? (
                   <>
-                    <span className="font-semibold text-amber-400">{fmtCurrency(spendMix.total - safeSpend)}/yr</span> above
+                    <span className="font-semibold text-amber-400">{fmtCurrency(spendMix.total - safeSpendTotal)}/yr</span> above
                     a prudently sustainable level — your {fmtCurrency(spendMix.total)} goal carries more risk of running short.
                   </>
                 ) : (
