@@ -109,12 +109,21 @@ export default function YearDetailModal({
       : row.phase === "bridge"
         ? "preserved until you can access super"
         : "above the transfer balance cap";
+  // The savings waterfall's opening backs out any in-opening home release (see
+  // yearFlow), so the opening super/outside shown here must match: net worth keeps the
+  // full post-release opening (its headline is the clicked net-worth bar), the savings
+  // view shows the pre-release opening (== last year's closing).
+  const toSuperRelease = b.homeProceedsToSuper ?? 0;
+  const toOutsideRelease = Math.max(0, (b.homeProceeds ?? 0) - toSuperRelease);
+  const openSuperView = isNetWorth ? b.openingSuper : b.openingSuper - toSuperRelease;
+  const openOutsideView = isNetWorth ? b.openingOutside : b.openingOutside - toOutsideRelease;
+  const openAccumView = isNetWorth ? b.accumSuper : Math.max(0, b.accumSuper - toSuperRelease);
   // Above the Transfer Balance Cap, show how the opening super splits between the
   // tax-free pension pool and the taxed accumulation pool.
   const superLabel =
-    b.accumSuper > 1
-      ? `super ${fmtCurrency(b.openingSuper)} (pension ${fmtCurrency(Math.round(b.pensionSuper))} · accum ${fmtCurrency(Math.round(b.accumSuper))})`
-      : `super ${fmtCurrency(b.openingSuper)}`;
+    openAccumView > 1
+      ? `super ${fmtCurrency(openSuperView)} (pension ${fmtCurrency(Math.round(b.pensionSuper))} · accum ${fmtCurrency(Math.round(openAccumView))})`
+      : `super ${fmtCurrency(openSuperView)}`;
   // The waterfall shown — savings or net worth — matching the chart clicked.
   const wf = {
     title: isNetWorth ? "How your net worth changed" : "How your savings changed",
@@ -123,9 +132,9 @@ export default function YearDetailModal({
     opening: isNetWorth ? nwTotal : flow.opening,
     closing: isNetWorth ? nwClosing : flow.closing,
     sub: isNetWorth
-      ? `${superLabel} · outside ${fmtCurrency(b.openingOutside)}` +
+      ? `${superLabel} · outside ${fmtCurrency(openOutsideView)}` +
         `${nwHome > 0 ? ` · home ${fmtCurrency(nwHome)}` : ""}${nwProp > 0 ? ` · property ${fmtCurrency(nwProp)}` : ""}`
-      : `${superLabel} · outside ${fmtCurrency(b.openingOutside)}`,
+      : `${superLabel} · outside ${fmtCurrency(openOutsideView)}`,
     lines:
       isNetWorth && Math.abs(homePropChange) > 0.5
         ? [...flow.lines, { key: "homeprop", label: "Home & property value change", amount: homePropChange }]

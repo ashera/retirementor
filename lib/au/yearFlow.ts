@@ -24,7 +24,13 @@ const EPS = 0.5;
 
 export function yearFlow(row: YearRow): YearFlow {
   const b = row.breakdown;
-  const opening = b.openingSuper + b.openingOutside;
+  // A home downsize / sell-and-rent injects its freed equity into the engine's
+  // START-of-year balance (so the balance chart's step lands on the event age). Left
+  // as-is, that makes this waterfall's opening exceed last year's closing by the
+  // release. Back it out so opening == prior year's closing and the release shows as
+  // the `proceeds` inflow below (property SALES aren't in the opening — they're added
+  // mid-year — so only the home release, `homeProceeds`, is netted here).
+  const opening = b.openingSuper + b.openingOutside - b.homeProceeds;
   const closing = b.closingSuper + b.closingOutside;
   const net = closing - opening;
   const retired = row.phase !== "accumulation";

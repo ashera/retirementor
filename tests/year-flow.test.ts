@@ -83,10 +83,13 @@ describe("Year-flow waterfall reconciliation", () => {
   for (const [label, plan] of Object.entries({ "held-property": vanilla["held-property"], downsize: eventful.downsize, "sell-property": eventful["sell-property"] })) {
     it(`net-worth opening = savings + home + property, matching the chart (${label})`, () => {
       for (const row of simulate(plan, cfg).rows) {
-        const f = yearFlow(row);
         const home = Math.max(0, row.homeEquity ?? 0);
         const prop = Math.max(0, (row.propertyEquity ?? 0) + (row.breakdown.propertyProceeds ?? 0));
-        expect(Math.abs(f.opening + home + prop - rowNetWorth(row))).toBeLessThan(1);
+        // Net worth = liquid savings (super + outside, post any home release) + home +
+        // property. The net-worth modal's opening headline is this rowNetWorth, so it
+        // must equal the clicked bar. (The savings waterfall's yearFlow.opening backs
+        // out an in-opening home release, so it's intentionally NOT the term here.)
+        expect(Math.abs(row.total + home + prop - rowNetWorth(row))).toBeLessThan(1);
       }
     });
   }
