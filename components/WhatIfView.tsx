@@ -414,12 +414,6 @@ export default function WhatIfView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [baseline, catalog, active, otherValsKey, config]);
 
-  // The same central sustainable-spend figure for the BARE baseline (no strategies),
-  // so the "Your spending" card can show how much extra headroom the active levers add.
-  const baseSustainable = useMemo(
-    () => (baseline ? maxSustainableSpend({ ...baseline, guardrails: undefined }, config) : null),
-    [baseline, config],
-  );
 
   // Essentials floor held by the Adjust discretionary spending lever (from the
   // plan's budget, or an ASFA 'modest' fallback). The spend slider can't go below it.
@@ -519,28 +513,33 @@ export default function WhatIfView({
     return () => clearTimeout(id);
   }, [composed, active, config]);
 
-  // Per-lever "affordable income" — the change in the most you could sustainably
-  // spend each YEAR that this strategy buys you (isolated from the baseline, like
-  // the chips above). A full max-sustainable-spend bisection per card is heavy, so
-  // it's debounced off the interaction path with a pending pulse. This uses the
-  // deterministic central projection; the prudent (85% Monte Carlo) figure lives
-  // on the Adjust-spending card and the "spend up to" lever.
+  // Per-lever "affordable income" — the change in the most you could PRUDENTLY
+  // spend each YEAR that this strategy buys you (isolated from the baseline). This
+  // is the 85%-confidence Monte Carlo safe-spend (same basis as the headroom card
+  // and the Adjust-spending lever), so the per-lever figures and the card total
+  // reconcile. Guardrails are stripped so it's a fixed-spending figure. It's ~14
+  // MC runs per card — heavy — so it's debounced off the interaction path with a
+  // pending pulse; a fixed seed keeps it stable between renders.
   const valsKey = useMemo(() => JSON.stringify(values), [values]);
   const [affordable, setAffordable] = useState<Record<string, number>>({});
   const [affordablePending, setAffordablePending] = useState(false);
+  // The baseline's own 85% safe-spend (no strategies) — reused by the headroom card
+  // as the "before" figure, so it's on the same basis as the per-lever deltas.
+  const [baseSafeSpend, setBaseSafeSpend] = useState<number | null>(null);
   useEffect(() => {
     if (!baseline) return;
     setAffordablePending(true);
     const id = setTimeout(() => {
-      const baseMax = maxSustainableSpend(baseline, config);
+      const baseMax = maxSpendForConfidence({ ...baseline, guardrails: undefined }, config, SAFE_TARGET, SAFE_MC);
+      setBaseSafeSpend(baseMax);
       const out: Record<string, number> = {};
       for (const card of catalog) {
         const single = card.apply(baseline, resolveValues(card, values[card.id]));
-        out[card.id] = maxSustainableSpend(single, config) - baseMax;
+        out[card.id] = maxSpendForConfidence({ ...single, guardrails: undefined }, config, SAFE_TARGET, SAFE_MC) - baseMax;
       }
       setAffordable(out);
       setAffordablePending(false);
-    }, 500);
+    }, 600);
     return () => clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [baseline, catalog, valsKey, config]);
@@ -920,56 +919,57 @@ export default function WhatIfView({
             loan={spendMix.loan}
             estimated={spendMix.estimated}
           />
-          {spendSustainable != null && (
-            <div className="mt-3 border-t border-line pt-2.5">
+          {safeSpend != null && (
+            <div className={`mt-3 border-t border-line pt-2.5 ${safePending ? "animate-pulse opacity-60" : ""}`}>
               <div className="flex items-baseline justify-between gap-2">
                 <span
                   className="text-[11px] font-medium uppercase tracking-wide text-muted"
-                  title="The most you could spend each year and still have your money last, on the central projection — the same basis as each strategy's “Extra you could spend”. The prudent (85% confidence) figure lives on the Adjust discretionary spending lever."
+                  title={`The most you could spend each year with at least an ${Math.round(SAFE_TARGET * 100)}% chance your money lasts across thousands of market up-and-down scenarios (Monte Carlo). The same 85% basis as each strategy's “Extra you could spend”.`}
                 >
                   Headroom to spend
+                  <span className="ml-1 rounded bg-panel-2 px-1 py-0.5 text-[9px] font-semibold text-muted">{Math.round(SAFE_TARGET * 100)}% confidence</span>
                 </span>
                 <span className="flex flex-wrap items-baseline justify-end gap-x-1.5 tabular-nums">
-                  {changed && baseSustainable != null && Math.abs(baseSustainable - spendSustainable) >= 500 ? (
+                  {changed && baseSafeSpend != null && Math.abs(baseSafeSpend - safeSpend) >= 500 ? (
                     <>
-                      <span className="text-sm text-muted line-through" title="Your base plan — the most it sustains before any strategies are applied">{fmtCurrency(baseSustainable)}</span>
+                      <span className="text-sm text-muted line-through" title="Your base plan — the most it safely sustains before any strategies are applied">{fmtCurrency(baseSafeSpend)}</span>
                       <span aria-hidden className="text-muted">→</span>
-                      <span className="text-lg font-bold text-white" title="With your active strategies applied">{fmtCurrency(spendSustainable)}</span>
-                      <span className={`text-xs font-semibold ${spendSustainable >= baseSustainable ? "text-accent" : "text-amber-400"}`}>
-                        {fmtDelta(spendSustainable - baseSustainable)}
+                      <span className="text-lg font-bold text-white" title="With your active strategies applied">{fmtCurrency(safeSpend)}</span>
+                      <span className={`text-xs font-semibold ${safeSpend >= baseSafeSpend ? "text-accent" : "text-amber-400"}`}>
+                        {fmtDelta(safeSpend - baseSafeSpend)}
                       </span>
                     </>
                   ) : (
-                    <span className="text-lg font-bold text-white">{fmtCurrency(spendSustainable)}</span>
+                    <span className="text-lg font-bold text-white">{fmtCurrency(safeSpend)}</span>
                   )}
                   <span className="text-xs font-medium text-muted">/yr</span>
                 </span>
               </div>
-              {changed && baseSustainable != null && Math.abs(baseSustainable - spendSustainable) >= 500 && (
+              {changed && baseSafeSpend != null && Math.abs(baseSafeSpend - safeSpend) >= 500 && (
                 <p className="mt-0.5 text-right text-[10px] uppercase tracking-wide text-muted/70">
                   base plan <span aria-hidden>→</span> with your strategies
                 </p>
               )}
               <p className="mt-0.5 text-[11px] leading-snug text-muted">
-                {spendSustainable - spendMix.total >= 500 ? (
+                {safeSpend - spendMix.total >= 500 ? (
                   <>
-                    <span className="font-semibold text-accent">{fmtCurrency(spendSustainable - spendMix.total)}/yr</span> above
-                    your {fmtCurrency(spendMix.total)} goal — extra you could spend and still have it last
+                    <span className="font-semibold text-accent">{fmtCurrency(safeSpend - spendMix.total)}/yr</span> above
+                    your {fmtCurrency(spendMix.total)} goal — extra you could spend with your money still very likely to last
                     {changed ? " (with these strategies)" : ""}.
                   </>
-                ) : spendSustainable - spendMix.total <= -500 ? (
+                ) : safeSpend - spendMix.total <= -500 ? (
                   <>
-                    <span className="font-semibold text-amber-400">{fmtCurrency(spendMix.total - spendSustainable)}/yr</span> short
-                    of your {fmtCurrency(spendMix.total)} goal at a sustainable level.
+                    <span className="font-semibold text-amber-400">{fmtCurrency(spendMix.total - safeSpend)}/yr</span> above
+                    a prudently sustainable level — your {fmtCurrency(spendMix.total)} goal carries more risk of running short.
                   </>
                 ) : (
                   <>Right at your {fmtCurrency(spendMix.total)} goal — little spare headroom.</>
                 )}
               </p>
               <p className="mt-1 text-[10px] leading-snug text-muted/70">
-                “Last” here is on the central projection — a steady {composed.investmentReturn}% return every year,
-                not the Monte Carlo “likely to last” test. For the prudent, market-tested (85%-confidence) figure,
-                use the Adjust discretionary spending lever.
+                Based on at least an {Math.round(SAFE_TARGET * 100)}% success rate across thousands of market
+                up-and-down scenarios (Monte Carlo) — not just your steady {composed.investmentReturn}% average.
+                Each strategy&apos;s “Extra you could spend” uses this same basis.
               </p>
             </div>
           )}
@@ -1366,7 +1366,7 @@ function DeltaChip({
           value={incStr}
           v={incomeDelta!}
           pending={incomePending}
-          title={`On its own, how much this lever changes the most you could sustainably spend each year — the yearly spending headroom it buys (central projection, to age ${life}).`}
+          title={`On its own, how much this lever changes the most you could prudently spend each year — the yearly spending headroom it buys (85% Monte Carlo confidence, to age ${life}).`}
         />
       )}
       {mlStr && (
