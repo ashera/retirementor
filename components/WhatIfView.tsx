@@ -101,6 +101,15 @@ interface Marginal {
   takeHomeNow: number; // working-year take-home pay with this lever alone (salary-sacrifice hit)
 }
 
+/** On-demand state for a lever's 85% "Extra you could spend" figure. null when the
+ *  metric isn't meaningful for that card (e.g. Adjust spending). */
+type IncomeCalc = {
+  value: number | null; // last computed Δ safe-spend /yr (null = never computed)
+  stale: boolean; // this card's inputs changed since `value` was computed
+  computing: boolean; // an MC run is in progress for this card
+  onCalc: () => void; // trigger the (heavy) 85% recompute for this card
+} | null;
+
 /** Compact signed dollar delta, or null when too small to bother showing. */
 function fmtDelta(d: number): string | null {
   const a = Math.abs(d);
@@ -513,36 +522,45 @@ export default function WhatIfView({
     return () => clearTimeout(id);
   }, [composed, active, config]);
 
-  // Per-lever "affordable income" — the change in the most you could PRUDENTLY
-  // spend each YEAR that this strategy buys you (isolated from the baseline). This
-  // is the 85%-confidence Monte Carlo safe-spend (same basis as the headroom card
-  // and the Adjust-spending lever), so the per-lever figures and the card total
-  // reconcile. Guardrails are stripped so it's a fixed-spending figure. It's ~14
-  // MC runs per card — heavy — so it's debounced off the interaction path with a
-  // pending pulse; a fixed seed keeps it stable between renders.
-  const valsKey = useMemo(() => JSON.stringify(values), [values]);
+  // Per-lever "Extra you could spend" — the change in the most you could PRUDENTLY
+  // spend each YEAR that this strategy buys you (85%-confidence Monte Carlo, the same
+  // basis as the headroom card). Each figure is ~14 MC runs, so — unlike the cheap
+  // deterministic chips above — it is NOT recomputed automatically as you drag. It's
+  // computed on demand per card when the user taps "Calculate" (once they've finished
+  // adjusting), and shown stale when that card's inputs change afterwards.
   const [affordable, setAffordable] = useState<Record<string, number>>({});
-  const [affordablePending, setAffordablePending] = useState(false);
-  // The baseline's own 85% safe-spend (no strategies) — reused by the headroom card
-  // as the "before" figure, so it's on the same basis as the per-lever deltas.
+  const [affordableKey, setAffordableKey] = useState<Record<string, string>>({});
+  const [affordableComputing, setAffordableComputing] = useState<string | null>(null);
+  // The baseline's own 85% safe-spend (no strategies) — the "before" figure for the
+  // headroom card AND the anchor each per-lever delta is measured against. Just one
+  // MC bisection, so it stays debounced/auto.
   const [baseSafeSpend, setBaseSafeSpend] = useState<number | null>(null);
   useEffect(() => {
     if (!baseline) return;
-    setAffordablePending(true);
     const id = setTimeout(() => {
-      const baseMax = maxSpendForConfidence({ ...baseline, guardrails: undefined }, config, SAFE_TARGET, SAFE_MC);
-      setBaseSafeSpend(baseMax);
-      const out: Record<string, number> = {};
-      for (const card of catalog) {
-        const single = card.apply(baseline, resolveValues(card, values[card.id]));
-        out[card.id] = maxSpendForConfidence({ ...single, guardrails: undefined }, config, SAFE_TARGET, SAFE_MC) - baseMax;
-      }
-      setAffordable(out);
-      setAffordablePending(false);
-    }, 600);
+      setBaseSafeSpend(maxSpendForConfidence({ ...baseline, guardrails: undefined }, config, SAFE_TARGET, SAFE_MC));
+    }, 300);
     return () => clearTimeout(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [baseline, catalog, valsKey, config]);
+  }, [baseline, config]);
+  // Signature of everything a per-lever figure depends on except that card's own
+  // slider values (added per card in cardKey) — so changing the base plan or config
+  // marks every computed figure stale.
+  const envKey = useMemo(() => JSON.stringify(config) + "|" + (baseline ? JSON.stringify(baseline) : ""), [config, baseline]);
+  const cardKey = (card: StrategyCard) => envKey + "|" + JSON.stringify(resolveValues(card, values[card.id]));
+  const recalcIncome = (card: StrategyCard) => {
+    if (!baseline) return;
+    const key = cardKey(card);
+    setAffordableComputing(card.id);
+    // Yield first so the "Calculating…" state paints before the blocking MC run.
+    setTimeout(() => {
+      const base = baseSafeSpend ?? maxSpendForConfidence({ ...baseline, guardrails: undefined }, config, SAFE_TARGET, SAFE_MC);
+      const single = card.apply(baseline, resolveValues(card, values[card.id]));
+      const v = maxSpendForConfidence({ ...single, guardrails: undefined }, config, SAFE_TARGET, SAFE_MC) - base;
+      setAffordable((a) => ({ ...a, [card.id]: v }));
+      setAffordableKey((k) => ({ ...k, [card.id]: key }));
+      setAffordableComputing(null);
+    }, 30);
+  };
 
   if (!baseline || !baseRes || !compRes || !composed) return <div className="min-h-screen bg-ink" />;
 
@@ -612,8 +630,15 @@ export default function WhatIfView({
         netWorth: 0,
         takeHomeNow: 0,
       },
-    incomeDelta: affordable[card.id] ?? null,
-    incomePending: affordablePending,
+    income:
+      card.id === "adjust-spending"
+        ? null
+        : {
+            value: affordable[card.id] ?? null,
+            stale: affordableKey[card.id] !== cardKey(card),
+            computing: affordableComputing === card.id,
+            onCalc: () => recalcIncome(card),
+          },
     life: baseline.lifeExpectancy,
     baseTakeHome: baseRes.rows[0]?.takeHome ?? 0,
     values: resolveValues(card, values[card.id]),
@@ -1295,16 +1320,17 @@ function Sparkline({
   );
 }
 
-function ImpactBreakdown({ delta, incomeDelta, life }: { delta: Marginal; incomeDelta: number | null; life: number }) {
+function ImpactBreakdown({ delta, income, life }: { delta: Marginal; income: IncomeCalc; life: number }) {
   const nwDiffers = Math.abs(delta.netWorth - delta.moneyLeft) >= 2_000;
-  const incomeStr = incomeDelta != null ? fmtDeltaYr(incomeDelta) : null;
+  const incomeReady = !!income && income.value != null && !income.stale;
+  const incomeStr = incomeReady ? fmtDeltaYr(income!.value!) : null;
   const rows = [
-    ...(incomeStr ? [{ label: "Extra you could spend", sub: "and still have it last / yr", str: incomeStr, v: incomeDelta! }] : []),
+    ...(incomeStr ? [{ label: "Extra you could spend", sub: "and still have it last / yr", str: incomeStr, v: income!.value! }] : []),
     { label: `Spendable funds at ${life}`, sub: "liquid super + savings", v: delta.moneyLeft },
     { label: "Spending shortfall avoided", sub: "spending you can now cover", v: delta.shortfallAvoided },
     ...(nwDiffers ? [{ label: `Net worth at ${life}`, sub: "adds your home & property", v: delta.netWorth }] : []),
   ].filter((r) => "str" in r || Math.abs(r.v) >= 2_000);
-  if (!rows.length) return null;
+  if (!rows.length && !income) return null;
   return (
     <div className="rounded-lg border border-line bg-panel px-3 py-2 text-xs">
       <div className="mb-1 text-[10px] uppercase tracking-wide text-muted">On its own — the impact</div>
@@ -1317,7 +1343,34 @@ function ImpactBreakdown({ delta, incomeDelta, life }: { delta: Marginal; income
           <span className={`shrink-0 font-semibold tabular-nums ${r.v > 0 ? "text-accent" : "text-amber-400"}`}>{"str" in r ? r.str : fmtDelta(r.v)}</span>
         </div>
       ))}
-      {incomeStr && incomeDelta! > 0 && (
+      {/* "Extra you could spend" is an 85% Monte Carlo run — heavy — so it's computed
+          on demand rather than on every slider move. */}
+      {income && (
+        incomeReady ? (
+          <div className="mt-1.5 flex items-center justify-between gap-2 border-t border-line pt-1.5">
+            <span className="text-[10px] text-muted/70">Spending impact up to date</span>
+            <button onClick={income.onCalc} className="text-[10px] font-medium text-muted transition hover:text-white">↻ Recalculate</button>
+          </div>
+        ) : (
+          <div className="mt-1.5 border-t border-line pt-1.5">
+            <button
+              onClick={income.onCalc}
+              disabled={income.computing}
+              className="flex w-full items-center justify-center gap-1.5 rounded-md border border-accent/40 bg-accent/10 px-2 py-1.5 text-[11px] font-semibold text-accent transition hover:bg-accent/20 disabled:cursor-wait disabled:opacity-70"
+            >
+              {income.computing
+                ? "Calculating… (85% confidence run)"
+                : income.value != null
+                  ? "↻ Update “Extra you could spend”"
+                  : "Calculate “Extra you could spend”"}
+            </button>
+            <p className="mt-1 text-center text-[10px] leading-snug text-muted/70">
+              An 85% Monte-Carlo run — tap once you&apos;ve finished adjusting the sliders.
+            </p>
+          </div>
+        )
+      )}
+      {incomeStr && income!.value! > 0 && (
         <p className="mt-1.5 border-t border-line pt-1.5 text-[10px] leading-snug text-muted/80">
           “Extra you could spend” is <span className="text-slate-300">headroom, not automatic income</span> — until you lift
           your spending goal it just builds up as extra balance. Raise it with “Adjust discretionary spending” to draw it.
@@ -1388,8 +1441,7 @@ function StrategyCardRow({
   card,
   on,
   delta,
-  incomeDelta,
-  incomePending,
+  income,
   life,
   baseTakeHome,
   values,
@@ -1403,8 +1455,9 @@ function StrategyCardRow({
   card: StrategyCard;
   on: boolean;
   delta: Marginal;
-  incomeDelta: number | null; // Δ affordable income /yr (null until first computed)
-  incomePending: boolean;
+  // The 85% "Extra you could spend" figure — computed on demand (null for cards where
+  // it isn't meaningful, e.g. Adjust spending). `stale` = inputs changed since it ran.
+  income: IncomeCalc;
   life: number;
   baseTakeHome: number;
   values: Record<string, number>;
@@ -1557,7 +1610,14 @@ function StrategyCardRow({
               Stress test
             </span>
           ) : (
-            <DeltaChip years={delta.years} moneyLeft={delta.moneyLeft} netWorth={delta.netWorth} incomeDelta={incomeDelta} incomePending={incomePending} life={life} />
+            <DeltaChip
+              years={delta.years}
+              moneyLeft={delta.moneyLeft}
+              netWorth={delta.netWorth}
+              incomeDelta={income && !income.stale ? income.value : null}
+              incomePending={income?.computing ?? false}
+              life={life}
+            />
           )}
         </div>
       </div>
@@ -1578,7 +1638,7 @@ function StrategyCardRow({
               </p>
             </div>
           ) : (
-            <ImpactBreakdown delta={delta} incomeDelta={incomeDelta} life={life} />
+            <ImpactBreakdown delta={delta} income={income} life={life} />
           )}
           {card.params.map((pm) => {
             // A discrete CHOICE param (who / mode) → a segmented control, not a slider.
