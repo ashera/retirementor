@@ -1821,9 +1821,9 @@ function StrategyCardRow({
                   )}
                 </div>
               )}
-              <div className="flex items-center justify-between gap-2 pt-0.5">
+              <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-2 pt-0.5">
                 {guardrails.outlook.downturnPath.length > 2 ? (
-                  <div className="flex items-center gap-2">
+                  <div className="flex min-w-0 flex-1 items-center gap-2">
                     <span className="shrink-0 text-[10px] text-muted" title="Your spending through a retire-into-a-downturn stress test — the same run as the modal">In a rough run</span>
                     <Sparkline
                       series={[guardrails.outlook.downturnPath.map((p) => ({ age: p.age, v: p.spend + gLoan }))]}
