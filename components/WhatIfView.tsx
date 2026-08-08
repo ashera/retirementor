@@ -932,9 +932,9 @@ export default function WhatIfView({
                 <span className="flex flex-wrap items-baseline justify-end gap-x-1.5 tabular-nums">
                   {changed && baseSustainable != null && Math.abs(baseSustainable - spendSustainable) >= 500 ? (
                     <>
-                      <span className="text-sm text-muted line-through">{fmtCurrency(baseSustainable)}</span>
+                      <span className="text-sm text-muted line-through" title="Your base plan — the most it sustains before any strategies are applied">{fmtCurrency(baseSustainable)}</span>
                       <span aria-hidden className="text-muted">→</span>
-                      <span className="text-lg font-bold text-white">{fmtCurrency(spendSustainable)}</span>
+                      <span className="text-lg font-bold text-white" title="With your active strategies applied">{fmtCurrency(spendSustainable)}</span>
                       <span className={`text-xs font-semibold ${spendSustainable >= baseSustainable ? "text-accent" : "text-amber-400"}`}>
                         {fmtDelta(spendSustainable - baseSustainable)}
                       </span>
@@ -945,6 +945,11 @@ export default function WhatIfView({
                   <span className="text-xs font-medium text-muted">/yr</span>
                 </span>
               </div>
+              {changed && baseSustainable != null && Math.abs(baseSustainable - spendSustainable) >= 500 && (
+                <p className="mt-0.5 text-right text-[10px] uppercase tracking-wide text-muted/70">
+                  base plan <span aria-hidden>→</span> with your strategies
+                </p>
+              )}
               <p className="mt-0.5 text-[11px] leading-snug text-muted">
                 {spendSustainable - spendMix.total >= 500 ? (
                   <>
