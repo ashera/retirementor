@@ -1091,6 +1091,9 @@ export default function WhatIfView({
                   <div className="space-y-1.5">
                     {cards.map((card) => {
                       const on = active.has(card.id);
+                      // When active, surface the strategy's age (e.g. "Downsize your home @Age 75").
+                      const ageParam = card.params.find((p) => ["age", "startAge", "fromAge", "atAge"].includes(p.key));
+                      const ageVal = on && ageParam ? resolveValues(card, values[card.id])[ageParam.key] : null;
                       return (
                         <button
                           key={card.id}
@@ -1116,7 +1119,10 @@ export default function WhatIfView({
                           >
                             ✓
                           </span>
-                          <span className="min-w-0 flex-1 truncate">{card.label}</span>
+                          <span className="min-w-0 flex-1 truncate">
+                            {card.label}
+                            {ageVal != null && <span className="font-medium text-accent/90"> @Age {Math.round(ageVal)}</span>}
+                          </span>
                           <span className="shrink-0 text-xs text-muted">{on ? "Edit" : "›"}</span>
                         </button>
                       );
