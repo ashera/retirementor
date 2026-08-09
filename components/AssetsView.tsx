@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import type { RetirementPlan } from "@/lib/au/types";
 import { getIncomeStreams, getInvestmentProperties, startingSuperBalances } from "@/lib/au/types";
 import { fmtCurrency } from "@/lib/au/format";
+import { StepIcon, personaAvatarSrc } from "@/components/wizardVisuals";
 
 export interface AgePoint {
   age: number; // oldest member's age this year
@@ -38,20 +39,25 @@ interface Item {
   label: string;
   value: number;
   sub?: string;
+  icon?: ReactNode;
 }
 
-function Row({ label, value, sub, tone = "text-slate-200", strong = false }: {
+function Row({ label, value, sub, tone = "text-slate-200", strong = false, icon }: {
   label: string;
   value: string;
   sub?: string;
   tone?: string;
   strong?: boolean;
+  icon?: ReactNode;
 }) {
   return (
-    <div className={`flex items-baseline justify-between gap-4 py-1.5 ${strong ? "border-t border-line pt-2" : ""}`}>
-      <span className={`text-sm ${strong ? "font-semibold text-white" : "text-slate-300"}`}>
-        {label}
-        {sub && <span className="mt-0.5 block text-[11px] text-muted">{sub}</span>}
+    <div className={`flex items-center justify-between gap-3 py-1.5 ${strong ? "border-t border-line pt-2" : ""}`}>
+      <span className="flex min-w-0 items-center gap-2.5">
+        {icon}
+        <span className={`min-w-0 text-sm ${strong ? "font-semibold text-white" : "text-slate-300"}`}>
+          {label}
+          {sub && <span className="mt-0.5 block text-[11px] leading-snug text-muted">{sub}</span>}
+        </span>
       </span>
       <span className={`shrink-0 text-sm tabular-nums ${strong ? "font-bold text-white" : tone}`}>{value}</span>
     </div>
@@ -72,6 +78,20 @@ export default function AssetsView({ name, plan, points }: { name: string; plan:
   const homeLoan = Math.max(0, p.homeValue - p.homeEquity);
   const propName = (n: number) => props[n].name?.trim() || (props.length > 1 ? `Investment property ${n + 1}` : "Investment property");
 
+  // Visuals reused from the plan wizard: category line-icons + persona avatars.
+  const ic = (key: string) => <StepIcon stepKey={key} size={18} />;
+  const avatar = (isPartner: boolean, cls: string) => (
+    <img src={personaAvatarSrc(plan.people[isPartner ? 1 : 0]?.sex, isPartner)} alt="" className={cls} />
+  );
+  const superIcon = isCouple ? (
+    <span className="flex shrink-0">
+      {avatar(false, "h-9 w-9 rounded-full object-cover ring-2 ring-panel-2")}
+      {avatar(true, "-ml-3 h-9 w-9 rounded-full object-cover ring-2 ring-panel-2")}
+    </span>
+  ) : (
+    avatar(false, "h-9 w-9 shrink-0 rounded-full object-cover ring-1 ring-line")
+  );
+
   // Per-person ages at the selected point (the axis is the oldest member's age).
   const oldestCur = Math.max(...plan.people.map((pp) => pp.currentAge));
   const t = p.age - oldestCur;
@@ -85,6 +105,7 @@ export default function AssetsView({ name, plan, points }: { name: string; plan:
       label: "Super",
       value: p.superTotal,
       sub: isToday && isCouple ? `you ${fmtCurrency(superSplit[0] ?? 0)} · partner ${fmtCurrency(superSplit[1] ?? 0)}` : undefined,
+      icon: superIcon,
     });
   }
   if (p.savings > 0) {
@@ -103,6 +124,7 @@ export default function AssetsView({ name, plan, points }: { name: string; plan:
       label: "Savings (outside super)",
       value: p.savings,
       sub: sources.length ? `incl. ${sources.join(" · ")}` : undefined,
+      icon: ic("outside"),
     });
   }
   if (p.homeValue > 0) {
@@ -110,6 +132,7 @@ export default function AssetsView({ name, plan, points }: { name: string; plan:
       label: "Home",
       value: p.homeValue,
       sub: homeLoan > 0 ? `net equity ${fmtCurrency(p.homeEquity)} after the home loan` : "owned outright — exempt from the assets test",
+      icon: ic("household"),
     });
   }
   // Each investment property shown at its gross market value (its loan is a separate
@@ -120,6 +143,7 @@ export default function AssetsView({ name, plan, points }: { name: string; plan:
         label: propName(n),
         value: pp.value,
         sub: `${props[n].grossYield}% gross yield${pp.loan > 0 ? " · loan shown in liabilities" : ""}`,
+        icon: ic("property"),
       });
     }
   });
@@ -132,10 +156,11 @@ export default function AssetsView({ name, plan, points }: { name: string; plan:
       label: "Home loan",
       value: homeLoan,
       sub: m ? `${m.interestRate}% · ${m.type === "interest_only" ? "interest-only" : "principal & interest"}` : undefined,
+      icon: ic("household"),
     });
   }
   p.properties.forEach((pp, n) => {
-    if (pp.loan > 0) liabilities.push({ label: `${propName(n)} loan`, value: pp.loan, sub: `${props[n].loanRate}% · interest-only` });
+    if (pp.loan > 0) liabilities.push({ label: `${propName(n)} loan`, value: pp.loan, sub: `${props[n].loanRate}% · interest-only`, icon: ic("property") });
   });
 
   const totalAssets = assets.reduce((s, a) => s + a.value, 0);
@@ -173,12 +198,18 @@ export default function AssetsView({ name, plan, points }: { name: string; plan:
     <main className="mx-auto max-w-3xl px-5 py-10">
       <Link href="/" className="text-sm font-medium text-muted transition hover:text-white">← Back to planner</Link>
 
-      <header className="mt-5">
-        <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-accent">Assets &amp; liabilities</div>
-        <h1 className="mt-1 text-3xl font-bold text-white">{name}</h1>
-        <p className="mt-2 text-sm text-muted">
-          Your balance sheet through the plan, in today&apos;s dollars. Use the age slider to see how it changes over time.
-        </p>
+      <header className="mt-5 flex items-center gap-4">
+        <span className="flex shrink-0">
+          {avatar(false, "h-14 w-14 rounded-full object-cover ring-2 ring-panel-2")}
+          {isCouple && avatar(true, "-ml-5 h-14 w-14 rounded-full object-cover ring-2 ring-panel-2")}
+        </span>
+        <div className="min-w-0">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-accent">Assets &amp; liabilities</div>
+          <h1 className="mt-1 text-3xl font-bold text-white">{name}</h1>
+          <p className="mt-2 text-sm text-muted">
+            Your balance sheet through the plan, in today&apos;s dollars. Use the age slider to see how it changes over time.
+          </p>
+        </div>
       </header>
 
       {/* Age navigator — steps by the eldest member's age. */}
@@ -244,7 +275,7 @@ export default function AssetsView({ name, plan, points }: { name: string; plan:
           ) : (
             <>
               {assets.map((a, n) => (
-                <Row key={n} label={a.label} value={fmtCurrency(a.value)} sub={a.sub} tone="text-emerald-300" />
+                <Row key={n} label={a.label} value={fmtCurrency(a.value)} sub={a.sub} icon={a.icon} tone="text-emerald-300" />
               ))}
               <Row label="Total assets" value={fmtCurrency(totalAssets)} strong />
             </>
@@ -259,7 +290,7 @@ export default function AssetsView({ name, plan, points }: { name: string; plan:
           ) : (
             <>
               {liabilities.map((l, n) => (
-                <Row key={n} label={l.label} value={`−${fmtCurrency(l.value)}`} sub={l.sub} tone="text-rose-300" />
+                <Row key={n} label={l.label} value={`−${fmtCurrency(l.value)}`} sub={l.sub} icon={l.icon} tone="text-rose-300" />
               ))}
               <Row label="Total liabilities" value={`−${fmtCurrency(totalLiab)}`} strong />
             </>
