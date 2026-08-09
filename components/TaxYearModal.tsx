@@ -133,6 +133,12 @@ export default function TaxYearModal({
   const contrib = b.contribTax ?? 0;
   const earnings = Math.max(0, b.earningsTax ?? 0);
   const propertyCgt = b.propertyCgt ?? 0;
+  // Outside-super return splits into income (dividends/distributions — assessable each
+  // year, shown in the personal blocks) and capital growth (deferred, taxed only on
+  // sale as a 50%-discounted gain). Surface the split so the assessable slice is clear.
+  const outsideDividend = Math.max(0, b.outsideDividend ?? 0);
+  const outsideGrowth = Math.max(0, b.outsideGrowth ?? 0);
+  const outsideDeferred = Math.max(0, outsideGrowth - outsideDividend);
   const total = (b.incomeTax ?? 0) + (b.medicare ?? 0) + contrib + earnings + (b.capitalGains ?? 0);
   const isCouple = plan.people.length > 1;
   const hasPersonal = detail.some((d) => Math.abs(d.salary + d.work + d.rent + (d.stream ?? 0) + d.dividends) > 0.5 || d.gross > 0.5 || d.cgt > 0.5);
@@ -202,6 +208,31 @@ export default function TaxYearModal({
                     ))}
                   </div>
                 </section>
+              )}
+
+              {outsideDividend > 0.5 && (
+                <div className="rounded-xl border border-line bg-panel-2/40 px-4 py-2.5 text-[12px] leading-snug text-muted">
+                  <span className="font-semibold text-slate-200">Why only part of your savings&apos; earnings is taxed.</span>{" "}
+                  Your outside-super savings earned about {cur(outsideGrowth)} this year, split into two parts:
+                  <div className="mt-1.5 space-y-0.5">
+                    <Line
+                      label="Dividends / distributions"
+                      value={cur(outsideDividend)}
+                      sub="income paid out — assessable now (the amount taxed in the personal income above)"
+                      tone="text-slate-200"
+                    />
+                    <Line
+                      label="Capital growth"
+                      value={cur(outsideDeferred)}
+                      sub="not taxed until you sell — then a capital gain, with the 50% discount"
+                      tone="text-slate-400"
+                    />
+                  </div>
+                  <p className="mt-1.5 border-t border-line pt-1.5">
+                    So your assessable income only includes the {cur(outsideDividend)} of dividends/distributions — the
+                    {" "}{cur(outsideDeferred)} of growth keeps compounding tax-deferred inside the pool.
+                  </p>
+                </div>
               )}
 
               {(contrib > 0.5 || earnings > 0.5) && (
