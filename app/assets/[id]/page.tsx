@@ -32,6 +32,11 @@ export default async function AssetsPage({ params }: { params: Promise<{ id: str
     homeEquity: row.homeEquity,
     propertyEquity: row.propertyEquity,
     drLoan: row.breakdown.investmentLoan ?? 0,
+    working: row.phase === "accumulation",
+    // Freed equity routed to OUTSIDE super this year — from a home downsize and from a
+    // property sale — so the savings row can name where a jump came from.
+    homeToOutside: Math.max(0, (row.breakdown.homeProceeds ?? 0) - (row.breakdown.homeProceedsToSuper ?? 0)),
+    propToOutside: row.breakdown.propertyProceeds ?? 0,
   }));
 
   return <AssetsView name={saved.name} plan={plan} points={points} />;

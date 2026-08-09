@@ -14,6 +14,9 @@ export interface AgePoint {
   homeEquity: number; // homeValue less any mortgage
   propertyEquity: number; // combined investment-property net equity
   drLoan: number; // debt-recycling loan balance (already netted into savings/net worth)
+  working: boolean; // accumulation phase (still earning)
+  homeToOutside: number; // freed home-downsize equity routed to outside this year
+  propToOutside: number; // property-sale proceeds routed to outside this year
 }
 
 interface Item {
@@ -69,7 +72,24 @@ export default function AssetsView({ name, plan, points }: { name: string; plan:
       sub: isToday && isCouple ? `you ${fmtCurrency(superSplit[0] ?? 0)} · partner ${fmtCurrency(superSplit[1] ?? 0)}` : undefined,
     });
   }
-  if (p.savings > 0) assets.push({ label: "Savings (outside super)", value: p.savings });
+  if (p.savings > 0) {
+    // Name where the savings came from — outside super often builds even with $0 of
+    // annual savings (reinvested property rent while working; downsize / sale proceeds
+    // routed to savings; leftover super drawdown in retirement).
+    const sources: string[] = [];
+    if (p.working) {
+      if ((plan.annualOutsideSavings ?? 0) > 0) sources.push("your annual savings");
+      if (props.some((pr) => pr.strategy !== "sell")) sources.push("reinvested property rent");
+    }
+    if (points.slice(0, idx + 1).some((pt) => pt.homeToOutside > 1)) sources.push("home downsize proceeds");
+    if (points.slice(0, idx + 1).some((pt) => pt.propToOutside > 1)) sources.push("property sale proceeds");
+    if (sources.length === 0 && !p.working) sources.push("reinvested income & super-drawdown surplus");
+    assets.push({
+      label: "Savings (outside super)",
+      value: p.savings,
+      sub: sources.length ? `incl. ${sources.join(" · ")}` : undefined,
+    });
+  }
   if (p.homeValue > 0) {
     assets.push({
       label: "Home",
