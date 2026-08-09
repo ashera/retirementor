@@ -562,6 +562,16 @@ export default function WhatIfView({
     }, 30);
   };
 
+  // Auto-run "Extra you could spend" ONCE when a card's detail is opened, so users see
+  // the figure without a tap. Keyed only on the open card's id — NOT its values — so
+  // subsequent slider tweaks mark it stale and need a manual "Recalculate" instead.
+  useEffect(() => {
+    if (!detailCard || !baseline || detailCard.id === "adjust-spending") return;
+    const stale = affordableKey[detailCard.id] !== cardKey(detailCard);
+    if (stale && affordableComputing !== detailCard.id) recalcIncome(detailCard);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [detailCard?.id]);
+
   if (!baseline || !baseRes || !compRes || !composed) return <div className="min-h-screen bg-ink" />;
 
   const changed = active.size > 0;
