@@ -196,7 +196,7 @@ export default function AssetsView({ name, plan, points }: { name: string; plan:
           {isCouple && avatar(true, "-ml-5 h-14 w-14 rounded-full object-cover ring-2 ring-panel-2")}
         </span>
         <div className="min-w-0">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-accent">Assets &amp; liabilities</div>
+          <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-accent">Financial summary</div>
           <h1 className="mt-1 text-3xl font-bold text-white">{name}</h1>
           <p className="mt-2 text-sm text-muted">
             Your balance sheet through the plan, in today&apos;s dollars. Use the age slider to see how it changes over time.

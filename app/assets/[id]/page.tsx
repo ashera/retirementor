@@ -8,7 +8,7 @@ import { propertyValueAt } from "@/lib/au/property";
 import { retirementYearIncome } from "@/lib/au/yearIncome";
 import AssetsView, { type AgePoint } from "@/components/AssetsView";
 
-export const metadata = { title: "Assets & liabilities", robots: { index: false, follow: false } };
+export const metadata = { title: "Financial summary", robots: { index: false, follow: false } };
 export const dynamic = "force-dynamic";
 
 export default async function AssetsPage({ params }: { params: Promise<{ id: string }> }) {
