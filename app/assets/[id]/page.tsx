@@ -1,8 +1,10 @@
 import { notFound, redirect } from "next/navigation";
 import { query } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
+import { getActiveConfig } from "@/lib/refdata";
+import { simulate } from "@/lib/au/simulate";
 import { DEFAULT_PLAN, type RetirementPlan } from "@/lib/au/types";
-import AssetsView from "@/components/AssetsView";
+import AssetsView, { type AgePoint } from "@/components/AssetsView";
 
 export const metadata = { title: "Assets & liabilities", robots: { index: false, follow: false } };
 export const dynamic = "force-dynamic";
@@ -20,5 +22,17 @@ export default async function AssetsPage({ params }: { params: Promise<{ id: str
   if (!saved) notFound();
 
   const plan = { ...DEFAULT_PLAN, ...saved.data };
-  return <AssetsView name={saved.name} plan={plan} />;
+  const config = await getActiveConfig();
+  const result = simulate(plan, config);
+  const points: AgePoint[] = result.rows.map((row) => ({
+    age: row.age,
+    superTotal: row.totalSuper,
+    savings: row.outside,
+    homeValue: row.homeValue,
+    homeEquity: row.homeEquity,
+    propertyEquity: row.propertyEquity,
+    drLoan: row.breakdown.investmentLoan ?? 0,
+  }));
+
+  return <AssetsView name={saved.name} plan={plan} points={points} />;
 }
