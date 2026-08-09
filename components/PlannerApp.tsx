@@ -1336,6 +1336,22 @@ export default function PlannerApp({
           </button>
         </div>
 
+        {/* Your private notes for this scenario (if any) — click "Notes" to edit. */}
+        {(() => {
+          const notes = ((activePlan && (notesOverride[activePlan.id] ?? activePlan.notes)) || "").trim();
+          if (!notes) return null;
+          return (
+            <button
+              onClick={() => setNotesOpen(true)}
+              title="Edit your notes for this scenario"
+              className="mt-1.5 flex max-w-3xl items-start gap-1.5 text-left text-xs leading-snug text-muted transition hover:text-slate-300"
+            >
+              <span aria-hidden className="shrink-0">📝</span>
+              <span className="line-clamp-2 whitespace-pre-line">{notes}</span>
+            </button>
+          );
+        })()}
+
         {/* Actions on the active scenario. */}
         <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-line pt-3">
           {activePlan ? (
