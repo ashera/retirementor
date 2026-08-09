@@ -506,6 +506,7 @@ export function simulate(
       let ttrPension = 0; // tax-free TTR pension drawn from super to hold take-home
       let medicare = 0; // Medicare levy on salary
       const taxables: number[] = []; // per-person taxable salary — base for the rental tax/deduction
+      const takeHomePer: number[] = new Array(plan.people.length).fill(0);
       plan.people.forEach((p, i) => {
         const brk = onBreak(i);
         const person = brk ? { ...p, salary: 0, voluntaryConcessional: 0 } : p;
@@ -521,6 +522,7 @@ export function simulate(
         superGrowth += r.superGrowth;
         earningsTax += r.earningsTax;
         takeHome += r.takeHome;
+        takeHomePer[i] = r.takeHome;
         ttrBenefit += r.ttrBenefit;
         ttrPension += r.ttrPension;
         medicare += r.medicareLevyPaid;
@@ -722,6 +724,7 @@ export function simulate(
           savings,
           salaryIncome: plan.people.reduce((s, p, i) => s + (onBreak(i) ? 0 : p.salary), 0),
           takeHome,
+          takeHomePer,
           ttrBenefit,
           ttrPension,
           workIncome: 0,
@@ -828,6 +831,7 @@ export function simulate(
     let workTtrBenefit = 0; // net super gained from a partner running TTR through the gap
     let workTtrPension = 0; // tax-free TTR pension drawn to hold a gap-worker's take-home
     let workOnBreak = false; // any still-working partner on a career break this year
+    const workTakeHomePer: number[] = new Array(plan.people.length).fill(0);
     plan.people.forEach((p, i) => {
       if (t >= retireOffsets[i]) return; // already retired — drawn down below
       // A career break landing in the staggered gap: no salary, no contributions
@@ -849,6 +853,7 @@ export function simulate(
       workSuperGrowth += r.superGrowth;
       workEarningsTax += r.earningsTax;
       workTakeHome += r.takeHome;
+      workTakeHomePer[i] = r.takeHome;
       workGrossSalary += brk ? 0 : p.salary * gapScale;
       workTtrBenefit += r.ttrBenefit;
       workTtrPension += r.ttrPension;
@@ -1533,6 +1538,7 @@ export function simulate(
         savings: 0, // no separate savings stream in retirement — a gap-year surplus is the "income kept in savings" funding line
         salaryIncome: workGrossSalary,
         takeHome: workTakeHome,
+        takeHomePer: workTakeHomePer,
         ttrBenefit: workTtrBenefit,
         ttrPension: workTtrPension,
         workIncome: netWork,

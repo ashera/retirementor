@@ -33,6 +33,9 @@ export interface AgePoint {
   homeLoanCost: number;
   rentCost: number; // if renting
   oneOffExpense: number; // a life-event expense
+  // Per-person split of the attributable income (order matches plan.people); pooled
+  // super/savings drawdowns stay in the household fields above.
+  perPerson: { takeHome: number; netRent: number; partTime: number; incomeStream: number; pension: number }[];
 }
 
 interface Item {
@@ -186,6 +189,22 @@ export default function AssetsView({ name, plan, points }: { name: string; plan:
   const totalIn = moneyIn.reduce((s, x) => s + x.value, 0);
   const totalOut = moneyOut.reduce((s, x) => s + x.value, 0);
 
+  // Per-person income (couples): each partner's attributable income; pooled drawdowns
+  // sit in a shared group so the split still reconciles with spending.
+  const personIncome = (i: number): Item[] => {
+    const pp = p.perPerson[i] ?? { takeHome: 0, netRent: 0, partTime: 0, incomeStream: 0, pension: 0 };
+    const items: Item[] = [];
+    if (pp.takeHome > 0.5) items.push({ label: "Take-home pay", value: pp.takeHome, icon: ic("you") });
+    if (pp.partTime > 0.5) items.push({ label: "Part-time work", value: pp.partTime, icon: ic("you") });
+    if (Math.abs(pp.incomeStream) > 0.5) items.push({ label: streamLabel, value: pp.incomeStream, icon: ic("outside") });
+    if (Math.abs(pp.netRent) > 0.5) items.push({ label: "Net rent", value: pp.netRent, icon: ic("property") });
+    if (pp.pension > 0.5) items.push({ label: "Age Pension", value: pp.pension, icon: ic("pension") });
+    return items;
+  };
+  const sharedIn: Item[] = [];
+  if (p.fromSuper > 0.5) sharedIn.push({ label: "Drawn from super", value: p.fromSuper, sub: "tax-free pension drawdown", icon: ic("super") });
+  if (p.fromOutside > 0.5) sharedIn.push({ label: "Drawn from savings", value: p.fromOutside, icon: ic("outside") });
+
   return (
     <main className="mx-auto max-w-3xl px-5 py-10">
       <Link href="/" className="text-sm font-medium text-muted transition hover:text-white">← Back to planner</Link>
@@ -299,6 +318,38 @@ export default function AssetsView({ name, plan, points }: { name: string; plan:
             <h3 className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted">Money in</h3>
             {moneyIn.length === 0 ? (
               <p className="py-1 text-xs text-muted">No income at this age.</p>
+            ) : isCouple ? (
+              <>
+                {[0, 1].map((i) => {
+                  const items = personIncome(i);
+                  if (!items.length) return null;
+                  const subtotal = items.reduce((s, x) => s + x.value, 0);
+                  return (
+                    <div key={i} className="mb-2 last:mb-0">
+                      <div className="flex items-center gap-2 pb-0.5">
+                        {avatar(i === 1, "h-6 w-6 rounded-full object-cover ring-1 ring-line")}
+                        <span className="text-xs font-semibold text-slate-200">{i === 0 ? "You" : "Your partner"}</span>
+                        <span className="ml-auto text-xs font-semibold tabular-nums text-slate-300">{fmtCurrency(subtotal)}</span>
+                      </div>
+                      {items.map((it, n) => (
+                        <Row key={n} label={it.label} value={fmtCurrency(it.value)} sub={it.sub} icon={it.icon} tone="text-teal-300" />
+                      ))}
+                    </div>
+                  );
+                })}
+                {sharedIn.length > 0 && (
+                  <div className="mb-2">
+                    <div className="flex items-center gap-2 pb-0.5">
+                      <StepIcon stepKey="household" size={16} />
+                      <span className="text-xs font-semibold text-slate-200">Shared</span>
+                    </div>
+                    {sharedIn.map((it, n) => (
+                      <Row key={n} label={it.label} value={fmtCurrency(it.value)} sub={it.sub} icon={it.icon} tone="text-teal-300" />
+                    ))}
+                  </div>
+                )}
+                <Row label="Total income" value={fmtCurrency(totalIn)} strong />
+              </>
             ) : (
               <>
                 {moneyIn.map((it, n) => (

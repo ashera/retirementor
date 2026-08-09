@@ -495,6 +495,7 @@ export interface YearBreakdown {
   savings: number; // added to outside-super this year
   salaryIncome: number; // gross household salary this year (accumulation only; 0 in retirement)
   takeHome: number; // net pay after income tax + pre-tax salary sacrifice (working years; 0 in retirement)
+  takeHomePer?: number[]; // per-person take-home pay (same order as plan.people) — for the per-person income view
   ttrBenefit: number; // net super gained this year from a Transition-to-Retirement swap (0 normally)
   ttrPension?: number; // tax-free TTR pension drawn from super to hold take-home while sacrificing more (0 normally)
   workIncome: number; // net part-time work income this year (retirement only; after tax)
