@@ -17,6 +17,7 @@ export interface AgePoint {
   working: boolean; // accumulation phase (still earning)
   homeToOutside: number; // freed home-downsize equity routed to outside this year
   propToOutside: number; // property-sale proceeds routed to outside this year
+  properties: { value: number; loan: number }[]; // per investment property, at this age (sold → 0/0)
 }
 
 interface Item {
@@ -97,15 +98,17 @@ export default function AssetsView({ name, plan, points }: { name: string; plan:
       sub: homeLoan > 0 ? `net equity ${fmtCurrency(p.homeEquity)} after the home loan` : "owned outright — exempt from the assets test",
     });
   }
-  if (p.propertyEquity > 0) {
-    assets.push({
-      label: props.length > 1 ? "Investment properties" : "Investment property",
-      value: p.propertyEquity,
-      sub: isToday && props.length
-        ? props.map((pr, n) => `${propName(n)} ${fmtCurrency(pr.value)}${pr.loanBalance > 0 ? ` − ${fmtCurrency(pr.loanBalance)} loan` : ""}`).join(" · ")
-        : "net equity (value less any loan)",
-    });
-  }
+  // Each investment property shown at its gross market value (its loan is a separate
+  // liability below).
+  p.properties.forEach((pp, n) => {
+    if (pp.value > 0) {
+      assets.push({
+        label: propName(n),
+        value: pp.value,
+        sub: `${props[n].grossYield}% gross yield${pp.loan > 0 ? " · loan shown in liabilities" : ""}`,
+      });
+    }
+  });
 
   // ── Liabilities ─────────────────────────────────────────────────────────────
   const liabilities: Item[] = [];
@@ -117,6 +120,9 @@ export default function AssetsView({ name, plan, points }: { name: string; plan:
       sub: m ? `${m.interestRate}% · ${m.type === "interest_only" ? "interest-only" : "principal & interest"}` : undefined,
     });
   }
+  p.properties.forEach((pp, n) => {
+    if (pp.loan > 0) liabilities.push({ label: `${propName(n)} loan`, value: pp.loan, sub: `${props[n].loanRate}% · interest-only` });
+  });
 
   const totalAssets = assets.reduce((s, a) => s + a.value, 0);
   const totalLiab = liabilities.reduce((s, a) => s + a.value, 0);
@@ -211,9 +217,7 @@ export default function AssetsView({ name, plan, points }: { name: string; plan:
         <section className="rounded-2xl border border-line bg-panel-2 p-4">
           <h2 className="mb-1 text-sm font-semibold text-slate-200">Liabilities</h2>
           {liabilities.length === 0 ? (
-            <p className="py-2 text-xs text-muted">
-              No loans at this age{props.length > 0 ? " (any property loan is netted into its equity above)" : ""}.
-            </p>
+            <p className="py-2 text-xs text-muted">No loans at this age.</p>
           ) : (
             <>
               {liabilities.map((l, n) => (
@@ -260,9 +264,9 @@ export default function AssetsView({ name, plan, points }: { name: string; plan:
       )}
 
       <p className="mt-6 text-[11px] leading-snug text-muted">
-        Projected with your plan&apos;s assumptions, in today&apos;s dollars. Your home is shown at market value with any
-        mortgage as a liability; investment properties are shown at their net equity (value less any loan). Super and
-        savings are the combined balances at each age.
+        Projected with your plan&apos;s assumptions, in today&apos;s dollars. Your home and any investment properties are
+        shown at their market value, with each loan listed separately as a liability, so net worth reflects your equity.
+        Super and savings are the combined balances at each age.
       </p>
     </main>
   );

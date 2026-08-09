@@ -3,7 +3,8 @@ import { query } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { getActiveConfig } from "@/lib/refdata";
 import { simulate } from "@/lib/au/simulate";
-import { DEFAULT_PLAN, type RetirementPlan } from "@/lib/au/types";
+import { DEFAULT_PLAN, getInvestmentProperties, type RetirementPlan } from "@/lib/au/types";
+import { propertyValueAt } from "@/lib/au/property";
 import AssetsView, { type AgePoint } from "@/components/AssetsView";
 
 export const metadata = { title: "Assets & liabilities", robots: { index: false, follow: false } };
@@ -24,20 +25,37 @@ export default async function AssetsPage({ params }: { params: Promise<{ id: str
   const plan = { ...DEFAULT_PLAN, ...saved.data };
   const config = await getActiveConfig();
   const result = simulate(plan, config);
-  const points: AgePoint[] = result.rows.map((row) => ({
-    age: row.age,
-    superTotal: row.totalSuper,
-    savings: row.outside,
-    homeValue: row.homeValue,
-    homeEquity: row.homeEquity,
-    propertyEquity: row.propertyEquity,
-    drLoan: row.breakdown.investmentLoan ?? 0,
-    working: row.phase === "accumulation",
-    // Freed equity routed to OUTSIDE super this year — from a home downsize and from a
-    // property sale — so the savings row can name where a jump came from.
-    homeToOutside: Math.max(0, (row.breakdown.homeProceeds ?? 0) - (row.breakdown.homeProceedsToSuper ?? 0)),
-    propToOutside: row.breakdown.propertyProceeds ?? 0,
-  }));
+
+  // Per-property value + loan at each age, so the balance sheet can show the property
+  // as a gross asset with its loan as a separate liability. Mirrors the engine: value
+  // grows at growthReal; the interest-only loan is the nominal balance deflated to
+  // today's dollars; a "sell" property drops out once sold (proceeds go to savings).
+  const oldestCur = Math.max(...plan.people.map((pp) => pp.currentAge));
+  const invProps = getInvestmentProperties(plan);
+  const inflPow = (t: number) => Math.pow(1 + plan.inflation / 100, t);
+
+  const points: AgePoint[] = result.rows.map((row) => {
+    const t = row.age - oldestCur;
+    const properties = invProps.map((pr) => {
+      const sold = pr.strategy === "sell" && row.age >= pr.sellAtAge;
+      return sold ? { value: 0, loan: 0 } : { value: propertyValueAt(pr, t), loan: pr.loanBalance / inflPow(t) };
+    });
+    return {
+      age: row.age,
+      superTotal: row.totalSuper,
+      savings: row.outside,
+      homeValue: row.homeValue,
+      homeEquity: row.homeEquity,
+      propertyEquity: row.propertyEquity,
+      drLoan: row.breakdown.investmentLoan ?? 0,
+      working: row.phase === "accumulation",
+      // Freed equity routed to OUTSIDE super this year — from a home downsize and from a
+      // property sale — so the savings row can name where a jump came from.
+      homeToOutside: Math.max(0, (row.breakdown.homeProceeds ?? 0) - (row.breakdown.homeProceedsToSuper ?? 0)),
+      propToOutside: row.breakdown.propertyProceeds ?? 0,
+      properties,
+    };
+  });
 
   return <AssetsView name={saved.name} plan={plan} points={points} />;
 }
