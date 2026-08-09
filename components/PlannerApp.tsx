@@ -1381,10 +1381,10 @@ export default function PlannerApp({
               </button>
               <Link
                 href={`/assets/${activePlan.id}`}
-                title={`Assets & liabilities defined in ${activePlan.name}`}
+                title={`Financial summary for ${activePlan.name}`}
                 className="rounded-lg border border-line bg-panel-2 px-3 py-1.5 text-sm font-medium text-slate-200 transition hover:border-accent/50 hover:text-white"
               >
-                🏦 Assets &amp; liabilities
+                🏦 Financial summary
               </Link>
               {renderIOButtons()}
               <button
