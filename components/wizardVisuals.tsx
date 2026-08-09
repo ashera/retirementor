@@ -11,6 +11,8 @@ export const STEP_META: Record<string, { color: string; desc: string }> = {
   property: { color: "#fb923c", desc: "An investment property is counted by the Age Pension." },
   goal: { color: "#fb7185", desc: "When you retire and how much you'll spend." },
   assumptions: { color: "#22d3ee", desc: "Long-run return, inflation and fees." },
+  super: { color: "#2dd4bf", desc: "Your superannuation balance." },
+  pension: { color: "#5eead4", desc: "The Age Pension you receive." },
 };
 
 // Persona silhouette for a person, by sex — reusing the Persona-test avatars. We
@@ -33,6 +35,10 @@ export function StepIcon({ stepKey, size = 22 }: { stepKey: string; size?: numbe
     property: (<><path d="M4 21V6l7-3v18" /><path d="M11 21V9l8 3v9" /><path d="M7 9v0M7 13v0M7 17v0M15 14v0M15 18v0" /></>),
     goal: (<><circle cx="12" cy="12" r="8" /><circle cx="12" cy="12" r="4" /><circle cx="12" cy="12" r="1" /></>),
     assumptions: (<><path d="M4 7h10" /><path d="M18 7h2" /><circle cx="16" cy="7" r="2" /><path d="M4 17h2" /><path d="M10 17h10" /><circle cx="8" cy="17" r="2" /></>),
+    // A stacked "nest egg" cylinder — super building up over the years.
+    super: (<><ellipse cx="12" cy="6" rx="7" ry="2.5" /><path d="M5 6v6c0 1.38 3.13 2.5 7 2.5s7-1.12 7-2.5V6" /><path d="M5 12v6c0 1.38 3.13 2.5 7 2.5s7-1.12 7-2.5v-6" /></>),
+    // Hand holding a coin — the Age Pension / income received.
+    pension: (<><circle cx="12" cy="8" r="3" /><path d="M4 20a5 5 0 0 1 6-4.9" /><path d="M13.5 18.5h4a1.5 1.5 0 0 0 0-3H14l-2-1.6a2 2 0 0 0-2.4 0" /></>),
   };
   return (
     <span

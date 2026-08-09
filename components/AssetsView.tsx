@@ -83,14 +83,6 @@ export default function AssetsView({ name, plan, points }: { name: string; plan:
   const avatar = (isPartner: boolean, cls: string) => (
     <img src={personaAvatarSrc(plan.people[isPartner ? 1 : 0]?.sex, isPartner)} alt="" className={cls} />
   );
-  const superIcon = isCouple ? (
-    <span className="flex shrink-0">
-      {avatar(false, "h-9 w-9 rounded-full object-cover ring-2 ring-panel-2")}
-      {avatar(true, "-ml-3 h-9 w-9 rounded-full object-cover ring-2 ring-panel-2")}
-    </span>
-  ) : (
-    avatar(false, "h-9 w-9 shrink-0 rounded-full object-cover ring-1 ring-line")
-  );
 
   // Per-person ages at the selected point (the axis is the oldest member's age).
   const oldestCur = Math.max(...plan.people.map((pp) => pp.currentAge));
@@ -105,7 +97,7 @@ export default function AssetsView({ name, plan, points }: { name: string; plan:
       label: "Super",
       value: p.superTotal,
       sub: isToday && isCouple ? `you ${fmtCurrency(superSplit[0] ?? 0)} · partner ${fmtCurrency(superSplit[1] ?? 0)}` : undefined,
-      icon: superIcon,
+      icon: ic("super"),
     });
   }
   if (p.savings > 0) {
@@ -177,19 +169,19 @@ export default function AssetsView({ name, plan, points }: { name: string; plan:
   const streamLabel = activeStreamNames.length && activeStreamNames.length <= 2 ? activeStreamNames.join(" + ") : "Income streams";
 
   const moneyIn: Item[] = [];
-  if (p.pension > 0.5) moneyIn.push({ label: "Age Pension", value: p.pension });
-  if (Math.abs(p.netRent) > 0.5) moneyIn.push({ label: "Net rent", value: p.netRent, sub: p.netRent < 0 ? "a geared property — a cash drain" : undefined });
-  if (p.takeHome > 0.5) moneyIn.push({ label: p.retired ? "Partner's take-home pay" : "Take-home pay", value: p.takeHome, sub: p.retired ? "a partner still working" : "salary, after tax & any sacrifice" });
-  if (p.partTimeWork > 0.5) moneyIn.push({ label: "Part-time work", value: p.partTimeWork });
-  if (p.incomeStream > 0.5) moneyIn.push({ label: streamLabel, value: p.incomeStream });
-  if (p.fromSuper > 0.5) moneyIn.push({ label: "Drawn from super", value: p.fromSuper, sub: "tax-free pension drawdown" });
-  if (p.fromOutside > 0.5) moneyIn.push({ label: "Drawn from savings", value: p.fromOutside });
+  if (p.pension > 0.5) moneyIn.push({ label: "Age Pension", value: p.pension, icon: ic("pension") });
+  if (Math.abs(p.netRent) > 0.5) moneyIn.push({ label: "Net rent", value: p.netRent, sub: p.netRent < 0 ? "a geared property — a cash drain" : undefined, icon: ic("property") });
+  if (p.takeHome > 0.5) moneyIn.push({ label: p.retired ? "Partner's take-home pay" : "Take-home pay", value: p.takeHome, sub: p.retired ? "a partner still working" : "salary, after tax & any sacrifice", icon: ic(p.retired ? "partner" : "you") });
+  if (p.partTimeWork > 0.5) moneyIn.push({ label: "Part-time work", value: p.partTimeWork, icon: ic("you") });
+  if (p.incomeStream > 0.5) moneyIn.push({ label: streamLabel, value: p.incomeStream, icon: ic("outside") });
+  if (p.fromSuper > 0.5) moneyIn.push({ label: "Drawn from super", value: p.fromSuper, sub: "tax-free pension drawdown", icon: ic("super") });
+  if (p.fromOutside > 0.5) moneyIn.push({ label: "Drawn from savings", value: p.fromOutside, icon: ic("outside") });
 
   const moneyOut: Item[] = [];
-  if (p.living > 0.5) moneyOut.push({ label: "Living costs", value: p.living });
-  if (p.homeLoanCost > 0.5) moneyOut.push({ label: "Home loan", value: p.homeLoanCost });
-  if (p.rentCost > 0.5) moneyOut.push({ label: "Rent", value: p.rentCost });
-  if (p.oneOffExpense > 0.5) moneyOut.push({ label: "One-off expense", value: p.oneOffExpense });
+  if (p.living > 0.5) moneyOut.push({ label: "Living costs", value: p.living, icon: ic("goal") });
+  if (p.homeLoanCost > 0.5) moneyOut.push({ label: "Home loan", value: p.homeLoanCost, icon: ic("household") });
+  if (p.rentCost > 0.5) moneyOut.push({ label: "Rent", value: p.rentCost, icon: ic("household") });
+  if (p.oneOffExpense > 0.5) moneyOut.push({ label: "One-off expense", value: p.oneOffExpense, icon: ic("goal") });
 
   const totalIn = moneyIn.reduce((s, x) => s + x.value, 0);
   const totalOut = moneyOut.reduce((s, x) => s + x.value, 0);
@@ -310,7 +302,7 @@ export default function AssetsView({ name, plan, points }: { name: string; plan:
             ) : (
               <>
                 {moneyIn.map((it, n) => (
-                  <Row key={n} label={it.label} value={fmtCurrency(it.value)} sub={it.sub} tone="text-teal-300" />
+                  <Row key={n} label={it.label} value={fmtCurrency(it.value)} sub={it.sub} icon={it.icon} tone="text-teal-300" />
                 ))}
                 <Row label="Total income" value={fmtCurrency(totalIn)} strong />
               </>
@@ -325,7 +317,7 @@ export default function AssetsView({ name, plan, points }: { name: string; plan:
             ) : (
               <>
                 {moneyOut.map((it, n) => (
-                  <Row key={n} label={it.label} value={fmtCurrency(it.value)} sub={it.sub} tone="text-rose-300" />
+                  <Row key={n} label={it.label} value={fmtCurrency(it.value)} sub={it.sub} icon={it.icon} tone="text-rose-300" />
                 ))}
                 <Row label="Total spending" value={fmtCurrency(totalOut)} strong />
               </>
