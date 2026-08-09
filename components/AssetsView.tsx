@@ -18,6 +18,20 @@ export interface AgePoint {
   homeToOutside: number; // freed home-downsize equity routed to outside this year
   propToOutside: number; // property-sale proceeds routed to outside this year
   properties: { value: number; loan: number }[]; // per investment property, at this age (sold → 0/0)
+  // Cash flow this year (today's dollars). Income sources reconcile with spending in a
+  // funded retirement year; in working years living costs aren't itemised.
+  retired: boolean;
+  pension: number;
+  netRent: number; // net of its income tax; negative = a geared cash drain
+  takeHome: number; // household net pay (working) or a still-working partner's (retirement)
+  partTimeWork: number;
+  incomeStream: number; // net recurring income streams
+  fromSuper: number; // super that actually funds spending
+  fromOutside: number; // savings drawn to fund spending
+  living: number; // living costs (retirement; 0 while working — funded by salary)
+  homeLoanCost: number;
+  rentCost: number; // if renting
+  oneOffExpense: number; // a life-event expense
 }
 
 interface Item {
@@ -128,8 +142,32 @@ export default function AssetsView({ name, plan, points }: { name: string; plan:
   const totalLiab = liabilities.reduce((s, a) => s + a.value, 0);
   const net = totalAssets - totalLiab;
 
-  const activeStreams = streams.filter((s) => p.age >= s.fromAge && (!s.untilAge || p.age <= s.untilAge));
   const dr = plan.debtRecycle;
+
+  // ── Cash flow this year (income & spending) ─────────────────────────────────
+  const activeStreamNames = streams
+    .filter((s) => p.age >= s.fromAge && (!s.untilAge || p.age <= s.untilAge))
+    .map((s) => s.label?.trim())
+    .filter((x): x is string => !!x);
+  const streamLabel = activeStreamNames.length && activeStreamNames.length <= 2 ? activeStreamNames.join(" + ") : "Income streams";
+
+  const moneyIn: Item[] = [];
+  if (p.pension > 0.5) moneyIn.push({ label: "Age Pension", value: p.pension });
+  if (Math.abs(p.netRent) > 0.5) moneyIn.push({ label: "Net rent", value: p.netRent, sub: p.netRent < 0 ? "a geared property — a cash drain" : undefined });
+  if (p.takeHome > 0.5) moneyIn.push({ label: p.retired ? "Partner's take-home pay" : "Take-home pay", value: p.takeHome, sub: p.retired ? "a partner still working" : "salary, after tax & any sacrifice" });
+  if (p.partTimeWork > 0.5) moneyIn.push({ label: "Part-time work", value: p.partTimeWork });
+  if (p.incomeStream > 0.5) moneyIn.push({ label: streamLabel, value: p.incomeStream });
+  if (p.fromSuper > 0.5) moneyIn.push({ label: "Drawn from super", value: p.fromSuper, sub: "tax-free pension drawdown" });
+  if (p.fromOutside > 0.5) moneyIn.push({ label: "Drawn from savings", value: p.fromOutside });
+
+  const moneyOut: Item[] = [];
+  if (p.living > 0.5) moneyOut.push({ label: "Living costs", value: p.living });
+  if (p.homeLoanCost > 0.5) moneyOut.push({ label: "Home loan", value: p.homeLoanCost });
+  if (p.rentCost > 0.5) moneyOut.push({ label: "Rent", value: p.rentCost });
+  if (p.oneOffExpense > 0.5) moneyOut.push({ label: "One-off expense", value: p.oneOffExpense });
+
+  const totalIn = moneyIn.reduce((s, x) => s + x.value, 0);
+  const totalOut = moneyOut.reduce((s, x) => s + x.value, 0);
 
   return (
     <main className="mx-auto max-w-3xl px-5 py-10">
@@ -229,26 +267,47 @@ export default function AssetsView({ name, plan, points }: { name: string; plan:
         </section>
       </div>
 
-      {/* Income streams active at the selected age. */}
-      {streams.length > 0 && (
-        <section className="mt-4 rounded-2xl border border-line bg-panel-2 p-4">
-          <h2 className="mb-1 text-sm font-semibold text-slate-200">Income streams at age {p.age}</h2>
-          <p className="mb-1 text-[11px] text-muted">Ongoing income (a pension, annuity or distribution) — not a balance, so not in net worth above.</p>
-          {activeStreams.length === 0 ? (
-            <p className="py-1 text-xs text-muted">None active at this age.</p>
-          ) : (
-            activeStreams.map((s, n) => (
-              <Row
-                key={s.id || n}
-                label={s.label?.trim() || `Income stream ${n + 1}`}
-                value={`${fmtCurrency(s.perYear)}/yr`}
-                sub={`from age ${s.fromAge}${s.untilAge ? ` to ${s.untilAge}` : " for life"}${s.indexed ? "" : " · not indexed"}`}
-                tone="text-teal-300"
-              />
-            ))
-          )}
-        </section>
-      )}
+      {/* Income & spending (cash flow) at the selected age. */}
+      <section className="mt-4 rounded-2xl border border-line bg-panel-2 p-4">
+        <h2 className="mb-1 text-sm font-semibold text-slate-200">Income &amp; spending at age {p.age}</h2>
+        <p className="mb-2 text-[11px] text-muted">A cash-flow view — money in and money out this year (not part of net worth above).</p>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <h3 className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted">Money in</h3>
+            {moneyIn.length === 0 ? (
+              <p className="py-1 text-xs text-muted">No income at this age.</p>
+            ) : (
+              <>
+                {moneyIn.map((it, n) => (
+                  <Row key={n} label={it.label} value={fmtCurrency(it.value)} sub={it.sub} tone="text-teal-300" />
+                ))}
+                <Row label="Total income" value={fmtCurrency(totalIn)} strong />
+              </>
+            )}
+          </div>
+          <div>
+            <h3 className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted">Money out</h3>
+            {moneyOut.length === 0 ? (
+              <p className="py-1 text-xs text-muted">
+                {p.working ? "While you're working, day-to-day living is funded by your salary and isn't itemised here." : "No spending at this age."}
+              </p>
+            ) : (
+              <>
+                {moneyOut.map((it, n) => (
+                  <Row key={n} label={it.label} value={fmtCurrency(it.value)} sub={it.sub} tone="text-rose-300" />
+                ))}
+                <Row label="Total spending" value={fmtCurrency(totalOut)} strong />
+              </>
+            )}
+          </div>
+        </div>
+        {p.working && (
+          <p className="mt-2 border-t border-line pt-2 text-[11px] leading-snug text-muted">
+            While you&apos;re working, your salary covers day-to-day living (not itemised); what you don&apos;t spend is
+            saved. Full income vs spending is tracked once you retire.
+          </p>
+        )}
+      </section>
 
       {/* Debt recycling — a planned geared loan; its balance is already netted into savings above. */}
       {dr && dr.perYear > 0 && (

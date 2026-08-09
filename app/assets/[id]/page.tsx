@@ -5,6 +5,7 @@ import { getActiveConfig } from "@/lib/refdata";
 import { simulate } from "@/lib/au/simulate";
 import { DEFAULT_PLAN, getInvestmentProperties, type RetirementPlan } from "@/lib/au/types";
 import { propertyValueAt } from "@/lib/au/property";
+import { retirementYearIncome } from "@/lib/au/yearIncome";
 import AssetsView, { type AgePoint } from "@/components/AssetsView";
 
 export const metadata = { title: "Assets & liabilities", robots: { index: false, follow: false } };
@@ -40,6 +41,8 @@ export default async function AssetsPage({ params }: { params: Promise<{ id: str
       const sold = pr.strategy === "sell" && row.age >= pr.sellAtAge;
       return sold ? { value: 0, loan: 0 } : { value: propertyValueAt(pr, t), loan: pr.loanBalance / inflPow(t) };
     });
+    const b = row.breakdown;
+    const inc = retirementYearIncome(row);
     return {
       age: row.age,
       superTotal: row.totalSuper,
@@ -47,13 +50,26 @@ export default async function AssetsPage({ params }: { params: Promise<{ id: str
       homeValue: row.homeValue,
       homeEquity: row.homeEquity,
       propertyEquity: row.propertyEquity,
-      drLoan: row.breakdown.investmentLoan ?? 0,
+      drLoan: b.investmentLoan ?? 0,
       working: row.phase === "accumulation",
       // Freed equity routed to OUTSIDE super this year — from a home downsize and from a
       // property sale — so the savings row can name where a jump came from.
-      homeToOutside: Math.max(0, (row.breakdown.homeProceeds ?? 0) - (row.breakdown.homeProceedsToSuper ?? 0)),
-      propToOutside: row.breakdown.propertyProceeds ?? 0,
+      homeToOutside: Math.max(0, (b.homeProceeds ?? 0) - (b.homeProceedsToSuper ?? 0)),
+      propToOutside: b.propertyProceeds ?? 0,
       properties,
+      // Cash flow this year.
+      retired: row.phase !== "accumulation",
+      pension: inc.pension,
+      netRent: (row.rentIncome ?? 0) - (b.rentTax ?? 0),
+      takeHome: b.takeHome ?? 0,
+      partTimeWork: inc.partTimeWork,
+      incomeStream: row.incomeStream ?? 0,
+      fromSuper: inc.fromSuper,
+      fromOutside: inc.fromOutside,
+      living: b.livingSpend ?? 0,
+      homeLoanCost: b.mortgageCost ?? 0,
+      rentCost: b.rentCost ?? 0,
+      oneOffExpense: b.eventExpense ?? 0,
     };
   });
 
