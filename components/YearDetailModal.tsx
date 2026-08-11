@@ -6,7 +6,7 @@ import { rowWithdrawalRate, withdrawalBand } from "@/lib/au/withdrawal";
 import { yearFlow } from "@/lib/au/yearFlow";
 import { incomeStreamLabel } from "@/lib/au/yearIncome";
 import { rowNetWorth } from "@/lib/au/networth";
-import { getLifeEvents, personRetirementOffset, type RetirementPlan, type YearRow } from "@/lib/au/types";
+import { getInvestmentProperties, getLifeEvents, personRetirementOffset, type RetirementPlan, type YearRow } from "@/lib/au/types";
 
 const WR_TONE: Record<"accent" | "amber" | "red", string> = {
   accent: "text-emerald-400",
@@ -118,6 +118,31 @@ export default function YearDetailModal({
   const openSuperView = isNetWorth ? b.openingSuper : b.openingSuper - toSuperRelease;
   const openOutsideView = isNetWorth ? b.openingOutside : b.openingOutside - toOutsideRelease;
   const openAccumView = isNetWorth ? b.accumSuper : Math.max(0, b.accumSuper - toSuperRelease);
+
+  // Where the outside-super balance has come from — it can build even with $0 saved
+  // (reinvested property rent while working; a downsize / property sale routed to
+  // savings; reinvested super-drawdown surplus in retirement). Inferred structurally
+  // from the plan + this year's age/phase.
+  const outsideSources: string[] = (() => {
+    if (openOutsideView <= 0.5) return [];
+    const iprops = getInvestmentProperties(plan);
+    const working = row.phase === "accumulation";
+    const out: string[] = [];
+    if (working) {
+      if ((plan.annualOutsideSavings ?? 0) > 0) out.push("your annual savings");
+      if (iprops.some((pr) => pr.strategy !== "sell")) out.push("reinvested property rent");
+    }
+    const dz = plan.home?.downsize;
+    if (dz && plan.home && row.age >= dz.atAge) {
+      const oldest = Math.max(...plan.people.map((pp) => pp.currentAge));
+      const homeAtDz = plan.home.value * Math.pow(1 + (plan.home.growthReal ?? 0) / 100, Math.max(0, dz.atAge - oldest));
+      if (homeAtDz - dz.newValue - dz.toSuper > 1000) out.push("home downsize proceeds");
+    }
+    if (iprops.some((pr) => pr.strategy === "sell" && row.age >= pr.sellAtAge)) out.push("property sale proceeds");
+    if (out.length === 0 && !working) out.push("reinvested income & super-drawdown surplus");
+    return out;
+  })();
+
   // Above the Transfer Balance Cap, show how the opening super splits between the
   // tax-free pension pool and the taxed accumulation pool.
   const superLabel =
@@ -290,6 +315,11 @@ export default function YearDetailModal({
               <span className="text-base font-bold tabular-nums text-white">{fmtCurrency(wf.opening)}</span>
             </div>
             <div className="mb-1 text-[11px] text-muted">{wf.sub}</div>
+            {outsideSources.length > 0 && (
+              <div className="mb-1 text-[10px] leading-snug text-muted/80">
+                Outside super so far — incl. {outsideSources.join(" · ")}.
+              </div>
+            )}
 
             <div className="my-2 space-y-1.5 border-y border-line py-2">
               {wf.lines.map((l) => (
