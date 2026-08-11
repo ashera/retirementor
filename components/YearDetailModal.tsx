@@ -130,7 +130,9 @@ export default function YearDetailModal({
     const out: string[] = [];
     if (working) {
       if ((plan.annualOutsideSavings ?? 0) > 0) out.push("your annual savings");
-      if (iprops.some((pr) => pr.strategy !== "sell")) out.push("reinvested property rent");
+      // A property still earns (and reinvests) rent until it's actually sold — so a
+      // "sell later" property counts while it's still held.
+      if (iprops.some((pr) => !(pr.strategy === "sell" && row.age >= pr.sellAtAge))) out.push("reinvested property rent");
     }
     const dz = plan.home?.downsize;
     if (dz && plan.home && row.age >= dz.atAge) {

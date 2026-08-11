@@ -110,7 +110,8 @@ export default function AssetsView({ name, plan, points }: { name: string; plan:
     const sources: string[] = [];
     if (p.working) {
       if ((plan.annualOutsideSavings ?? 0) > 0) sources.push("your annual savings");
-      if (props.some((pr) => pr.strategy !== "sell")) sources.push("reinvested property rent");
+      // A property still earns (and reinvests) rent until it's actually sold.
+      if (props.some((pr) => !(pr.strategy === "sell" && p.age >= pr.sellAtAge))) sources.push("reinvested property rent");
     }
     if (points.slice(0, idx + 1).some((pt) => pt.homeToOutside > 1)) sources.push("home downsize proceeds");
     if (points.slice(0, idx + 1).some((pt) => pt.propToOutside > 1)) sources.push("property sale proceeds");
