@@ -381,18 +381,19 @@ export default function ConfidenceHero({
           </div>
           <div className="flex flex-wrap gap-2">
             {chips.map((c) => (
-              <span
+              <Link
                 key={c.key}
-                className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium ${
+                href={whatIfHref}
+                className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition hover:brightness-125 ${
                   c.kind === "expense"
                     ? "border-amber-400/40 bg-amber-400/10 text-amber-300"
                     : "border-accent/40 bg-accent/10 text-accent"
                 }`}
-                title={c.kind === "strategy" ? "Reflected in your dashboard numbers" : "A committed life event"}
+                title={c.kind === "strategy" ? "Edit this strategy in What-If" : "Edit this life event in What-If"}
               >
                 <span aria-hidden>{c.kind === "strategy" ? "✓" : "📌"}</span>
                 {c.label}
-              </span>
+              </Link>
             ))}
           </div>
         </div>
