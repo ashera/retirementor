@@ -755,6 +755,17 @@ export default function PlannerApp({
     }
   };
 
+  // Adopting a whole new scenario makes the debounced hero tiers (safe/failsafe)
+  // belong to the OLD plan. Null them so the hero falls back to a cache hit or its
+  // "Assessing…" skeleton for the new plan — never the previous scenario's stale
+  // numbers — until they recompute. Only fires on a full load; slider edits keep
+  // their last-good values + shimmer. (The safe-rate marker is spending-independent
+  // and keyed on the non-spending plan, so it's left to its own effect to refresh.)
+  const resetScenarioDerived = () => {
+    setMcMaxSpend(null);
+    setFailsafeSpend(null);
+  };
+
   // Commit a whole scenario as the new baseline (load / save / guide). Splits it
   // into base + strategy layer; the working-plan storage is handled by the effect.
   const commit = (next: RetirementPlan, name: string | null = null) => {
@@ -762,6 +773,7 @@ export default function PlannerApp({
     setBaseline(next);
     setBaselineName(name);
     persistBaseline(next, name);
+    resetScenarioDerived();
   };
 
   // Commit an edited BASE (wizard re-entry) while KEEPING the strategy layer, and
@@ -772,6 +784,7 @@ export default function PlannerApp({
     setBaseline(composed);
     setBaselineName(null);
     persistBaseline(composed, null);
+    resetScenarioDerived();
   };
 
   // Leaving the first-run guide. Completing adopts the entered plan and shows the
