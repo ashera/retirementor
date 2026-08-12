@@ -85,6 +85,32 @@ const NUDGE_KEY = "au-retirement-nudge-dismissed"; // signed-out "save your work
 const SCEN_ACTION =
   "flex items-center gap-2 rounded-lg border border-line bg-panel-2 px-3 py-2.5 text-sm font-medium text-slate-200 transition hover:border-accent/50 hover:text-white disabled:opacity-60";
 
+// The confidence hero's Monte Carlo spend tiers (safe 85% / failsafe 95%) are a
+// deterministic (fixed-seed) function of plan + config, but each is ~12 MC runs. Cache
+// them per plan+config signature so returning to the dashboard (from What-If, a report,
+// the back button…) reuses the result instead of re-running the "Assessing your plan"
+// solve for a plan that hasn't changed. Backed by sessionStorage so it survives a full
+// page reload too (not just in-app navigation); only a genuine plan/config change misses.
+const TIER_SS_KEY = "au-retirement-tier-cache";
+const tierCache = new Map<string, { safe: number; failsafe: number }>();
+if (typeof window !== "undefined") {
+  try {
+    const raw = sessionStorage.getItem(TIER_SS_KEY);
+    if (raw) for (const [k, v] of Object.entries(JSON.parse(raw) as Record<string, { safe: number; failsafe: number }>)) tierCache.set(k, v);
+  } catch {
+    /* ignore malformed cache */
+  }
+}
+const persistTierCache = () => {
+  if (typeof window === "undefined") return;
+  try {
+    while (tierCache.size > 20) tierCache.delete(tierCache.keys().next().value as string); // bound
+    sessionStorage.setItem(TIER_SS_KEY, JSON.stringify(Object.fromEntries(tierCache)));
+  } catch {
+    /* ignore quota / serialisation errors */
+  }
+};
+
 // A blank starting point for a first-time visitor's "Enter my details" wizard:
 // the personal figures (age, super, salary) start empty (NaN renders as a blank
 // Field) so nothing looks like the user's data until they type it. Spending and
@@ -595,16 +621,32 @@ export default function PlannerApp({
   const [mcMaxSpend, setMcMaxSpend] = useState<number | null>(null);
   const [failsafeSpend, setFailsafeSpend] = useState<number | null>(null);
   const [mcMaxPending, setMcMaxPending] = useState(false);
+  // Signature of everything the tiers depend on — a cache hit means an identical plan
+  // we've already solved (e.g. after a round-trip to What-If), so we can skip the solve.
+  const tierKey = useMemo(() => JSON.stringify({ p: plan, c: config }), [plan, config]);
   useEffect(() => {
     if (!ready || !configured) return;
+    const cached = tierCache.get(tierKey);
+    if (cached) {
+      // Reuse the already-computed tiers — no recompute, no "Assessing" flash.
+      setMcMaxSpend(cached.safe);
+      setFailsafeSpend(cached.failsafe);
+      setMcMaxPending(false);
+      return;
+    }
     setMcMaxPending(true);
     const id = setTimeout(() => {
-      setMcMaxSpend(maxSpendForConfidence(plan, config, MC_CONFIDENCE_TARGET, MC_CONFIDENCE_MC));
-      setFailsafeSpend(maxSpendForConfidence(plan, config, 0.95, MC_CONFIDENCE_MC));
+      const safe = maxSpendForConfidence(plan, config, MC_CONFIDENCE_TARGET, MC_CONFIDENCE_MC);
+      const failsafe = maxSpendForConfidence(plan, config, 0.95, MC_CONFIDENCE_MC);
+      tierCache.set(tierKey, { safe, failsafe });
+      persistTierCache();
+      setMcMaxSpend(safe);
+      setFailsafeSpend(failsafe);
       setMcMaxPending(false);
     }, 400);
     return () => clearTimeout(id);
-  }, [plan, config, ready, configured]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tierKey, ready, configured]);
   const maxSpend = mcMaxSpend ?? gs.maxSpend; // prudent once settled, central meanwhile
   // SAFE WITHDRAWAL RATE marker — a FIXED benchmark, computed on STEADY (flat real)
   // spending like the classic 4% rule, so it's a stable property of the portfolio and
@@ -1047,8 +1089,13 @@ export default function PlannerApp({
   const confLoan = goal.loanCost;
   const centralLiving = gs.maxSpend ?? gs.currentSpend;
   const centralTotal = centralLiving + confLoan;
-  const safeTotal = Math.min((mcMaxSpend ?? centralLiving) + confLoan, centralTotal);
-  const failsafeTotal = Math.min((failsafeSpend ?? mcMaxSpend ?? centralLiving) + confLoan, safeTotal);
+  // Prefer live state, then the cache (so a remount onto an already-solved plan shows
+  // the real tiers on the FIRST paint — the effect that sets state runs after paint).
+  const cachedTiers = tierCache.get(tierKey);
+  const safeLiving = mcMaxSpend ?? cachedTiers?.safe ?? null;
+  const failsafeLiving = failsafeSpend ?? cachedTiers?.failsafe ?? null;
+  const safeTotal = Math.min((safeLiving ?? centralLiving) + confLoan, centralTotal);
+  const failsafeTotal = Math.min((failsafeLiving ?? safeLiving ?? centralLiving) + confLoan, safeTotal);
   // Apply the safe tier as the new spend (its LIVING part; the engine layers the
   // loan on itself). Edits the base inputs, like the other quick-adjust levers.
   const setSpendToSafe = (living: number) => {
@@ -1416,7 +1463,7 @@ export default function PlannerApp({
         lastsToLE={result.lastsToLifeExpectancy}
         depletedAge={result.depletedAge}
         pending={mcMaxPending}
-        loading={mcMaxSpend == null || failsafeSpend == null}
+        loading={safeLiving == null || failsafeLiving == null}
         spendOverridden={spendOverridden}
         onSetSpend={setSpendToSafe}
         whatIfHref={whatIfHref}
