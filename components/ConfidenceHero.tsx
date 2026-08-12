@@ -67,6 +67,11 @@ export default function ConfidenceHero({
 }: ConfidenceHeroProps) {
   const state: ConfidenceState = confidenceState(goalTotal, { failsafe, safe, central });
   const headroom = safe - goalTotal; // + = room to spend more; − = above the safe level
+  // One colour for the whole card's "where does your goal sit" signal — the range
+  // zone, the dial and the verdict emphasis all use it: green at/below safe, amber
+  // above safe, rose above central.
+  const zoneColor =
+    state === "ambitious" ? ZONE.amber : state === "short" ? ZONE.short : ZONE.safe;
 
   // ── Range positioning ──────────────────────────────────────────────────────
   // Zones anchor to the tier boundaries; the domain pads a little beyond failsafe
@@ -87,7 +92,9 @@ export default function ConfidenceHero({
     `${ZONE.short} ${pCent}%, ${ZONE.short} 100%)`;
 
   // ── Confidence dial ─────────────────────────────────────────────────────────
-  const dialColor = confidencePct >= 85 ? ZONE.safe : confidencePct >= 60 ? ZONE.amber : ZONE.short;
+  // Colour by where the goal sits (zoneColor), so the donut matches the safe-spend
+  // range and verdict; the label below still speaks to the likelihood %.
+  const dialColor = zoneColor;
   const dialLabel = lastsToLE
     ? confidencePct >= 85
       ? "Very likely to last as long as your plan does."
@@ -132,12 +139,6 @@ export default function ConfidenceHero({
       </>
     );
   }
-
-  // The verdict's emphasis takes the state's zone colour, so the highlighted phrase
-  // ("above a safe level", "~$X/yr more") carries the same green/amber/rose signal
-  // as the range bar and the dial — not always green.
-  const verdictColor =
-    state === "ambitious" ? ZONE.amber : state === "short" ? ZONE.short : ZONE.safe;
 
   // "Set my spend to the safe level" — up when there's headroom, down when over it.
   // Hidden when a What-If strategy owns the spend (it wouldn't take effect here).
@@ -193,7 +194,7 @@ export default function ConfidenceHero({
           <>
           <p
             className="mt-2 max-w-[34ch] text-xl font-semibold leading-snug text-white text-balance sm:text-[26px] [&_b]:text-[color:var(--vc)]"
-            style={{ "--vc": verdictColor } as React.CSSProperties}
+            style={{ "--vc": zoneColor } as React.CSSProperties}
           >
             {verdict}
           </p>
