@@ -1133,7 +1133,7 @@ export default function PlannerApp({
   // loan on itself). Edits the base inputs, like the other quick-adjust levers.
   const setSpendToSafe = (living: number) => {
     setBase((prev) => withSpend(prev, Math.round(Math.max(0, living))));
-    setNotice("Spend set to your safe level — fine-tune it any time.");
+    setNotice("Spend set to your prudent level — fine-tune it any time.");
   };
   const goalSub =
     goal.loanKind === "pi"
@@ -1590,7 +1590,7 @@ export default function PlannerApp({
                     {fmtCurrency(wr.portfolio)} {hasSavings ? "super + savings" : "super"} at age {wr.age}
                     {safePct != null && (
                       <span className="mt-0.5 block text-sky-300">
-                        Safe rate ~{safePct}%{safeRatePending ? " …" : ""}
+                        Prudent rate ~{safePct}%{safeRatePending ? " …" : ""}
                         {flexPct != null ? ` · flexible ~${flexPct}%` : ""}
                       </span>
                     )}

@@ -98,6 +98,17 @@ export default function ConfidenceHero({
   const pSafe = pos(safe);
   const pCent = pos(central);
   const pGoal = pos(goalTotal);
+  // Bar ticks sit at the true positions, but the fixed-width tier CAPTIONS below would
+  // overlap when tiers are close (e.g. failsafe ≈ safe on a strong plan). Spread the
+  // caption anchors left-to-right to keep a minimum gap so their labels never collide.
+  const labelPct = (() => {
+    const MIN = 16; // min % between caption centres
+    const p = [pFail, pSafe, pCent].map((x) => clamp(x, 6, 94));
+    for (let i = 1; i < p.length; i++) if (p[i] - p[i - 1] < MIN) p[i] = p[i - 1] + MIN;
+    const over = p[p.length - 1] - 94;
+    if (over > 0) for (let i = 0; i < p.length; i++) p[i] = Math.max(6, p[i] - over);
+    return p;
+  })();
   const trackBg =
     `linear-gradient(90deg, ${ZONE.bullet} 0%, ${ZONE.bullet} ${pFail}%, ` +
     `${ZONE.safe} ${pFail}%, ${ZONE.safe} ${pSafe}%, ` +
@@ -110,52 +121,54 @@ export default function ConfidenceHero({
   const dialColor = zoneColor;
   const dialLabel = lastsToLE
     ? confidencePct >= 85
-      ? "Very likely to last as long as your plan does."
+      ? "A high modelled chance, across market ups and downs."
       : confidencePct >= 60
-        ? "Reasonably likely to last, but not a sure thing."
-        : "At real risk of running short before your planning age."
+        ? "A moderate modelled chance — not a sure thing."
+        : "A real modelled risk of running short before your planning age."
     : depletedAge != null
       ? `On the assumed ${assumedReturnPct}% return, funds run low around age ${depletedAge}.`
-      : "At risk of running short before your planning age.";
+      : "A modelled risk of running short before your planning age.";
 
   // ── Verdict copy ────────────────────────────────────────────────────────────
   const goalStr = fmtCurrency(goalTotal);
   const overspend = goalTotal - safe; // positive when spending above the safe level
   const eyebrow = "Retirement confidence · your plan today";
+  // Copy is framed as modelled ESTIMATES, not conclusions/assurances — this is a
+  // general-information calculator (ASIC Instrument 2022/603 / RG 276), not advice.
   let verdict: React.ReactNode;
   if (state === "bulletproof") {
     verdict = (
       <>
-        Your plan is <b>bulletproof</b> — even the worst market history funds your {goalStr} goal
-        {headroom >= CONFIDENCE_EPS ? <>, with room to spend <b>~{fmtCurrency(headroom)}/yr more</b></> : null}.
+        Your plan looks <b>very resilient</b> — even the worst market on record funds your {goalStr} goal
+        {headroom >= CONFIDENCE_EPS ? <>, with modelled room for <b>~{fmtCurrency(headroom)}/yr more</b></> : null}.
       </>
     );
   } else if (state === "safe") {
     verdict =
       headroom >= CONFIDENCE_EPS ? (
         <>
-          You can comfortably afford your {goalStr} goal — and could likely spend{" "}
-          <b>~{fmtCurrency(headroom)}/yr more</b>.
+          Your plan is <b>projected to fund</b> your {goalStr} goal — with modelled room for{" "}
+          <b>~{fmtCurrency(headroom)}/yr more</b> at the same 85% confidence.
         </>
       ) : (
         <>
-          You can comfortably afford your {goalStr} goal — it sits right at your{" "}
-          <b>safe spending level</b>, so your money is very likely to last as long as you do,
-          even through a poor run of markets.
+          Your plan is <b>projected to fund</b> your {goalStr} goal — it sits right at your{" "}
+          <b>prudent (85%) spending level</b>, modelled to last to your planning age of {lifeExpectancy} in
+          about 85% of return scenarios, including poor ones.
         </>
       );
   } else if (state === "ambitious") {
     verdict = (
       <>
-        Your {goalStr} goal works on the assumed {assumedReturnPct}% return, but sits <b>above a safe level</b> —
-        more risk of running short if markets disappoint.
+        Your {goalStr} goal is funded on the assumed {assumedReturnPct}% return, but sits{" "}
+        <b>above your prudent (85%) level</b> — a higher modelled chance of running short if markets disappoint.
       </>
     );
   } else {
     verdict = (
       <>
-        Your {goalStr} goal is <b>above even the optimistic level</b>. Easing toward{" "}
-        {fmtCompact(safe)}, or boosting the plan, brings it back to safe.
+        Your {goalStr} goal is <b>above even the central (50%) estimate</b>. Easing toward{" "}
+        {fmtCompact(safe)}, or strengthening the plan, brings it back within your prudent (85%) level.
       </>
     );
   }
@@ -221,7 +234,7 @@ export default function ConfidenceHero({
           ) : (
           <>
           <p
-            className="mt-2 max-w-[34ch] text-xl font-semibold leading-snug text-white text-balance sm:text-[26px] [&_b]:text-[color:var(--vc)]"
+            className="mt-2 text-xl font-semibold leading-snug text-white text-pretty sm:text-[26px] [&_b]:text-[color:var(--vc)]"
             style={{ "--vc": zoneColor } as React.CSSProperties}
           >
             {verdict}
@@ -242,9 +255,9 @@ export default function ConfidenceHero({
               ))}
             </div>
             <div className="relative mt-2 h-11">
-              {marker(pFail, ZONE.bullet, fmtCompact(failsafe), "Failsafe", "survives worst history")}
-              {marker(pSafe, ZONE.safe, fmtCompact(safe), "Safe · 85%", "very likely to last")}
-              {marker(pCent, ZONE.amber, fmtCompact(central), "Central · 50%", `on ${assumedReturnPct}% returns`)}
+              {marker(labelPct[0], ZONE.bullet, fmtCompact(failsafe), "Failsafe", "survives worst history")}
+              {marker(labelPct[1], ZONE.safe, fmtCompact(safe), "Prudent · 85%", "≈85% of runs last")}
+              {marker(labelPct[2], ZONE.amber, fmtCompact(central), "Central · 50%", `on ${assumedReturnPct}% returns`)}
             </div>
           </div>
 
@@ -252,9 +265,8 @@ export default function ConfidenceHero({
             <div className="mt-4 flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/[0.08] px-4 py-3">
               <span aria-hidden className="text-base">💡</span>
               <p className="text-[13px] leading-snug text-slate-200">
-                Most Australians <b className="text-amber-300">under-spend</b> and die with the bulk of their super
-                intact — you&apos;re leaving roughly <b className="text-amber-300">{fmtCurrency(headroom)}/yr</b> on the
-                table without meaningfully raising the risk.
+                At the same 85% confidence, your plan models capacity for about{" "}
+                <b className="text-amber-300">{fmtCurrency(headroom)}/yr</b> more than your current goal.
               </p>
             </div>
           )}

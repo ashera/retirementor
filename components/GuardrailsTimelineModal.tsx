@@ -244,7 +244,7 @@ export default function GuardrailsTimelineModal({
                 )
               ) : raised ? (
                 <>
-                  Your savings comfortably outpace your spending, so guardrails mostly hand you <strong className="text-white">raises</strong> —
+                  In this modelling your savings outpace your spending, so guardrails mostly hand you <strong className="text-white">raises</strong> —
                   spending climbs to about <strong className="text-white">{fmtCurrency(tl.plateauSpend)}</strong> by the end.
                 </>
               ) : recovers ? (
@@ -323,8 +323,8 @@ export default function GuardrailsTimelineModal({
                 </>
               ) : raised ? (
                 <>
-                  You&apos;re comfortably funded — flexibility is <strong className="text-white">upside</strong> here, not a
-                  rescue. You stay <strong className={toneClass(flexSuccess)}>{flexSuccess}%</strong> likely to last while
+                  Your plan is well-funded on these assumptions — flexibility is <strong className="text-white">upside</strong> here, not a
+                  rescue. It stays <strong className={toneClass(flexSuccess)}>{flexSuccess}%</strong> likely to last while
                   spending more in the good years.
                 </>
               ) : (

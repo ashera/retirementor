@@ -982,12 +982,12 @@ export default function WhatIfView({
               <div className="flex items-baseline justify-between gap-2">
                 <span
                   className="text-[11px] font-medium uppercase tracking-wide text-muted"
-                  title={`Your safe spending level — the most you could spend each year (including your home loan) with at least an ${Math.round(SAFE_TARGET * 100)}% chance your money lasts across thousands of market up-and-down scenarios (Monte Carlo). The same 85% basis as each strategy's “Extra you could spend”.`}
+                  title={`Your prudent spending level — the most you could spend each year (including your home loan) with at least an ${Math.round(SAFE_TARGET * 100)}% chance your money lasts across thousands of market up-and-down scenarios (Monte Carlo). The same 85% basis as each strategy's “Extra you could spend”.`}
                 >
-                  Safe spending
+                  Prudent spending
                   <span className="ml-1 rounded bg-panel-2 px-1 py-0.5 text-[9px] font-semibold text-muted">{Math.round(SAFE_TARGET * 100)}% confidence</span>
                 </span>
-                {/* Headline = the gap between your goal and your safe level (the actionable number). */}
+                {/* Headline = the gap between your goal and your prudent level (the actionable number). */}
                 <span className="flex items-baseline gap-x-1.5 tabular-nums">
                   {safeGap >= 500 ? (
                     <>
@@ -997,7 +997,7 @@ export default function WhatIfView({
                   ) : safeGap <= -500 ? (
                     <>
                       <span className="text-lg font-bold text-amber-400">−{fmtCompact(-safeGap)}</span>
-                      <span className="text-xs font-medium text-muted">/yr over safe</span>
+                      <span className="text-xs font-medium text-muted">/yr over prudent</span>
                     </>
                   ) : (
                     <span className="text-lg font-bold text-white">On target</span>
@@ -1008,36 +1008,36 @@ export default function WhatIfView({
               <p className="mt-0.5 text-[11px] leading-snug text-muted">
                 {safeGap >= 500 ? (
                   <>
-                    You could spend <span className="font-semibold text-accent">{fmtCurrency(safeGap)}/yr</span> more than your{" "}
-                    {fmtCurrency(spendMix.total)} goal and still be very likely to last — your safe level is{" "}
+                    Your plan models room for <span className="font-semibold text-accent">{fmtCurrency(safeGap)}/yr</span> more than your{" "}
+                    {fmtCurrency(spendMix.total)} goal at the same 85% confidence — your prudent (85%) level is{" "}
                     <span className="font-semibold text-slate-200">{fmtCurrency(safeSpendTotal)}/yr</span>.
                   </>
                 ) : safeGap <= -500 ? (
                   <>
                     Your {fmtCurrency(spendMix.total)} goal is <span className="font-semibold text-amber-400">{fmtCurrency(-safeGap)}/yr above</span> your
-                    safe level of <span className="font-semibold text-slate-200">{fmtCurrency(safeSpendTotal)}/yr</span>, so it carries more risk of running short.
+                    prudent level of <span className="font-semibold text-slate-200">{fmtCurrency(safeSpendTotal)}/yr</span>, so it carries more risk of running short.
                   </>
                 ) : (
                   <>
                     Your {fmtCurrency(spendMix.total)} goal sits right at your{" "}
-                    <span className="font-semibold text-slate-200">{fmtCurrency(safeSpendTotal)}/yr</span> safe level — little spare headroom.
+                    <span className="font-semibold text-slate-200">{fmtCurrency(safeSpendTotal)}/yr</span> prudent level — little spare headroom.
                   </>
                 )}
               </p>
               {/* Secondary: what your strategies did to the safe level. */}
               {showSafeDelta ? (
                 <p className="mt-1 text-[11px] leading-snug text-muted/80">
-                  {safeStratSubject} {safeStratVerb} your safe level by{" "}
+                  {safeStratSubject} {safeStratVerb} your prudent level by{" "}
                   <span className={`font-semibold ${safeDelta >= 0 ? "text-accent" : "text-amber-400"}`}>{fmtDeltaYr(safeDelta)}</span>{" "}
                   (from {fmtCurrency(baseSafeTotal!)} to {fmtCurrency(safeSpendTotal)}).
                 </p>
               ) : changed ? (
                 <p className="mt-1 text-[11px] leading-snug text-muted/80">
-                  Your active strategies don&apos;t materially change your safe level.
+                  Your active strategies don&apos;t materially change your prudent level.
                 </p>
               ) : (
                 <p className="mt-1 text-[11px] leading-snug text-muted/80">
-                  Toggle a strategy to see how it moves your safe level.
+                  Toggle a strategy to see how it moves your prudent level.
                 </p>
               )}
               <p className="mt-1 text-[10px] leading-snug text-muted/70">
@@ -1854,9 +1854,9 @@ function StrategyCardRow({
                   a stretched plan a higher start is just more austerity, not upside. */}
               {gHeadroom && gSafeStart != null && gSafeStart > gCurrent + 1_000 && (
                 <div className="border-t border-line pt-1.5 text-slate-300">
-                  You&apos;re comfortably funded — you could start as high as{" "}
-                  <span className="font-semibold text-accent">{fmtCurrency(gSafeStart)}/yr</span> and stay ~
-                  {guardrails.targetPct}% likely, mostly enjoying raises. Set it with the spending lever.
+                  Your plan is well-funded on these assumptions — it models a start as high as{" "}
+                  <span className="font-semibold text-accent">{fmtCurrency(gSafeStart)}/yr</span> staying ~
+                  {guardrails.targetPct}% likely, mostly with raises. Set it with the spending lever.
                   {guardrails.safePending && (
                     <span className="ml-1 inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-accent align-middle" />
                   )}
@@ -1939,17 +1939,17 @@ function StrategyCardRow({
                     </div>
                   )}
                   <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[10px] text-muted">
-                    <span><span className="font-semibold text-emerald-400">≤4%</span> safe</span>
+                    <span><span className="font-semibold text-emerald-400">≤4%</span> conservative</span>
                     <span><span className="font-semibold text-amber-400">4–6%</span> moderate</span>
                     <span><span className="font-semibold text-red-400">&gt;6%</span> high</span>
                     {safeRatePct != null && (
                       <span className="flex items-center gap-1 text-sky-300">
-                        <span aria-hidden>▲</span> SWR ~{safeRatePct}%{sustainable.safePending ? " …" : ""}
+                        <span aria-hidden>▲</span> prudent ~{safeRatePct}%{sustainable.safePending ? " …" : ""}
                       </span>
                     )}
                     {flexSafePct != null && (
                       <span className="flex items-center gap-1 text-violet-300">
-                        <span aria-hidden>▲</span> flexible SWR ~{flexSafePct}%
+                        <span aria-hidden>▲</span> flexible ~{flexSafePct}%
                       </span>
                     )}
                   </div>
@@ -1982,7 +1982,7 @@ function StrategyCardRow({
               {sustainable.safe == null && sustainable.safePending ? (
                 <span className="flex items-center gap-1.5 text-muted">
                   <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent" />
-                  Finding your safe spend…
+                  Finding your prudent spend…
                 </span>
               ) : sustainable.safe != null && sustainable.safe <= 10_000 ? (
                 <span className="text-amber-400">
@@ -1993,7 +1993,7 @@ function StrategyCardRow({
                 <>
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-slate-300">
-                      Safe spend: up to{" "}
+                      Prudent spend: up to{" "}
                       <span className="font-semibold text-accent">{fmtCurrency(sustainable.safe + spendLoan)}/yr</span> — about{" "}
                       {sustainable.targetPct}% likely to last to {sustainable.life}.
                       {sustainable.safePending && (
@@ -2005,7 +2005,7 @@ function StrategyCardRow({
                       onClick={sustainable.onSetSafe}
                       className="shrink-0 rounded-md border border-accent/40 bg-accent/10 px-2.5 py-1 font-semibold text-accent transition hover:bg-accent/20"
                     >
-                      Set to safe
+                      Set to prudent
                     </button>
                   </div>
                   <div className="mt-1 text-[11px] text-muted">
@@ -2014,7 +2014,7 @@ function StrategyCardRow({
                   </div>
                   {values.spend > sustainable.safe + 500 && (
                     <div className="mt-1 text-amber-400">
-                      Above your safe spend — &ldquo;Likely to last&rdquo; falls from here.
+                      Above your prudent spend — &ldquo;Likely to last&rdquo; falls from here.
                     </div>
                   )}
                 </>

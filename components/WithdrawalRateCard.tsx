@@ -121,18 +121,18 @@ export function WithdrawalRateStatExplainer({
           </div>
         )}
         <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-0.5 text-[11px] text-muted">
-          <span><span className="font-semibold text-emerald-400">≤4%</span> safe</span>
+          <span><span className="font-semibold text-emerald-400">≤4%</span> conservative</span>
           <span><span className="font-semibold text-amber-400">4–6%</span> moderate</span>
           <span><span className="font-semibold text-red-400">&gt;6%</span> high</span>
           <span className="text-white">● you {pct}%</span>
           {safePct != null && (
             <span className="flex items-center gap-1 text-sky-300">
-              <span aria-hidden>▲</span> SWR ~{safePct}%{safePending ? " …" : ""}
+              <span aria-hidden>▲</span> prudent ~{safePct}%{safePending ? " …" : ""}
             </span>
           )}
           {flexPct != null && (
             <span className="flex items-center gap-1 text-violet-300">
-              <span aria-hidden>▲</span> flexible SWR ~{flexPct}%
+              <span aria-hidden>▲</span> flexible ~{flexPct}%
             </span>
           )}
         </div>
@@ -140,19 +140,19 @@ export function WithdrawalRateStatExplainer({
           {safePct != null ? (
             <>
               The classic guide is about 4%, but Australia&apos;s Age Pension is a safety net, so your{" "}
-              <span className="font-semibold text-sky-300">safe withdrawal rate (SWR) is ~{safePct}%</span> — the
-              most you could draw at a steady income and still be about {safeConfidence}% likely to last to age{" "}
-              {plan.lifeExpectancy}.
+              <span className="font-semibold text-sky-300">prudent withdrawal rate is ~{safePct}%</span>{" "}
+              (often called a &ldquo;safe withdrawal rate&rdquo;) — the most you could draw at a steady income and
+              still be about {safeConfidence}% likely to last to age {plan.lifeExpectancy}.
               {overSafe
                 ? ` You're drawing ${pct}%, above that, so the plan leans more on the Age Pension and a good sequence of returns — the `
-                : ` You're at ${pct}%, comfortably within it — the `}
+                : ` You're at ${pct}%, within it — the `}
               <a href="#likelihood" className="text-accent hover:underline">{successPct}% likelihood</a>{" "}
               is the real test.
               {flexPct != null && (
                 <>
                   {" "}
                   <span className="text-violet-300">Flexible spending</span> — easing back a little after markets
-                  fall — could lift your SWR to{" "}
+                  fall — could lift your prudent rate to{" "}
                   <span className="font-semibold text-violet-300">~{flexPct}%</span>, but that becomes a{" "}
                   <em>starting</em> rate you&apos;d trim in rough markets rather than a fixed draw.
                 </>
