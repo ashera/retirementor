@@ -24,7 +24,7 @@ import LifestageModal from "@/components/LifestageModal";
 import GuidedIntro from "@/components/GuidedIntro";
 import GetStartedPanel from "@/components/GetStartedPanel";
 import NewScenarioModal from "@/components/NewScenarioModal";
-import ConfidenceHero from "@/components/ConfidenceHero";
+import ConfidenceHero, { type PlanChip } from "@/components/ConfidenceHero";
 import {
   AgePensionExplainer,
   LikelihoodExplainer,
@@ -601,6 +601,21 @@ export default function PlannerApp({
   const lifeEvents = useMemo(
     () => [...getLifeEvents(storable)].sort((a, b) => a.atAge - b.atAge),
     [storable],
+  );
+  // "In this plan" chips for the confidence hero's foot: committed life events +
+  // applied strategies, each already baked into the numbers above.
+  const planChips = useMemo<PlanChip[]>(
+    () => [
+      ...lifeEvents.map((e) => ({
+        key: e.id,
+        kind: (e.kind === "income" ? "income" : "expense") as PlanChip["kind"],
+        label:
+          (e.label?.trim() || (e.kind === "income" ? "Windfall" : "Expense")) +
+          ` ${e.kind === "income" ? "+" : "−"}${fmtCurrency(e.amount)} at ${e.atAge}`,
+      })),
+      ...applied.map((s) => ({ key: s.id, kind: "strategy" as const, label: s.label })),
+    ],
+    [lifeEvents, applied],
   );
   const mc = useMemo(() => runMonteCarlo(plan, config), [plan, config]);
   const successPct = Math.round(mc.successRate * 100);
@@ -1474,6 +1489,7 @@ export default function PlannerApp({
         showSignupNudge={!user && !shared && !nudgeDismissed}
         onDismissNudge={dismissNudge}
         ioSlot={!user && !shared ? renderIOButtons() : null}
+        chips={planChips}
       />
 
       {/* Stat cards */}
@@ -1555,91 +1571,9 @@ export default function PlannerApp({
         />
       </div>
 
-      {/* Flagship feature invite — users told us they didn't realise What-If
-          exists, so make it a prominent, unmissable call-out here (shown to
-          everyone with a plan, signed in or not). */}
-      <Link
-        href={whatIfHref}
-        onClick={() => track("What-if promo clicked")}
-        className="group mb-6 block rounded-2xl border border-accent/40 bg-accent/[0.07] px-5 py-4 transition hover:border-accent/70 hover:bg-accent/10"
-      >
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-          <div className="flex min-w-0 items-start gap-3">
-            <span className="shrink-0 text-2xl" aria-hidden>🎛</span>
-            <div className="min-w-0">
-              <div className="font-semibold text-white">Add a life event or try a strategy</div>
-              <div className="text-sm text-muted">
-                Record a one-off you expect — an inheritance, a big trip, helping the kids — or try a strategy like
-                downsizing, retiring later or working part-time, and watch how your balance, income and how long it
-                lasts respond.
-                {applied.length === 0 && lifeEvents.length === 0 && " Strategies never touch this plan until you save."}
-              </div>
-            </div>
-          </div>
-          <span className="w-full shrink-0 rounded-lg bg-accent px-4 py-2 text-center text-sm font-semibold text-ink transition group-hover:brightness-110 sm:w-auto">
-            {applied.length > 0 ? "Edit What-If Strategies →" : "Try What-If Strategies →"}
-          </span>
-        </div>
-        {/* The active scenario's strategy layer (see appliedStrategies) + committed
-            life events: each is applied on top of your base inputs and already shapes
-            the numbers above. Life-event chips make a known event discoverable here. */}
-        {(applied.length > 0 || lifeEvents.length > 0) && (
-          <div className="mt-4 border-t border-accent/20 pt-3">
-            <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted">
-              In this plan — already in the numbers above
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {lifeEvents.map((e) => (
-                <span
-                  key={e.id}
-                  className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium ${
-                    e.kind === "income"
-                      ? "border-accent/40 bg-accent/10 text-accent"
-                      : "border-amber-400/40 bg-amber-400/10 text-amber-300"
-                  }`}
-                  title="A committed life event — edit it in What-If"
-                >
-                  <span aria-hidden>📌</span>
-                  {(e.label?.trim() || (e.kind === "income" ? "Windfall" : "Expense")) +
-                    ` ${e.kind === "income" ? "+" : "−"}${fmtCurrency(e.amount)} at ${e.atAge}`}
-                </span>
-              ))}
-              {applied.map((s) => (
-                <span
-                  key={s.id}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-accent/40 bg-accent/10 px-3 py-1 text-xs font-medium text-accent"
-                  title="Reflected in your dashboard numbers"
-                >
-                  <span aria-hidden>✓</span>
-                  {s.label}
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
-      </Link>
-
-      {/* Stress-test invite — shown to everyone with a plan (incl. shared views), so
-          a shared scenario can be run against history from its read-only dashboard. */}
-      <Link
-        href={stressHref}
-        onClick={() => track("Stress test promo clicked")}
-        className="group mb-6 flex flex-col gap-3 rounded-2xl border border-line bg-panel px-5 py-3.5 transition hover:border-accent/50 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
-      >
-        <div className="flex min-w-0 items-center gap-3">
-          <span className="shrink-0 text-2xl" aria-hidden>🏛</span>
-          <div className="min-w-0">
-            <div className="font-semibold text-white">Stress-test against history</div>
-            <div className="text-sm text-muted">
-              See if this plan survives every major downturn of the last century — 1929, the 1970s, the GFC — with
-              fixed vs flexible spending compared side by side.
-            </div>
-          </div>
-        </div>
-        <span className="w-full shrink-0 rounded-lg border border-accent/40 bg-accent/10 px-4 py-2 text-center text-sm font-semibold text-accent transition group-hover:bg-accent/20 sm:w-auto">
-          Run stress test →
-        </span>
-      </Link>
+      {/* The What-If and Stress-test promo cards were removed: the confidence hero
+          already carries "Boost it →" (What-If) and "Pressure-test it →" (Stress),
+          and the "In this plan" chips now sit at the bottom of the hero card. */}
 
       {/* Withdrawal-rate diagnostic */}
       <WithdrawalRateCard result={result} plan={plan} successPct={successPct} safeRate={safeRate} flexSafeRate={flexSafeRate} safePending={safeRatePending} />

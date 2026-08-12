@@ -13,6 +13,13 @@ const ZONE = {
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
+/** A "what's already in this plan" chip: a committed life event or an applied strategy. */
+export interface PlanChip {
+  key: string;
+  kind: "income" | "expense" | "strategy";
+  label: string;
+}
+
 export interface ConfidenceHeroProps {
   goalTotal: number; // loan-inclusive annual income goal (today's $)
   loan: number; // ongoing home-loan cost baked into the goal
@@ -39,6 +46,7 @@ export interface ConfidenceHeroProps {
   showSignupNudge?: boolean;
   onDismissNudge?: () => void;
   ioSlot?: React.ReactNode; // guest import/export buttons (local-first backup)
+  chips?: PlanChip[]; // committed life events + applied strategies, shown at the foot
 }
 
 export default function ConfidenceHero({
@@ -64,6 +72,7 @@ export default function ConfidenceHero({
   showSignupNudge,
   onDismissNudge,
   ioSlot,
+  chips,
 }: ConfidenceHeroProps) {
   const state: ConfidenceState = confidenceState(goalTotal, { failsafe, safe, central });
   const headroom = safe - goalTotal; // + = room to spend more; − = above the safe level
@@ -348,6 +357,32 @@ export default function ConfidenceHero({
           )}
         </div>
       </div>
+
+      {/* What's already baked into the numbers above — committed life events and
+          applied What-If strategies (moved here from the old What-If promo card). */}
+      {chips && chips.length > 0 && (
+        <div className="mt-6 border-t border-line pt-4">
+          <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted">
+            In this plan — already in the numbers above
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {chips.map((c) => (
+              <span
+                key={c.key}
+                className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium ${
+                  c.kind === "expense"
+                    ? "border-amber-400/40 bg-amber-400/10 text-amber-300"
+                    : "border-accent/40 bg-accent/10 text-accent"
+                }`}
+                title={c.kind === "strategy" ? "Reflected in your dashboard numbers" : "A committed life event"}
+              >
+                <span aria-hidden>{c.kind === "strategy" ? "✓" : "📌"}</span>
+                {c.label}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
     </section>
   );
 }

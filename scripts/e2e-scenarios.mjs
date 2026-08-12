@@ -99,7 +99,8 @@ try {
   const firstId = ps[0]?.id;
 
   // B — What-If toggles a strategy; auto-save updates the SAME active plan in place.
-  await page.getByRole("link", { name: /What-If Strategies/i }).first().click();
+  // Reach What-If via the hero's "Boost it →" button (the old promo card was removed).
+  await page.getByRole("link", { name: /Boost it/i }).first().click();
   await page.waitForURL("**/what-if").catch(() => {});
   await page.waitForTimeout(1200);
   // Strategies are compact goal-grouped pills; tapping one APPLIES it and opens its
