@@ -1474,6 +1474,7 @@ export default function PlannerApp({
         failsafe={failsafeTotal}
         safeLiving={safeTotal - confLoan}
         confidencePct={successPct}
+        assumedReturnPct={plan.investmentReturn}
         lifeExpectancy={plan.lifeExpectancy}
         lastsToLE={result.lastsToLifeExpectancy}
         depletedAge={result.depletedAge}

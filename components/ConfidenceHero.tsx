@@ -28,6 +28,7 @@ export interface ConfidenceHeroProps {
   failsafe: number; // 95% tier, loan-inclusive (falls back to safe while pending)
   safeLiving: number; // living-only safe spend, applied by "Set my spend"
   confidencePct: number; // Monte Carlo chance the current goal lasts (0–100)
+  assumedReturnPct: number; // the plan's assumed investment return (e.g. 7)
   lifeExpectancy: number;
   lastsToLE: boolean;
   depletedAge: number | null;
@@ -57,6 +58,7 @@ export default function ConfidenceHero({
   failsafe,
   safeLiving,
   confidencePct,
+  assumedReturnPct,
   lifeExpectancy,
   lastsToLE,
   depletedAge,
@@ -111,7 +113,7 @@ export default function ConfidenceHero({
         ? "Reasonably likely to last, but not a sure thing."
         : "At real risk of running short before your planning age."
     : depletedAge != null
-      ? `On the assumed return, funds run low around age ${depletedAge}.`
+      ? `On the assumed ${assumedReturnPct}% return, funds run low around age ${depletedAge}.`
       : "At risk of running short before your planning age.";
 
   // ── Verdict copy ────────────────────────────────────────────────────────────
@@ -136,8 +138,8 @@ export default function ConfidenceHero({
   } else if (state === "ambitious") {
     verdict = (
       <>
-        Your {goalStr} goal works on the assumed return, but sits <b>above a safe level</b> — more
-        risk of running short if markets disappoint.
+        Your {goalStr} goal works on the assumed {assumedReturnPct}% return, but sits <b>above a safe level</b> —
+        more risk of running short if markets disappoint.
       </>
     );
   } else {
@@ -230,7 +232,7 @@ export default function ConfidenceHero({
             <div className="relative mt-2 h-11">
               {marker(pFail, ZONE.bullet, fmtCompact(failsafe), "Failsafe", "survives worst history")}
               {marker(pSafe, ZONE.safe, fmtCompact(safe), "Safe · 85%", "very likely to last")}
-              {marker(pCent, ZONE.amber, fmtCompact(central), "Central · 50%", "on assumed returns")}
+              {marker(pCent, ZONE.amber, fmtCompact(central), "Central · 50%", `on ${assumedReturnPct}% returns`)}
             </div>
           </div>
 
