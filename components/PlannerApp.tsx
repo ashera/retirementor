@@ -33,6 +33,7 @@ import {
   SuperAtRetirementExplainer,
 } from "@/components/explainers";
 import { runMonteCarlo, MC_CONFIDENCE_TARGET, MC_CONFIDENCE_MC, MC_CONFIDENCE_VERIFY } from "@/lib/au/montecarlo";
+import { failsafeSpend as historicalFailsafe } from "@/lib/au/stresstest";
 import { streamNamesLabel } from "@/lib/au/yearIncome";
 import { whatWillItTake, earliestRetirement } from "@/lib/au/goalseek";
 import { maxSpendForConfidence, withSpend, appliedStrategies } from "@/lib/au/strategies";
@@ -652,7 +653,11 @@ export default function PlannerApp({
     setMcMaxPending(true);
     const id = setTimeout(() => {
       const safe = maxSpendForConfidence(plan, config, MC_CONFIDENCE_TARGET, MC_CONFIDENCE_MC, MC_CONFIDENCE_VERIFY);
-      const failsafe = maxSpendForConfidence(plan, config, 0.95, MC_CONFIDENCE_MC, MC_CONFIDENCE_VERIFY);
+      // Failsafe = the ERN-style worst-case-proof spend (survives every historical
+      // stress era), the SAME figure the Stress-test page shows — not an MC-95% tier —
+      // so the hero's Failsafe marker and the Stress page agree. Living spend; the loan
+      // is added below (like the other tiers) for the loan-inclusive bar.
+      const failsafe = Math.floor(historicalFailsafe(plan, config).spend / 1_000) * 1_000;
       tierCache.set(tierKey, { safe, failsafe });
       persistTierCache();
       setMcMaxSpend(safe);

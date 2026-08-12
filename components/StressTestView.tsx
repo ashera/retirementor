@@ -13,6 +13,7 @@ import { survivalLens } from "@/lib/au/survivalLens";
 import { oldestCurrentAge, householdRetirementOffset } from "@/lib/au/types";
 import SurvivalOverlay from "@/components/SurvivalOverlay";
 import { essentialsFloor } from "@/lib/au/strategies";
+import { retirementGoal } from "@/lib/au/goal";
 import { fmtCurrency } from "@/lib/au/format";
 import { stressNarrative } from "@/lib/au/stressNarrative";
 import { track } from "@/lib/analytics";
@@ -184,6 +185,9 @@ export default function StressTestView({
   // ERN-style "failsafe": the most you could START spending and still fund every year
   // through EVERY era on record — the worst-case-proof spend (fixed, never trimmed).
   const failsafe = useMemo(() => (plan ? failsafeSpend(plan, config) : null), [plan, config]);
+  // Home-loan cost, so the failsafe is shown all-in (living + loan) — the same
+  // loan-inclusive basis the dashboard confidence bar's Failsafe marker uses.
+  const failsafeLoan = useMemo(() => (plan ? retirementGoal(plan).loanCost : 0), [plan]);
   // The era where flexing demanded the deepest spending cut — the honest "catch".
   const worstFlexCut = useMemo(
     () => (flex ? flex.eras.filter((e) => e.cutYears > 0).sort((a, b) => b.deepestCutPct - a.deepestCutPct)[0] ?? null : null),
@@ -316,34 +320,41 @@ export default function StressTestView({
                 )}
               </div>
 
-              {/* ERN-style failsafe: the worst-case-proof starting spend. */}
-              {!running && failsafe && failsafe.spend > 1 && (
+              {/* ERN-style failsafe: the worst-case-proof starting spend. Shown all-in
+                  (living + any home loan) to match the dashboard confidence bar. */}
+              {!running && failsafe && failsafe.spend > 1 && (() => {
+                const fsTotal = failsafe.spend + failsafeLoan;
+                const curTotal = failsafe.currentSpend + failsafeLoan;
+                const hp = curTotal > 0 ? (fsTotal - curTotal) / curTotal : 0;
+                return (
                 <div className="rounded-2xl border border-line bg-panel p-5">
                   <div className="text-xs font-semibold uppercase tracking-wide text-muted">Failsafe spend</div>
                   <div className="mt-1 text-3xl font-bold text-white">
-                    {fmtCurrency(Math.round(failsafe.spend))}
+                    {fmtCurrency(Math.round(fsTotal))}
                     <span className="text-base font-normal text-muted">/yr</span>
                   </div>
                   <p className="mt-1 text-sm text-muted">
-                    The most you could start spending and still fund <strong className="text-slate-200">every year</strong>{" "}
-                    through <strong className="text-slate-200">every downturn on record</strong>
+                    The most you could start spending{failsafeLoan > 0 ? " (including your home loan)" : ""} and still fund{" "}
+                    <strong className="text-slate-200">every year</strong> through{" "}
+                    <strong className="text-slate-200">every downturn on record</strong>
                     {failsafe.bindingEra ? <> — {failsafe.bindingEra.label} is what caps it</> : null}.{" "}
-                    {failsafe.headroomPct >= 0.02 ? (
+                    {hp >= 0.02 ? (
                       <>
-                        You&apos;re on <span className="text-emerald-400">{fmtCurrency(Math.round(failsafe.currentSpend))}</span> — about{" "}
-                        {Math.round(failsafe.headroomPct * 100)}% under it.
+                        You&apos;re on <span className="text-emerald-400">{fmtCurrency(Math.round(curTotal))}</span> — about{" "}
+                        {Math.round(hp * 100)}% under it.
                       </>
-                    ) : failsafe.headroomPct <= -0.02 ? (
+                    ) : hp <= -0.02 ? (
                       <>
-                        You&apos;re on <span className="text-amber-400">{fmtCurrency(Math.round(failsafe.currentSpend))}</span> — about{" "}
-                        {Math.round(-failsafe.headroomPct * 100)}% above it.
+                        You&apos;re on <span className="text-amber-400">{fmtCurrency(Math.round(curTotal))}</span> — about{" "}
+                        {Math.round(-hp * 100)}% above it.
                       </>
                     ) : (
                       <>You&apos;re spending right at it.</>
                     )}
                   </p>
                 </div>
-              )}
+                );
+              })()}
 
               {/* Ranked, worst-first — revealed as each era's test completes. */}
               <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-panel">
