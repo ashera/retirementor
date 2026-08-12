@@ -33,6 +33,10 @@ export interface ConfidenceHeroProps {
   scenarioName: string | null;
   hasNotes: boolean;
   onManage: (() => void) | null; // null in a read-only shared view
+  // Signed-out "your plan is saved on this device only" prompt — shown in the right
+  // column where a signed-out user has no scenario block (reclaims its old card).
+  showSignupNudge?: boolean;
+  onDismissNudge?: () => void;
 }
 
 export default function ConfidenceHero({
@@ -54,6 +58,8 @@ export default function ConfidenceHero({
   scenarioName,
   hasNotes,
   onManage,
+  showSignupNudge,
+  onDismissNudge,
 }: ConfidenceHeroProps) {
   const state: ConfidenceState = confidenceState(goalTotal, { failsafe, safe, central });
   const headroom = safe - goalTotal; // + = room to spend more; − = above the safe level
@@ -243,6 +249,37 @@ export default function ConfidenceHero({
               </div>
               <div className="mt-1.5 text-[11px] text-muted/70">
                 saved automatically{hasNotes ? " · 📝 has notes" : ""}
+              </div>
+            </div>
+          )}
+
+          {showSignupNudge && (
+            <div className="relative border-t border-dashed border-line pt-4">
+              {onDismissNudge && (
+                <button
+                  onClick={onDismissNudge}
+                  aria-label="Dismiss"
+                  className="absolute right-0 top-3 rounded p-1 text-muted/60 transition hover:text-white"
+                >
+                  ✕
+                </button>
+              )}
+              <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-amber-300/80">
+                💾 Saved on this device only
+              </div>
+              <p className="mt-1.5 pr-4 text-xs leading-snug text-muted">
+                Create a free account to keep your plan safe and pick up where you left off on any device.
+              </p>
+              <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                <Link
+                  href="/signup"
+                  className="rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-ink transition hover:brightness-110"
+                >
+                  Create free account
+                </Link>
+                <Link href="/login" className="text-xs font-medium text-slate-300 transition hover:text-white">
+                  Sign in
+                </Link>
               </div>
             </div>
           )}

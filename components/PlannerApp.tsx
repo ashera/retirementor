@@ -1253,35 +1253,9 @@ export default function PlannerApp({
         </div>
       )}
 
-      {/* Signed-out users: their work lives only on this device — nudge them to
-          create an account so it's backed up and available anywhere. */}
-      {!user && !shared && configured && !nudgeDismissed && (
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/5 px-5 py-3">
-          <p className="text-sm text-amber-100">
-            <span aria-hidden>💾</span> Your plan is saved on{" "}
-            <strong>this device only</strong>. Create a free account to keep it safe and pick up
-            where you left off on any device.
-          </p>
-          <div className="flex shrink-0 items-center gap-2">
-            <Link
-              href="/signup"
-              className="rounded-lg bg-accent px-3 py-1.5 text-sm font-semibold text-ink transition hover:bg-accent-soft"
-            >
-              Create free account
-            </Link>
-            <Link href="/login" className="text-sm font-medium text-amber-100 hover:text-white">
-              Sign in
-            </Link>
-            <button
-              onClick={dismissNudge}
-              aria-label="Dismiss"
-              className="ml-1 rounded p-1 text-amber-200/70 transition hover:text-white"
-            >
-              ✕
-            </button>
-          </div>
-        </div>
-      )}
+      {/* The signed-out "saved on this device" nudge now lives inside the
+          confidence hero's right column (below the dial), where a signed-out user
+          has no scenario block — reclaiming this card's space. */}
 
       <div className="mt-4" />
       <Disclosures config={config} />
@@ -1454,6 +1428,8 @@ export default function PlannerApp({
         scenarioName={shared ? null : activeName}
         hasNotes={!!(((activePlan && (notesOverride[activePlan.id] ?? activePlan.notes)) || "") as string).trim()}
         onManage={user && !shared ? () => setScenarioModalOpen(true) : null}
+        showSignupNudge={!user && !shared && !nudgeDismissed}
+        onDismissNudge={dismissNudge}
       />
 
       {/* Stat cards */}
