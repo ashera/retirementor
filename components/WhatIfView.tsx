@@ -583,6 +583,13 @@ export default function WhatIfView({
   const baseLoan = retirementGoal(baseline).loanCost;
   const safeSpendTotal = safeSpend != null ? safeSpend + compLoan : null;
   const baseSafeTotal = baseSafeSpend != null ? baseSafeSpend + baseLoan : null;
+  // The dashboard hero owns the absolute safe-spend answer; here the point is what
+  // your strategies DO to it, so lead with the delta from the base plan.
+  const safeDelta = changed && baseSafeTotal != null && safeSpendTotal != null ? safeSpendTotal - baseSafeTotal : 0;
+  const showSafeDelta = changed && baseSafeTotal != null && Math.abs(safeDelta) >= 500;
+  const safeStratSubject = active.size === 1 ? "This strategy" : "These strategies";
+  const safeStratVerb =
+    active.size === 1 ? (safeDelta >= 0 ? "lifts" : "lowers") : safeDelta >= 0 ? "lift" : "lower";
 
   // Net worth trajectory: total wealth (super + outside + home + property) across
   // retirement, plus the terminal estate at life expectancy. The sparkline spans
@@ -972,25 +979,33 @@ export default function WhatIfView({
                   Safe spending
                   <span className="ml-1 rounded bg-panel-2 px-1 py-0.5 text-[9px] font-semibold text-muted">{Math.round(SAFE_TARGET * 100)}% confidence</span>
                 </span>
-                <span className="flex flex-wrap items-baseline justify-end gap-x-1.5 tabular-nums">
-                  {changed && baseSafeTotal != null && Math.abs(baseSafeTotal - safeSpendTotal) >= 500 ? (
-                    <>
-                      <span className="text-sm text-muted" title="Your base plan — the most it safely sustains before any strategies are applied">{fmtCurrency(baseSafeTotal)}</span>
-                      <span className={`text-xs font-semibold ${safeSpendTotal >= baseSafeTotal ? "text-accent" : "text-amber-400"}`}>
-                        {fmtDelta(safeSpendTotal - baseSafeTotal)}
-                      </span>
-                      <span aria-hidden className="text-muted">→</span>
-                      <span className="text-lg font-bold text-white" title="With your active strategies applied">{fmtCurrency(safeSpendTotal)}</span>
-                    </>
-                  ) : (
+                {showSafeDelta ? (
+                  // Delta-forward: the change your active strategies make.
+                  <span className={`text-lg font-bold tabular-nums ${safeDelta >= 0 ? "text-accent" : "text-amber-400"}`}>
+                    {fmtDelta(safeDelta)}
+                    <span className="text-xs font-medium text-muted">/yr</span>
+                  </span>
+                ) : (
+                  // No active change: the current safe-spend level (the dashboard's baseline).
+                  <span className="flex items-baseline gap-x-1.5 tabular-nums">
                     <span className="text-lg font-bold text-white">{fmtCurrency(safeSpendTotal)}</span>
-                  )}
-                  <span className="text-xs font-medium text-muted">/yr</span>
-                </span>
+                    <span className="text-xs font-medium text-muted">/yr</span>
+                  </span>
+                )}
               </div>
-              {changed && baseSafeTotal != null && Math.abs(baseSafeTotal - safeSpendTotal) >= 500 && (
-                <p className="mt-0.5 text-right text-[10px] uppercase tracking-wide text-muted/70">
-                  base plan <span aria-hidden>→</span> with your strategies
+              {showSafeDelta ? (
+                <p className="mt-0.5 text-[11px] leading-snug text-muted">
+                  {safeStratSubject} {safeStratVerb} your safe spend from{" "}
+                  <span className="font-semibold text-slate-200">{fmtCurrency(baseSafeTotal!)}</span> to{" "}
+                  <span className="font-semibold text-white">{fmtCurrency(safeSpendTotal)}/yr</span>.
+                </p>
+              ) : changed ? (
+                <p className="mt-0.5 text-[11px] leading-snug text-muted">
+                  Your active strategies don&apos;t materially change your safe spend.
+                </p>
+              ) : (
+                <p className="mt-0.5 text-[11px] leading-snug text-muted">
+                  Toggle a strategy to see how it moves your safe spend.
                 </p>
               )}
               <p className="mt-0.5 text-[11px] leading-snug text-muted">
