@@ -1549,6 +1549,14 @@ export default function PlannerApp({
         {(() => {
           const wr = initialWithdrawal(result);
           const band = wr ? withdrawalBand(wr.portfolioRate) : null;
+          // The draw is measured across the WHOLE portfolio (super + any outside-super
+          // savings), and against the NET spend (goal less Age Pension / rent / work) —
+          // so label both, to distinguish it from the super-only + headline-goal cards.
+          const hasSavings = wr ? wr.portfolio - wr.balance > 1 : false;
+          const hasOffset = wr ? wr.agePension + wr.rent + wr.workIncome > 1 : false;
+          const safePct = safeRate != null ? +(safeRate * 100).toFixed(1) : null;
+          const showFlex = flexSafeRate != null && safeRate != null && flexSafeRate > safeRate + 0.002;
+          const flexPct = showFlex ? +(flexSafeRate! * 100).toFixed(1) : null;
           return (
             <StatCard
               label="Withdrawal rate"
@@ -1557,9 +1565,21 @@ export default function PlannerApp({
               tagTone={band?.tone}
               tagTitle="How sustainable is this draw? Tap the ⓘ for the full breakdown"
               sub={
-                wr
-                  ? `${fmtCurrency(wr.netSpend)} from ${fmtCurrency(wr.portfolio)} at age ${wr.age}`
-                  : "in your first drawdown year"
+                wr ? (
+                  <>
+                    {fmtCurrency(wr.netSpend)}
+                    {hasOffset ? ` of your ${fmtCurrency(goal.total)} goal` : ""} drawn from{" "}
+                    {fmtCurrency(wr.portfolio)} {hasSavings ? "super + savings" : "super"} at age {wr.age}
+                    {safePct != null && (
+                      <span className="mt-0.5 block text-sky-300">
+                        Safe rate ~{safePct}%{safeRatePending ? " …" : ""}
+                        {flexPct != null ? ` · flexible ~${flexPct}%` : ""}
+                      </span>
+                    )}
+                  </>
+                ) : (
+                  "in your first drawdown year"
+                )
               }
               explainer={
                 <WithdrawalRateStatExplainer
