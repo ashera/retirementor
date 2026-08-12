@@ -42,6 +42,7 @@ export interface ConfidenceHeroProps {
   scenarioName: string | null;
   hasNotes: boolean;
   onManage: (() => void) | null; // null in a read-only shared view
+  dialExplainer?: React.ReactNode; // "how is this worked out?" affordance beside the dial
   // Signed-out "your plan is saved on this device only" prompt — shown in the right
   // column where a signed-out user has no scenario block (reclaims its old card).
   showSignupNudge?: boolean;
@@ -71,6 +72,7 @@ export default function ConfidenceHero({
   scenarioName,
   hasNotes,
   onManage,
+  dialExplainer,
   showSignupNudge,
   onDismissNudge,
   ioSlot,
@@ -282,7 +284,7 @@ export default function ConfidenceHero({
 
         {/* ── RIGHT: confidence dial + folded-in scenario ─────────────────── */}
         <div className="flex flex-col gap-4 border-t border-line pt-5 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
-          <div className="flex items-center gap-3.5">
+          <div className="flex items-center gap-3">
             <div
               className="relative grid h-[76px] w-[76px] shrink-0 place-items-center rounded-full"
               style={{ background: `conic-gradient(${dialColor} ${confidencePct}%, #263048 ${confidencePct}% 100%)` }}
@@ -290,12 +292,13 @@ export default function ConfidenceHero({
               <div className="absolute inset-[7px] rounded-full bg-panel" />
               <span className="relative text-lg font-bold tabular-nums text-white">{confidencePct}%</span>
             </div>
-            <p className="text-xs leading-snug text-muted">
+            <p className="min-w-0 flex-1 text-xs leading-snug text-muted">
               <b className="font-semibold text-slate-200">
                 {lastsToLE ? `Chance your money lasts to ${lifeExpectancy}+` : "Chance your money lasts"}
               </b>{" "}
               — {dialLabel}
             </p>
+            {dialExplainer && <span className="shrink-0 self-start">{dialExplainer}</span>}
           </div>
 
           {/* Only signed-in users (who can Manage) get the active-scenario block —

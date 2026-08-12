@@ -37,7 +37,7 @@ import { streamNamesLabel } from "@/lib/au/yearIncome";
 import { whatWillItTake, earliestRetirement } from "@/lib/au/goalseek";
 import { maxSpendForConfidence, withSpend, appliedStrategies } from "@/lib/au/strategies";
 import { composeScenario, toActiveScenario, EMPTY_LAYER, type StrategyLayer } from "@/lib/au/scenario";
-import { initialWithdrawal } from "@/lib/au/withdrawal";
+import { initialWithdrawal, withdrawalBand } from "@/lib/au/withdrawal";
 import TrimSpendingModal from "@/components/TrimSpendingModal";
 import BoostSpendingModal from "@/components/BoostSpendingModal";
 import ProbabilityYearModal from "@/components/ProbabilityYearModal";
@@ -61,7 +61,7 @@ import { fmtCurrency } from "@/lib/au/format";
 import { track, trackPlanBuiltConversion } from "@/lib/analytics";
 import { trackVisit } from "@/app/actions/track";
 import CountryFlag from "@/components/CountryFlag";
-import WithdrawalRateCard from "@/components/WithdrawalRateCard";
+import { WithdrawalRateStatExplainer } from "@/components/WithdrawalRateCard";
 import {
   DEFAULT_PLAN,
   getLifeEvents,
@@ -1487,6 +1487,7 @@ export default function PlannerApp({
         scenarioName={shared ? null : activeName}
         hasNotes={!!(((activePlan && (notesOverride[activePlan.id] ?? activePlan.notes)) || "") as string).trim()}
         onManage={user && !shared ? () => setScenarioModalOpen(true) : null}
+        dialExplainer={<MoneyLastsExplainer plan={plan} config={config} result={result} />}
         showSignupNudge={!user && !shared && !nudgeDismissed}
         onDismissNudge={dismissNudge}
         ioSlot={!user && !shared ? renderIOButtons() : null}
@@ -1542,22 +1543,37 @@ export default function PlannerApp({
             </button>
           }
         />
-        <StatCard
-          label="Money lasts"
-          value={
-            result.lastsToLifeExpectancy
-              ? `to ${plan.lifeExpectancy}+`
-              : `to age ${result.depletedAge}`
-          }
-          tag={`${successPct}% likely`}
-          tagTone={successTone}
-          tagHref="#likelihood"
-          tagTitle={`${successPct}% of market return scenarios fund your spending all the way to age ${plan.lifeExpectancy} — tap for the breakdown`}
-          sub={`${successPct}% likely to last to your planning age of ${plan.lifeExpectancy}`}
-          explainer={
-            <MoneyLastsExplainer plan={plan} config={config} result={result} />
-          }
-        />
+        {/* "Money lasts" was folded into the confidence hero's dial (which shows the
+            same survival likelihood); its explainer moved there too. This slot now
+            shows the withdrawal rate, with the full detail in its explainer modal. */}
+        {(() => {
+          const wr = initialWithdrawal(result);
+          const band = wr ? withdrawalBand(wr.portfolioRate) : null;
+          return (
+            <StatCard
+              label="Withdrawal rate"
+              value={wr ? `${(+(wr.portfolioRate * 100).toFixed(1))}%` : "—"}
+              tag={band?.label}
+              tagTone={band?.tone}
+              tagTitle="How sustainable is this draw? Tap the ⓘ for the full breakdown"
+              sub={
+                wr
+                  ? `${fmtCurrency(wr.netSpend)} from ${fmtCurrency(wr.portfolio)} at age ${wr.age}`
+                  : "in your first drawdown year"
+              }
+              explainer={
+                <WithdrawalRateStatExplainer
+                  result={result}
+                  plan={plan}
+                  successPct={successPct}
+                  safeRate={safeRate}
+                  flexSafeRate={flexSafeRate}
+                  safePending={safeRatePending}
+                />
+              }
+            />
+          );
+        })()}
         <StatCard
           label="Age Pension from"
           value={
@@ -1576,8 +1592,8 @@ export default function PlannerApp({
           already carries "Boost it →" (What-If) and "Pressure-test it →" (Stress),
           and the "In this plan" chips now sit at the bottom of the hero card. */}
 
-      {/* Withdrawal-rate diagnostic */}
-      <WithdrawalRateCard result={result} plan={plan} successPct={successPct} safeRate={safeRate} flexSafeRate={flexSafeRate} safePending={safeRatePending} />
+      {/* The withdrawal-rate diagnostic card was folded into the "Withdrawal rate"
+          stat card above; its full detail now lives in that card's explainer modal. */}
 
       {/* Assets chart */}
       <div className="rounded-2xl border border-line bg-panel p-6">

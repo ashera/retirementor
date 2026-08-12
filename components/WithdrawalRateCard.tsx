@@ -1,6 +1,6 @@
 "use client";
 
-import { hasStaggeredRetirement, type RetirementPlan, type SimResult } from "@/lib/au/types";
+import { type RetirementPlan, type SimResult } from "@/lib/au/types";
 import { fmtCurrency } from "@/lib/au/format";
 import { retirementGoal, type GoalBreakdown } from "@/lib/au/goal";
 import { initialWithdrawal, withdrawalBand, type InitialWithdrawal } from "@/lib/au/withdrawal";
@@ -20,31 +20,25 @@ function reductions(w: InitialWithdrawal, goal: GoalBreakdown): { label: string;
   const out: { label: string; amount: number }[] = [];
   const loanErosion = Math.round(goal.total - w.spend); // nominal loan − its deflated value that year
   if (w.agePension + w.rent > 1) {
-    // Only name the components that actually contribute, so a rent-only scenario
-    // (no Age Pension entitlement) doesn't misleadingly say "the Age Pension".
     const hasPension = w.agePension > 1;
     const hasRent = w.rent > 1;
     const label = hasPension ? `the Age Pension${hasRent ? " & rent" : ""}` : "rent";
     out.push({ label, amount: Math.round(w.agePension + w.rent) });
   }
-  // Part-time work income funds part of the spend too, so the ledger reconciles.
   if (w.workIncome > 1) out.push({ label: "part-time work", amount: Math.round(w.workIncome) });
   if (loanErosion > 100) out.push({ label: "inflation eroding your fixed loan payment", amount: loanErosion });
   return out;
 }
 
-const TONE: Record<"accent" | "amber" | "red", { text: string; badge: string }> = {
-  accent: { text: "text-emerald-400", badge: "bg-emerald-500/15 text-emerald-400" },
-  amber: { text: "text-amber-400", badge: "bg-amber-500/15 text-amber-400" },
-  red: { text: "text-red-400", badge: "bg-red-500/15 text-red-400" },
-};
-
 /**
- * Withdrawal-rate diagnostic card — the share of super drawn in the first
- * drawdown year, with a safe/moderate/high guidance band. Read-only; it explains
- * sustainability alongside "money lasts" and the likelihood gauge.
+ * Withdrawal-rate stat-card explainer — the full detail (was its own diagnostic
+ * card) now lives in this modal, launched from the "Withdrawal rate" stat card:
+ * how the rate is worked out, where it sits on the guidance band, your personal
+ * safe withdrawal rate (steady + flexible), the income-goal reconciliation, and
+ * why it climbs. Self-contained — derives everything from the plan + sim result;
+ * returns null before there's a drawdown year.
  */
-export default function WithdrawalRateCard({
+export function WithdrawalRateStatExplainer({
   result,
   plan,
   successPct,
@@ -55,93 +49,57 @@ export default function WithdrawalRateCard({
   result: SimResult;
   plan: RetirementPlan;
   successPct: number;
-  // Personal safe withdrawal rate (the whole-portfolio rate at the 85%-MC max spend),
-  // measured on the same basis as the headline so it drops onto the same bar.
   safeRate?: number | null;
-  // The safe rate under FLEXIBLE spending (Guyton-Klinger guardrails) — higher,
-  // because trimming in downturns lets you start higher. Shown as a second marker.
   flexSafeRate?: number | null;
   safePending?: boolean;
 }) {
   const w = initialWithdrawal(result);
   if (!w) return null;
-  // Headline is the WHOLE-PORTFOLIO rate (super + outside savings) — the number the
-  // 4% band actually applies to. It doesn't jump when the savings buffer empties,
-  // and it doesn't understate the draw while that buffer quietly funds part of the
-  // spend. The super-only rate is kept for the reconciliation & explainer.
-  const pct = +(w.portfolioRate * 100).toFixed(1);
-  const band = withdrawalBand(w.portfolioRate);
-  const tone = TONE[band.tone];
-  const markerPct = Math.min(100, Math.max(0, (w.portfolioRate / 0.1) * 100)); // 0–10% scale
-  const safeMarkerPct = safeRate != null ? Math.min(100, Math.max(0, (safeRate / 0.1) * 100)) : null;
-  const safePct = safeRate != null ? +(safeRate * 100).toFixed(1) : null;
-  // The flexible-spending rate, only surfaced when it's meaningfully above the steady
-  // one (guardrails always lifts it, but guard against noise / a null result).
-  const showFlex = flexSafeRate != null && safeRate != null && flexSafeRate > safeRate + 0.002;
-  const flexMarkerPct = showFlex ? Math.min(100, Math.max(0, (flexSafeRate! / 0.1) * 100)) : null;
-  const flexPct = showFlex ? +(flexSafeRate! * 100).toFixed(1) : null;
-  const safeConfidence = Math.round(MC_CONFIDENCE_TARGET * 100);
-  const overSafe = safeRate != null && w.portfolioRate > safeRate + 0.0005; // drawing above the safe rate
   const goal = retirementGoal(plan);
   const reds = reductions(w, goal);
+  const pct = +(w.portfolioRate * 100).toFixed(1);
   const superPct = +(w.rate * 100).toFixed(1);
+  const band = withdrawalBand(w.portfolioRate).label;
   const hasBuffer = w.outsideDrawn > 1;
-  const runoutPct = w.bufferRunout ? Math.round(w.bufferRunout.rate * 100) : null;
+
+  // Guidance-band positions (0–10% scale).
+  const clampPct = (v: number) => Math.min(100, Math.max(0, v));
+  const markerPct = clampPct((w.portfolioRate / 0.1) * 100);
+  const safeMarkerPct = safeRate != null ? clampPct((safeRate / 0.1) * 100) : null;
+  const showFlex = flexSafeRate != null && safeRate != null && flexSafeRate > safeRate + 0.002;
+  const flexMarkerPct = showFlex ? clampPct((flexSafeRate! / 0.1) * 100) : null;
+  const safePct = safeRate != null ? +(safeRate * 100).toFixed(1) : null;
+  const flexPct = showFlex ? +(flexSafeRate! * 100).toFixed(1) : null;
+  const overSafe = safeRate != null && w.portfolioRate > safeRate + 0.0005;
+  const safeConfidence = Math.round(MC_CONFIDENCE_TARGET * 100);
 
   return (
-    <div className="mb-6 rounded-2xl border border-line bg-panel p-5">
-      <div className="flex items-start justify-between gap-2">
-        <span className="text-xs font-medium uppercase tracking-wide text-muted">Your withdrawal rate</span>
-        <WithdrawalRateExplainer w={w} goal={goal} reds={reds} pct={pct} superPct={superPct} band={band.label} successPct={successPct} />
-      </div>
-      <div className="mt-1 flex flex-wrap items-baseline gap-2">
-        <span className={`text-3xl font-bold tabular-nums ${tone.text}`}>{pct}%</span>
-        <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${tone.badge}`}>{band.label}</span>
-        <span className="text-xs text-muted">
-          of your {hasBuffer ? "super + savings" : "super"} is funding your lifestyle in the first year
-        </span>
-      </div>
-      <div className="mt-0.5 text-xs text-muted">
-        {fmtCurrency(w.netSpend)} from {fmtCurrency(w.portfolio)} in {hasBuffer ? "super + savings" : "super"} at age {w.age}
-        {hasStaggeredRetirement(plan) && " (your first year both retired, once no salary is coming in)"}
-        {reds.length > 0 ? (
-          <> — your {fmtCurrency(goal.total)} goal less {joinAnd(reds.map((r) => `${fmtCurrency(r.amount)} from ${r.label}`))}.</>
-        ) : (
-          "."
-        )}
-        {hasBuffer && (
-          <> Super itself is drawing {fmtCurrency(w.drawn)} ({superPct}%) so far — your savings fund the rest.</>
-        )}
-      </div>
-      {w.bufferRunout && (
-        <div className="mt-2 rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-xs text-amber-200/90">
-          This climbs to about <span className="font-semibold tabular-nums">{runoutPct}%</span> by age{" "}
-          {w.bufferRunout.age}, when your outside-super savings run out and super carries the full load.
-          That&apos;s expected as you draw down — the{" "}
-          <a href="#likelihood" className="underline hover:text-amber-100">{successPct}% likelihood</a>{" "}
-          is what confirms it still lasts.
-        </div>
-      )}
+    <Explainer title="Your withdrawal rate">
+      <p>
+        Your <strong className="text-white">withdrawal rate</strong> is the share of your retirement
+        capital you draw in a year to fund your lifestyle. Because the classic{" "}
+        <strong>4% rule</strong> is a <em>whole-portfolio</em> guide, we measure it across{" "}
+        <strong className="text-white">all your investable assets</strong> — super{" "}
+        {hasBuffer && "plus outside-super savings "}together. In your first full-retirement year
+        that&apos;s <strong className="text-white">{pct}%</strong> — {fmtCurrency(w.netSpend)} drawn
+        from {fmtCurrency(w.portfolio)} at age {w.age} ({band}).
+      </p>
 
-      {/* Guidance band bar (0–10% scale): current rate (white) with the classic 4%
-          anchor, and — below — an arrow at YOUR personal safe withdrawal rate. */}
-      <div className="mt-4">
+      {/* Where you sit on the guidance band, with your personal safe rate(s). */}
+      <div>
+        <h3 className="mb-2 font-semibold text-white">Where you sit</h3>
         <div className="relative h-2 w-full overflow-hidden rounded-full">
           <div className="absolute inset-0 flex">
             <div className="h-full bg-emerald-500/60" style={{ width: "40%" }} />
             <div className="h-full bg-amber-500/60" style={{ width: "20%" }} />
             <div className="h-full bg-red-500/60" style={{ width: "40%" }} />
           </div>
-          {/* Classic 4% anchor */}
-          <div className="absolute inset-y-0 w-px bg-white/40" style={{ left: "40%" }} />
-          {/* Current rate */}
+          <div className="absolute inset-y-0 w-px bg-white/50" style={{ left: "40%" }} />
           <div
             className="absolute top-1/2 h-4 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow"
             style={{ left: `${markerPct}%` }}
           />
         </div>
-        {/* Safe-rate arrows, pointing up at the bar: steady (sky) and, if higher,
-            flexible-spending (violet). */}
         {safeMarkerPct != null && (
           <div className="relative mt-px h-2.5">
             <span
@@ -162,10 +120,11 @@ export default function WithdrawalRateCard({
             )}
           </div>
         )}
-        <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-0.5 text-[10px] text-muted">
+        <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-0.5 text-[11px] text-muted">
           <span><span className="font-semibold text-emerald-400">≤4%</span> safe</span>
           <span><span className="font-semibold text-amber-400">4–6%</span> moderate</span>
           <span><span className="font-semibold text-red-400">&gt;6%</span> high</span>
+          <span className="text-white">● you {pct}%</span>
           {safePct != null && (
             <span className="flex items-center gap-1 text-sky-300">
               <span aria-hidden>▲</span> SWR ~{safePct}%{safePending ? " …" : ""}
@@ -177,71 +136,38 @@ export default function WithdrawalRateCard({
             </span>
           )}
         </div>
+        <p className="mt-3">
+          {safePct != null ? (
+            <>
+              The classic guide is about 4%, but Australia&apos;s Age Pension is a safety net, so your{" "}
+              <span className="font-semibold text-sky-300">safe withdrawal rate (SWR) is ~{safePct}%</span> — the
+              most you could draw at a steady income and still be about {safeConfidence}% likely to last to age{" "}
+              {plan.lifeExpectancy}.
+              {overSafe
+                ? ` You're drawing ${pct}%, above that, so the plan leans more on the Age Pension and a good sequence of returns — the `
+                : ` You're at ${pct}%, comfortably within it — the `}
+              <a href="#likelihood" className="text-accent hover:underline">{successPct}% likelihood</a>{" "}
+              is the real test.
+              {flexPct != null && (
+                <>
+                  {" "}
+                  <span className="text-violet-300">Flexible spending</span> — easing back a little after markets
+                  fall — could lift your SWR to{" "}
+                  <span className="font-semibold text-violet-300">~{flexPct}%</span>, but that becomes a{" "}
+                  <em>starting</em> rate you&apos;d trim in rough markets rather than a fixed draw.
+                </>
+              )}
+            </>
+          ) : (
+            <>
+              A lower rate lasts longer. The classic guide is about 4%, but Australia&apos;s Age Pension is a
+              safety net, so a higher rate can still last — your{" "}
+              <a href="#likelihood" className="text-accent hover:underline">{successPct}% likelihood</a>{" "}
+              is the real test.
+            </>
+          )}
+        </p>
       </div>
-
-      <p className="mt-3 text-xs text-muted">
-        {safePct != null ? (
-          <>
-            The classic guide is about 4%, but Australia&apos;s Age Pension is a safety net, so your{" "}
-            <span className="font-semibold text-sky-300">safe withdrawal rate (SWR) is ~{safePct}%</span> — the
-            most you could draw at a steady income and still be about {safeConfidence}% likely to last to age{" "}
-            {plan.lifeExpectancy}.
-            {overSafe
-              ? ` You're drawing ${pct}%, above that — see the `
-              : ` You're at ${pct}%, comfortably within it — the `}
-            <a href="#likelihood" className="text-accent hover:underline">{successPct}% likelihood</a>{overSafe ? "." : " confirms it."}
-            {flexPct != null && (
-              <>
-                {" "}
-                <span className="text-violet-300">Flexible spending</span> — easing back a little after market
-                falls — could lift your SWR to{" "}
-                <span className="font-semibold text-violet-300">~{flexPct}%</span>, but this becomes a{" "}
-                <em>starting</em> rate you&apos;d trim in rough markets rather than a fixed draw.
-              </>
-            )}
-          </>
-        ) : (
-          <>
-            A lower rate lasts longer. The classic guide is about 4%, but Australia&apos;s Age Pension is a
-            safety net, so a higher rate can still last — your{" "}
-            <a href="#likelihood" className="text-accent hover:underline">{successPct}% likelihood</a>{" "}
-            is the real test.
-          </>
-        )}
-      </p>
-    </div>
-  );
-}
-
-function WithdrawalRateExplainer({
-  w,
-  goal,
-  reds,
-  pct,
-  superPct,
-  band,
-  successPct,
-}: {
-  w: InitialWithdrawal;
-  goal: GoalBreakdown;
-  reds: { label: string; amount: number }[];
-  pct: number;
-  superPct: number;
-  band: string;
-  successPct: number;
-}) {
-  const hasBuffer = w.outsideDrawn > 1;
-  return (
-    <Explainer title="Your withdrawal rate">
-      <p>
-        Your <strong className="text-white">withdrawal rate</strong> is the share of your retirement
-        capital you draw in a year to fund your lifestyle. Because the classic{" "}
-        <strong>4% rule</strong> is a <em>whole-portfolio</em> guide, we measure it across{" "}
-        <strong className="text-white">all your investable assets</strong> — super{" "}
-        {hasBuffer && "plus outside-super savings "}together. In your first full-retirement year
-        that&apos;s <strong className="text-white">{pct}%</strong> — {fmtCurrency(w.netSpend)} drawn
-        from {fmtCurrency(w.portfolio)} at age {w.age} ({band}).
-      </p>
 
       <div>
         <h3 className="mb-1 font-semibold text-white">How it&apos;s worked out</h3>
