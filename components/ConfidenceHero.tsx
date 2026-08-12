@@ -139,7 +139,7 @@ export default function ConfidenceHero({
   if (state === "bulletproof") {
     verdict = (
       <>
-        Your plan looks <b>very resilient</b> — even the worst market on record funds your {goalStr} goal
+        Your plan looks <b>very resilient</b> — even the worst market on record funds your {goalStr} retirement income goal
         {headroom >= CONFIDENCE_EPS ? <>, with modelled room for <b>~{fmtCurrency(headroom)}/yr more</b></> : null}.
       </>
     );
@@ -147,12 +147,12 @@ export default function ConfidenceHero({
     verdict =
       headroom >= CONFIDENCE_EPS ? (
         <>
-          Your plan is <b>projected to fund</b> your {goalStr} goal — with modelled room for{" "}
+          Your plan is <b>projected to fund</b> your {goalStr} retirement income goal — with modelled room for{" "}
           <b>~{fmtCurrency(headroom)}/yr more</b> at the same 85% confidence.
         </>
       ) : (
         <>
-          Your plan is <b>projected to fund</b> your {goalStr} goal — it sits right at your{" "}
+          Your plan is <b>projected to fund</b> your {goalStr} retirement income goal — it sits right at your{" "}
           <b>prudent (85%) spending level</b>, modelled to last to your planning age of {lifeExpectancy} in
           about 85% of return scenarios, including poor ones.
         </>
@@ -160,14 +160,14 @@ export default function ConfidenceHero({
   } else if (state === "ambitious") {
     verdict = (
       <>
-        Your {goalStr} goal is funded on the assumed {assumedReturnPct}% return, but sits{" "}
+        Your {goalStr} retirement income goal is funded on the assumed {assumedReturnPct}% return, but sits{" "}
         <b>above your prudent (85%) level</b> — a higher modelled chance of running short if markets disappoint.
       </>
     );
   } else {
     verdict = (
       <>
-        Your {goalStr} goal is <b>above even the central (50%) estimate</b>. Easing toward{" "}
+        Your {goalStr} retirement income goal is <b>above even the central (50%) estimate</b>. Easing toward{" "}
         {fmtCompact(safe)}, or strengthening the plan, brings it back within your prudent (85%) level.
       </>
     );
@@ -246,7 +246,7 @@ export default function ConfidenceHero({
               {/* goal marker */}
               <div className="absolute -top-7 -translate-x-1/2 whitespace-nowrap text-center" style={{ left: `${clamp(pGoal, 4, 96)}%` }}>
                 <span className="rounded-md border border-line bg-ink px-2 py-0.5 text-[11px] font-bold text-white">
-                  Your goal {fmtCompact(goalTotal)}
+                  Your income goal {fmtCompact(goalTotal)}
                 </span>
                 <div className="text-[11px] leading-none text-white">▼</div>
               </div>
