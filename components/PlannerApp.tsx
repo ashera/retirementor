@@ -1392,15 +1392,10 @@ export default function PlannerApp({
       </div>
       )}
 
-      {/* Export/import is offered to everyone (the app is local-first); signed-in users
-          get the buttons in the scenario bar above, guests get them here. */}
+      {/* Export/import is offered to everyone (the app is local-first). Signed-in
+          users get the buttons in the ⚙ Manage modal; guests get them inside the
+          confidence hero (below the create-account nudge — see `ioSlot`). */}
       <input ref={importInputRef} type="file" accept="application/json,.json" hidden onChange={onImportFile} />
-      {!user && !shared && configured && (
-        <div className="mb-6 flex flex-wrap items-center gap-2">
-          {renderIOButtons()}
-          <span className="text-xs text-muted">Back up your plan or move it to another device.</span>
-        </div>
-      )}
 
       {/* The projection only renders once the user has actually built a plan.
           Before that we show the Get-started panel — never fabricated numbers. */}
@@ -1430,6 +1425,7 @@ export default function PlannerApp({
         onManage={user && !shared ? () => setScenarioModalOpen(true) : null}
         showSignupNudge={!user && !shared && !nudgeDismissed}
         onDismissNudge={dismissNudge}
+        ioSlot={!user && !shared ? renderIOButtons() : null}
       />
 
       {/* Stat cards */}

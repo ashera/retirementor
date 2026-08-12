@@ -37,6 +37,7 @@ export interface ConfidenceHeroProps {
   // column where a signed-out user has no scenario block (reclaims its old card).
   showSignupNudge?: boolean;
   onDismissNudge?: () => void;
+  ioSlot?: React.ReactNode; // guest import/export buttons (local-first backup)
 }
 
 export default function ConfidenceHero({
@@ -60,6 +61,7 @@ export default function ConfidenceHero({
   onManage,
   showSignupNudge,
   onDismissNudge,
+  ioSlot,
 }: ConfidenceHeroProps) {
   const state: ConfidenceState = confidenceState(goalTotal, { failsafe, safe, central });
   const headroom = safe - goalTotal; // + = room to spend more; − = above the safe level
@@ -281,6 +283,15 @@ export default function ConfidenceHero({
                   Sign in
                 </Link>
               </div>
+            </div>
+          )}
+
+          {ioSlot && (
+            <div className="border-t border-dashed border-line pt-4">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted/70">
+                Back up your plan
+              </div>
+              <div className="mt-2 flex flex-wrap gap-2">{ioSlot}</div>
             </div>
           )}
         </div>
