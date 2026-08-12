@@ -164,8 +164,10 @@ export function maxSpendForConfidence(
   config: EngineConfig,
   targetSuccess: number,
   mc: { iterations: number; seed: number },
+  verify?: { iterations: number; seed: number },
 ): number {
-  const success = (s: number) => runMonteCarlo(withSpend(plan, s), config, mc).successRate;
+  const success = (s: number, m: { iterations: number; seed: number } = mc) =>
+    runMonteCarlo(withSpend(plan, s), config, m).successRate;
   const lo0 = 10_000;
   const hi0 = 300_000;
   if (success(lo0) < targetSuccess) return lo0; // can't hit the target even minimally
@@ -177,7 +179,19 @@ export function maxSpendForConfidence(
     if (success(mid) >= targetSuccess) lo = mid;
     else hi = mid;
   }
-  return Math.floor(lo / 1_000) * 1_000;
+  let candidate = Math.floor(lo / 1_000) * 1_000;
+  // The bisection above runs on the fast `mc` preset for responsiveness, so at the
+  // boundary it sits ~2–3pp optimistic vs the higher-fidelity run the UI DISPLAYS the
+  // likelihood with. When a `verify` preset is supplied (the display's iteration
+  // count), re-score the winner at that resolution and step down $1,000 at a time
+  // until it genuinely clears the bar — so "set to safe" actually reads targetSuccess.
+  if (verify) {
+    for (let i = 0; i < 20 && candidate > lo0; i++) {
+      if (success(candidate, verify) >= targetSuccess) break;
+      candidate -= 1_000;
+    }
+  }
+  return candidate;
 }
 
 /** The default value each param takes for a plan (used when a card is toggled on

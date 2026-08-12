@@ -32,7 +32,7 @@ import {
   RetirementIncomeGoalExplainer,
   SuperAtRetirementExplainer,
 } from "@/components/explainers";
-import { runMonteCarlo, MC_CONFIDENCE_TARGET, MC_CONFIDENCE_MC } from "@/lib/au/montecarlo";
+import { runMonteCarlo, MC_CONFIDENCE_TARGET, MC_CONFIDENCE_MC, MC_CONFIDENCE_VERIFY } from "@/lib/au/montecarlo";
 import { streamNamesLabel } from "@/lib/au/yearIncome";
 import { whatWillItTake, earliestRetirement } from "@/lib/au/goalseek";
 import { maxSpendForConfidence, withSpend, appliedStrategies } from "@/lib/au/strategies";
@@ -651,8 +651,8 @@ export default function PlannerApp({
     }
     setMcMaxPending(true);
     const id = setTimeout(() => {
-      const safe = maxSpendForConfidence(plan, config, MC_CONFIDENCE_TARGET, MC_CONFIDENCE_MC);
-      const failsafe = maxSpendForConfidence(plan, config, 0.95, MC_CONFIDENCE_MC);
+      const safe = maxSpendForConfidence(plan, config, MC_CONFIDENCE_TARGET, MC_CONFIDENCE_MC, MC_CONFIDENCE_VERIFY);
+      const failsafe = maxSpendForConfidence(plan, config, 0.95, MC_CONFIDENCE_MC, MC_CONFIDENCE_VERIFY);
       tierCache.set(tierKey, { safe, failsafe });
       persistTierCache();
       setMcMaxSpend(safe);
@@ -689,7 +689,7 @@ export default function PlannerApp({
     const id = setTimeout(() => {
       const rateFor = (guardrails: RetirementPlan["guardrails"]): number | null => {
         const p: RetirementPlan = { ...plan, spendingMode: "flat", guardrails };
-        const ms = maxSpendForConfidence(p, config, MC_CONFIDENCE_TARGET, MC_CONFIDENCE_MC);
+        const ms = maxSpendForConfidence(p, config, MC_CONFIDENCE_TARGET, MC_CONFIDENCE_MC, MC_CONFIDENCE_VERIFY);
         const w = initialWithdrawal(simulate(withSpend(p, ms), config));
         return w ? w.portfolioRate : null;
       };

@@ -96,6 +96,11 @@ export const MC_CONFIDENCE_TARGET = 0.85;
 // Fewer iterations (300 vs the dashboard's 1000) keeps the many binary-search
 // evaluations fast; that only leaves ~1pp of sampling noise between the two.
 export const MC_CONFIDENCE_MC = { iterations: 300, seed: 0x9e3779b9 } as const;
+// Display-resolution preset (matches runMonteCarlo's default 1000 iterations + seed):
+// the safe-spend solver bisects on the fast MC above, then re-verifies its winner at
+// THIS resolution so the spend it returns actually clears the bar on the same run the
+// UI shows the likelihood with — otherwise the boundary reads ~2–3pp optimistic.
+export const MC_CONFIDENCE_VERIFY = { iterations: 1000, seed: 0x9e3779b9 } as const;
 
 export interface MonteCarloResult {
   iterations: number;

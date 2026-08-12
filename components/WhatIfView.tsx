@@ -6,7 +6,12 @@ import type { EngineConfig } from "@/lib/au/config";
 import type { RetirementPlan, SimResult, LifeEvent } from "@/lib/au/types";
 import { DEFAULT_PLAN, getInvestmentProperties, oldestCurrentAge } from "@/lib/au/types";
 import { simulate } from "@/lib/au/simulate";
-import { runMonteCarlo, MC_CONFIDENCE_TARGET as SAFE_TARGET, MC_CONFIDENCE_MC as SAFE_MC } from "@/lib/au/montecarlo";
+import {
+  runMonteCarlo,
+  MC_CONFIDENCE_TARGET as SAFE_TARGET,
+  MC_CONFIDENCE_MC as SAFE_MC,
+  MC_CONFIDENCE_VERIFY as SAFE_VERIFY,
+} from "@/lib/au/montecarlo";
 import { guardrailsOutlook, type GuardrailsOutlook } from "@/lib/au/guardrails";
 import { fmtCurrency, fmtCompact } from "@/lib/au/format";
 import { rowNetWorth } from "@/lib/au/networth";
@@ -471,11 +476,11 @@ export default function WhatIfView({
     const steadyBase: RetirementPlan = { ...composedOthers, guardrails: undefined };
     const flexBase: RetirementPlan = { ...composedOthers, guardrails: {} };
     const id = setTimeout(() => {
-      const ss = maxSpendForConfidence(steadyBase, config, SAFE_TARGET, SAFE_MC);
+      const ss = maxSpendForConfidence(steadyBase, config, SAFE_TARGET, SAFE_MC, SAFE_VERIFY);
       setSafeSpend(ss);
       const w = ss != null ? initialWithdrawal(simulate(withSpend(steadyBase, ss), config)) : null;
       setSafeRate(w ? w.portfolioRate : null);
-      const fs = maxSpendForConfidence(flexBase, config, SAFE_TARGET, SAFE_MC);
+      const fs = maxSpendForConfidence(flexBase, config, SAFE_TARGET, SAFE_MC, SAFE_VERIFY);
       setFlexSafeSpend(fs);
       const wf = fs != null ? initialWithdrawal(simulate(withSpend(flexBase, fs), config)) : null;
       setFlexSafeRate(wf ? wf.portfolioRate : null);
@@ -538,7 +543,7 @@ export default function WhatIfView({
   useEffect(() => {
     if (!baseline) return;
     const id = setTimeout(() => {
-      setBaseSafeSpend(maxSpendForConfidence({ ...baseline, guardrails: undefined }, config, SAFE_TARGET, SAFE_MC));
+      setBaseSafeSpend(maxSpendForConfidence({ ...baseline, guardrails: undefined }, config, SAFE_TARGET, SAFE_MC, SAFE_VERIFY));
     }, 300);
     return () => clearTimeout(id);
   }, [baseline, config]);
@@ -553,9 +558,9 @@ export default function WhatIfView({
     setAffordableComputing(card.id);
     // Yield first so the "Calculating…" state paints before the blocking MC run.
     setTimeout(() => {
-      const base = baseSafeSpend ?? maxSpendForConfidence({ ...baseline, guardrails: undefined }, config, SAFE_TARGET, SAFE_MC);
+      const base = baseSafeSpend ?? maxSpendForConfidence({ ...baseline, guardrails: undefined }, config, SAFE_TARGET, SAFE_MC, SAFE_VERIFY);
       const single = card.apply(baseline, resolveValues(card, values[card.id]));
-      const v = maxSpendForConfidence({ ...single, guardrails: undefined }, config, SAFE_TARGET, SAFE_MC) - base;
+      const v = maxSpendForConfidence({ ...single, guardrails: undefined }, config, SAFE_TARGET, SAFE_MC, SAFE_VERIFY) - base;
       setAffordable((a) => ({ ...a, [card.id]: v }));
       setAffordableKey((k) => ({ ...k, [card.id]: key }));
       setAffordableComputing(null);
