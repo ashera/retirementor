@@ -8,7 +8,7 @@ import { DEFAULT_PLAN, getInvestmentProperties, oldestCurrentAge } from "@/lib/a
 import { simulate } from "@/lib/au/simulate";
 import { runMonteCarlo, MC_CONFIDENCE_TARGET as SAFE_TARGET, MC_CONFIDENCE_MC as SAFE_MC } from "@/lib/au/montecarlo";
 import { guardrailsOutlook, type GuardrailsOutlook } from "@/lib/au/guardrails";
-import { fmtCurrency } from "@/lib/au/format";
+import { fmtCurrency, fmtCompact } from "@/lib/au/format";
 import { rowNetWorth } from "@/lib/au/networth";
 import { ttrFlowsFromResult } from "@/lib/au/ttrFlow";
 import TtrFlowButton from "@/components/TtrFlowButton";
@@ -590,6 +590,9 @@ export default function WhatIfView({
   const safeStratSubject = active.size === 1 ? "This strategy" : "These strategies";
   const safeStratVerb =
     active.size === 1 ? (safeDelta >= 0 ? "lifts" : "lowers") : safeDelta >= 0 ? "lift" : "lower";
+  // The headline for the section: the gap between the goal and the safe level — the
+  // actionable "are you over/under safe, and by how much?" (positive = headroom).
+  const safeGap = safeSpendTotal != null && spendMix != null ? safeSpendTotal - spendMix.total : 0;
 
   // Net worth trajectory: total wealth (super + outside + home + property) across
   // retirement, plus the terminal estate at life expectancy. The sparkline spans
@@ -979,51 +982,59 @@ export default function WhatIfView({
                   Safe spending
                   <span className="ml-1 rounded bg-panel-2 px-1 py-0.5 text-[9px] font-semibold text-muted">{Math.round(SAFE_TARGET * 100)}% confidence</span>
                 </span>
-                {showSafeDelta ? (
-                  // Delta-forward: the change your active strategies make.
-                  <span className={`text-lg font-bold tabular-nums ${safeDelta >= 0 ? "text-accent" : "text-amber-400"}`}>
-                    {fmtDelta(safeDelta)}
-                    <span className="text-xs font-medium text-muted">/yr</span>
-                  </span>
-                ) : (
-                  // No active change: the current safe-spend level (the dashboard's baseline).
-                  <span className="flex items-baseline gap-x-1.5 tabular-nums">
-                    <span className="text-lg font-bold text-white">{fmtCurrency(safeSpendTotal)}</span>
-                    <span className="text-xs font-medium text-muted">/yr</span>
-                  </span>
-                )}
+                {/* Headline = the gap between your goal and your safe level (the actionable number). */}
+                <span className="flex items-baseline gap-x-1.5 tabular-nums">
+                  {safeGap >= 500 ? (
+                    <>
+                      <span className="text-lg font-bold text-accent">+{fmtCompact(safeGap)}</span>
+                      <span className="text-xs font-medium text-muted">/yr headroom</span>
+                    </>
+                  ) : safeGap <= -500 ? (
+                    <>
+                      <span className="text-lg font-bold text-amber-400">−{fmtCompact(-safeGap)}</span>
+                      <span className="text-xs font-medium text-muted">/yr over safe</span>
+                    </>
+                  ) : (
+                    <span className="text-lg font-bold text-white">On target</span>
+                  )}
+                </span>
               </div>
-              {showSafeDelta ? (
-                <p className="mt-0.5 text-[11px] leading-snug text-muted">
-                  {safeStratSubject} {safeStratVerb} your safe spend from{" "}
-                  <span className="font-semibold text-slate-200">{fmtCurrency(baseSafeTotal!)}</span> to{" "}
-                  <span className="font-semibold text-white">{fmtCurrency(safeSpendTotal)}/yr</span>.
-                </p>
-              ) : changed ? (
-                <p className="mt-0.5 text-[11px] leading-snug text-muted">
-                  Your active strategies don&apos;t materially change your safe spend.
-                </p>
-              ) : (
-                <p className="mt-0.5 text-[11px] leading-snug text-muted">
-                  Toggle a strategy to see how it moves your safe spend.
-                </p>
-              )}
+              {/* Primary: what the gap means, naming the safe level once. */}
               <p className="mt-0.5 text-[11px] leading-snug text-muted">
-                {safeSpendTotal - spendMix.total >= 500 ? (
+                {safeGap >= 500 ? (
                   <>
-                    You have headroom of <span className="font-semibold text-accent">{fmtCurrency(safeSpendTotal - spendMix.total)}/yr</span> above
-                    your {fmtCurrency(spendMix.total)} goal — this is extra you could spend annually with your money still very likely to last
-                    {changed ? " (with these strategies)" : ""}.
+                    You could spend <span className="font-semibold text-accent">{fmtCurrency(safeGap)}/yr</span> more than your{" "}
+                    {fmtCurrency(spendMix.total)} goal and still be very likely to last — your safe level is{" "}
+                    <span className="font-semibold text-slate-200">{fmtCurrency(safeSpendTotal)}/yr</span>.
                   </>
-                ) : safeSpendTotal - spendMix.total <= -500 ? (
+                ) : safeGap <= -500 ? (
                   <>
-                    No headroom, you are currently spending <span className="font-semibold text-amber-400">{fmtCurrency(spendMix.total - safeSpendTotal)}/yr</span> above
-                    a prudently sustainable level — your {fmtCurrency(spendMix.total)} goal carries more risk of running short.
+                    Your {fmtCurrency(spendMix.total)} goal is <span className="font-semibold text-amber-400">{fmtCurrency(-safeGap)}/yr above</span> your
+                    safe level of <span className="font-semibold text-slate-200">{fmtCurrency(safeSpendTotal)}/yr</span>, so it carries more risk of running short.
                   </>
                 ) : (
-                  <>Right at your {fmtCurrency(spendMix.total)} goal — little spare headroom.</>
+                  <>
+                    Your {fmtCurrency(spendMix.total)} goal sits right at your{" "}
+                    <span className="font-semibold text-slate-200">{fmtCurrency(safeSpendTotal)}/yr</span> safe level — little spare headroom.
+                  </>
                 )}
               </p>
+              {/* Secondary: what your strategies did to the safe level. */}
+              {showSafeDelta ? (
+                <p className="mt-1 text-[11px] leading-snug text-muted/80">
+                  {safeStratSubject} {safeStratVerb} your safe level by{" "}
+                  <span className={`font-semibold ${safeDelta >= 0 ? "text-accent" : "text-amber-400"}`}>{fmtDeltaYr(safeDelta)}</span>{" "}
+                  (from {fmtCurrency(baseSafeTotal!)} to {fmtCurrency(safeSpendTotal)}).
+                </p>
+              ) : changed ? (
+                <p className="mt-1 text-[11px] leading-snug text-muted/80">
+                  Your active strategies don&apos;t materially change your safe level.
+                </p>
+              ) : (
+                <p className="mt-1 text-[11px] leading-snug text-muted/80">
+                  Toggle a strategy to see how it moves your safe level.
+                </p>
+              )}
               <p className="mt-1 text-[10px] leading-snug text-muted/70">
                 Based on at least an {Math.round(SAFE_TARGET * 100)}% success rate across thousands of market
                 up-and-down scenarios (Monte Carlo) — not just your steady {composed.investmentReturn}% average.
