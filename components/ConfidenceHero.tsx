@@ -365,7 +365,7 @@ export default function ConfidenceHero({
       {chips && chips.length > 0 && (
         <div className="mt-6 border-t border-line pt-4">
           <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted">
-            In this plan — already in the numbers above
+            What-if boosts and life events already applied to this scenario
           </div>
           <div className="flex flex-wrap gap-2">
             {chips.map((c) => (
