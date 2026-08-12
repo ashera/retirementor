@@ -24,7 +24,8 @@ export interface ConfidenceHeroProps {
   lifeExpectancy: number;
   lastsToLE: boolean;
   depletedAge: number | null;
-  pending: boolean; // safe/failsafe tiers still settling
+  pending: boolean; // safe/failsafe tiers recomputing after an edit (keep last numbers, shimmer)
+  loading: boolean; // first load — no real safe/failsafe tier yet, so show a skeleton not fallbacks
   spendOverridden: boolean; // a What-If strategy sets spend → don't offer an inline set
   onSetSpend: (living: number) => void;
   whatIfHref: string;
@@ -52,6 +53,7 @@ export default function ConfidenceHero({
   lastsToLE,
   depletedAge,
   pending,
+  loading,
   spendOverridden,
   onSetSpend,
   whatIfHref,
@@ -155,6 +157,34 @@ export default function ConfidenceHero({
         {/* ── LEFT: the answer ───────────────────────────────────────────── */}
         <div>
           <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-accent">{eyebrow}</div>
+
+          {loading ? (
+            /* First load: the Monte Carlo safe/failsafe tiers take a moment. Show a
+               skeleton instead of the deterministic fallbacks, which would flash an
+               over-optimistic verdict/range before snapping to the real numbers. */
+            <div aria-busy="true">
+              <div className="mt-2 flex items-center gap-2.5 text-slate-300">
+                <svg className="h-5 w-5 animate-spin text-accent" viewBox="0 0 24 24" fill="none" aria-hidden>
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-90" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V0C5.4 0 0 5.4 0 12h4z" />
+                </svg>
+                <span className="text-lg font-semibold">Assessing your plan…</span>
+              </div>
+              <p className="mt-2 max-w-[38ch] text-sm text-muted">
+                Working out the most you could safely spend and how likely your money is to last.
+              </p>
+              <div className="mt-6 h-4 w-full animate-pulse rounded-full bg-panel-2" />
+              <div className="mt-3 flex gap-6">
+                {[0, 1, 2].map((i) => (
+                  <div key={i} className="flex-1 animate-pulse space-y-1.5">
+                    <div className="h-4 w-14 rounded bg-panel-2" />
+                    <div className="h-2.5 w-20 rounded bg-panel-2/60" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+          <>
           <p className="mt-2 max-w-[34ch] text-xl font-semibold leading-snug text-white text-balance sm:text-[26px] [&_b]:text-accent">
             {verdict}
           </p>
@@ -213,6 +243,8 @@ export default function ConfidenceHero({
               Pressure-test it <span aria-hidden className="text-accent">→</span>
             </Link>
           </div>
+          </>
+          )}
         </div>
 
         {/* ── RIGHT: confidence dial + folded-in scenario ─────────────────── */}

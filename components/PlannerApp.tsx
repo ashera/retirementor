@@ -1416,6 +1416,7 @@ export default function PlannerApp({
         lastsToLE={result.lastsToLifeExpectancy}
         depletedAge={result.depletedAge}
         pending={mcMaxPending}
+        loading={mcMaxSpend == null || failsafeSpend == null}
         spendOverridden={spendOverridden}
         onSetSpend={setSpendToSafe}
         whatIfHref={whatIfHref}
