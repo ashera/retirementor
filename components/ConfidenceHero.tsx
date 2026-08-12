@@ -147,6 +147,11 @@ export default function ConfidenceHero({
   // The "leaving money on the table" nudge — only where there's real headroom.
   const showNudge = (state === "bulletproof" || state === "safe") && headroom >= 3000;
 
+  // Active-scenario name: allow up to 50 characters (wrapping to two lines in the
+  // column) before hard-truncating with an ellipsis.
+  const fullName = scenarioName ?? "Working scenario";
+  const displayName = fullName.length > 50 ? `${fullName.slice(0, 50).trimEnd()}…` : fullName;
+
   const marker = (leftPct: number, tone: string, big: string, small: string, note: string) => (
     <div
       className="absolute -translate-x-1/2 text-center"
@@ -278,10 +283,18 @@ export default function ConfidenceHero({
           {(scenarioName || onManage) && (
             <div className="border-t border-dashed border-line pt-4">
               <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted/70">Active scenario</div>
-              <div className="mt-1.5 flex items-center gap-2">
-                <div className="min-w-0 flex-1 truncate text-[15px] font-bold text-white" title={scenarioName ?? undefined}>
-                  {scenarioName ?? "Working scenario"}
-                </div>
+              {/* Full column width + up to two lines so ~50 characters can show before
+                  the ellipsis (the name is also hard-capped at 50 chars). */}
+              <div
+                className="mt-1 line-clamp-2 break-words text-[15px] font-bold leading-snug text-white"
+                title={scenarioName ?? undefined}
+              >
+                {displayName}
+              </div>
+              <div className="mt-2 flex items-center justify-between gap-2">
+                <span className="text-[11px] text-muted/70">
+                  saved automatically{hasNotes ? " · 📝 has notes" : ""}
+                </span>
                 {onManage && (
                   <button
                     onClick={onManage}
@@ -290,9 +303,6 @@ export default function ConfidenceHero({
                     ⚙ Manage
                   </button>
                 )}
-              </div>
-              <div className="mt-1.5 text-[11px] text-muted/70">
-                saved automatically{hasNotes ? " · 📝 has notes" : ""}
               </div>
             </div>
           )}
