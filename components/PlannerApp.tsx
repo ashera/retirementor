@@ -24,6 +24,7 @@ import LifestageModal from "@/components/LifestageModal";
 import GuidedIntro from "@/components/GuidedIntro";
 import GetStartedPanel from "@/components/GetStartedPanel";
 import NewScenarioModal from "@/components/NewScenarioModal";
+import ConfidenceHero from "@/components/ConfidenceHero";
 import {
   AgePensionExplainer,
   LikelihoodExplainer,
@@ -81,6 +82,10 @@ const WORKING_TS_KEY = "au-retirement-plan-ts"; // when the local working plan w
 const SAVED_ID_KEY = "au-retirement-saved-id"; // the plans-row id the active scenario is (for in-place Save)
 const PLAN_OWNER_KEY = "au-retirement-plan-owner"; // whose account last wrote the local plan ("" = built while signed out)
 const NUDGE_KEY = "au-retirement-nudge-dismissed"; // signed-out "save your work" banner dismissed
+
+// Shared styling for the ⚙ Manage modal's action tiles (buttons + links alike).
+const SCEN_ACTION =
+  "flex items-center gap-2 rounded-lg border border-line bg-panel-2 px-3 py-2.5 text-sm font-medium text-slate-200 transition hover:border-accent/50 hover:text-white disabled:opacity-60";
 
 // A blank starting point for a first-time visitor's "Enter my details" wizard:
 // the personal figures (age, super, salary) start empty (NaN renders as a blank
@@ -353,6 +358,7 @@ export default function PlannerApp({
   const [notice, setNotice] = useState<string | null>(null);
   const [nudgeDismissed, setNudgeDismissed] = useState(false);
   const [newScenarioOpen, setNewScenarioOpen] = useState(false);
+  const [scenarioModalOpen, setScenarioModalOpen] = useState(false);
   const [notesOpen, setNotesOpen] = useState(false);
   // Latest notes per saved scenario, so the modal reflects saves without a full
   // router refresh (which would re-simulate). Keyed by plans-row id.
@@ -585,13 +591,18 @@ export default function PlannerApp({
   // clears the shared 85% bar (matching the What-If safe spend and the boost
   // modal). Heavier than the deterministic goal-seek, so debounce it and show a
   // pulse; fall back to the central-projection figure until it settles.
+  // `mcMaxSpend` is the SAFE tier (85% MC); `failsafeSpend` is the FAILSAFE tier
+  // (95% MC — survives a bad run of markets). Both feed the confidence hero's
+  // three-tier range and settle together off the interaction path.
   const [mcMaxSpend, setMcMaxSpend] = useState<number | null>(null);
+  const [failsafeSpend, setFailsafeSpend] = useState<number | null>(null);
   const [mcMaxPending, setMcMaxPending] = useState(false);
   useEffect(() => {
     if (!ready || !configured) return;
     setMcMaxPending(true);
     const id = setTimeout(() => {
       setMcMaxSpend(maxSpendForConfidence(plan, config, MC_CONFIDENCE_TARGET, MC_CONFIDENCE_MC));
+      setFailsafeSpend(maxSpendForConfidence(plan, config, 0.95, MC_CONFIDENCE_MC));
       setMcMaxPending(false);
     }, 400);
     return () => clearTimeout(id);
@@ -1029,6 +1040,23 @@ export default function PlannerApp({
 
   // True income need = living costs + any ongoing home-loan cost (see lib/au/goal).
   const goal = retirementGoal(plan);
+
+  // ── Confidence hero: three loan-inclusive spend tiers vs the goal ───────────
+  // central (50%, deterministic) ≥ safe (85% MC) ≥ failsafe (95% MC). The solvers
+  // return LIVING spend, so add the ongoing home loan to compare with the goal;
+  // clamp so the tiers stay monotone even if Monte Carlo noise crosses them. The
+  // heavy tiers fall back to the cheaper ones until they settle (see `mcMaxPending`).
+  const confLoan = goal.loanCost;
+  const centralLiving = gs.maxSpend ?? gs.currentSpend;
+  const centralTotal = centralLiving + confLoan;
+  const safeTotal = Math.min((mcMaxSpend ?? centralLiving) + confLoan, centralTotal);
+  const failsafeTotal = Math.min((failsafeSpend ?? mcMaxSpend ?? centralLiving) + confLoan, safeTotal);
+  // Apply the safe tier as the new spend (its LIVING part; the engine layers the
+  // loan on itself). Edits the base inputs, like the other quick-adjust levers.
+  const setSpendToSafe = (living: number) => {
+    setBase((prev) => withSpend(prev, Math.round(Math.max(0, living))));
+    setNotice("Spend set to your safe level — fine-tune it any time.");
+  };
   const goalSub =
     goal.loanKind === "pi"
       ? `incl. ${fmtCurrency(goal.loanCost)} home loan · eases to ${fmtCurrency(goal.living)} at ${goal.payoffAge}`
@@ -1279,10 +1307,11 @@ export default function PlannerApp({
       {/* Status confirmations (loaded / saved / applied) — shown to everyone. */}
       {notice && <p className="mb-4 text-xs text-accent">{notice}</p>}
 
-      {/* Scenario bar — signed-in users only. The active scenario auto-saves; the
-          name is inline-editable, "New scenario" branches a copy, and the switcher
-          flips which scenario is active. */}
-      {user && (configured || savedPlans.length > 0) && (
+      {/* Scenario bar — signed-in users only, shown ONLY in the pre-build empty
+          state so you can switch/create before there's a plan. Once configured, the
+          confidence hero owns the active-scenario identity and its ⚙ Manage modal
+          holds these controls (they're folded away to reclaim the space). */}
+      {user && !configured && savedPlans.length > 0 && (
       <div className="mb-6 rounded-2xl border border-line bg-panel px-5 py-4">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           <div className="flex items-center gap-2">
@@ -1420,6 +1449,30 @@ export default function PlannerApp({
           Before that we show the Get-started panel — never fabricated numbers. */}
       {configured ? (
         <>
+      {/* Confidence hero — the page's headline answer: can you afford your goal,
+          and how much could you safely spend? Folds in the active-scenario identity
+          (name + Manage → modal below). */}
+      <ConfidenceHero
+        goalTotal={goal.total}
+        loan={confLoan}
+        central={centralTotal}
+        safe={safeTotal}
+        failsafe={failsafeTotal}
+        safeLiving={safeTotal - confLoan}
+        confidencePct={successPct}
+        lifeExpectancy={plan.lifeExpectancy}
+        lastsToLE={result.lastsToLifeExpectancy}
+        depletedAge={result.depletedAge}
+        pending={mcMaxPending}
+        spendOverridden={spendOverridden}
+        onSetSpend={setSpendToSafe}
+        whatIfHref={whatIfHref}
+        stressHref={stressHref}
+        scenarioName={shared ? null : activeName}
+        hasNotes={!!(((activePlan && (notesOverride[activePlan.id] ?? activePlan.notes)) || "") as string).trim()}
+        onManage={user && !shared ? () => setScenarioModalOpen(true) : null}
+      />
+
       {/* Stat cards */}
       <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
@@ -2421,6 +2474,149 @@ export default function PlannerApp({
           onCreate={createScenarioFrom}
           onClose={() => setNewScenarioOpen(false)}
         />
+      )}
+
+      {/* ⚙ Manage — the folded-away Scenario card. Everything from the old scenario
+          bar (rename, switch, new, compare, notes, financial summary, report, share,
+          import/export, delete) lives here, launched from the confidence hero. */}
+      {scenarioModalOpen && user && !shared && (
+        <div
+          className="fixed inset-0 z-[70] flex items-start justify-center overflow-y-auto bg-ink/70 p-4 backdrop-blur-sm sm:items-center"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Manage scenario"
+          onClick={() => setScenarioModalOpen(false)}
+        >
+          <div
+            className="w-full max-w-md overflow-hidden rounded-2xl border border-line bg-panel shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-line px-5 py-4">
+              <div>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-accent">Scenario</div>
+                <div className="mt-0.5 text-lg font-semibold text-white">Manage this scenario</div>
+              </div>
+              <button
+                onClick={() => setScenarioModalOpen(false)}
+                aria-label="Close"
+                className="rounded-lg px-2 py-1 text-lg text-muted transition hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="px-5 py-4">
+              {/* Name */}
+              <label htmlFor="scen-name" className="block text-[11px] font-semibold uppercase tracking-wide text-muted">
+                Name
+              </label>
+              <input
+                id="scen-name"
+                value={nameDraft}
+                onChange={(e) => setNameDraft(e.target.value)}
+                onBlur={renameActive}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") e.currentTarget.blur();
+                  if (e.key === "Escape") {
+                    setNameDraft(activeName ?? "");
+                    e.currentTarget.blur();
+                  }
+                }}
+                disabled={!savedId}
+                aria-label="Scenario name"
+                placeholder={savedId ? "Name this scenario" : "Working scenario"}
+                className="mt-1.5 w-full rounded-lg border border-line bg-panel-2 px-3 py-2 text-sm font-semibold text-white outline-none focus:border-accent disabled:opacity-60"
+              />
+              <p className="mt-1 text-[11px] text-muted">Every change is saved to this scenario automatically.</p>
+
+              {/* Switch */}
+              {savedPlans.length > 1 && (
+                <div className="mt-4">
+                  <label htmlFor="scen-switch" className="block text-[11px] font-semibold uppercase tracking-wide text-muted">
+                    Switch scenario
+                  </label>
+                  <select
+                    id="scen-switch"
+                    value={savedId ?? ""}
+                    onChange={(e) => {
+                      setScenarioModalOpen(false);
+                      switchScenario(e.target.value);
+                    }}
+                    aria-label="Switch scenario"
+                    disabled={pending}
+                    className="mt-1.5 w-full rounded-lg border border-line bg-panel-2 px-3 py-2 text-sm text-white outline-none focus:border-accent disabled:opacity-60"
+                  >
+                    {savedId == null && <option value="">Working scenario</option>}
+                    {savedPlans.map((sp) => (
+                      <option key={sp.id} value={sp.id}>
+                        {sp.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div className="my-4 border-t border-line" />
+
+              {/* Actions */}
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => { setScenarioModalOpen(false); setNewScenarioOpen(true); }}
+                  disabled={pending}
+                  className={SCEN_ACTION}
+                >
+                  ＋ New scenario
+                </button>
+                {activePlan && (
+                  <Link href="/compare" onClick={() => setScenarioModalOpen(false)} className={SCEN_ACTION}>
+                    ⚖ Compare
+                  </Link>
+                )}
+                {activePlan && (
+                  <button onClick={() => { setScenarioModalOpen(false); setNotesOpen(true); }} className={SCEN_ACTION}>
+                    📝 Notes
+                  </button>
+                )}
+                {activePlan && (
+                  <Link href={`/assets/${activePlan.id}`} onClick={() => setScenarioModalOpen(false)} className={SCEN_ACTION}>
+                    🏦 Financial summary
+                  </Link>
+                )}
+                {activePlan && (
+                  <Link href={`/report/${activePlan.id}`} target="_blank" className={SCEN_ACTION}>
+                    ↗ Run report
+                  </Link>
+                )}
+              </div>
+
+              {!activePlan && (
+                <p className="mt-3 text-sm text-muted">Saving your scenario… more options appear once it&apos;s saved.</p>
+              )}
+
+              {/* Share + import/export */}
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                {activePlan && (
+                  <ShareControl key={activePlan.id} id={activePlan.id} initialToken={activePlan.share_token} onNotice={setNotice} />
+                )}
+                {renderIOButtons()}
+              </div>
+
+              {/* Delete */}
+              {activePlan && (
+                <div className="mt-4 border-t border-line pt-4">
+                  <button
+                    onClick={() => { setScenarioModalOpen(false); handleDelete(activePlan); }}
+                    disabled={pending}
+                    aria-label={`Delete ${activePlan.name}`}
+                    className="w-full rounded-lg border border-line bg-panel-2 px-3 py-2.5 text-sm font-medium text-muted transition hover:border-red-400/50 hover:text-red-400 disabled:opacity-60"
+                  >
+                    ✕ Delete scenario
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
 
       {taxAge != null &&

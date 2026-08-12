@@ -133,9 +133,17 @@ try {
   ok("?edit opens What-If editing 'Scenario Two'", (await txt()).includes("Scenario Two"));
   ok("?edit sets it as the active scenario on the server", (await activePlanId()) === twoId);
 
-  // F — inline rename of the active scenario from the dashboard name field.
+  // The scenario controls (rename, switch, new, delete, …) are folded into the
+  // confidence hero's ⚙ Manage modal, so each folded-control test opens it first.
+  const openManage = async () => {
+    await page.getByRole("button", { name: /Manage/i }).click();
+    await page.getByRole("dialog", { name: /Manage scenario/i }).waitFor();
+  };
+
+  // F — rename the active scenario from the ⚙ Manage modal's name field.
   await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
   await page.waitForTimeout(1800);
+  await openManage();
   const nameField = page.getByLabel("Scenario name");
   await nameField.click();
   await nameField.fill("Renamed Two");
@@ -146,9 +154,9 @@ try {
     (await db.query("select name from plans where id=$1", [twoId])).rows[0]?.name === "Renamed Two",
   );
 
-  // G — "New scenario" opens a modal; the "copy" mode branches from the current plan.
+  // G — "New scenario" (in the Manage modal) opens the create dialog; "copy" branches.
   const beforeBranch = (await plans()).length;
-  await page.getByRole("button", { name: /New scenario/i }).click();
+  await page.getByRole("button", { name: /New scenario/i }).click(); // Manage modal is open
   await page.waitForTimeout(500);
   ok("New scenario opens a dialog", (await page.getByRole("dialog").count()) > 0);
   // "Based on this scenario" is the default; name pre-fills "Copy of {name}".
@@ -161,6 +169,7 @@ try {
   ok("copy becomes the active scenario", (await activePlanId()) === copy?.id);
 
   // G2 — "Start from scratch" creates a blank named scenario and jumps into the wizard.
+  await openManage();
   await page.getByRole("button", { name: /New scenario/i }).click();
   await page.getByRole("dialog").getByRole("button", { name: /Start from scratch/i }).waitFor();
   await page.getByRole("button", { name: /Start from scratch/i }).click();
@@ -172,17 +181,19 @@ try {
   ok("scratch mode creates the named scenario", !!scratch);
   ok("scratch scenario is the active one", (await activePlanId()) === scratch?.id);
   ok("scratch jumps straight into the wizard (no guide/Get-started)", (await txt()).includes("Your plan overview"));
-  // Reload to a clean state (wizard closed), then switch back to the copy so the
-  // delete-fallback test below has a built active plan.
+  // Reload to a clean state (wizard closed), then switch back to the renamed plan so
+  // the delete-fallback test below has a built active plan.
   await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
-  await page.waitForTimeout(1500);
-  await page.getByLabel("Switch scenario").selectOption(twoId);
   await page.waitForTimeout(1500);
 
   // H — the switcher flips the active scenario; deleting the active one falls back.
+  // The active plan is now the BLANK "Fresh Build", so the dashboard shows the
+  // empty-state scenario bar (with its switcher) rather than the hero — switch from
+  // there back to a built plan, which brings the hero (and its ⚙ Manage) back.
   await page.getByLabel("Switch scenario").selectOption(twoId);
-  await page.waitForTimeout(1600);
+  await page.waitForTimeout(1800);
   ok("switcher makes the chosen scenario active", (await activePlanId()) === twoId);
+  await openManage();
   await page.getByRole("button", { name: /Delete Renamed Two/i }).click();
   await page.waitForTimeout(1600);
   const remaining = await plans();
