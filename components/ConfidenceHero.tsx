@@ -269,13 +269,13 @@ export default function ConfidenceHero({
               href={whatIfHref}
               className="rounded-xl border border-line bg-panel-2 px-4 py-2.5 text-sm font-semibold text-slate-200 transition hover:border-accent/50 hover:text-white"
             >
-              Boost it <span aria-hidden className="text-accent">→</span>
+              Boost it with What-If&apos;s <span aria-hidden className="text-accent">→</span>
             </Link>
             <Link
               href={stressHref}
               className="rounded-xl border border-line bg-panel-2 px-4 py-2.5 text-sm font-semibold text-slate-200 transition hover:border-accent/50 hover:text-white"
             >
-              Pressure-test it <span aria-hidden className="text-accent">→</span>
+              Pressure test it with History <span aria-hidden className="text-accent">→</span>
             </Link>
           </div>
           </>
