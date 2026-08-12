@@ -289,7 +289,9 @@ export default function ConfidenceHero({
             </p>
           </div>
 
-          {(scenarioName || onManage) && (
+          {/* Only signed-in users (who can Manage) get the active-scenario block —
+              a signed-out guest has no named scenario to show or manage. */}
+          {onManage && (
             <div className="border-t border-dashed border-line pt-4">
               <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted/70">Active scenario</div>
               {/* Full column width + up to two lines so ~50 characters can show before
