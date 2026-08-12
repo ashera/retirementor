@@ -61,8 +61,6 @@ import { fmtCurrency } from "@/lib/au/format";
 import { track, trackPlanBuiltConversion } from "@/lib/analytics";
 import { trackVisit } from "@/app/actions/track";
 import CountryFlag from "@/components/CountryFlag";
-import { planCompleteness } from "@/lib/au/completeness";
-import CompletenessRing from "@/components/CompletenessRing";
 import WithdrawalRateCard from "@/components/WithdrawalRateCard";
 import {
   DEFAULT_PLAN,
@@ -1221,8 +1219,12 @@ export default function PlannerApp({
         </div>
       </div>
 
-      <header className="mb-2 flex flex-wrap items-end justify-between gap-4">
-        <div>
+      {/* The intro title/subtext only frames the tool before there's a plan. Once
+          a scenario is built, the confidence hero is the headline — the generic
+          title (and the redundant "Edit scenario" ring, replaced by "Refine
+          scenario" on the stat card) just pushed the answer down the page. */}
+      {!configured && (
+        <header className="mb-2">
           <h1 className="text-3xl font-bold text-white sm:text-4xl">
             Will your super and the Age Pension last?
           </h1>
@@ -1230,27 +1232,8 @@ export default function PlannerApp({
             Models superannuation, the means-tested Age Pension, and an
             early-retirement bridge — all in today&apos;s dollars, FY{config.financialYear} rules.
           </p>
-        </div>
-        {configured &&
-          (() => {
-            const comp = planCompleteness(plan);
-            return (
-              <button
-                onClick={() => setWizardOpen(true)}
-                title="Edit scenario — add detail for a sharper model"
-                className="flex items-center gap-3 rounded-xl border border-line bg-panel px-3 py-2 text-left transition hover:border-accent/40"
-              >
-                <CompletenessRing pct={comp.pct} size={38} />
-                <div>
-                  <div className="text-sm font-semibold text-white">{comp.tier}</div>
-                  <div className="text-xs text-accent">
-                    {comp.pct < 100 ? "Edit scenario · add detail →" : "Edit scenario →"}
-                  </div>
-                </div>
-              </button>
-            );
-          })()}
-      </header>
+        </header>
+      )}
 
       {/* Public share-link view: make it clear this is someone else's scenario,
           it's read-only (tweaks explore but aren't saved), and offer a way in. */}
