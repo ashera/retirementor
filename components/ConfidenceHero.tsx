@@ -133,6 +133,12 @@ export default function ConfidenceHero({
     );
   }
 
+  // The verdict's emphasis takes the state's zone colour, so the highlighted phrase
+  // ("above a safe level", "~$X/yr more") carries the same green/amber/rose signal
+  // as the range bar and the dial — not always green.
+  const verdictColor =
+    state === "ambitious" ? ZONE.amber : state === "short" ? ZONE.short : ZONE.safe;
+
   // "Set my spend to the safe level" — up when there's headroom, down when over it.
   // Hidden when a What-If strategy owns the spend (it wouldn't take effect here).
   const showSet = !spendOverridden && Math.abs(headroom) >= CONFIDENCE_EPS;
@@ -185,7 +191,10 @@ export default function ConfidenceHero({
             </div>
           ) : (
           <>
-          <p className="mt-2 max-w-[34ch] text-xl font-semibold leading-snug text-white text-balance sm:text-[26px] [&_b]:text-accent">
+          <p
+            className="mt-2 max-w-[34ch] text-xl font-semibold leading-snug text-white text-balance sm:text-[26px] [&_b]:text-[color:var(--vc)]"
+            style={{ "--vc": verdictColor } as React.CSSProperties}
+          >
             {verdict}
           </p>
 
