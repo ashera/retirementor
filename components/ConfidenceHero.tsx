@@ -161,9 +161,12 @@ export default function ConfidenceHero({
   }
 
   // "Set my spend to the safe level" — up when there's headroom, down when over it.
-  // Hidden when a What-If strategy owns the spend (it wouldn't take effect here).
-  const showSet = !spendOverridden && Math.abs(headroom) >= CONFIDENCE_EPS;
-  const setLabel = headroom > 0 ? `Set my spend to ${fmtCompact(safe)}` : `Trim to ${fmtCompact(safe)}`;
+  // Shown whenever the goal is meaningfully off the safe level. When a What-If strategy
+  // owns the spend (spendOverridden), editing the base plan here would be a no-op, so
+  // the button instead routes to What-If where that lever can be changed.
+  const showSet = Math.abs(headroom) >= CONFIDENCE_EPS;
+  const setVerb = headroom > 0 ? `Set my spend to ${fmtCompact(safe)}` : `Trim to ${fmtCompact(safe)}`;
+  const setLabel = spendOverridden ? `${setVerb} in What-If` : setVerb;
   // The "leaving money on the table" nudge — only where there's real headroom.
   const showNudge = (state === "bulletproof" || state === "safe") && headroom >= 3000;
 
@@ -257,14 +260,23 @@ export default function ConfidenceHero({
           )}
 
           <div className="mt-5 flex flex-wrap gap-2.5">
-            {showSet && (
-              <button
-                onClick={() => onSetSpend(safeLiving)}
-                className="rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-ink transition hover:brightness-110"
-              >
-                {setLabel} <span aria-hidden>→</span>
-              </button>
-            )}
+            {showSet &&
+              (spendOverridden ? (
+                // A What-If lever owns the spend — send them there to change it.
+                <Link
+                  href={whatIfHref}
+                  className="rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-ink transition hover:brightness-110"
+                >
+                  {setLabel} <span aria-hidden>→</span>
+                </Link>
+              ) : (
+                <button
+                  onClick={() => onSetSpend(safeLiving)}
+                  className="rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-ink transition hover:brightness-110"
+                >
+                  {setLabel} <span aria-hidden>→</span>
+                </button>
+              ))}
             <Link
               href={whatIfHref}
               className="rounded-xl border border-line bg-panel-2 px-4 py-2.5 text-sm font-semibold text-slate-200 transition hover:border-accent/50 hover:text-white"
