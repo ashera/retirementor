@@ -129,12 +129,19 @@ export default function ConfidenceHero({
       </>
     );
   } else if (state === "safe") {
-    verdict = (
-      <>
-        You can comfortably afford your {goalStr} goal
-        {headroom >= CONFIDENCE_EPS ? <> — and could likely spend <b>~{fmtCurrency(headroom)}/yr more</b></> : null}.
-      </>
-    );
+    verdict =
+      headroom >= CONFIDENCE_EPS ? (
+        <>
+          You can comfortably afford your {goalStr} goal — and could likely spend{" "}
+          <b>~{fmtCurrency(headroom)}/yr more</b>.
+        </>
+      ) : (
+        <>
+          You can comfortably afford your {goalStr} goal — it sits right at your{" "}
+          <b>safe spending level</b>, so your money is very likely to last as long as you do,
+          even through a poor run of markets.
+        </>
+      );
   } else if (state === "ambitious") {
     verdict = (
       <>
