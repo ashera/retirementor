@@ -305,6 +305,39 @@ create table if not exists releases (
 );
 create index if not exists releases_pub_idx on releases(published, released_at desc, build desc);
 create unique index if not exists releases_version_uidx on releases(version);
+
+-- Compliance audit runs (e.g. ASIC RG 276 reviews): one row per run, plus its
+-- findings, each with a remediation status so fixes can be tracked across runs.
+create table if not exists compliance_audits (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  standard text,                          -- e.g. "ASIC RG 276 / Instrument 2022/603"
+  build text,                             -- app version / git sha audited
+  ran_at timestamptz not null default now(),
+  report_md text,                         -- the full narrative report (markdown)
+  high int not null default 0,
+  med int not null default 0,
+  low int not null default 0,
+  status text not null default 'open',    -- open | in_progress | actioned
+  notes text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create table if not exists compliance_findings (
+  id uuid primary key default gen_random_uuid(),
+  audit_id uuid not null references compliance_audits(id) on delete cascade,
+  ref text,                               -- file:line
+  quote text,                             -- the flagged string
+  category text,                          -- concern (advice/assurance/nudge/promotion/guarantee/misleading)
+  severity text not null default 'med',   -- high | med | low
+  suggestion text,                        -- suggested softer wording / fix
+  status text not null default 'open',    -- open | fixed | accepted
+  sort int not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists compliance_audits_ran_idx on compliance_audits(ran_at desc);
+create index if not exists compliance_findings_audit_idx on compliance_findings(audit_id, severity, sort);
 `;
 
 /** Apply the schema. Safe to run repeatedly. */
@@ -588,6 +621,94 @@ export async function migrate(c: Client): Promise<void> {
   await seedReleases(c);
   await autoDraftRelease(c);
   await retirePlanDrafts(c);
+  await seedComplianceAudit(c);
+}
+
+/**
+ * Seed the first compliance audit run — the adversarial ASIC RG 276 / Instrument
+ * 2022/603 language review (Aug 2026) — with its findings and remediation status.
+ * INSERT-if-absent by title, so it never overwrites status changes made in the
+ * backoffice, and future runs are added through the admin UI.
+ */
+export async function seedComplianceAudit(c: Client): Promise<void> {
+  const title = "ASIC RG 276 language review — Aug 2026";
+  const exists = await c.query("select id from compliance_audits where title = $1 limit 1", [title]);
+  if (exists.rowCount) return;
+
+  const report = [
+    "# ASIC RG 276 / Instrument 2022/603 — adversarial language review",
+    "",
+    "General-information superannuation calculator; must not be personal advice or promote a product.",
+    "Five parallel reviewers swept the app (dashboard, What-If, stress/report/mortality, education/marketing, budget/charts).",
+    "",
+    "## Overall posture",
+    "Disclosure scaffolding is strong (not-advice banner, assumptions & limitations modal, report footer, About/FAQ). Residual risk is concentrated in a few themes below.",
+    "",
+    "## High priority — actioned in batch 1",
+    "- GuidedIntro 'on track / ahead of the pack' adequacy verdicts → neutral factual comparison.",
+    "- BudgetBuilder 'clearing it with super is the cleanest fix' → option, deferred to the user.",
+    "- LifestageModal deep-link to a specific super fund → removed (product-promotion risk).",
+    "- ReportView stress section missing 'past performance is not a guarantee' → added; 'safely start higher' softened.",
+    "- 'Lean on the Age Pension by holding fewer assessable assets' → reframed as the means-test mechanism.",
+    "- 'Money lasts to X' (+🎉/✓) → 'projected to last to X' across budget/report/notes/chart.",
+    "",
+    "## Medium — queued (batch 2)",
+    "Absolute-certainty phrases ('can't sink the plan', 'near-certain', 'a resilient plan', 'true chance', 'the honest risk'); spend-more nudges; adequacy/affordability wording; the 'Failsafe' tier name; mortality-overlay framing; the 'Confidence' label.",
+    "",
+    "## Low — polish (batch 3)",
+    "Celebratory tone/emoji; ASFA 'comfortable' default & green framing; per-component 'estimates' caveats; knowledge-base benefit-led titles.",
+    "",
+    "> Adversarial self-review to surface candidates — not a compliance sign-off. Action items require the AFS licensee / compliance review.",
+  ].join("\n");
+
+  // severity | ref | category | quote | suggestion | status
+  const F: [string, string, string, string, string, string][] = [
+    ["high", "GuidedIntro.tsx:181", "advice", "You're ahead of the pack 🎉 / a little behind — but there's time", "Neutral factual comparison to the age average.", "fixed"],
+    ["high", "GuidedIntro.tsx:313", "advice", "Am I on track? →", "Compare to the average →", "fixed"],
+    ["high", "BudgetBuilder.tsx:767", "advice", "Clearing it with super is often the cleanest fix.", "Present as an option; defer to the user.", "fixed"],
+    ["high", "LifestageModal.tsx:9", "promotion", "Link to caresuper.com.au (a specific super fund)", "Remove; attribute the 'spending smile' to general research.", "fixed"],
+    ["high", "ReportView.tsx:571", "guarantee", "Stress section with no adjacent 'past performance is not a guarantee'", "Add the disclosure in-section.", "fixed"],
+    ["high", "ReportView.tsx:613", "assurance", "Flexible spending lets you safely start higher than this.", "May allow a higher starting spend, depending on cutting back in bad years.", "fixed"],
+    ["high", "explainers.tsx:645", "nudge", "lean on the Age Pension by holding fewer assessable assets", "Describe the means-test mechanism, not asset restructuring.", "fixed"],
+    ["high", "BudgetBuilder.tsx:1265", "assurance", "On this budget your money lasts to {age}+ 🎉", "projected to last to {age}+ (drop emoji).", "fixed"],
+    ["med", "WhatIfView.tsx:1691", "assurance", "a rough market can't sink the plan", "…is less likely to sink the plan.", "open"],
+    ["med", "GuardrailsTimelineModal.tsx:332", "assurance", "turns a coin-flip into near-certain", "markedly raises the modelled odds.", "open"],
+    ["med", "StressTestView.tsx:312", "advice", "a resilient plan", "In this test the plan funded spending across every historical era modelled.", "open"],
+    ["med", "StressTestView.tsx:439", "misleading", "your true chance of running short … still here to spend it", "an estimate of the chance the plan runs short during your modelled lifetime.", "open"],
+    ["med", "SurvivalOverlay.tsx:44", "misleading", "Chance you outlive your money / the honest risk of being alive and broke", "Prefix 'Estimated'; soften the emotive framing.", "open"],
+    ["med", "PlannerApp.tsx:2254", "advice", "Just right! … the most you can prudently afford", "Near the top of what the model projects at 85% — general information, not advice.", "open"],
+    ["med", "PlannerApp.tsx:2238", "nudge", "Money to spare? Put your headroom to work / Help me spend more", "The model shows headroom at 85%; the choice is yours.", "open"],
+    ["med", "BoostSpendingModal.tsx:85", "nudge", "Spend more with your headroom", "Model spending more with your headroom.", "open"],
+    ["med", "ConfidenceHero.tsx:290", "assurance", "Failsafe (tier name)", "Rename to a non-assurance term (e.g. 'Most cautious').", "open"],
+    ["med", "ScenarioNotesModal.tsx:108", "assurance", "Confidence (Monte Carlo)", "Modelled success rate (Monte Carlo).", "open"],
+    ["med", "GuidedIntro.tsx:464", "assurance", "the Age Pension is always there … not running out of income", "may provide a partial income floor for those who qualify.", "open"],
+    ["med", "knowledgeBase.ts:345", "nudge", "a coin-flip you'd want to de-risk", "carries meaningful risk; some people respond by reducing spending or risk.", "open"],
+    ["low", "BudgetBuilder.tsx:99", "misleading", "ASFA 'comfortable' as the pre-selected default (green)", "Neutral colour / no implied target.", "open"],
+    ["low", "YearDetailModal.tsx", "guarantee", "Per-year exact $ reconciliation with no in-modal 'estimates' caveat", "Add 'figures are estimates' to the footer.", "open"],
+  ];
+
+  const high = F.filter((f) => f[0] === "high").length;
+  const med = F.filter((f) => f[0] === "med").length;
+  const low = F.filter((f) => f[0] === "low").length;
+
+  const ins = await c.query<{ id: string }>(
+    `insert into compliance_audits (title, standard, build, ran_at, report_md, high, med, low, status)
+     values ($1, $2, $3, now(), $4, $5, $6, $7, 'in_progress') returning id`,
+    [title, "ASIC RG 276 / Instrument 2022/603", APP_VERSION, report, high, med, low],
+  );
+  const auditId = ins.rows[0]?.id;
+  if (!auditId) return;
+
+  const order = { high: 0, med: 1, low: 2 } as Record<string, number>;
+  let sort = 0;
+  for (const [severity, ref, category, quote, suggestion, status] of F.sort((a, b) => order[a[0]] - order[b[0]])) {
+    await c.query(
+      `insert into compliance_findings (audit_id, ref, quote, category, severity, suggestion, status, sort)
+       values ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [auditId, ref, quote, category, severity, suggestion, status, sort++],
+    );
+  }
+  console.log(`  compliance-audit: seeded '${title}' with ${F.length} findings.`);
 }
 
 /**
