@@ -102,7 +102,7 @@ export default function ConfidenceHero({
   // reads as "this region", never as a precise point that must line up with a tick.
   // Bar ticks still mark the true boundaries. Spread the mid-points if a zone is thin.
   const zonePct = (() => {
-    const mids = [pFail / 2, (pFail + pSafe) / 2, (pSafe + 100) / 2];
+    const mids = [pFail / 2, (pFail + pSafe) / 2, (pSafe + pCent) / 2];
     const MIN = 21; // min % between caption centres
     const p = mids.map((x) => clamp(x, 9, 91));
     for (let i = 1; i < p.length; i++) if (p[i] - p[i - 1] < MIN) p[i] = p[i - 1] + MIN;
@@ -260,7 +260,7 @@ export default function ConfidenceHero({
             <div className="relative mt-2 h-16">
               {marker(zonePct[0], ZONE.bullet, "Failsafe zone", `up to ${fmtCompact(failsafe)}`, "survives worst history")}
               {marker(zonePct[1], ZONE.safe, "Prudent zone", `${fmtCompact(failsafe)}–${fmtCompact(safe)}`, `≈85% chance of lasting to ${lifeExpectancy}`)}
-              {marker(zonePct[2], ZONE.amber, "Risky zone", `above ${fmtCompact(safe)}`, `50% likely by ${fmtCompact(central)}`)}
+              {marker(zonePct[2], ZONE.amber, "Risky zone", `${fmtCompact(safe)}–${fmtCompact(central)}`, "down to 50% likely to last")}
             </div>
           </div>
 
