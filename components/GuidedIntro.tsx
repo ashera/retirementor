@@ -176,12 +176,14 @@ export default function GuidedIntro({
 
   // On-track vs the average balance for their age(s).
   const ratio = benchmark > 0 ? totalSuper / benchmark : 1;
+  // A factual comparison to the age-based average — NOT an "on track"/adequacy verdict
+  // (whether it's enough is deferred to the later phases). Neutral colour, no judgement.
   const track =
     ratio >= 1.1
-      ? { head: "You're ahead of the pack 🎉", rel: "ahead of", tone: "text-emerald-400" }
+      ? { head: "Above the average for your age", rel: "above", tone: "text-white" }
       : ratio >= 0.9
-        ? { head: "You're right on the average", rel: "about the same as", tone: "text-emerald-400" }
-        : { head: "A little behind — but there's time", rel: "below", tone: "text-amber-400" };
+        ? { head: "Around the average for your age", rel: "about the same as", tone: "text-white" }
+        : { head: "Below the average for your age", rel: "below", tone: "text-white" };
 
   const bottomRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -310,7 +312,7 @@ export default function GuidedIntro({
               </>
             )}
           </div>
-          {step === 2 && <Actions label="Am I on track? →" onClick={next} />}
+          {step === 2 && <Actions label="Compare to the average →" onClick={next} />}
         </Panel>
       )}
 

@@ -255,7 +255,7 @@ export default function RetirementChart({
     });
   });
   if (depletedAge !== null) {
-    markerInputs.push({ key: "deplete", x: depletedAge, color: "#ef4444", name: `Depletes ${depletedAge}`, dash: "2 2" });
+    markerInputs.push({ key: "deplete", x: depletedAge, color: "#ef4444", name: `Depletes ~${depletedAge}`, dash: "2 2" });
   }
   // Committed life events — a pin per event (green for money in, amber for money out).
   // They join the same lane solver, so their labels never collide with the pins above.

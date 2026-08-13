@@ -642,8 +642,8 @@ export function MoneyLastsExplainer({
         <h3 className="mb-1 font-semibold text-white">Make it last longer</h3>
         <p>
           The big levers: retire later, trim spending (especially the go-go
-          years), save more before retiring, or lean on the Age Pension by
-          holding fewer assessable assets.
+          years), or save more before retiring. The Age Pension is means-tested,
+          so your assessable assets also affect how much you receive.
         </p>
       </div>
 

@@ -371,9 +371,9 @@ export default function BudgetBuilder({ plan, config, onApply, onProgress, onClo
               </button>
               <div className="mt-1.5 text-xs text-muted">
                 {impact.lastsToLifeExpectancy ? (
-                  <span className="text-accent">lasts to {plan.lifeExpectancy}+ ✓</span>
+                  <span className="text-accent">projected to last to {plan.lifeExpectancy}+</span>
                 ) : (
-                  <span className="text-amber-400">money lasts to {impact.depletedAge}</span>
+                  <span className="text-amber-400">projected to last to {impact.depletedAge}</span>
                 )}
               </div>
             </div>
@@ -763,8 +763,9 @@ function HomePanel({
           <span className="font-semibold text-white">{fmtCurrency(Math.round(cost))}/yr</span> in
           interest, and the{" "}
           <span className="font-semibold text-white">{fmtCurrency(mortgage.balance)}</span> balance
-          never shrinks — you’ll clear it by downsizing, selling, or from your estate. Clearing it
-          with super (below) is often the cleanest fix.
+          never shrinks — it’s cleared by downsizing, selling, or from your estate. Some people
+          model clearing it with super at retirement (below); whether that suits you is a personal
+          decision.
         </div>
       )}
 
@@ -1261,7 +1262,7 @@ function PayoffStep({
       >
         {impact.lastsToLifeExpectancy ? (
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <span>On this budget your money lasts to {plan.lifeExpectancy}+ 🎉</span>
+            <span>On this budget your savings are projected to last to {plan.lifeExpectancy}+.</span>
             {canBoost && (
               <button
                 onClick={onBoost}
@@ -1274,7 +1275,7 @@ function PayoffStep({
         ) : (
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span>
-              Heads up — on this budget your money runs short around age{" "}
+              Heads up — on this budget your savings are projected to run short around age{" "}
               <span className="font-bold">{impact.depletedAge}</span>.
             </span>
             <button

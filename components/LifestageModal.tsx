@@ -5,9 +5,6 @@ import type { RetirementPlan } from "@/lib/au/types";
 import { fmtCurrency } from "@/lib/au/format";
 import { lifestageBreakdown } from "@/lib/au/lifestages";
 
-const ARTICLE =
-  "https://www.caresuper.com.au/members/advice-and-resources/education-hub/how-retirement-goes-from-go-go-to-no-go";
-
 const STAGE_META: Record<string, { color: string; blurb: string }> = {
   "Go-go": {
     color: "#34d399",
@@ -138,9 +135,10 @@ export default function LifestageModal({
               ` Your interest-only home loan of ${fmtCurrency(goal.loanCost)}/yr is added on top for life.`}
           </p>
 
-          <a href={ARTICLE} target="_blank" rel="noreferrer" className="inline-block text-xs text-accent hover:underline">
-            Read more about go-go / slow-go / no-go →
-          </a>
+          <p className="text-xs text-muted">
+            The go-go / slow-go / no-go &ldquo;spending smile&rdquo; comes from research on how
+            retirement spending typically eases with age — a general pattern, not a rule for your plan.
+          </p>
         </div>
       </div>
     </div>

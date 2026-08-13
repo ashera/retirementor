@@ -271,7 +271,7 @@ export default function ReportView({
             <Stat label="Retirement income goal" value={`${money(goal.total)}/yr`} sub={goal.loanKind !== "none" ? "includes home-loan costs" : "living costs"} />
             <Stat
               label="Money lasts"
-              value={result.lastsToLifeExpectancy ? `to ${plan.lifeExpectancy}+` : `to age ${result.depletedAge}`}
+              value={result.lastsToLifeExpectancy ? `projected to ${plan.lifeExpectancy}+` : `projected to age ${result.depletedAge}`}
               sub={`${successPct}% likely (Monte Carlo)`}
             />
             <Stat
@@ -290,8 +290,8 @@ export default function ReportView({
             Pension age
             {bands ? "; shaded bands mark the go-go / slow-go / no-go stages" : ""}.
             {result.lastsToLifeExpectancy
-              ? " Your balance lasts the whole plan."
-              : ` The “Depletes” marker is where savings run out (${result.depletedAge}).`}
+              ? " Your balance is projected to last the whole plan on these assumptions."
+              : ` The “Depletes” marker is where savings are projected to run out (~${result.depletedAge}).`}
           </Lead>
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-2">
             <RetirementChart result={result} bands={bands} animate={false} height={200} wageInflationPct={wageInfl} cpiPct={plan.inflation} ages={ageGapInfo(plan)} />
@@ -608,11 +608,15 @@ export default function ReportView({
               {failsafe && failsafe.spend > 0 && (
                 <p className="mt-3 text-xs text-slate-600">
                   <strong className="text-slate-800">Failsafe spend: {money(failsafe.spend)}/yr</strong> ({(failsafe.rate * 100).toFixed(1)}%) —
-                  the highest fixed spend that would have survived <em>every</em> one of these downturns without a cut,
+                  the highest fixed spend that would have funded <em>every</em> one of these historical eras without a cut,
                   {failsafe.bindingEra ? ` set by ${failsafe.bindingEra.label}.` : "."} Flexible spending (easing off in
-                  bad years) lets you safely start higher than this.
+                  bad years) may allow a higher starting spend, though that depends on making cuts in bad years.
                 </p>
               )}
+              <p className="mt-2 text-[10px] leading-snug text-slate-500">
+                Based on 1928–2025 market history used as a proxy. Past performance is not a guarantee of future
+                performance; these are estimates, not a prediction.
+              </p>
             </Section>
           </div>
         )}

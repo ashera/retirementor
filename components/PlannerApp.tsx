@@ -2331,8 +2331,7 @@ export default function PlannerApp({
             <span className="font-semibold text-amber-400">
               {result.depletedAge}
             </span>
-            . Try retiring later, spending less, saving more, or leaning on the
-            Age Pension by adjusting your assets.
+            . The levers above model retiring later, spending less, or saving more.
           </p>
         )}
       </div>
