@@ -266,7 +266,7 @@ export default function ConfidenceHero({
           ) : (
           <>
           <p
-            className="mt-2 text-xl font-semibold leading-snug text-white text-pretty sm:text-[26px] [&_b]:text-[color:var(--vc)]"
+            className="mt-2 text-[19px] font-semibold leading-snug text-white text-pretty sm:text-[25px] [&_b]:text-[color:var(--vc)]"
             style={{ "--vc": zoneColor } as React.CSSProperties}
           >
             {verdict}
