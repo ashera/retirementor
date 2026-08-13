@@ -167,7 +167,7 @@ export default function ConfidenceHero({
   } else {
     verdict = (
       <>
-        Your {goalStr} retirement income goal is <b>above even the central (50%) estimate</b>. Easing toward{" "}
+        Your {goalStr} retirement income goal is <b>above even a 50/50 chance of lasting</b>. Easing toward{" "}
         {fmtCompact(safe)}, or strengthening the plan, brings it back within your prudent (85%) level.
       </>
     );
@@ -257,7 +257,7 @@ export default function ConfidenceHero({
             <div className="relative mt-2 h-11">
               {marker(labelPct[0], ZONE.bullet, fmtCompact(failsafe), "Failsafe", "survives worst history")}
               {marker(labelPct[1], ZONE.safe, fmtCompact(safe), "Prudent · 85%", "≈85% of runs last")}
-              {marker(labelPct[2], ZONE.amber, fmtCompact(central), "Central · 50%", `on ${assumedReturnPct}% returns`)}
+              {marker(labelPct[2], ZONE.amber, fmtCompact(central), "Risky", `only 50% chance of lasting to ${lifeExpectancy}`)}
             </div>
           </div>
 
