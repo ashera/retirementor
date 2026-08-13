@@ -254,7 +254,7 @@ export default function ConfidenceHero({
                 <div key={i} className="absolute -top-1.5 h-7 w-0.5 bg-ink/60" style={{ left: `${p}%` }} />
               ))}
             </div>
-            <div className="relative mt-2 h-11">
+            <div className="relative mt-2 h-14">
               {marker(labelPct[0], ZONE.bullet, fmtCompact(failsafe), "Failsafe", "survives worst history")}
               {marker(labelPct[1], ZONE.safe, fmtCompact(safe), "Prudent", `≈85% chance of lasting to ${lifeExpectancy}`)}
               {marker(labelPct[2], ZONE.amber, fmtCompact(central), "Risky", `only 50% chance of lasting to ${lifeExpectancy}`)}
@@ -271,7 +271,7 @@ export default function ConfidenceHero({
             </div>
           )}
 
-          <div className="mt-5 flex flex-wrap gap-2.5">
+          <div className="mt-7 flex flex-wrap gap-2.5">
             {showSet &&
               (spendOverridden ? (
                 // A What-If lever owns the spend — send them there to change it.
