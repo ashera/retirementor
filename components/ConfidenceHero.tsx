@@ -98,15 +98,16 @@ export default function ConfidenceHero({
   const pSafe = pos(safe);
   const pCent = pos(central);
   const pGoal = pos(goalTotal);
-  // Bar ticks sit at the true positions, but the fixed-width tier CAPTIONS below would
-  // overlap when tiers are close (e.g. failsafe ≈ safe on a strong plan). Spread the
-  // caption anchors left-to-right to keep a minimum gap so their labels never collide.
-  const labelPct = (() => {
-    const MIN = 16; // min % between caption centres
-    const p = [pFail, pSafe, pCent].map((x) => clamp(x, 6, 94));
+  // Zone captions sit at the MID-POINT of each zone (not at a boundary), so a label
+  // reads as "this region", never as a precise point that must line up with a tick.
+  // Bar ticks still mark the true boundaries. Spread the mid-points if a zone is thin.
+  const zonePct = (() => {
+    const mids = [pFail / 2, (pFail + pSafe) / 2, (pSafe + 100) / 2];
+    const MIN = 21; // min % between caption centres
+    const p = mids.map((x) => clamp(x, 9, 91));
     for (let i = 1; i < p.length; i++) if (p[i] - p[i - 1] < MIN) p[i] = p[i - 1] + MIN;
-    const over = p[p.length - 1] - 94;
-    if (over > 0) for (let i = 0; i < p.length; i++) p[i] = Math.max(6, p[i] - over);
+    const over = p[p.length - 1] - 91;
+    if (over > 0) for (let i = 0; i < p.length; i++) p[i] = Math.max(9, p[i] - over);
     return p;
   })();
   const trackBg =
@@ -188,13 +189,15 @@ export default function ConfidenceHero({
   const fullName = scenarioName ?? "Working scenario";
   const displayName = fullName.length > 50 ? `${fullName.slice(0, 50).trimEnd()}…` : fullName;
 
-  const marker = (leftPct: number, tone: string, big: string, small: string, note: string) => (
+  // A zone caption: the zone NAME (colored), its spend RANGE, and a plain note —
+  // anchored at the zone's mid-point (see zonePct) rather than a boundary value.
+  const marker = (leftPct: number, tone: string, name: string, range: string, note: string) => (
     <div
       className="absolute -translate-x-1/2 text-center"
-      style={{ left: `${clamp(leftPct, 6, 94)}%`, width: 110 }}
+      style={{ left: `${clamp(leftPct, 9, 91)}%`, width: 124 }}
     >
-      <div className="text-[15px] font-bold tabular-nums text-white">{big}</div>
-      <div className="text-[10px] font-bold uppercase tracking-wide" style={{ color: tone }}>{small}</div>
+      <div className="text-[10.5px] font-bold uppercase tracking-wide" style={{ color: tone }}>{name}</div>
+      <div className="text-[13px] font-bold tabular-nums text-white">{range}</div>
       <div className="mt-0.5 text-[10px] leading-tight text-muted">{note}</div>
     </div>
   );
@@ -254,10 +257,10 @@ export default function ConfidenceHero({
                 <div key={i} className="absolute -top-1.5 h-7 w-0.5 bg-ink/60" style={{ left: `${p}%` }} />
               ))}
             </div>
-            <div className="relative mt-2 h-14">
-              {marker(labelPct[0], ZONE.bullet, fmtCompact(failsafe), "Failsafe", "survives worst history")}
-              {marker(labelPct[1], ZONE.safe, fmtCompact(safe), "Prudent", `≈85% chance of lasting to ${lifeExpectancy}`)}
-              {marker(labelPct[2], ZONE.amber, fmtCompact(central), "Risky", `only 50% chance of lasting to ${lifeExpectancy}`)}
+            <div className="relative mt-2 h-16">
+              {marker(zonePct[0], ZONE.bullet, "Failsafe zone", `up to ${fmtCompact(failsafe)}`, "survives worst history")}
+              {marker(zonePct[1], ZONE.safe, "Prudent zone", `${fmtCompact(failsafe)}–${fmtCompact(safe)}`, `≈85% chance of lasting to ${lifeExpectancy}`)}
+              {marker(zonePct[2], ZONE.amber, "Risky zone", `above ${fmtCompact(safe)}`, `50% likely by ${fmtCompact(central)}`)}
             </div>
           </div>
 
