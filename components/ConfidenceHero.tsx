@@ -256,7 +256,7 @@ export default function ConfidenceHero({
             </div>
             <div className="relative mt-2 h-11">
               {marker(labelPct[0], ZONE.bullet, fmtCompact(failsafe), "Failsafe", "survives worst history")}
-              {marker(labelPct[1], ZONE.safe, fmtCompact(safe), "Prudent · 85%", "≈85% of runs last")}
+              {marker(labelPct[1], ZONE.safe, fmtCompact(safe), "Prudent", `≈85% chance of lasting to ${lifeExpectancy}`)}
               {marker(labelPct[2], ZONE.amber, fmtCompact(central), "Risky", `only 50% chance of lasting to ${lifeExpectancy}`)}
             </div>
           </div>
