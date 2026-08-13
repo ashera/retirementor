@@ -12,6 +12,7 @@ export interface AuditRun {
   low: number;
   status: string; // open | in_progress | actioned
   notes: string | null;
+  share_token: string | null;
 }
 
 export interface AuditFinding {
@@ -26,7 +27,7 @@ export interface AuditFinding {
 }
 
 const RUN_COLS =
-  "id, title, standard, build, ran_at, report_md, high, med, low, status, notes";
+  "id, title, standard, build, ran_at, report_md, high, med, low, status, notes, share_token";
 
 /** All audit runs, newest first (with a resolved-findings count for the list). */
 export async function listAudits(): Promise<(AuditRun & { total: number; resolved: number })[]> {
@@ -49,11 +50,24 @@ export async function getAudit(
 ): Promise<{ audit: AuditRun; findings: AuditFinding[] } | null> {
   const a = await query<AuditRun>(`select ${RUN_COLS} from compliance_audits where id = $1`, [id]);
   if (!a.rows[0]) return null;
+  return { audit: a.rows[0], findings: await findingsFor(id) };
+}
+
+/** One audit run by its public share token (unauthenticated), or null. */
+export async function getAuditByToken(
+  token: string,
+): Promise<{ audit: AuditRun; findings: AuditFinding[] } | null> {
+  const a = await query<AuditRun>(`select ${RUN_COLS} from compliance_audits where share_token = $1`, [token]);
+  if (!a.rows[0]) return null;
+  return { audit: a.rows[0], findings: await findingsFor(a.rows[0].id) };
+}
+
+async function findingsFor(auditId: string): Promise<AuditFinding[]> {
   const f = await query<AuditFinding>(
     `select id, ref, quote, category, severity, suggestion, status, sort
        from compliance_findings where audit_id = $1
       order by (case severity when 'high' then 0 when 'med' then 1 else 2 end), sort`,
-    [id],
+    [auditId],
   );
-  return { audit: a.rows[0], findings: f.rows };
+  return f.rows;
 }

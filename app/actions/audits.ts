@@ -1,5 +1,6 @@
 "use server";
 
+import { randomBytes } from "crypto";
 import { revalidatePath } from "next/cache";
 import { query } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
@@ -133,5 +134,31 @@ export async function deleteAudit(id: string): Promise<Result> {
   if ("error" in gate) return { error: gate.error };
   await query("delete from compliance_audits where id = $1", [id]);
   revalidatePath("/admin/audits");
+  return { ok: true };
+}
+
+/** Mint (or reuse) a public read-only share token for the report at /audit/<token>. */
+export async function createAuditShareLink(id: string): Promise<{ token?: string; error?: string }> {
+  const gate = await requireAdmin();
+  if ("error" in gate) return { error: gate.error };
+  const existing = await query<{ share_token: string | null }>(
+    "select share_token from compliance_audits where id = $1",
+    [id],
+  );
+  if (!existing.rows[0]) return { error: "Audit not found." };
+  const current = existing.rows[0].share_token;
+  if (current) return { token: current };
+  const token = randomBytes(24).toString("base64url"); // ~32 URL-safe chars, unguessable
+  await query("update compliance_audits set share_token = $1 where id = $2", [token, id]);
+  revalidatePath(`/admin/audits/${id}`);
+  return { token };
+}
+
+/** Revoke the public share link (the /audit/<token> URL stops working). */
+export async function revokeAuditShareLink(id: string): Promise<Result> {
+  const gate = await requireAdmin();
+  if ("error" in gate) return { error: gate.error };
+  await query("update compliance_audits set share_token = null where id = $1", [id]);
+  revalidatePath(`/admin/audits/${id}`);
   return { ok: true };
 }

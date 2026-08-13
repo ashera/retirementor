@@ -4,7 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { AuditRun, AuditFinding } from "@/lib/audits";
-import { setFindingStatus, setAuditStatus, deleteAudit } from "@/app/actions/audits";
+import { setFindingStatus, setAuditStatus, deleteAudit, createAuditShareLink, revokeAuditShareLink } from "@/app/actions/audits";
 
 const SEV: Record<string, { label: string; cls: string }> = {
   high: { label: "HIGH", cls: "bg-red-500/15 text-red-400" },
@@ -23,7 +23,39 @@ export default function AuditDetail({ audit, findings: initial }: { audit: Audit
   const [tab, setTab] = useState<"findings" | "report">("findings");
   const [findings, setFindings] = useState(initial);
   const [runStatus, setRunStatus] = useState(audit.status);
+  const [shareToken, setShareToken] = useState(audit.share_token);
+  const [shareBusy, setShareBusy] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
   const [, startTransition] = useTransition();
+
+  const shareUrl = (t: string) => `${typeof window !== "undefined" ? window.location.origin : ""}/audit/${t}`;
+  const copy = async (url: string) => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setNotice("Public report link copied — anyone with it can view (read-only).");
+    } catch {
+      setNotice(`Public report link: ${url}`);
+    }
+  };
+  const share = async () => {
+    if (shareBusy) return;
+    if (shareToken) return void copy(shareUrl(shareToken));
+    setShareBusy(true);
+    const res = await createAuditShareLink(audit.id);
+    setShareBusy(false);
+    if (res.token) {
+      setShareToken(res.token);
+      void copy(shareUrl(res.token));
+    } else setNotice(res.error ?? "Couldn't create a link.");
+  };
+  const unshare = async () => {
+    if (shareBusy) return;
+    setShareBusy(true);
+    await revokeAuditShareLink(audit.id);
+    setShareBusy(false);
+    setShareToken(null);
+    setNotice("Public link revoked.");
+  };
 
   const resolved = findings.filter((f) => f.status !== "open").length;
   const total = findings.length;
@@ -85,10 +117,24 @@ export default function AuditDetail({ audit, findings: initial }: { audit: Audit
               {resolved}/{total} resolved
             </div>
           )}
-          <button onClick={remove} className="ml-auto rounded-lg border border-line px-3 py-1 text-sm text-muted transition hover:border-red-400/50 hover:text-red-400">
+          {shareToken ? (
+            <div className="ml-auto inline-flex items-center overflow-hidden rounded-lg border border-line bg-panel-2 text-sm">
+              <button onClick={share} disabled={shareBusy} title="Copy the public report link" className="px-3 py-1 font-medium text-accent transition hover:bg-accent/10 disabled:opacity-60">
+                🔗 Copy report link
+              </button>
+              <a href={shareUrl(shareToken)} target="_blank" rel="noreferrer" className="border-l border-line px-2 py-1 text-muted transition hover:text-white" title="Open the shared report">↗</a>
+              <button onClick={unshare} disabled={shareBusy} className="border-l border-line px-2 py-1 text-muted transition hover:text-red-400 disabled:opacity-60" title="Disable the public link">unshare</button>
+            </div>
+          ) : (
+            <button onClick={share} disabled={shareBusy} className="ml-auto rounded-lg border border-line bg-panel-2 px-3 py-1 text-sm font-medium text-slate-200 transition hover:border-accent/50 hover:text-white disabled:opacity-60" title="Create a public read-only link to this report">
+              🔗 Share report
+            </button>
+          )}
+          <button onClick={remove} className="rounded-lg border border-line px-3 py-1 text-sm text-muted transition hover:border-red-400/50 hover:text-red-400">
             ✕ Delete
           </button>
         </div>
+        {notice && <p className="mt-2 text-xs text-accent">{notice}</p>}
       </header>
 
       <div className="mb-4 flex gap-1 rounded-lg border border-line bg-panel-2 p-1 text-sm w-fit">

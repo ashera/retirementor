@@ -320,9 +320,11 @@ create table if not exists compliance_audits (
   low int not null default 0,
   status text not null default 'open',    -- open | in_progress | actioned
   notes text,
+  share_token text,                        -- set → a public read-only report link exists
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+alter table compliance_audits add column if not exists share_token text;
 create table if not exists compliance_findings (
   id uuid primary key default gen_random_uuid(),
   audit_id uuid not null references compliance_audits(id) on delete cascade,
@@ -338,6 +340,7 @@ create table if not exists compliance_findings (
 );
 create index if not exists compliance_audits_ran_idx on compliance_audits(ran_at desc);
 create index if not exists compliance_findings_audit_idx on compliance_findings(audit_id, severity, sort);
+create unique index if not exists compliance_audits_share_uidx on compliance_audits(share_token) where share_token is not null;
 `;
 
 /** Apply the schema. Safe to run repeatedly. */

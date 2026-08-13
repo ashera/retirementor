@@ -11,7 +11,7 @@ const SENTIMENTS = [
 ];
 
 // Hide the widget on backoffice and print/report surfaces.
-const HIDDEN_PREFIXES = ["/admin", "/report"];
+const HIDDEN_PREFIXES = ["/admin", "/report", "/audit"];
 
 export default function FeedbackButton() {
   const pathname = usePathname() || "/";
