@@ -93,7 +93,36 @@ export default function ConfidenceHero({
   const spread = Math.max(central - failsafe, goalTotal * 0.15, 8000);
   const lo = Math.min(failsafe, goalTotal) - spread * 0.28;
   const hi = Math.max(central, goalTotal) + spread * 0.14;
-  const pos = (v: number) => clamp(((v - lo) / (hi - lo)) * 100, 0, 100);
+  // The four segments (below-failsafe · prudent · risky · danger tail) are mapped to
+  // display widths that are proportional to their $ span BUT with a minimum for the
+  // prudent band — failsafe and prudent are often only a few $k apart, which would
+  // otherwise leave it a barely-visible sliver. `pos` is then piecewise-linear across
+  // these control points, so the goal marker and boundaries stay consistent.
+  const bounds = [lo, failsafe, safe, central, hi];
+  const rawW = [failsafe - lo, safe - failsafe, central - safe, hi - central].map((x) => Math.max(0, x));
+  const rawTotal = rawW.reduce((s, x) => s + x, 0) || 1;
+  const dispW = (() => {
+    const w = rawW.map((x) => (x / rawTotal) * 100);
+    const PRUDENT_MIN = 24;
+    if (w[1] < PRUDENT_MIN) {
+      const others = w[0] + w[2] + w[3] || 1;
+      const deficit = PRUDENT_MIN - w[1];
+      return [w[0] - deficit * (w[0] / others), PRUDENT_MIN, w[2] - deficit * (w[2] / others), w[3] - deficit * (w[3] / others)];
+    }
+    return w;
+  })();
+  const disp = [0, dispW[0], dispW[0] + dispW[1], dispW[0] + dispW[1] + dispW[2], 100];
+  const pos = (v: number) => {
+    if (v <= lo) return 0;
+    if (v >= hi) return 100;
+    for (let i = 0; i < bounds.length - 1; i++) {
+      if (v <= bounds[i + 1]) {
+        const t = (v - bounds[i]) / (bounds[i + 1] - bounds[i] || 1);
+        return disp[i] + t * (disp[i + 1] - disp[i]);
+      }
+    }
+    return 100;
+  };
   const pFail = pos(failsafe);
   const pSafe = pos(safe);
   const pCent = pos(central);
