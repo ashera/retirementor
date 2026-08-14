@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { fmtCurrency } from "@/lib/au/format";
 import type { AgedCarePlan } from "@/lib/au/types";
@@ -88,12 +88,13 @@ function summary(ac: AgedCarePlan): string {
 // base plan (baseline.agedCare). Presented as neutral, user-driven scenarios —
 // general information, not advice.
 export default function AgedCareEditor({
-  value, minAge, maxAge, onChange,
+  value, minAge, maxAge, onChange, children,
 }: {
   value: AgedCarePlan | undefined;
   minAge: number;
   maxAge: number;
   onChange: (agedCare: AgedCarePlan | undefined) => void;
+  children?: ReactNode; // exposure/result content, rendered inside the card when enabled
 }) {
   const enabled = !!value?.enabled;
   const [open, setOpen] = useState(false);
@@ -127,15 +128,18 @@ export default function AgedCareEditor({
       </p>
 
       {enabled && value ? (
-        <button
-          type="button"
-          onClick={start}
-          className="mt-3 flex w-full items-center gap-2 rounded-lg border border-line bg-panel-2 px-3 py-2 text-left text-sm transition hover:border-accent/40"
-        >
-          <span className="h-2 w-2 shrink-0 rounded-full bg-rose-400" aria-hidden />
-          <span className="min-w-0 flex-1 truncate text-slate-200">{summary(value)}</span>
-          <span className="shrink-0 text-xs text-muted">edit</span>
-        </button>
+        <>
+          <button
+            type="button"
+            onClick={start}
+            className="mt-3 flex w-full items-center gap-2 rounded-lg border border-line bg-panel-2 px-3 py-2 text-left text-sm transition hover:border-accent/40"
+          >
+            <span className="h-2 w-2 shrink-0 rounded-full bg-rose-400" aria-hidden />
+            <span className="min-w-0 flex-1 truncate text-slate-200">{summary(value)}</span>
+            <span className="shrink-0 text-xs text-muted">edit</span>
+          </button>
+          {children}
+        </>
       ) : (
         <button
           type="button"

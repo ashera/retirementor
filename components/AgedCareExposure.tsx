@@ -39,17 +39,12 @@ export default function AgedCareExposure({
   }
 
   return (
-    <div className="rounded-2xl border border-rose-400/25 bg-panel p-4">
-      <h3 className="flex items-center gap-2 font-semibold text-white">
-        <span aria-hidden>🏥</span> Aged-care exposure
-      </h3>
-      <p className="mt-0.5 text-xs text-muted">
-        {isResidential ? "Residential care" : "At-home care"} from age {ac.entryAge} for {ac.durationYears} year
-        {ac.durationYears === 1 ? "" : "s"}
-        {probabilistic ? " — shown as an expected cost, weighted by the chance you need care." : "."}
-      </p>
+    <div className="mt-3 border-t border-line pt-3">
+      {probabilistic && (
+        <p className="mb-2 text-[11px] text-muted">Shown as an expected cost, weighted by the chance you need care.</p>
+      )}
 
-      <div className="mt-3 rounded-xl border border-line bg-panel-2 p-3">
+      <div className="rounded-xl border border-line bg-panel-2 p-3">
         <div className="flex items-baseline justify-between">
           <span className="text-xs font-medium text-muted">Cost in the first care year</span>
           <span className="text-lg font-bold tabular-nums text-rose-300">{fmtCurrency(Math.round(first.agedCareTotal ?? 0))}<span className="text-xs font-normal text-muted">/yr</span></span>

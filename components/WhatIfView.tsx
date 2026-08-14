@@ -1116,18 +1116,19 @@ export default function WhatIfView({
         onChange={(lifeEvents: LifeEvent[]) => setBaseline({ ...baseline, lifeEvents })}
       />
 
-      {/* Committed bucket: aged care (a possible late-life cost the user can model). */}
+      {/* Committed bucket: aged care (a possible late-life cost the user can model).
+          When it's on, the exposure card (cost breakdown + refundable RAD + effect
+          on longevity) renders inside the same card as its result. */}
       <AgedCareEditor
         value={baseline.agedCare}
         minAge={Math.max(oldestCurrentAge(baseline), baseline.retirementAge)}
         maxAge={baseline.lifeExpectancy}
         onChange={(agedCare) => setBaseline({ ...baseline, agedCare })}
-      />
-
-      {/* When aged care is modelled, surface the cost breakdown + refundable RAD. */}
-      {composed?.agedCare?.enabled && compRes && (
-        <AgedCareExposure plan={composed} result={compRes} noCareResult={noCareRes} />
-      )}
+      >
+        {composed?.agedCare?.enabled && compRes && (
+          <AgedCareExposure plan={composed} result={compRes} noCareResult={noCareRes} />
+        )}
+      </AgedCareEditor>
 
       {/* Exploring bucket: strategies, grouped by goal. Each is a compact pill; the
           full detail card (params + impact) opens in a modal when clicked. */}
