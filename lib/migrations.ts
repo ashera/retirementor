@@ -625,16 +625,51 @@ export async function migrate(c: Client): Promise<void> {
   await autoDraftRelease(c);
   await retirePlanDrafts(c);
   await seedComplianceAudit(c);
+  await reconcileComplianceAudit(c);
 }
+
+const RG276_TITLE = "ASIC RG 276 language review — Aug 2026";
+// Sentinel stored in compliance_audits.notes once the shipped finding
+// dispositions have been applied to an already-seeded row. Bump the version
+// suffix whenever RG276_FINDINGS statuses change and prod needs to catch up.
+const RG276_RECONCILE_MARKER = "[statuses-reconciled:v1]";
+
+// severity | ref | category | quote | suggestion | status
+// Single source of truth for BOTH the initial seed and the one-shot reconcile.
+const RG276_FINDINGS: [string, string, string, string, string, string][] = [
+  ["high", "GuidedIntro.tsx:181", "advice", "You're ahead of the pack 🎉 / a little behind — but there's time", "Neutral factual comparison to the age average.", "fixed"],
+  ["high", "GuidedIntro.tsx:313", "advice", "Am I on track? →", "Compare to the average →", "fixed"],
+  ["high", "BudgetBuilder.tsx:767", "advice", "Clearing it with super is often the cleanest fix.", "Present as an option; defer to the user.", "fixed"],
+  ["high", "LifestageModal.tsx:9", "promotion", "Link to caresuper.com.au (a specific super fund)", "Remove; attribute the 'spending smile' to general research.", "fixed"],
+  ["high", "ReportView.tsx:571", "guarantee", "Stress section with no adjacent 'past performance is not a guarantee'", "Add the disclosure in-section.", "fixed"],
+  ["high", "ReportView.tsx:613", "assurance", "Flexible spending lets you safely start higher than this.", "May allow a higher starting spend, depending on cutting back in bad years.", "fixed"],
+  ["high", "explainers.tsx:645", "nudge", "lean on the Age Pension by holding fewer assessable assets", "Describe the means-test mechanism, not asset restructuring.", "fixed"],
+  ["high", "BudgetBuilder.tsx:1265", "assurance", "On this budget your money lasts to {age}+ 🎉", "projected to last to {age}+ (drop emoji).", "fixed"],
+  ["med", "WhatIfView.tsx:1691", "assurance", "a rough market can't sink the plan", "…is less likely to sink the plan.", "fixed"],
+  ["med", "GuardrailsTimelineModal.tsx:332", "assurance", "turns a coin-flip into near-certain", "markedly raises the modelled odds.", "fixed"],
+  ["med", "StressTestView.tsx:312", "advice", "a resilient plan", "In this test the plan funded spending across every historical era modelled.", "fixed"],
+  ["med", "StressTestView.tsx:439", "misleading", "your true chance of running short … still here to spend it", "an estimate of the chance the plan runs short during your modelled lifetime.", "fixed"],
+  ["med", "SurvivalOverlay.tsx:44", "misleading", "Chance you outlive your money / the honest risk of being alive and broke", "Prefix 'Estimated'; soften the emotive framing.", "fixed"],
+  ["med", "PlannerApp.tsx:2254", "advice", "Just right! … the most you can prudently afford", "Near the top of what the model projects at 85% — general information, not advice.", "fixed"],
+  ["med", "PlannerApp.tsx:2238", "nudge", "Money to spare? Put your headroom to work / Help me spend more", "The model shows headroom at 85%; the choice is yours.", "fixed"],
+  ["med", "BoostSpendingModal.tsx:85", "nudge", "Spend more with your headroom", "Model spending more with your headroom.", "fixed"],
+  ["med", "ConfidenceHero.tsx:290", "assurance", "Failsafe (tier name)", "Rename to a non-assurance term (e.g. 'Most cautious'). Decision: kept — established ERN term of art used consistently and defined in-context; revisit if compliance sign-off objects.", "accepted"],
+  ["med", "ScenarioNotesModal.tsx:108", "assurance", "Confidence (Monte Carlo)", "Modelled success rate (Monte Carlo).", "fixed"],
+  ["med", "GuidedIntro.tsx:464", "assurance", "the Age Pension is always there … not running out of income", "may provide a partial income floor for those who qualify.", "fixed"],
+  ["med", "knowledgeBase.ts:345", "nudge", "a coin-flip you'd want to de-risk", "carries meaningful risk; some people respond by reducing spending or risk.", "fixed"],
+  ["low", "BudgetBuilder.tsx:99", "misleading", "ASFA 'comfortable' as the pre-selected default (green)", "Neutral colour / no implied target.", "fixed"],
+  ["low", "YearDetailModal.tsx", "guarantee", "Per-year exact $ reconciliation with no in-modal 'estimates' caveat", "Add 'figures are estimates' to the footer.", "fixed"],
+];
 
 /**
  * Seed the first compliance audit run — the adversarial ASIC RG 276 / Instrument
  * 2022/603 language review (Aug 2026) — with its findings and remediation status.
  * INSERT-if-absent by title, so it never overwrites status changes made in the
- * backoffice, and future runs are added through the admin UI.
+ * backoffice, and future runs are added through the admin UI. A freshly seeded
+ * row is born with the reconcile marker so reconcileComplianceAudit() skips it.
  */
 export async function seedComplianceAudit(c: Client): Promise<void> {
-  const title = "ASIC RG 276 language review — Aug 2026";
+  const title = RG276_TITLE;
   const exists = await c.query("select id from compliance_audits where title = $1 limit 1", [title]);
   if (exists.rowCount) return;
 
@@ -664,40 +699,15 @@ export async function seedComplianceAudit(c: Client): Promise<void> {
     "> Adversarial self-review to surface candidates — not a compliance sign-off. Action items require the AFS licensee / compliance review.",
   ].join("\n");
 
-  // severity | ref | category | quote | suggestion | status
-  const F: [string, string, string, string, string, string][] = [
-    ["high", "GuidedIntro.tsx:181", "advice", "You're ahead of the pack 🎉 / a little behind — but there's time", "Neutral factual comparison to the age average.", "fixed"],
-    ["high", "GuidedIntro.tsx:313", "advice", "Am I on track? →", "Compare to the average →", "fixed"],
-    ["high", "BudgetBuilder.tsx:767", "advice", "Clearing it with super is often the cleanest fix.", "Present as an option; defer to the user.", "fixed"],
-    ["high", "LifestageModal.tsx:9", "promotion", "Link to caresuper.com.au (a specific super fund)", "Remove; attribute the 'spending smile' to general research.", "fixed"],
-    ["high", "ReportView.tsx:571", "guarantee", "Stress section with no adjacent 'past performance is not a guarantee'", "Add the disclosure in-section.", "fixed"],
-    ["high", "ReportView.tsx:613", "assurance", "Flexible spending lets you safely start higher than this.", "May allow a higher starting spend, depending on cutting back in bad years.", "fixed"],
-    ["high", "explainers.tsx:645", "nudge", "lean on the Age Pension by holding fewer assessable assets", "Describe the means-test mechanism, not asset restructuring.", "fixed"],
-    ["high", "BudgetBuilder.tsx:1265", "assurance", "On this budget your money lasts to {age}+ 🎉", "projected to last to {age}+ (drop emoji).", "fixed"],
-    ["med", "WhatIfView.tsx:1691", "assurance", "a rough market can't sink the plan", "…is less likely to sink the plan.", "fixed"],
-    ["med", "GuardrailsTimelineModal.tsx:332", "assurance", "turns a coin-flip into near-certain", "markedly raises the modelled odds.", "fixed"],
-    ["med", "StressTestView.tsx:312", "advice", "a resilient plan", "In this test the plan funded spending across every historical era modelled.", "fixed"],
-    ["med", "StressTestView.tsx:439", "misleading", "your true chance of running short … still here to spend it", "an estimate of the chance the plan runs short during your modelled lifetime.", "fixed"],
-    ["med", "SurvivalOverlay.tsx:44", "misleading", "Chance you outlive your money / the honest risk of being alive and broke", "Prefix 'Estimated'; soften the emotive framing.", "fixed"],
-    ["med", "PlannerApp.tsx:2254", "advice", "Just right! … the most you can prudently afford", "Near the top of what the model projects at 85% — general information, not advice.", "fixed"],
-    ["med", "PlannerApp.tsx:2238", "nudge", "Money to spare? Put your headroom to work / Help me spend more", "The model shows headroom at 85%; the choice is yours.", "fixed"],
-    ["med", "BoostSpendingModal.tsx:85", "nudge", "Spend more with your headroom", "Model spending more with your headroom.", "fixed"],
-    ["med", "ConfidenceHero.tsx:290", "assurance", "Failsafe (tier name)", "Rename to a non-assurance term (e.g. 'Most cautious'). Decision: kept — established ERN term of art used consistently and defined in-context; revisit if compliance sign-off objects.", "accepted"],
-    ["med", "ScenarioNotesModal.tsx:108", "assurance", "Confidence (Monte Carlo)", "Modelled success rate (Monte Carlo).", "fixed"],
-    ["med", "GuidedIntro.tsx:464", "assurance", "the Age Pension is always there … not running out of income", "may provide a partial income floor for those who qualify.", "fixed"],
-    ["med", "knowledgeBase.ts:345", "nudge", "a coin-flip you'd want to de-risk", "carries meaningful risk; some people respond by reducing spending or risk.", "fixed"],
-    ["low", "BudgetBuilder.tsx:99", "misleading", "ASFA 'comfortable' as the pre-selected default (green)", "Neutral colour / no implied target.", "fixed"],
-    ["low", "YearDetailModal.tsx", "guarantee", "Per-year exact $ reconciliation with no in-modal 'estimates' caveat", "Add 'figures are estimates' to the footer.", "fixed"],
-  ];
-
+  const F = RG276_FINDINGS;
   const high = F.filter((f) => f[0] === "high").length;
   const med = F.filter((f) => f[0] === "med").length;
   const low = F.filter((f) => f[0] === "low").length;
 
   const ins = await c.query<{ id: string }>(
-    `insert into compliance_audits (title, standard, build, ran_at, report_md, high, med, low, status)
-     values ($1, $2, $3, now(), $4, $5, $6, $7, 'actioned') returning id`,
-    [title, "ASIC RG 276 / Instrument 2022/603", APP_VERSION, report, high, med, low],
+    `insert into compliance_audits (title, standard, build, ran_at, report_md, high, med, low, status, notes)
+     values ($1, $2, $3, now(), $4, $5, $6, $7, 'actioned', $8) returning id`,
+    [title, "ASIC RG 276 / Instrument 2022/603", APP_VERSION, report, high, med, low, RG276_RECONCILE_MARKER],
   );
   const auditId = ins.rows[0]?.id;
   if (!auditId) return;
@@ -712,6 +722,38 @@ export async function seedComplianceAudit(c: Client): Promise<void> {
     );
   }
   console.log(`  compliance-audit: seeded '${title}' with ${F.length} findings.`);
+}
+
+/**
+ * One-shot: bring an ALREADY-seeded RG 276 audit's finding statuses (and run
+ * status) up to the shipped dispositions in RG276_FINDINGS. Needed because the
+ * seed is insert-if-absent — a row created on an earlier deploy never picks up
+ * later status changes. Guarded by a marker in `notes` so it runs exactly once
+ * per marker version and does not clobber subsequent backoffice edits. Matches
+ * findings by `ref` (stable), not the shifting line-numbered quote.
+ */
+export async function reconcileComplianceAudit(c: Client): Promise<void> {
+  const row = await c.query<{ id: string; notes: string | null }>(
+    "select id, notes from compliance_audits where title = $1 limit 1",
+    [RG276_TITLE],
+  );
+  if (!row.rowCount) return; // not seeded here — seedComplianceAudit sets correct statuses
+  const { id, notes } = row.rows[0];
+  if ((notes ?? "").includes(RG276_RECONCILE_MARKER)) return; // already reconciled
+
+  let updated = 0;
+  for (const [, ref, , , , status] of RG276_FINDINGS) {
+    const r = await c.query(
+      "update compliance_findings set status = $1, updated_at = now() where audit_id = $2 and ref = $3 and status is distinct from $1",
+      [status, id, ref],
+    );
+    updated += r.rowCount ?? 0;
+  }
+  await c.query(
+    "update compliance_audits set status = 'actioned', notes = trim(coalesce(notes, '') || ' ' || $2), updated_at = now() where id = $1",
+    [id, RG276_RECONCILE_MARKER],
+  );
+  console.log(`  compliance-audit: reconciled ${updated} finding status(es) on '${RG276_TITLE}'.`);
 }
 
 /**
