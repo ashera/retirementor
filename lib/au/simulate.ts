@@ -1104,7 +1104,20 @@ export function simulate(
         acFull = homeCareAnnualCost(means, config.agedCare); // full "if in care" cost
         agedCareCostNow = acFull * acWeight;
       } else {
-        const unpaid = acAssume ? radUnpaid : Math.max(0, agedCare.radAmount ?? config.agedCare.radNationalAvg);
+        // Accommodation charged as DAP on the UN-lump-summed share. In "assume" mode
+        // `radUnpaid` was set at entry; in "probabilistic" mode there's no lump-sum
+        // event, but we still respect the RAD/DAP/mix choice (a RAD → no daily charge,
+        // so its expected accommodation cost is $0; the refundable capital isn't tied
+        // up here) rather than always charging DAP on the full price.
+        let unpaid: number;
+        if (acAssume) {
+          unpaid = radUnpaid;
+        } else {
+          const room = Math.max(0, agedCare.radAmount ?? config.agedCare.radNationalAvg);
+          const mode = agedCare.accommodation ?? "dap";
+          const lumpShare = mode === "rad" ? 1 : mode === "dap" ? 0 : Math.min(1, Math.max(0, (agedCare.radSharePct ?? 100) / 100));
+          unpaid = room * (1 - lumpShare);
+        }
         const cost = residentialAnnualCost(
           { means, radUnpaid: unpaid, ncccPaidToDate: ncccPaid, ncccYearsToDate: ncccYears },
           config.agedCare,

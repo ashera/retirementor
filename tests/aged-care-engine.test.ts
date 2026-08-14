@@ -195,6 +195,30 @@ describe("aged care — former-home Age Pension interaction (Phase 2)", () => {
   });
 });
 
+describe("aged care — fee components reconcile with the full cost", () => {
+  const firstCare = (p: RetirementPlan) => simulate(p, cfg).rows.find((r) => (r.breakdown.agedCareTotal ?? 0) > 0)!.breakdown;
+  const sumParts = (b: ReturnType<typeof firstCare>) =>
+    (b.agedCareBasic ?? 0) + (b.agedCareHotelling ?? 0) + (b.agedCareNCCC ?? 0) + (b.agedCareDAP ?? 0);
+
+  for (const framing of ["assume", "probabilistic"] as const) {
+    for (const accommodation of ["dap", "rad", "combo"] as const) {
+      it(`components sum to agedCareFull (${framing} · ${accommodation})`, () => {
+        const b = firstCare(withCare({ framing, accommodation, radAmount: 570_000, radSharePct: 50 }));
+        expect(sumParts(b)).toBeCloseTo(b.agedCareFull ?? 0, 1);
+      });
+    }
+  }
+
+  it("respects the RAD choice in probabilistic mode (no DAP for a lump sum)", () => {
+    const rad = firstCare(withCare({ framing: "probabilistic", accommodation: "rad", radAmount: 570_000 }));
+    const dap = firstCare(withCare({ framing: "probabilistic", accommodation: "dap", radAmount: 570_000 }));
+    expect(rad.agedCareDAP ?? 0).toBe(0);
+    expect(dap.agedCareDAP ?? 0).toBeGreaterThan(0);
+    // A lump-sum room therefore has a lower "if you need care" cost than paying daily.
+    expect(rad.agedCareFull ?? 0).toBeLessThan(dap.agedCareFull ?? 0);
+  });
+});
+
 describe("aged care — probabilistic framing", () => {
   it("survival-weights the expected cost so the tail is discounted below entry probability", () => {
     const sumCost = (p: RetirementPlan) => simulate(p, cfg).rows.reduce((s, r) => s + (r.breakdown.agedCareTotal ?? 0), 0);
