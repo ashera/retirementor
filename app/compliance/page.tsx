@@ -170,9 +170,10 @@ export default async function CompliancePage() {
         <Rule title="Significant limitations are disclosed">
           <p>
             The disclosures state what the tool does <em>not</em> do: it cannot predict future changes to rates or
-            law; it excludes aged-care costs, one-off or lump-sum spending and personal circumstances; and it flags
-            simplifications (e.g. the Transfer Balance Cap and investment-property CGT). Users are directed to consider
-            advice from an AFS licensee and to read the relevant Product Disclosure Statement before acting.
+            law; it excludes one-off or lump-sum spending and personal circumstances (aged-care costs are excluded
+            unless the user chooses to model them as an optional estimate); and it flags simplifications (e.g. the
+            Transfer Balance Cap and investment-property CGT). Users are directed to consider advice from an AFS
+            licensee and to read the relevant Product Disclosure Statement before acting.
           </p>
         </Rule>
 

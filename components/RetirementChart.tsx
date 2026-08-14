@@ -139,6 +139,7 @@ export default function RetirementChart({
   cpiPct,
   ages = null,
   lifeEvents,
+  agedCare = null,
 }: {
   result: SimResult;
   bands?: SpendingBand[];
@@ -158,6 +159,8 @@ export default function RetirementChart({
   // Committed life events → a pin on the year each one lands. atAge is the oldest
   // person's age (same axis as depletedAge), so it places directly with no age-gap shift.
   lifeEvents?: readonly LifeEvent[];
+  // Aged care → a pin at the entry age (same oldest-person axis).
+  agedCare?: { entryAge: number; durationYears: number } | null;
 }) {
   const { retirementAge, partnerRetirementAge, depletedAge } = result;
   // Markers sit on the OLDEST-person age axis, but each partner's OWN retirement age
@@ -270,6 +273,10 @@ export default function RetirementChart({
         dash: "4 3",
       }),
     );
+  // Aged care → a pin at the entry age (joins the same lane solver).
+  if (agedCare && agedCare.entryAge >= (result.rows[0]?.age ?? 0)) {
+    markerInputs.push({ key: "aged-care", x: agedCare.entryAge, color: "#f472b6", name: "Aged care", dash: "5 3" });
+  }
   const { placed, rows: markerRows } = placeMarkers(markerInputs);
   const rowStepPx = 14;
   const rowTopPx = 6;

@@ -160,9 +160,11 @@ export default function Disclosures({ config }: { config: EngineConfig }) {
                 outside the cash-flow (e.g. from the estate).
               </li>
               <li>
-                <strong>Not included:</strong> aged-care costs, one-off/lump-sum
+                <strong>Not included by default:</strong> one-off/lump-sum
                 spending, personal circumstances, and any future changes to
-                rates or law.
+                rates or law. Aged-care costs are excluded unless you choose to
+                model them (an optional estimate in What-If), and life events
+                cover one-off amounts you add.
               </li>
             </ul>
 

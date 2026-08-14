@@ -47,6 +47,7 @@ import StrategyAssumptionsModal from "@/components/StrategyAssumptionsModal";
 import GuardrailsTimelineModal from "@/components/GuardrailsTimelineModal";
 import SpendingBreakdown from "@/components/SpendingBreakdown";
 import LifeEventsEditor from "@/components/LifeEventsEditor";
+import AgedCareEditor from "@/components/AgedCareEditor";
 import { retirementGoal } from "@/lib/au/goal";
 import { initialWithdrawal, withdrawalBand } from "@/lib/au/withdrawal";
 import Field from "@/components/Field";
@@ -925,6 +926,7 @@ export default function WhatIfView({
               cpiPct={composed.inflation}
               ages={ageGapInfo(composed)}
               lifeEvents={composed.lifeEvents ?? []}
+              agedCare={composed.agedCare?.enabled ? { entryAge: composed.agedCare.entryAge, durationYears: composed.agedCare.durationYears } : null}
             />
             <div className="mt-3 flex flex-wrap gap-4">
               {[
@@ -1101,6 +1103,14 @@ export default function WhatIfView({
         maxAge={baseline.lifeExpectancy}
         defaultAge={Math.max(oldestCurrentAge(baseline) + 1, baseline.retirementAge + 3)}
         onChange={(lifeEvents: LifeEvent[]) => setBaseline({ ...baseline, lifeEvents })}
+      />
+
+      {/* Committed bucket: aged care (a possible late-life cost the user can model). */}
+      <AgedCareEditor
+        value={baseline.agedCare}
+        minAge={Math.max(oldestCurrentAge(baseline), baseline.retirementAge)}
+        maxAge={baseline.lifeExpectancy}
+        onChange={(agedCare) => setBaseline({ ...baseline, agedCare })}
       />
 
       {/* Exploring bucket: strategies, grouped by goal. Each is a compact pill; the
