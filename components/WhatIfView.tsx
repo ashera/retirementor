@@ -1688,7 +1688,7 @@ function StrategyCardRow({
               <p className="text-slate-300">
                 Unlike the other levers, guardrails don&apos;t grow your money or make it last longer on their own —
                 they&apos;re a rule for <em>how you spend</em>: ease off in bad years, treat yourself in good ones, so a
-                rough market can&apos;t sink the plan. The panel below stress-tests it — your odds of lasting, and what
+                rough market is less likely to sink the plan. The panel below stress-tests it — your odds of lasting, and what
                 the flexing costs.
               </p>
             </div>

@@ -105,7 +105,7 @@ export default function ScenarioNotesModal({
     const outcome: { label: string; value: string }[] = [
       { label: "Money lasts", value: result.lastsToLifeExpectancy ? `projected beyond ${plan.lifeExpectancy}` : result.depletedAge != null ? `projected to run out ~${result.depletedAge}` : "—" },
       { label: "Super at retirement", value: cur(result.superAtRetirement) },
-      { label: "Confidence (Monte Carlo)", value: `${successPct}%` },
+      { label: "Modelled success rate (Monte Carlo)", value: `${successPct}%` },
     ];
     return { situation, outcome };
   }, [plan, result, successPct]);

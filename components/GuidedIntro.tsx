@@ -463,9 +463,9 @@ export default function GuidedIntro({
             Your target is fully covered in about <strong>{successPct} of every 100</strong> of them.
           </p>
           <p className="mx-auto mt-2 max-w-md text-center text-xs text-muted">
-            And you&apos;re not left with nothing in the rest: the Age Pension is
-            always there as a floor, so a &ldquo;miss&rdquo; means dropping below your
-            target lifestyle for a while — not running out of income.
+            And you&apos;re not left with nothing in the rest: for those who qualify, the
+            Age Pension may provide a partial income floor, so a &ldquo;miss&rdquo; can mean
+            dropping below your target lifestyle for a while rather than running out of income.
           </p>
           <div className="mt-4 max-w-xs">
             <Field label="How bumpy are markets?" value={volatility} onChange={(v) => setOVol(v)} min={0} max={20} step={1} suffix="%" hint="Volatility. A diversified balanced/growth fund is roughly 9–13%." />

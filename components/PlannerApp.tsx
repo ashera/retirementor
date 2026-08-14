@@ -2235,25 +2235,25 @@ export default function PlannerApp({
         {spendHeadroom && (
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
             <p className="text-sm text-slate-300">
-              Money to spare? Put your headroom to work — raise discretionary
-              spending (essentials kept) to the most your plan can afford while
-              staying about {Math.round(MC_CONFIDENCE_TARGET * 100)}% likely to
-              last to age {plan.lifeExpectancy}.
+              The model shows headroom: discretionary spending (essentials kept) could
+              rise while the plan stays about {Math.round(MC_CONFIDENCE_TARGET * 100)}%
+              likely to last to age {plan.lifeExpectancy}. Whether to spend it is your
+              choice — this is general information, not advice.
             </p>
             <button
               onClick={() => setBoostOpen(true)}
               className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-ink transition hover:brightness-110"
             >
-              📈 Help me spend more
+              📈 Model spending more
             </button>
           </div>
         )}
         {budgetBalanced && (
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
             <p className="text-sm text-slate-300">
-              <span className="font-semibold text-accent">Just right!</span> Your spending is about the most you
-              can prudently afford — right around the {Math.round(MC_CONFIDENCE_TARGET * 100)}% mark. Nothing to
-              trim, nothing left on the table.
+              <span className="font-semibold text-accent">Around the mark.</span> Your spending sits near the top
+              of what the model projects at about the {Math.round(MC_CONFIDENCE_TARGET * 100)}% likelihood — nothing
+              flagged to trim, and little modelled headroom to add. General information, not advice.
             </p>
             <span className="text-2xl" aria-hidden>🎯</span>
           </div>

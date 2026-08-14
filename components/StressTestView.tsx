@@ -309,7 +309,7 @@ export default function StressTestView({
                     </div>
                     <p className="mt-1 text-sm text-muted">
                       {result.survived === result.total
-                        ? "Your plan lasts to life expectancy through every downturn on record — a resilient plan."
+                        ? "In this test the plan funded spending to life expectancy across every historical era modelled."
                         : result.worst
                           ? result.worst.recovered
                             ? `No downturn wipes you out — but ${result.worst.label} leaves ${result.worst.unfundedYears} year${result.worst.unfundedYears === 1 ? "" : "s"} around age ${result.worst.depletionAge} you couldn't fully fund before the plan recovers.`
@@ -440,8 +440,8 @@ export default function StressTestView({
                     Most plans simply assume you live all the way to {life}, and count running low on money in your final years as
                     a failure — even though you might not be here by then.
                     {plan.people.length > 1 ? " And with two of you, what really matters is how long at least one of you is still around." : ""}{" "}
-                    This view takes into account how likely you are to still be alive at each age, so the number below is your true
-                    chance of running short of money while you are still here to spend it.
+                    This view takes into account how likely you are to still be alive at each age, so the number below is an
+                    estimate of the chance the plan runs short of money during your modelled lifetime.
                   </p>
                 </div>
                 <button

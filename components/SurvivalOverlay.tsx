@@ -41,7 +41,7 @@ export default function SurvivalOverlay({
     <div>
       <div className="mb-4 grid gap-3 sm:grid-cols-2">
         <div className="rounded-xl border border-line bg-panel-2 p-4">
-          <div className="text-xs font-semibold uppercase tracking-wide text-muted">Chance you outlive your money</div>
+          <div className="text-xs font-semibold uppercase tracking-wide text-muted">Estimated chance you outlive your money</div>
           <div className="mt-1 text-3xl font-bold text-white tabular-nums">{(risk * 100).toFixed(risk < 0.1 ? 1 : 0)}%</div>
           <p className="mt-1 text-xs text-muted">
             The odds you’re still alive if and when the plan runs short — the Monte-Carlo shortfall risk ({(naive * 100).toFixed(0)}%)
@@ -53,7 +53,7 @@ export default function SurvivalOverlay({
           <p className="mt-1 text-xs text-muted">
             A run-out at, say, 95 is counted as a full failure by a run-to-life-expectancy test — but most people aren’t alive then.
             {lens.medianAgeAtDeath != null && ` There’s a 50/50 chance the household is still going at age ${lens.medianAgeAtDeath}.`} Weighting
-            by survival gives the honest risk of being <em>alive and broke</em>.
+            by survival estimates the risk of running short <em>while still alive</em>.
           </p>
         </div>
       </div>

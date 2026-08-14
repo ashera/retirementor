@@ -329,7 +329,7 @@ export default function GuardrailsTimelineModal({
                 </>
               ) : (
                 <>
-                  {coinFlip ? "That flexibility turns a coin-flip into near-certain: " : "That flexibility lifts your odds: "}
+                  {coinFlip ? "That flexibility markedly raises the modelled odds: " : "That flexibility lifts your odds: "}
                   <strong className="text-white">{fixedSuccess}% → {flexSuccess}%</strong> likely to last.{" "}
                   {recovers ? (
                     <>The cost — the belt-tightening in step 3 — is real but eases: the Age Pension does much of the recovery.</>

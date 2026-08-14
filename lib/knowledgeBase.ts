@@ -342,7 +342,7 @@ export const KB_ARTICLES: KbArticle[] = [
       {
         heading: "Why a probability, not a yes/no",
         body: [
-          { p: "Because markets are uncertain, the honest answer isn't 'yes' or 'no' — it's *how likely*. A plan at 95% is robust; one at 60% is a coin-flip you'd want to de-risk. The same machinery powers the safe-withdrawal-rate solver and the effect of turning on [flexible spending](/learn/flexible-spending), which typically lifts the likelihood by reducing draws in bad runs." },
+          { p: "Because markets are uncertain, the honest answer isn't 'yes' or 'no' — it's *how likely*. A plan at 95% is robust; one at 60% carries meaningful risk — some people respond by reducing spending or investment risk. The same machinery powers the safe-withdrawal-rate solver and the effect of turning on [flexible spending](/learn/flexible-spending), which typically lifts the likelihood by reducing draws in bad runs." },
           { note: "Monte Carlo draws returns randomly. For a complementary view that replays *actual* history in order — capturing crashes and recoveries as they really happened — see the [sequence-risk stress test](/learn/sequence-risk)." },
         ],
       },

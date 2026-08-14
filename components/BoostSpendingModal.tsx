@@ -82,7 +82,7 @@ export default function BoostSpendingModal({
         <div className="flex items-center justify-between border-b border-line px-6 py-4">
           <div className="flex items-center gap-2">
             <span aria-hidden>📈</span>
-            <h2 className="text-lg font-bold text-white">Spend more with your headroom</h2>
+            <h2 className="text-lg font-bold text-white">Model spending more with your headroom</h2>
           </div>
           <button
             type="button"
