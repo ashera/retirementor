@@ -561,7 +561,8 @@ export interface YearBreakdown {
   // = refundable deposit paid at entry; radHeld = running preserved deposit (refundable
   // to the estate, exempt from the Age Pension assets test — NOT part of the spendable
   // balance).
-  agedCareTotal?: number;
+  agedCareTotal?: number; // cost charged this year (probabilistic framing weights it); drives the drawdown
+  agedCareFull?: number; // full "if in care" cost (un-weighted); the components sum to this
   agedCareBasic?: number;
   agedCareHotelling?: number;
   agedCareNCCC?: number;

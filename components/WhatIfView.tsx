@@ -1126,7 +1126,7 @@ export default function WhatIfView({
         onChange={(agedCare) => setBaseline({ ...baseline, agedCare })}
       >
         {composed?.agedCare?.enabled && compRes && (
-          <AgedCareExposure plan={composed} result={compRes} noCareResult={noCareRes} />
+          <AgedCareExposure plan={composed} result={compRes} noCareResult={noCareRes} config={config} />
         )}
       </AgedCareEditor>
 

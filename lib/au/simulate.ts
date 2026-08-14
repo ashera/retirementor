@@ -1095,13 +1095,14 @@ export function simulate(
     // from the OPENING assessable assets (super + outside + capped former home if
     // kept); income is folded in at v2. Probabilistic framing weights the whole cost
     // by the entry probability and treats accommodation as DAP on the full price.
-    let acBasic = 0, acHotelling = 0, acNCCC = 0, acDAP = 0, agedCareCostNow = 0;
+    let acBasic = 0, acHotelling = 0, acNCCC = 0, acDAP = 0, agedCareCostNow = 0, acFull = 0;
     if (agedCare && acActive(oldest)) {
       const acWeight = acYearWeight(oldest);
       const keptHome = acHomeSold ? 0 : Math.min(homeVal, config.agedCare.homeValueCapMeansTest);
       const means = { assets: Math.max(0, startOutside) + startSuper + keptHome, income: 0 };
       if (agedCare.careType === "home") {
-        agedCareCostNow = homeCareAnnualCost(means, config.agedCare) * acWeight;
+        acFull = homeCareAnnualCost(means, config.agedCare); // full "if in care" cost
+        agedCareCostNow = acFull * acWeight;
       } else {
         const unpaid = acAssume ? radUnpaid : Math.max(0, agedCare.radAmount ?? config.agedCare.radNationalAvg);
         const cost = residentialAnnualCost(
@@ -1109,6 +1110,7 @@ export function simulate(
           config.agedCare,
         );
         acBasic = cost.basic; acHotelling = cost.hotelling; acNCCC = cost.nccc; acDAP = cost.dap;
+        acFull = cost.total; // sticker fees (unweighted); the components sum to this
         ncccPaid += cost.nccc; // track against the cap on the real (unweighted) schedule
         ncccYears += 1;
         agedCareCostNow = cost.total * acWeight;
@@ -1696,6 +1698,7 @@ export function simulate(
         eventIncome: eventIncomeNow,
         eventExpense: eventExpenseNow,
         agedCareTotal: agedCareCostNow || undefined,
+        agedCareFull: acFull || undefined,
         agedCareBasic: acBasic || undefined,
         agedCareHotelling: acHotelling || undefined,
         agedCareNCCC: acNCCC || undefined,
