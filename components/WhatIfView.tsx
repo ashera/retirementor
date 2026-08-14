@@ -48,6 +48,7 @@ import GuardrailsTimelineModal from "@/components/GuardrailsTimelineModal";
 import SpendingBreakdown from "@/components/SpendingBreakdown";
 import LifeEventsEditor from "@/components/LifeEventsEditor";
 import AgedCareEditor from "@/components/AgedCareEditor";
+import AgedCareExposure from "@/components/AgedCareExposure";
 import { retirementGoal } from "@/lib/au/goal";
 import { initialWithdrawal, withdrawalBand } from "@/lib/au/withdrawal";
 import Field from "@/components/Field";
@@ -321,6 +322,16 @@ export default function WhatIfView({
   }, [active, values, baseline, shared, signedIn]);
 
   const compRes = useMemo(() => (composed ? simulate(composed, config) : null), [composed, config]);
+
+  // For the aged-care exposure card: the same composed plan WITHOUT the care cost,
+  // to show how much longer the money would last without it. Only when it's on.
+  const noCareRes = useMemo(
+    () =>
+      composed?.agedCare?.enabled
+        ? simulate({ ...composed, agedCare: { ...composed.agedCare, enabled: false } }, config)
+        : null,
+    [composed, config],
+  );
 
   // Every TTR-active year of the composed plan → the (navigable) flow-of-funds
   // diagram for the TTR strategy modal (only present when the lever is on).
@@ -1112,6 +1123,11 @@ export default function WhatIfView({
         maxAge={baseline.lifeExpectancy}
         onChange={(agedCare) => setBaseline({ ...baseline, agedCare })}
       />
+
+      {/* When aged care is modelled, surface the cost breakdown + refundable RAD. */}
+      {composed?.agedCare?.enabled && compRes && (
+        <AgedCareExposure plan={composed} result={compRes} noCareResult={noCareRes} />
+      )}
 
       {/* Exploring bucket: strategies, grouped by goal. Each is a compact pill; the
           full detail card (params + impact) opens in a modal when clicked. */}
