@@ -591,12 +591,12 @@ function SetupStep({
                 onClick={() => applyPreset(l.key)}
                 className={`flex w-full items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left transition ${
                   active
-                    ? "border-accent bg-accent/10"
-                    : "border-line bg-panel-2 hover:border-accent/40"
+                    ? "border-slate-300 bg-white/5 ring-1 ring-slate-300/40"
+                    : "border-line bg-panel-2 hover:border-slate-400/50"
                 }`}
               >
                 <div>
-                  <div className={`font-semibold ${active ? "text-accent" : "text-white"}`}>
+                  <div className="font-semibold text-white">
                     {l.label}
                   </div>
                   <div className="text-xs text-muted">{l.blurb}</div>

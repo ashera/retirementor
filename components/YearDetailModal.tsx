@@ -570,7 +570,8 @@ export default function YearDetailModal({
         {/* Footer */}
         <div className="border-t border-line px-6 py-3 text-[11px] text-muted">
           Today&apos;s dollars. Balances are start-of-year; income in − spending out reconciles to
-          next year&apos;s opening.
+          next year&apos;s opening. Figures are model estimates, not guarantees, and rounding may
+          make lines differ by a dollar or two.
         </div>
       </div>
     </div>

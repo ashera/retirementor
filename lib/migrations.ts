@@ -686,8 +686,8 @@ export async function seedComplianceAudit(c: Client): Promise<void> {
     ["med", "ScenarioNotesModal.tsx:108", "assurance", "Confidence (Monte Carlo)", "Modelled success rate (Monte Carlo).", "fixed"],
     ["med", "GuidedIntro.tsx:464", "assurance", "the Age Pension is always there … not running out of income", "may provide a partial income floor for those who qualify.", "fixed"],
     ["med", "knowledgeBase.ts:345", "nudge", "a coin-flip you'd want to de-risk", "carries meaningful risk; some people respond by reducing spending or risk.", "fixed"],
-    ["low", "BudgetBuilder.tsx:99", "misleading", "ASFA 'comfortable' as the pre-selected default (green)", "Neutral colour / no implied target.", "open"],
-    ["low", "YearDetailModal.tsx", "guarantee", "Per-year exact $ reconciliation with no in-modal 'estimates' caveat", "Add 'figures are estimates' to the footer.", "open"],
+    ["low", "BudgetBuilder.tsx:99", "misleading", "ASFA 'comfortable' as the pre-selected default (green)", "Neutral colour / no implied target.", "fixed"],
+    ["low", "YearDetailModal.tsx", "guarantee", "Per-year exact $ reconciliation with no in-modal 'estimates' caveat", "Add 'figures are estimates' to the footer.", "fixed"],
   ];
 
   const high = F.filter((f) => f[0] === "high").length;
