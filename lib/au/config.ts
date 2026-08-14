@@ -148,6 +148,40 @@ export interface EngineConfig {
     // Per-category breakdown that pre-fills the guided budget builder.
     breakdown: AsfaBreakdown;
   };
+
+  // Aged care (post-1 Nov 2025 Aged Care Act; figures are a 2026 vintage and are
+  // indexed — re-verify at build). Residential fees = a non-means-tested basic
+  // daily fee + a means-tested hotelling contribution (no cap) + a means-tested
+  // non-clinical care contribution (NCCC, capped) + accommodation (RAD lump sum
+  // or DAP daily). v1 approximates the statutory means test with a transparent
+  // 0–1 means score (see lib/au/agedCare.ts). See docs/aged-care-module-v1-spec.md.
+  agedCare: AgedCareConfig;
+}
+
+export interface AgedCareConfig {
+  vintage: string;
+  basicDailyFee: number; // not means-tested (≈85% of the single pension)
+  hotellingMaxDaily: number; // means-tested, no annual/lifetime cap
+  ncccMaxDaily: number; // means-tested non-clinical care contribution
+  ncccLifetimeCap: number; // NCCC lifetime $ cap
+  ncccMaxYears: number; // NCCC also stops after this many years (whichever first)
+  mpir: number; // Maximum Permissible Interest Rate for DAP (annual fraction)
+  radNationalAvg: number; // default RAD price (today's $)
+  radRetentionPctPerYear: number; // provider may retain this % of the RAD per year
+  radRetentionMaxYears: number; // for at most this many years
+  homeValueCapMeansTest: number; // former home assessed up to this cap for aged-care means testing
+  // v1 means-score inputs: score = max(assetScore, incomeScore), each a clamped
+  // linear ramp between its free area and full-contribution point. Self-funded
+  // retirees land near 1 (max contributions); low-asset/low-income pensioners near 0.
+  careAssetFreeArea: number; // assets at/below → 0 asset score
+  careAssetFullArea: number; // assets at/above → asset score 1 (max hotelling/NCCC)
+  careIncomeFreeArea: number; // annual income at/below → 0 income score
+  careIncomeFullArea: number; // annual income at/above → income score 1
+  // Planning base rates for the probabilistic framing (verify vs AIHW GEN data).
+  entryProbability: number; // lifetime chance of entering permanent residential care
+  medianEntryAge: number;
+  medianDurationYears: number;
+  homeCareAnnualEstimate: number; // simplified Support-at-Home out-of-pocket estimate (v1 home-care option)
 }
 
 const FN = 26; // fortnights per year
@@ -257,6 +291,31 @@ export const DEFAULT_CONFIG: EngineConfig = {
       smile: { slowGoDiscretionary: 0.8, noGoDiscretionary: 0.55, slowGoAge: 75, noGoAge: 85 },
     },
   },
+
+  // Aged care — 2026 vintage (post-1 Nov 2025 Aged Care Act). Indexed figures;
+  // re-verify at build (Dept. of Health/Ageing schedules + adviser tech refs).
+  agedCare: {
+    vintage: "2026",
+    basicDailyFee: 65.55,
+    hotellingMaxDaily: 22.15,
+    ncccMaxDaily: 107.32,
+    ncccLifetimeCap: 137_917,
+    ncccMaxYears: 4,
+    mpir: 0.0796, // Apr–Jun 2026 Maximum Permissible Interest Rate
+    radNationalAvg: 570_000,
+    radRetentionPctPerYear: 0.02,
+    radRetentionMaxYears: 5,
+    homeValueCapMeansTest: 214_884, // 20 Mar 2026
+    // v1 means-score ramps (transparent approximation of the statutory test).
+    careAssetFreeArea: 61_500, // ~ the aged-care asset free area
+    careAssetFullArea: 290_453, // assets at/above → max hotelling
+    careIncomeFreeArea: 33_508, // single income free area (legacy MTF)
+    careIncomeFullArea: 100_000,
+    entryProbability: 0.33, // ~1 in 3 enter permanent residential care
+    medianEntryAge: 85,
+    medianDurationYears: 2.6,
+    homeCareAnnualEstimate: 8_000, // simplified Support-at-Home out-of-pocket (v1)
+  },
 };
 
 /** Minimum drawdown rate for a given age, from the config's age bands. */
@@ -308,6 +367,13 @@ export function withDefaults(data: EngineConfig): EngineConfig {
         cgtMinRatePct: DEFAULT_CONFIG.outsideTax.cgtMinRatePct,
       },
     };
+  }
+  // Aged-care block, added after the initial seed. Backfill so stored configs
+  // still run the aged-care engine; a partial block gets its missing keys filled.
+  if (out.agedCare == null) {
+    out = { ...out, agedCare: DEFAULT_CONFIG.agedCare };
+  } else {
+    out = { ...out, agedCare: { ...DEFAULT_CONFIG.agedCare, ...out.agedCare } };
   }
   // Monte Carlo return model, added after the initial seed.
   if (out.returnModel == null) {

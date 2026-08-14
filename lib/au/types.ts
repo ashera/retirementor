@@ -180,6 +180,30 @@ export interface IncomeStream {
   owner?: number; // couples only: which person the income belongs to for TAX (0 = you, 1 = partner). Omitted → split evenly. No effect on the Age Pension income test (assessed on combined household income) or for a single.
 }
 
+// Aged care (v1, consumer-facing general information). Models a late-life
+// residential- or home-care phase for ONE person (single, or one member of a
+// couple with the partner as the protected person keeping the home exempt).
+// `framing`: "assume" models a definite care phase; "probabilistic" weights the
+// cost by the config entry probability (a gentler "what if you need care?"). All
+// amounts today's dollars. Residential accommodation is paid as a refundable
+// lump sum (RAD), an ongoing daily charge (DAP = RAD × MPIR/365), or a blend;
+// the RAD is preserved as refundable estate value (not consumed) and is exempt
+// from the Age Pension assets test while held. See docs/aged-care-module-v1-spec.md.
+export interface AgedCarePlan {
+  enabled: boolean;
+  framing: "assume" | "probabilistic";
+  careType: "residential" | "home";
+  person?: number; // person index entering care; default the oldest member
+  entryAge: number; // oldest person's age on the timeline when care begins
+  durationYears: number; // modelled length of the care phase
+  // Residential only:
+  accommodation?: "rad" | "dap" | "combo";
+  radAmount?: number; // RAD price (today's $); default config.agedCare.radNationalAvg
+  radSharePct?: number; // combo: % of the RAD paid as a lump sum, remainder as DAP (0–100)
+  radFundedFrom?: "home" | "super" | "outside" | "auto"; // lump-sum funding source (auto: home → outside → super)
+  homeAction?: "sell" | "keep-rent" | "keep-vacant"; // what happens to the former home
+}
+
 // Per-person "keep super in accumulation" configuration (see RetirementPlan).
 export interface KeepAccumulation {
   who?: number[]; // person indices kept in accumulation (default: every member)
@@ -243,6 +267,7 @@ export interface RetirementPlan {
   careerBreaks?: CareerBreak[]; // "gap years": each entry = person `who` takes `years` off from their age `atAge` — no salary or super contributions in that window, drawing `spendFromSavings`/yr from outside savings to live. Savings additions pause only when EVERY working member is on a break that year. Super keeps earning on the existing balance; the lost contributions + compounding are the main cost.
   lifeEvents?: LifeEvent[]; // committed one-off cashflows at an age: an income (windfall/inheritance) lands in outside savings untaxed; an expense is an extra draw that year (from savings while working, from the retirement drawdown once retired). Today's dollars. Flows through the means test, MC, stress test, failsafe and guardrails automatically.
   incomeStreams?: IncomeStream[]; // recurring income (defined-benefit / annuity / foreign pension e.g. US Social Security): offsets the drawdown, assessed under the Age Pension INCOME test (not deemed/not asset-tested) and taxed as ordinary income by default; indexed (constant real) unless flagged otherwise. See IncomeStream.
+  agedCare?: AgedCarePlan; // optional late-life aged-care phase (cost overlay + RAD/DAP accommodation + former-home & Age Pension interaction). General information; flows through the projection, MC, stress test and failsafe. See AgedCarePlan.
   // Tax residency for the WHOLE projection. "non-resident" (foreign resident, e.g. a
   // retiree living permanently overseas) uses the foreign-resident tax scale (no
   // tax-free threshold, no Medicare, no LITO/SAPTO), taxes only AU-sourced income
