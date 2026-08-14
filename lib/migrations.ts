@@ -682,7 +682,7 @@ export async function seedComplianceAudit(c: Client): Promise<void> {
     ["med", "PlannerApp.tsx:2254", "advice", "Just right! … the most you can prudently afford", "Near the top of what the model projects at 85% — general information, not advice.", "fixed"],
     ["med", "PlannerApp.tsx:2238", "nudge", "Money to spare? Put your headroom to work / Help me spend more", "The model shows headroom at 85%; the choice is yours.", "fixed"],
     ["med", "BoostSpendingModal.tsx:85", "nudge", "Spend more with your headroom", "Model spending more with your headroom.", "fixed"],
-    ["med", "ConfidenceHero.tsx:290", "assurance", "Failsafe (tier name)", "Rename to a non-assurance term (e.g. 'Most cautious').", "open"],
+    ["med", "ConfidenceHero.tsx:290", "assurance", "Failsafe (tier name)", "Rename to a non-assurance term (e.g. 'Most cautious'). Decision: kept — established ERN term of art used consistently and defined in-context; revisit if compliance sign-off objects.", "accepted"],
     ["med", "ScenarioNotesModal.tsx:108", "assurance", "Confidence (Monte Carlo)", "Modelled success rate (Monte Carlo).", "fixed"],
     ["med", "GuidedIntro.tsx:464", "assurance", "the Age Pension is always there … not running out of income", "may provide a partial income floor for those who qualify.", "fixed"],
     ["med", "knowledgeBase.ts:345", "nudge", "a coin-flip you'd want to de-risk", "carries meaningful risk; some people respond by reducing spending or risk.", "fixed"],
@@ -696,7 +696,7 @@ export async function seedComplianceAudit(c: Client): Promise<void> {
 
   const ins = await c.query<{ id: string }>(
     `insert into compliance_audits (title, standard, build, ran_at, report_md, high, med, low, status)
-     values ($1, $2, $3, now(), $4, $5, $6, $7, 'in_progress') returning id`,
+     values ($1, $2, $3, now(), $4, $5, $6, $7, 'actioned') returning id`,
     [title, "ASIC RG 276 / Instrument 2022/603", APP_VERSION, report, high, med, low],
   );
   const auditId = ins.rows[0]?.id;
