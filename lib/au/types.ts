@@ -554,6 +554,20 @@ export interface YearBreakdown {
   onBreak?: boolean; // accumulation only: at least one member is on a career break ("gap year") this year — charts shade the span
   eventIncome?: number; // life-event windfall/inheritance received this year (added to outside savings, untaxed)
   eventExpense?: number; // life-event one-off expense paid this year (extra draw; in accumulation, floored at available savings)
+  // Aged care (retirement only; present only in care years). agedCareTotal is the
+  // charged cost this year (probabilistic framing weights it by the entry probability)
+  // and is included in `livingSpend`'s funding via the drawdown; the components split
+  // it (residential: basic + hotelling + NCCC + DAP; home care: total only). radDrawn
+  // = refundable deposit paid at entry; radHeld = running preserved deposit (refundable
+  // to the estate, exempt from the Age Pension assets test — NOT part of the spendable
+  // balance).
+  agedCareTotal?: number;
+  agedCareBasic?: number;
+  agedCareHotelling?: number;
+  agedCareNCCC?: number;
+  agedCareDAP?: number;
+  radDrawn?: number;
+  radHeld?: number;
   // Retirement income
   agePension: number;
   pension: PensionBreakdown | null; // means-test working behind agePension (null before pension age)

@@ -29,6 +29,7 @@ import {
   startingSuperBalances,
 } from "./types";
 import { mortgageActiveAtAge, mortgageAnnualCost, outstandingBalance } from "./mortgage";
+import { residentialAnnualCost, homeCareAnnualCost, entryWeight } from "./agedCare";
 import { budgetSplit, presetCategories } from "./budget";
 import { residentIncomeTax, seniorIncomeTax, nonResidentIncomeTax, medicareLevy, personTax, type CgtParams } from "./tax";
 import { capitalGainsTax, propertySaleDetail, netEquity, netRentCash, propertyValueAt } from "./property";
@@ -239,6 +240,23 @@ export function simulate(
   // (non-homeowner means test + ongoing rent) from `atAge`.
   const sellRent = plan.home?.sellAndRent;
   let soldHome = false;
+  // Aged care (v1). "assume" framing models a definite care phase — the RAD lump
+  // sum, former-home sale and DAP are all modelled; "probabilistic" instead adds a
+  // probability-weighted EXPECTED annual cost (accommodation as DAP on the full
+  // price), with no balance-sheet events. Care is active on the OLDEST-person
+  // timeline (same axis as life events). See lib/au/agedCare.ts + the v1 spec.
+  const agedCare = plan.agedCare?.enabled ? plan.agedCare : undefined;
+  const acAssume = agedCare ? agedCare.framing !== "probabilistic" : false;
+  const acWeight = agedCare ? entryWeight(agedCare.framing, config.agedCare) : 0;
+  const acActive = (age: number) =>
+    !!agedCare && age >= agedCare.entryAge && age < agedCare.entryAge + agedCare.durationYears;
+  let acEntered = false; // RAD entry (assume mode) fired once
+  let acHomeSold = false; // former home sold to help fund the RAD (assume mode)
+  let acHomeCash = 0; // released home equity awaiting RAD funding (not yet assessable)
+  let radHeld = 0; // preserved refundable accommodation deposit (exempt from the assets test)
+  let radUnpaid = 0; // accommodation amount charged as DAP (assume mode: the un-lump-summed share)
+  let ncccPaid = 0; // lifetime non-clinical care contribution paid (cap tracking, unweighted)
+  let ncccYears = 0; // whole years of NCCC charged (max-years cap tracking)
   // Keep-super-in-accumulation config (per-person + mode), null when off.
   const keepAccum = keepAccumConfig(plan);
   // Optional one-off lump sum withdrawn (and spent) from super at a chosen age.
@@ -466,7 +484,24 @@ export function simulate(
       homeVal = 0;
       if (mortgage) mortgageCleared = true; // discharged from the sale
     }
-    const isHomeowner = plan.homeowner && !(sellRent != null && oldest >= sellRent.atAge);
+    // Aged care (assume mode): sell the former home at entry to help fund the RAD.
+    // Mirrors sell-and-rent — releases equity (net of the loan) into a cash bucket
+    // the RAD consumes first (below), and zeroes the home so it drops off net worth.
+    if (
+      agedCare &&
+      acAssume &&
+      agedCare.careType === "residential" &&
+      agedCare.homeAction === "sell" &&
+      !acHomeSold &&
+      oldest >= agedCare.entryAge &&
+      homeVal > 0
+    ) {
+      acHomeCash = Math.max(0, homeVal - loanBal);
+      homeVal = 0;
+      acHomeSold = true;
+      if (mortgage) mortgageCleared = true;
+    }
+    const isHomeowner = plan.homeowner && !(sellRent != null && oldest >= sellRent.atAge) && !acHomeSold;
     const homeValueThisYear = homeVal;
     // Net-worth band = home equity = market value less any mortgage still owed
     // against it. Netting the loan keeps net worth continuous across a downsize,
@@ -1006,11 +1041,60 @@ export function simulate(
       const floor = Math.max(Math.min(guardEssentials, smileBase), guardFloorPct * smileBase);
       livingSpend = Math.max(smileBase * guardFactor, floor);
     }
+    // --- Aged care ---------------------------------------------------------
+    // (a) RAD entry (assume mode, residential): a one-off at the first care year.
+    // Pay the refundable deposit from home cash → outside → super (honouring an
+    // explicit funding source), hold it as a preserved, assets-test-EXEMPT asset,
+    // and route any home cash left over into (assessable) outside savings.
+    let radDrawnNow = 0;
+    if (agedCare && acAssume && agedCare.careType === "residential" && !acEntered && oldest >= agedCare.entryAge) {
+      acEntered = true;
+      const radPrice = Math.max(0, agedCare.radAmount ?? config.agedCare.radNationalAvg);
+      const mode = agedCare.accommodation ?? "rad";
+      const lumpShare = mode === "rad" ? 1 : mode === "dap" ? 0 : Math.min(1, Math.max(0, (agedCare.radSharePct ?? 100) / 100));
+      radUnpaid = radPrice * (1 - lumpShare); // the DAP-charged share (recurring, below)
+      let need = radPrice * lumpShare;
+      const src = agedCare.radFundedFrom ?? "auto";
+      if (src !== "outside" && src !== "super") {
+        const u = Math.min(need, acHomeCash); acHomeCash -= u; need -= u; // home cash first
+      }
+      if (need > 0 && src !== "super") {
+        const u = Math.min(need, Math.max(0, outside)); realizeOutside(u); outside -= u; need -= u;
+      }
+      if (need > 0) { const s = drawSuper(accessibleIdx, need); need -= s.accum + s.pension; }
+      radDrawnNow = radPrice * lumpShare - Math.max(0, need); // actually funded
+      radHeld += radDrawnNow;
+      if (acHomeCash > 0) { outside += acHomeCash; acHomeCash = 0; } // remainder → assessable savings
+    }
+    // (b) Recurring care cost this year (added to what must be funded → flows through
+    // the drawdown, MC, stress test and failsafe). v1 means-tests on a banded score
+    // from the OPENING assessable assets (super + outside + capped former home if
+    // kept); income is folded in at v2. Probabilistic framing weights the whole cost
+    // by the entry probability and treats accommodation as DAP on the full price.
+    let acBasic = 0, acHotelling = 0, acNCCC = 0, acDAP = 0, agedCareCostNow = 0;
+    if (agedCare && acActive(oldest)) {
+      const keptHome = acHomeSold ? 0 : Math.min(homeVal, config.agedCare.homeValueCapMeansTest);
+      const means = { assets: Math.max(0, startOutside) + startSuper + keptHome, income: 0 };
+      if (agedCare.careType === "home") {
+        agedCareCostNow = homeCareAnnualCost(means, config.agedCare) * acWeight;
+      } else {
+        const unpaid = acAssume ? radUnpaid : Math.max(0, agedCare.radAmount ?? config.agedCare.radNationalAvg);
+        const cost = residentialAnnualCost(
+          { means, radUnpaid: unpaid, ncccPaidToDate: ncccPaid, ncccYearsToDate: ncccYears },
+          config.agedCare,
+        );
+        acBasic = cost.basic; acHotelling = cost.hotelling; acNCCC = cost.nccc; acDAP = cost.dap;
+        ncccPaid += cost.nccc; // track against the cap on the real (unweighted) schedule
+        ncccYears += 1;
+        agedCareCostNow = cost.total * acWeight;
+      }
+    }
+
     // A one-off life-event expense this year is added to what must be funded (an
     // extra draw). It's deliberately kept OUT of the guardrails rail measure below
     // (which uses guardAnchorBase, not `spending`), so a single big expense doesn't
     // read as a permanently higher withdrawal rate and trigger spurious cuts.
-    const spending = livingSpend + rentExpense + mortgageCost + eventExpenseNow;
+    const spending = livingSpend + rentExpense + mortgageCost + eventExpenseNow + agedCareCostNow;
 
     // Investment property: real capital growth, actual net rent (income test) and
     // net equity (assets test — assessed, NOT deemed). An optional sale releases
@@ -1574,6 +1658,13 @@ export function simulate(
         recontribution: recontributionNow,
         eventIncome: eventIncomeNow,
         eventExpense: eventExpenseNow,
+        agedCareTotal: agedCareCostNow || undefined,
+        agedCareBasic: acBasic || undefined,
+        agedCareHotelling: acHotelling || undefined,
+        agedCareNCCC: acNCCC || undefined,
+        agedCareDAP: acDAP || undefined,
+        radDrawn: radDrawnNow || undefined,
+        radHeld: radHeld || undefined,
         propertyProceeds,
         propertyCgt,
         propertySales,
