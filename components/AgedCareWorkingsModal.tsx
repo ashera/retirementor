@@ -8,6 +8,19 @@ import type { RetirementPlan, YearBreakdown } from "@/lib/au/types";
 const clamp01 = (x: number) => (x < 0 ? 0 : x > 1 ? 1 : x);
 const pct = (x: number) => `${(x * 100).toFixed(1)}%`;
 
+const FRAMING_LABEL = { probabilistic: "If you need it", assume: "Assume it" } as const;
+const CARE_LABEL = { residential: "Residential", home: "At home" } as const;
+const ACC_LABEL = { rad: "Lump sum (RAD)", dap: "Daily (DAP)", combo: "A mix" } as const;
+const HOME_LABEL = { sell: "Sell the home", "keep-vacant": "Keep the home", "keep-rent": "Keep & rent" } as const;
+
+function Chip({ children, accent }: { children: React.ReactNode; accent?: boolean }) {
+  return (
+    <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${accent ? "bg-accent/20 text-accent" : "bg-panel-2 text-slate-300"}`}>
+      {children}
+    </span>
+  );
+}
+
 function Row({ label, formula, value, muted }: { label: string; formula: string; value: string; muted?: boolean }) {
   return (
     <div className="flex items-start justify-between gap-3 border-b border-line/60 py-1.5 last:border-0">
@@ -70,8 +83,22 @@ export default function AgedCareWorkingsModal({
           <button onClick={onClose} aria-label="Close" className="text-muted transition hover:text-white">✕</button>
         </div>
         <p className="mt-1 text-xs text-muted">
-          {residential ? "Residential care" : "At-home care"} at age {careAge}. Figures are 2026-vintage estimates in today&apos;s dollars.
+          At age {careAge}. Figures are 2026-vintage estimates in today&apos;s dollars.
         </p>
+
+        {/* Your choices — echoes the Model aged care dialog so the working below is
+            traceable to what the user picked. */}
+        <div className="mt-3 rounded-xl border border-line bg-panel-2/60 p-3">
+          <div className="text-[11px] font-medium text-muted">Your choices (from the &ldquo;Model aged care&rdquo; dialog)</div>
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            <Chip accent>{FRAMING_LABEL[ac.framing]}</Chip>
+            <Chip>{CARE_LABEL[ac.careType]}</Chip>
+            {residential && <Chip>{ACC_LABEL[ac.accommodation ?? "dap"]}</Chip>}
+            {residential && <Chip>{HOME_LABEL[ac.homeAction ?? "keep-vacant"]}</Chip>}
+            <Chip>From {ac.entryAge} · {ac.durationYears} yr{ac.durationYears === 1 ? "" : "s"}</Chip>
+          </div>
+          <p className="mt-2 text-[11px] text-muted">Change any of these in the dialog and this working updates.</p>
+        </div>
 
         {/* Step 1 — the means test */}
         <div className="mt-4">
@@ -121,12 +148,18 @@ export default function AgedCareWorkingsModal({
               <span className="tabular-nums font-bold text-rose-300">{fmtCurrency(Math.round(full))}/yr</span>
             </div>
           </div>
+          {residential && (
+            <p className="mt-1.5 text-[11px] text-muted">
+              Accommodation follows your <span className="text-slate-300">{ACC_LABEL[ac.accommodation ?? "dap"]}</span> choice
+              {isLump ? " — a lump-sum room is refundable, so there's no daily charge here." : " — paid daily at the MPIR."}
+            </p>
+          )}
         </div>
 
-        {/* Step 3 — weighting (probabilistic only) */}
-        {weighted && (
+        {/* Step 3 — the framing choice */}
+        {weighted ? (
           <div className="mt-4">
-            <div className="text-[11px] font-semibold uppercase tracking-wide text-accent">3 · Weighted for the chance you need it</div>
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-accent">3 · Because you chose &ldquo;If you need it&rdquo;</div>
             <div className="mt-2 rounded-xl border border-line bg-panel-2 p-3">
               <Row
                 label="Expected cost this year"
@@ -134,10 +167,17 @@ export default function AgedCareWorkingsModal({
                 value={fmtCurrency(Math.round(charged))}
               />
               <p className="mt-1 text-[11px] text-muted">
-                In the &ldquo;if you need it&rdquo; framing the modelled cost is weighted by the likelihood you actually enter care and
-                are still alive that year, so the deep tail is discounted. Switch to &ldquo;Assume it&rdquo; to model the full cost.
+                You picked the <span className="text-accent">If you need it</span> framing, so the cost above is weighted by the
+                likelihood you actually enter care and are still alive that year — the deep tail is discounted. Switch to
+                <span className="text-slate-300"> Assume it</span> in the dialog to use the full cost instead.
               </p>
             </div>
+          </div>
+        ) : (
+          <div className="mt-3 rounded-xl border border-line bg-panel-2 p-3 text-[11px] leading-relaxed text-muted">
+            You picked the <span className="text-accent">Assume it</span> framing, so the full cost above is what your plan uses
+            (not weighted). Switch to <span className="text-slate-300">If you need it</span> in the dialog to weight it by the
+            chance you need care.
           </div>
         )}
 
