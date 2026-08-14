@@ -248,6 +248,39 @@ const nomadRetired60: RetirementPlan = {
   ],
 };
 
+// Aged-care case study — the "moving parts" made concrete. Margaret, a single
+// homeowner who retired at 67 ($500k super + $150k outside + an $800k home, $52k/yr),
+// needs 3 years of residential care from 85. Same person, same care — the FUNDING
+// decision is everything. These two scenarios are linked from the /learn aged-care
+// articles. (Illustrative general information — NOT advice; see the articles.)
+const agedCareMargaret: RetirementPlan = {
+  ...DEFAULT_PLAN,
+  household: "single",
+  people: [{ ...DEFAULT_PLAN.people[0], currentAge: 67, superBalance: 500_000, salary: 0, voluntaryConcessional: 0, voluntaryNonConcessional: 0 }],
+  superMode: "individual",
+  homeowner: true,
+  home: { value: 800_000, growthReal: 2 },
+  outsideSuper: 150_000,
+  annualOutsideSavings: 0,
+  retirementAge: 67,
+  spendingMode: "flat",
+  targetSpending: 52_000,
+  investmentReturn: 6,
+  returnVolatility: 11,
+  inflation: 2.5,
+  lifeExpectancy: 92,
+};
+// Keeps the home (idle) and pays the accommodation as a Daily Accommodation Payment.
+const agedCareKeepHome: RetirementPlan = {
+  ...agedCareMargaret,
+  agedCare: { enabled: true, framing: "assume", careType: "residential", entryAge: 85, durationYears: 3, accommodation: "dap", homeAction: "keep-vacant" },
+};
+// Sells the home to pay a Refundable Accommodation Deposit (RAD) as a lump sum.
+const agedCareSellRad: RetirementPlan = {
+  ...agedCareMargaret,
+  agedCare: { enabled: true, framing: "assume", careType: "residential", entryAge: 85, durationYears: 3, accommodation: "rad", radAmount: 550_000, homeAction: "sell", radFundedFrom: "auto" },
+};
+
 export const DEMO_SCENARIOS: DemoScenario[] = [
   {
     slug: "fire-at-45",
@@ -347,5 +380,27 @@ export const DEMO_SCENARIOS: DemoScenario[] = [
     threadUrl: "", // paste the thread URL once posted
     sortOrder: 90,
     data: nomadRetired60,
+  },
+  {
+    slug: "aged-care-keep-home",
+    title: "Aged care · keep the home + DAP",
+    blurb:
+      "Margaret, a single homeowner (retired at 67 on $500k super + $150k outside + an $800k home, $52k/yr), needs 3 years of residential care from 85 — keeping her home and paying the accommodation as a Daily Accommodation Payment. Modelled cost ~$116k/yr, and her liquid savings run short at 87 while $800k of home equity sits idle. Illustrative general information, not advice.",
+    context:
+      "Aged-care case study (leg 1 of the structural-depth build) linked from the /learn aged-care articles. Same person as aged-care-sell-rad — only the FUNDING choice differs. Residential fees (2026 vintage): basic daily fee ~$23.9k + means-tested hotelling ~$8.1k + NCCC ~$39.2k + DAP on a ~$570k room at the 7.96% MPIR ~$45.4k ≈ $116.5k/yr. With the home kept but not paying accommodation, its $800k equity is illiquid, so the ~$650k of super+savings is exhausted by age 87. Shows the aged-care illiquidity trap. Not advice — the right choice is personal; see My Aged Care / a specialist.",
+    threadUrl: "",
+    sortOrder: 100,
+    data: agedCareKeepHome,
+  },
+  {
+    slug: "aged-care-sell-rad",
+    title: "Aged care · sell to fund a RAD",
+    blurb:
+      "The same Margaret, same 3 years of care from 85 — but she sells the $800k home to pay a $550k Refundable Accommodation Deposit (RAD) as a lump sum. No DAP, so the modelled cost drops to ~$71k/yr; the RAD is refundable to her estate and exempt from the pension assets test; her plan now lasts past 92. Illustrative general information, not advice.",
+    context:
+      "The funding-choice counterpart to aged-care-keep-home (identical person + care need). Selling the home frees the equity: $550k pays the RAD as a lump sum (no DAP → care ~$71.2k/yr, ~$45k less than the DAP route), the RAD is refundable to the estate AND exempt from the Age Pension assets test (so the pension rises through the care years as she draws down), and ~$250k of leftover proceeds + super keep the plan solvent past 92. The pair makes the point advisers charge for: with the same person and care need, the funding decision is the difference between running short at 87 and lasting past 92. NOT advice — the trade-offs (losing the home, RAD provider risk, family circumstances) are personal.",
+    threadUrl: "",
+    sortOrder: 110,
+    data: agedCareSellRad,
   },
 ];

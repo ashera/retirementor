@@ -8,6 +8,7 @@
 
 export type KbCategory =
   | "Age Pension"
+  | "Aged care"
   | "Spending & withdrawal"
   | "Risk & simulation"
   | "Super, tax & contributions"
@@ -15,6 +16,7 @@ export type KbCategory =
 
 export const KB_CATEGORIES: KbCategory[] = [
   "Age Pension",
+  "Aged care",
   "Spending & withdrawal",
   "Risk & simulation",
   "Super, tax & contributions",
@@ -129,6 +131,124 @@ export const KB_ARTICLES: KbArticle[] = [
       { href: "/scenario/retire-55-couple", label: "Retire @55 · couple", note: "The assets test at work for a homeowner couple." },
     ],
     related: ["age-pension", "income-streams"],
+  },
+
+  // ─────────────────────────────── Aged care ─────────────────────────────────
+  {
+    slug: "aged-care-costs",
+    title: "What aged care costs: the fees explained",
+    category: "Aged care",
+    summary:
+      "Residential aged care has four fees — a flat basic daily fee plus three means-tested charges — while clinical care is free. Here's each one, and what the acronyms mean.",
+    keywords: ["aged care", "RAD", "DAP", "NCCC", "hotelling", "MPIR", "residential aged care", "nursing home", "basic daily fee", "means tested care fee", "Support at Home", "home care", "fees", "aged care act"],
+    sections: [
+      {
+        body: [
+          { p: "Aged care in Australia comes in two forms: **Support at Home** (help while you stay in your own home) and **residential aged care** (moving into a care home). The government fully funds the clinical care; you contribute to the rest, scaled by a means test. The figures below are a 2026 vintage and are indexed regularly." },
+        ],
+      },
+      {
+        heading: "Residential care: four fees",
+        body: [
+          { list: [
+            "**Basic daily fee** — a flat everyday-living charge everyone pays, set at 85% of the single Age Pension (about **$65.55/day, ~$23,900/yr**). Not means-tested.",
+            "**Hotelling contribution** — a means-tested charge for 'hotel' services (meals, cleaning, laundry, heating), up to about **$22.15/day (~$8,100/yr)**. No cap.",
+            "**Non-Clinical Care Contribution (NCCC)** — a means-tested charge toward non-clinical personal care (bathing, dressing, mobility), up to about **$107.32/day (~$39,200/yr)** — but **capped**: it stops at **$137,917 over your lifetime, or after 4 years**, whichever comes first.",
+            "**Accommodation** — what you pay for the room, as a **RAD** or a **DAP** (see [Paying for aged care](/learn/aged-care-funding)).",
+          ] },
+          { note: "**Clinical care — nursing, medical and allied health — is fully government-funded.** You never pay for it." },
+        ],
+      },
+      {
+        heading: "The acronyms, decoded",
+        body: [
+          { list: [
+            "**RAD — Refundable Accommodation Deposit**: a lump sum you pay for your room. It's **refundable** to you or your estate when you leave (less a small retained amount), and it's **exempt from the Age Pension assets test**.",
+            "**DAP — Daily Accommodation Payment**: paying for the room as a daily charge instead of a lump sum — effectively interest on the unpaid room price at the MPIR.",
+            "**MPIR — Maximum Permissible Interest Rate**: the government rate that converts a room price into a DAP (currently about **7.96%**). A $570,000 room works out to roughly **$45,000/yr** as a DAP.",
+            "**NCCC / hotelling**: the two means-tested care and living charges above.",
+          ] },
+        ],
+      },
+      {
+        heading: "How the means test scales the fees",
+        body: [
+          { p: "The hotelling and NCCC charges are **means-tested** — the more assessable income and assets you have, the more you pay, up to the maximums above. A full pensioner with modest savings pays little; a self-funded retiree pays the maximum. This is a **separate** test from the [Age Pension means test](/learn/means-testing), with its own rules — including how your former home is treated. The planner approximates it with a simple means score in this first version." },
+        ],
+      },
+      {
+        heading: "Home care (Support at Home)",
+        body: [
+          { p: "If you're cared for at home instead, the newer **Support at Home** program works similarly: **clinical care is free**, while everyday-living and independence services attract means-tested contributions, under a combined lifetime cap (~$135k across home and residential care)." },
+          { note: "These figures are **estimates** and indexed regularly; your actual fees depend on a care assessment and the provider. This is **general information, not financial or aged-care advice** — for your situation, use the government's My Aged Care service or a specialist adviser." },
+        ],
+      },
+    ],
+    examples: [
+      { href: "/scenario/aged-care-keep-home", label: "Margaret · keep the home + DAP", note: "The four fees plus a ~$45k/yr DAP — ~$116k/yr, and the plan runs short at 87." },
+      { href: "/scenario/aged-care-sell-rad", label: "Margaret · sell to fund a RAD", note: "No DAP, so ~$71k/yr; the RAD is refundable and assets-test exempt." },
+    ],
+    related: ["aged-care-funding", "means-testing"],
+  },
+  {
+    slug: "aged-care-funding",
+    title: "Paying for aged care: RAD, DAP and the family home",
+    category: "Aged care",
+    summary:
+      "Two decisions drive the whole picture — pay the room as a lump sum (RAD) or a daily charge (DAP), and sell or keep the family home. Both interact with the Age Pension. A worked example.",
+    keywords: ["RAD", "DAP", "refundable accommodation deposit", "daily accommodation payment", "family home aged care", "former home", "aged care pension", "sell home aged care", "aged care funding", "MPIR", "protected person"],
+    sections: [
+      {
+        body: [
+          { p: "Beyond the [fees](/learn/aged-care-costs), two choices shape the whole picture: **how you pay for the room**, and **what happens to your home**. Both interact with the Age Pension, so they matter more than they first appear." },
+        ],
+      },
+      {
+        heading: "RAD vs DAP: lump sum or daily",
+        body: [
+          { list: [
+            "**RAD (lump sum)** — you pay the room price upfront. It's **refundable** (to you or your estate, less a small retained share) and **exempt from the Age Pension assets test** — so paying a RAD from assessable savings can actually **lift** your pension. The catch: it ties up a large sum and depends on the provider being able to refund it.",
+            "**DAP (daily)** — you pay interest on the room price at the MPIR (~7.96%) instead. Nothing large is tied up, but it's a real ongoing cost (~$45k/yr on a $570k room) that never comes back.",
+            "Many people pay a **combination** of the two.",
+          ] },
+          { formula: "DAP per year = unpaid room price × MPIR   (e.g. $570,000 × 7.96% ≈ $45,000)" },
+        ],
+      },
+      {
+        heading: "The family home",
+        body: [
+          { p: "The home is usually the biggest asset and the hardest decision. For the **aged-care** means test a former home is counted only up to a **capped value (~$214,884)** — but its treatment for the **Age Pension** changes once you move into care:" },
+          { list: [
+            "**Exempt for 2 years** from the day you enter care, if you keep it.",
+            "**After 2 years**, a kept home becomes an **assessable asset** for the Age Pension (at market value), and you're treated as a **non-homeowner** (a higher assets free area partly offsets it).",
+            "**Rent it out** and the rent is assessable income that helps pay the fees — but it can reduce your pension.",
+            "**A couple**: if your partner still lives there, the home stays **exempt** — they're a 'protected person'.",
+          ] },
+        ],
+      },
+      {
+        heading: "Worked example: Margaret",
+        body: [
+          { p: "Margaret is a single homeowner who retired at 67 with $500k super, $150k outside super and an $800k home, spending $52k/yr. At 85 she needs 3 years of residential care. Same person, same care — two funding choices:" },
+          { list: [
+            "**Keep the home, pay DAP** — the accommodation adds ~$45k/yr on top of ~$71k of care and living fees, so about **$116k/yr**. Her $800k of home equity sits **idle** while she pays, and her ~$650k of super + savings **runs short at 87**.",
+            "**Sell the home, pay a $550k RAD** — no DAP, so the cost drops to about **$71k/yr**; the $550k RAD is **refundable to her estate** and **exempt from the assets test** (so her Age Pension actually **rises** as she draws down); ~$250k of leftover proceeds plus her super keep the plan **lasting past 92**.",
+          ] },
+          { note: "Same person, same care need — the funding decision is the difference between **running short at 87** and **lasting past 92**, with a refundable $550k still in the estate. That's why the choice is worth getting right." },
+          { p: "This doesn't make selling 'correct' — keeping the home can matter for family, a possible return home, or provider-refund risk. It shows the **mechanism**, so you can ask the right questions." },
+        ],
+      },
+      {
+        body: [
+          { note: "Illustrative figures from the planner's model (a 2026 vintage of indexed rates) — **general information, not advice**. Aged-care decisions are complex and personal; get advice from a specialist and check the government's My Aged Care service." },
+        ],
+      },
+    ],
+    examples: [
+      { href: "/scenario/aged-care-keep-home", label: "Margaret · keep the home + DAP", note: "The idle-home trap: ~$116k/yr and the plan runs short at 87." },
+      { href: "/scenario/aged-care-sell-rad", label: "Margaret · sell to fund a RAD", note: "The RAD route: ~$71k/yr, pension rises, plan lasts past 92, deposit refundable." },
+    ],
+    related: ["aged-care-costs", "means-testing"],
   },
 
   // ─────────────────────────── How the model works ───────────────────────────
