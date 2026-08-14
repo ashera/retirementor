@@ -170,6 +170,7 @@ export interface AgedCareConfig {
   radRetentionPctPerYear: number; // provider may retain this % of the RAD per year
   radRetentionMaxYears: number; // for at most this many years
   homeValueCapMeansTest: number; // former home assessed up to this cap for aged-care means testing
+  formerHomeRentYieldNet: number; // net rental yield (fraction of value) if a kept former home is rented out
   // v1 means-score inputs: score = max(assetScore, incomeScore), each a clamped
   // linear ramp between its free area and full-contribution point. Self-funded
   // retirees land near 1 (max contributions); low-asset/low-income pensioners near 0.
@@ -306,6 +307,7 @@ export const DEFAULT_CONFIG: EngineConfig = {
     radRetentionPctPerYear: 0.02,
     radRetentionMaxYears: 5,
     homeValueCapMeansTest: 214_884, // 20 Mar 2026
+    formerHomeRentYieldNet: 0.03, // ~3% net rent on a kept, rented former home
     // v1 means-score ramps (transparent approximation of the statutory test).
     careAssetFreeArea: 61_500, // ~ the aged-care asset free area
     careAssetFullArea: 290_453, // assets at/above → max hotelling

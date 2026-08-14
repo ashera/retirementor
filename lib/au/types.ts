@@ -566,6 +566,7 @@ export interface YearBreakdown {
   agedCareHotelling?: number;
   agedCareNCCC?: number;
   agedCareDAP?: number;
+  agedCareHomeRent?: number; // net rent from a kept, rented former home (assessable + offsets the care cost)
   radDrawn?: number;
   radHeld?: number;
   // Retirement income

@@ -139,7 +139,75 @@ describe("aged care — RAD accommodation & means test", () => {
   });
 });
 
+describe("aged care — former-home Age Pension interaction (Phase 2)", () => {
+  it("keeps the former home exempt for 2 years, then assesses it (single, keep)", () => {
+    const sim = simulate(withCare({ durationYears: 5, homeAction: "keep-vacant", accommodation: "dap" }), cfg).rows;
+    const yr2 = sim.find((r) => r.age === 86)!.breakdown.pension!; // within the 2-year grace
+    const yr3 = sim.find((r) => r.age === 87)!.breakdown.pension!; // grace over → home assessed
+    const homeVal = sim.find((r) => r.age === 87)!.breakdown.homeValue || 900_000;
+    // Assessable assets jump by roughly the home value once the grace ends.
+    expect(yr3.assessableAssets - yr2.assessableAssets).toBeGreaterThan(0.5 * homeVal);
+  });
+
+  it("drops the Age Pension when the former home becomes assessable (modest single)", () => {
+    const modest: RetirementPlan = {
+      ...base,
+      people: [{ currentAge: 67, superBalance: 150_000, salary: 0, voluntaryConcessional: 0, voluntaryNonConcessional: 0 }],
+      outsideSuper: 40_000,
+      home: { value: 700_000, growthReal: 0 },
+      targetSpending: 38_000,
+      investmentReturn: 5,
+      agedCare: { enabled: true, framing: "assume", careType: "residential", entryAge: 85, durationYears: 5, accommodation: "dap", homeAction: "keep-vacant" },
+    };
+    const sim = simulate(modest, cfg).rows;
+    const p86 = sim.find((r) => r.age === 86)!.agePension; // home still exempt
+    const p87 = sim.find((r) => r.age === 87)!.agePension; // home now assessed
+    expect(p86).toBeGreaterThan(0);
+    expect(p87).toBeLessThan(p86);
+  });
+
+  it("earns assessable net rent on a kept, rented former home that offsets the cost", () => {
+    const rentRow = rowAt(withCare({ homeAction: "keep-rent", accommodation: "dap" }), 85);
+    const homeVal = rentRow.breakdown.homeValue || 900_000;
+    expect(rentRow.breakdown.agedCareHomeRent).toBeCloseTo(homeVal * AC.formerHomeRentYieldNet, 0);
+    // Rent offsets the care cost → higher spendable balance than not renting.
+    const rented = rowAt(withCare({ homeAction: "keep-rent", accommodation: "dap" }), 87).total;
+    const vacant = rowAt(withCare({ homeAction: "keep-vacant", accommodation: "dap" }), 87).total;
+    expect(rented).toBeGreaterThan(vacant);
+  });
+
+  it("a couple keeps the former home exempt (protected partner)", () => {
+    const couple: RetirementPlan = {
+      ...base,
+      household: "couple",
+      people: [
+        { currentAge: 67, superBalance: 400_000, salary: 0, voluntaryConcessional: 0, voluntaryNonConcessional: 0 },
+        { currentAge: 67, superBalance: 300_000, salary: 0, voluntaryConcessional: 0, voluntaryNonConcessional: 0 },
+      ],
+      agedCare: { enabled: true, framing: "assume", careType: "residential", entryAge: 85, durationYears: 5, accommodation: "dap", homeAction: "keep-vacant" },
+    };
+    const sim = simulate(couple, cfg).rows;
+    const yr2 = sim.find((r) => r.age === 86)!.breakdown.pension!;
+    const yr3 = sim.find((r) => r.age === 87)!.breakdown.pension!;
+    // No former-home jump: the protected partner keeps it exempt (difference is only
+    // the year's drawdown, far less than the home value).
+    expect(Math.abs(yr3.assessableAssets - yr2.assessableAssets)).toBeLessThan(200_000);
+  });
+});
+
 describe("aged care — probabilistic framing", () => {
+  it("survival-weights the expected cost so the tail is discounted below entry probability", () => {
+    const sumCost = (p: RetirementPlan) => simulate(p, cfg).rows.reduce((s, r) => s + (r.breakdown.agedCareTotal ?? 0), 0);
+    // Wealthy plan, ≤ NCCC-cap years → identical per-year unweighted cost across
+    // framings, so only the survival weighting differs.
+    const assume = sumCost(withCare({ durationYears: 4, framing: "assume", accommodation: "dap" }));
+    const prob = sumCost(withCare({ durationYears: 4, framing: "probabilistic", accommodation: "dap" }));
+    expect(prob).toBeGreaterThan(0);
+    expect(prob).toBeLessThan(AC.entryProbability * assume); // survival (<1 after entry) discounts the tail
+    expect(prob).toBeGreaterThan(AC.entryProbability * assume * 0.7); // but not wildly so
+  });
+
+
   it("weights an expected DAP-financed cost by the entry probability, with no balance-sheet events", () => {
     const prob = rowAt(withCare({ framing: "probabilistic" }), 85).breakdown;
     const means = {

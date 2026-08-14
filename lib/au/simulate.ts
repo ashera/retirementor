@@ -29,7 +29,8 @@ import {
   startingSuperBalances,
 } from "./types";
 import { mortgageActiveAtAge, mortgageAnnualCost, outstandingBalance } from "./mortgage";
-import { residentialAnnualCost, homeCareAnnualCost, entryWeight } from "./agedCare";
+import { residentialAnnualCost, homeCareAnnualCost } from "./agedCare";
+import { survivalCurve } from "./mortality";
 import { budgetSplit, presetCategories } from "./budget";
 import { residentIncomeTax, seniorIncomeTax, nonResidentIncomeTax, medicareLevy, personTax, type CgtParams } from "./tax";
 import { capitalGainsTax, propertySaleDetail, netEquity, netRentCash, propertyValueAt } from "./property";
@@ -247,9 +248,32 @@ export function simulate(
   // timeline (same axis as life events). See lib/au/agedCare.ts + the v1 spec.
   const agedCare = plan.agedCare?.enabled ? plan.agedCare : undefined;
   const acAssume = agedCare ? agedCare.framing !== "probabilistic" : false;
-  const acWeight = agedCare ? entryWeight(agedCare.framing, config.agedCare) : 0;
   const acActive = (age: number) =>
     !!agedCare && age >= agedCare.entryAge && age < agedCare.entryAge + agedCare.durationYears;
+  // Probabilistic framing weights the expected care cost by survival — you must be
+  // alive to keep paying, so the deep tail is discounted (reuses the same mortality
+  // model as the longevity overlay). Precompute P(entrant alive at oldest-age |
+  // alive at entry), keyed by the OLDEST-person timeline age. Assume framing = weight 1.
+  const acOldestNow = plan.people.length ? Math.max(...plan.people.map((p) => p.currentAge)) : 0;
+  const acEntrantIdx =
+    agedCare && agedCare.person != null && agedCare.person >= 0 && agedCare.person < plan.people.length
+      ? agedCare.person
+      : plan.people.reduce((best, p, i, a) => (p.currentAge > a[best].currentAge ? i : best), 0);
+  let acSurvivalByAge: Map<number, number> | null = null;
+  if (agedCare && !acAssume && plan.people.length) {
+    const entrant = plan.people[acEntrantIdx];
+    const byOwnAge = new Map<number, number>();
+    for (const pt of survivalCurve(entrant.currentAge, entrant.sex)) byOwnAge.set(pt.age, pt.p);
+    const sAtEntry = byOwnAge.get(Math.round(entrant.currentAge + (agedCare.entryAge - acOldestNow))) ?? 1;
+    acSurvivalByAge = new Map();
+    for (const [ownAge, p] of byOwnAge) {
+      acSurvivalByAge.set(acOldestNow + (ownAge - entrant.currentAge), sAtEntry > 0 ? Math.min(1, p / sAtEntry) : 0);
+    }
+  }
+  // Weight applied to a modelled care cost this year: 1 when assumed; the entry
+  // probability × conditional survival when probabilistic.
+  const acYearWeight = (oldestAge: number) =>
+    acAssume ? 1 : config.agedCare.entryProbability * (acSurvivalByAge?.get(oldestAge) ?? 1);
   let acEntered = false; // RAD entry (assume mode) fired once
   let acHomeSold = false; // former home sold to help fund the RAD (assume mode)
   let acHomeCash = 0; // released home equity awaiting RAD funding (not yet assessable)
@@ -1073,6 +1097,7 @@ export function simulate(
     // by the entry probability and treats accommodation as DAP on the full price.
     let acBasic = 0, acHotelling = 0, acNCCC = 0, acDAP = 0, agedCareCostNow = 0;
     if (agedCare && acActive(oldest)) {
+      const acWeight = acYearWeight(oldest);
       const keptHome = acHomeSold ? 0 : Math.min(homeVal, config.agedCare.homeValueCapMeansTest);
       const means = { assets: Math.max(0, startOutside) + startSuper + keptHome, income: 0 };
       if (agedCare.careType === "home") {
@@ -1213,7 +1238,19 @@ export function simulate(
       }
     }
     const streamTaxable = streamTaxablePer.reduce((a, b) => a + b, 0);
-    const assessableOther = rentAssessable + assessableEmployment + streamAssessable;
+    // Aged care (single, home KEPT): a former home is exempt for 2 years, then
+    // assessable for the Age Pension at market value AND the resident is treated as a
+    // non-homeowner (the higher free area). A rented former home (keep-rent) also earns
+    // assessable net rent from entry — real cash that offsets the care cost (v1 doesn't
+    // separately income-tax it). A COUPLE keeps the home exempt via the protected
+    // partner, so this bites only for a single. Assume mode only.
+    const acKeepHome =
+      !!agedCare && acAssume && agedCare.careType === "residential" &&
+      agedCare.homeAction !== "sell" && !acHomeSold && plan.household === "single" && acActive(oldest);
+    const acFormerHomeAssessed = acKeepHome && oldest >= agedCare!.entryAge + 2 ? homeVal : 0;
+    const acFormerHomeRent =
+      acKeepHome && agedCare!.homeAction === "keep-rent" ? homeVal * config.agedCare.formerHomeRentYieldNet : 0;
+    const assessableOther = rentAssessable + assessableEmployment + streamAssessable + acFormerHomeRent;
 
     // Age Pension (household level, from pension age). Financial assets are deemed;
     // an investment property's equity is assessable but NOT deemed, and its rent is
@@ -1247,8 +1284,8 @@ export function simulate(
       const ap = agePension(
         {
           household: plan.household,
-          homeowner: isHomeowner,
-          assessableAssets: financialAssets + propertyEquity,
+          homeowner: isHomeowner && acFormerHomeAssessed === 0,
+          assessableAssets: financialAssets + propertyEquity + acFormerHomeAssessed,
           financialAssets,
           otherIncome: assessableOther,
         },
@@ -1266,7 +1303,7 @@ export function simulate(
         accessibleSuper: assessedSuper,
         propertyEquity,
         propertyParts,
-        assessableAssets: financialAssets + propertyEquity,
+        assessableAssets: financialAssets + propertyEquity + acFormerHomeAssessed,
         financialAssets,
         deemedIncome: deemedIncome(financialAssets, plan.household, config),
         otherIncome: assessableOther,
@@ -1325,7 +1362,7 @@ export function simulate(
     // External income offsets the spending the household must fund from
     // super/outside; any surplus (income beyond spending — e.g. a working
     // partner's salary covering the retiree's needs) is saved to outside super.
-    const externalIncome = agePensionAmt + afterTaxRent + netWork + workTakeHome + streamNet;
+    const externalIncome = agePensionAmt + afterTaxRent + netWork + workTakeHome + streamNet + acFormerHomeRent;
     const privateNeed = Math.max(0, spending - externalIncome);
     if (externalIncome > spending) outside += externalIncome - spending;
     // Staggered gap: a partner still earning has their take-home ALREADY credited
@@ -1663,6 +1700,7 @@ export function simulate(
         agedCareHotelling: acHotelling || undefined,
         agedCareNCCC: acNCCC || undefined,
         agedCareDAP: acDAP || undefined,
+        agedCareHomeRent: acFormerHomeRent || undefined,
         radDrawn: radDrawnNow || undefined,
         radHeld: radHeld || undefined,
         propertyProceeds,

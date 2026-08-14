@@ -1,6 +1,6 @@
 # Aged Care Module — v1 Spec (consumer-facing)
 
-**Status:** proposed · **Primary user:** consumer (v1) · **Moat context:** first leg of the AU structural-depth trio (aged care → super death-benefit tax → lifetime-annuity concession). See memory `project-structural-depth-moat`.
+**Status:** Phase 1 + Phase 2 (engine) SHIPPED — commits 4519247 (1a), 3ddf669 (1b), + Phase 2 (former-home Age Pension interaction, keep-rent income, protected-partner exemption, survival-weighted probabilistic cost). Phase 3 (UI/disclosures/e2e) PENDING. · **Primary user:** consumer (v1) · **Moat context:** first leg of the AU structural-depth trio (aged care → super death-benefit tax → lifetime-annuity concession). See memory `project-structural-depth-moat`.
 
 Aged care is currently an **explicit exclusion** in the app's disclosures (`app/compliance/page.tsx`, `components/Disclosures.tsx`). This module flips it into a modelled — but firmly general-information — late-life cost.
 
