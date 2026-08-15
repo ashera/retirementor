@@ -294,7 +294,7 @@ export default function ReportView({
               : ` The “Depletes” marker is where savings are projected to run out (~${result.depletedAge}).`}
           </Lead>
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-2">
-            <RetirementChart result={result} bands={bands} animate={false} height={200} wageInflationPct={wageInfl} cpiPct={plan.inflation} ages={ageGapInfo(plan)} />
+            <RetirementChart result={result} bands={bands} animate={false} height={200} wageInflationPct={wageInfl} cpiPct={plan.inflation} ages={ageGapInfo(plan)} agedCare={plan.agedCare?.enabled ? { entryAge: plan.agedCare.entryAge, durationYears: plan.agedCare.durationYears } : null} />
           </div>
         </Section>
 
@@ -559,7 +559,7 @@ export default function ReportView({
                 savings grow) rather than losing it.
               </Lead>
               <div className="rounded-lg border border-slate-200 bg-slate-50 p-2">
-                <RetirementChart result={result} showHome bands={bands} animate={false} height={300} wageInflationPct={wageInfl} cpiPct={plan.inflation} ages={ageGapInfo(plan)} />
+                <RetirementChart result={result} showHome bands={bands} animate={false} height={300} wageInflationPct={wageInfl} cpiPct={plan.inflation} ages={ageGapInfo(plan)} agedCare={plan.agedCare?.enabled ? { entryAge: plan.agedCare.entryAge, durationYears: plan.agedCare.durationYears } : null} />
               </div>
             </Section>
           </div>
