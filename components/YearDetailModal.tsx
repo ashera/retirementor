@@ -220,7 +220,7 @@ export default function YearDetailModal({
     }
     return "one partner still working, one retired";
   })();
-  const spending = b.livingSpend + b.rentCost + b.mortgageCost + (b.eventExpense ?? 0);
+  const spending = b.livingSpend + b.rentCost + b.mortgageCost + (b.eventExpense ?? 0) + (b.agedCareTotal ?? 0);
   // The name(s) of the life event(s) landing this year (e.g. "Big trip"), matched by
   // firing age (max of the event's age and the projection start). Falls back to a
   // generic label. An event fires the year the oldest person first reaches its age.
@@ -239,7 +239,7 @@ export default function YearDetailModal({
   // super figure here is only the part that actually funded spending. A still-
   // working partner's take-home is household income too, so include it — otherwise
   // super/savings look like they must cover the whole spend (a phantom shortfall).
-  const external = b.agePension + b.rentIncome + row.workIncome + b.takeHome + (row.incomeStream ?? 0);
+  const external = b.agePension + b.rentIncome + row.workIncome + b.takeHome + (row.incomeStream ?? 0) + (b.agedCareHomeRent ?? 0);
   const privateNeed = Math.max(0, spending - external);
   const drawnFromSuper = Math.max(0, Math.min(row.superDrawn, privateNeed));
   const drawnFromOutside = Math.max(0, row.outsideDrawn);
@@ -255,6 +255,7 @@ export default function YearDetailModal({
   if (b.rentIncome > 0) fundingParts.push(`net rent ${fmtCurrency(Math.round(b.rentIncome))}`);
   if (row.workIncome > 0) fundingParts.push(`part-time work ${fmtCurrency(Math.round(row.workIncome))}`);
   if ((row.incomeStream ?? 0) > 1) fundingParts.push(`${incomeStreamLabel(row, "pension / annuity income")} ${fmtCurrency(Math.round(row.incomeStream ?? 0))}`);
+  if ((b.agedCareHomeRent ?? 0) > 1) fundingParts.push(`former-home rent ${fmtCurrency(Math.round(b.agedCareHomeRent ?? 0))}`);
   if (drawnFromSuper > 1) fundingParts.push(`${fmtCurrency(Math.round(drawnFromSuper))} from super`);
   if (drawnFromOutside > 1) fundingParts.push(`${fmtCurrency(Math.round(drawnFromOutside))} from outside savings`);
   const fundingText = fundingParts.length
@@ -468,6 +469,14 @@ export default function YearDetailModal({
                   label={eventExpenseLabel}
                   sub="a one-off life-event expense you planned for"
                   value={money(-(b.eventExpense ?? 0))}
+                  tone="text-amber-400"
+                />
+              )}
+              {(b.agedCareTotal ?? 0) > 0 && (
+                <Line
+                  label="Aged-care fees"
+                  sub={`${(b.agedCareDAP ?? 0) > 0 ? "basic + hotelling + care + daily accommodation" : "basic + hotelling + care fees"} this year`}
+                  value={money(-(b.agedCareTotal ?? 0))}
                   tone="text-amber-400"
                 />
               )}
