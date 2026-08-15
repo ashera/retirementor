@@ -1078,8 +1078,7 @@ export function simulate(
       const radPrice = Math.max(0, agedCare.radAmount ?? config.agedCare.radNationalAvg);
       const mode = agedCare.accommodation ?? "rad";
       const lumpShare = mode === "rad" ? 1 : mode === "dap" ? 0 : Math.min(1, Math.max(0, (agedCare.radSharePct ?? 100) / 100));
-      radUnpaid = radPrice * (1 - lumpShare); // the DAP-charged share (recurring, below)
-      let need = radPrice * lumpShare;
+      let need = radPrice * lumpShare; // the lump sum the user wants to pay
       const src = agedCare.radFundedFrom ?? "auto";
       if (src !== "outside" && src !== "super") {
         const u = Math.min(need, acHomeCash); acHomeCash -= u; need -= u; // home cash first
@@ -1088,8 +1087,12 @@ export function simulate(
         const u = Math.min(need, Math.max(0, outside)); realizeOutside(u); outside -= u; need -= u;
       }
       if (need > 0) { const s = drawSuper(accessibleIdx, need); need -= s.accum + s.pension; }
-      radDrawnNow = radPrice * lumpShare - Math.max(0, need); // actually funded
+      const unfundedLump = Math.max(0, need); // lump the liquid assets couldn't cover
+      radDrawnNow = radPrice * lumpShare - unfundedLump; // actually paid as a refundable deposit
       radHeld += radDrawnNow;
+      // Any lump we couldn't fund is charged daily (DAP) on the unpaid balance — just
+      // like the real system — so the room is always fully paid for, not silently short.
+      radUnpaid = radPrice * (1 - lumpShare) + unfundedLump;
       if (acHomeCash > 0) { outside += acHomeCash; acHomeCash = 0; } // remainder → assessable savings
     }
     // (b) Recurring care cost this year (added to what must be funded → flows through

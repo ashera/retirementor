@@ -46,7 +46,9 @@ export default function AgedCareExposure({
   const mode = isResidential ? (ac.accommodation ?? "dap") : "dap";
   const lumpShare = mode === "rad" ? 1 : mode === "combo" ? Math.min(1, Math.max(0, (ac.radSharePct ?? 50) / 100)) : 0;
   const room = ac.radAmount ?? config.agedCare.radNationalAvg;
-  const lumpSum = radHeld > 0 ? radHeld : room * lumpShare;
+  const chosenLump = room * lumpShare; // the deposit the user chose to pay
+  const fundedLump = radHeld; // actually paid as a refundable deposit (assume mode; 0 when probabilistic)
+  const partialRad = fundedLump > 0 && chosenLump - fundedLump > 1; // savings couldn't cover the full lump
 
   const rows: { label: string; value: number }[] = [];
   if (isResidential) {
@@ -87,17 +89,26 @@ export default function AgedCareExposure({
         )}
       </div>
 
-      {lumpSum > 0 && (
+      {chosenLump > 0 && (
         <div className="mt-2 rounded-xl border border-rose-400/25 bg-panel-2 p-3">
           <div className="flex items-baseline justify-between">
             <span className="text-xs font-medium text-muted">Plus a one-off deposit (RAD)</span>
-            <span className="text-base font-bold tabular-nums text-rose-200">{fmtCurrency(Math.round(lumpSum))}</span>
+            <span className="text-base font-bold tabular-nums text-rose-200">{fmtCurrency(Math.round(chosenLump))}</span>
           </div>
-          <p className="mt-1 text-[11px] leading-relaxed text-muted">
-            A refundable lump sum for the room, paid once — returned to your estate and exempt from the Age Pension assets
-            test. Separate from the annual cost above
-            {radHeld > 0 ? ", and drawn from your balance at entry (so it isn't part of the spendable balance on the chart)" : ""}.
-          </p>
+          {partialRad ? (
+            <p className="mt-1 text-[11px] leading-relaxed text-muted">
+              Your savings cover <span className="text-slate-200">{fmtCurrency(Math.round(fundedLump))}</span> as a refundable
+              deposit (returned to your estate, exempt from the assets test); the remaining{" "}
+              <span className="text-slate-200">{fmtCurrency(Math.round(chosenLump - fundedLump))}</span> is paid daily (DAP),
+              included in the annual cost above.
+            </p>
+          ) : (
+            <p className="mt-1 text-[11px] leading-relaxed text-muted">
+              A refundable lump sum for the room, paid once — returned to your estate and exempt from the Age Pension assets
+              test. Separate from the annual cost above
+              {radHeld > 0 ? ", and drawn from your balance at entry (so it isn't part of the spendable balance on the chart)" : ""}.
+            </p>
+          )}
         </div>
       )}
 

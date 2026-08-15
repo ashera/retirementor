@@ -149,20 +149,22 @@ export default function AgedCareWorkingsModal({
                   note={`$${AC.ncccMaxDaily.toFixed(2)} is the government maximum daily non-clinical care charge, scaled by your means score and capped at ${fmtCurrency(AC.ncccLifetimeCap)} over ${AC.ncccMaxYears} years. Clinical care (nursing, medical) is free.`}
                   value={fmtCurrency(Math.round(breakdown.agedCareNCCC ?? 0))}
                 />
-                {isLump ? (
+                {(breakdown.agedCareDAP ?? 0) > 0 ? (
+                  <Row
+                    label="Accommodation (DAP)"
+                    formula={`${fmtCurrency(Math.round((breakdown.agedCareDAP ?? 0) / AC.mpir))} unpaid room × MPIR ${pct(AC.mpir)}`}
+                    note={isLump
+                      ? `You chose a lump sum, but your savings couldn't cover all of the ${fmtCurrency(room)} room — the unpaid part is charged daily at the MPIR (${pct(AC.mpir)}).`
+                      : `${fmtCurrency(room)} is the room price you set${ac.radAmount == null ? " (defaulting to the ~national average)" : ""}. The MPIR (${pct(AC.mpir)}) is the government rate that turns an unpaid room price into a daily payment — the cost of not paying a lump-sum RAD.`}
+                    value={fmtCurrency(Math.round(breakdown.agedCareDAP ?? 0))}
+                  />
+                ) : (
                   <Row
                     label="Accommodation (RAD)"
                     formula={`${fmtCurrency(room)} lump sum — refundable, no daily charge`}
                     note={`${fmtCurrency(room)} is the room price you set${ac.radAmount == null ? " (defaulting to the ~national average)" : ""}. You chose to pay it as a refundable lump-sum RAD, so nothing is charged here each year.`}
                     value="$0"
                     muted
-                  />
-                ) : (
-                  <Row
-                    label="Accommodation (DAP)"
-                    formula={`room ${fmtCurrency(room)} × MPIR ${pct(AC.mpir)}`}
-                    note={`${fmtCurrency(room)} is the room price you set${ac.radAmount == null ? " (defaulting to the ~national average)" : ""}. The MPIR (${pct(AC.mpir)}) is the government rate that turns an unpaid room price into a daily payment — this is the cost of not paying a lump-sum RAD.`}
-                    value={fmtCurrency(Math.round(breakdown.agedCareDAP ?? 0))}
                   />
                 )}
                 {(breakdown.agedCareHomeRent ?? 0) > 0 && (
@@ -185,7 +187,11 @@ export default function AgedCareWorkingsModal({
           {residential && (
             <p className="mt-1.5 text-[11px] text-muted">
               Accommodation follows your <span className="text-slate-300">{ACC_LABEL[ac.accommodation ?? "dap"]}</span> choice
-              {isLump ? " — a lump-sum room is refundable, so there's no daily charge here." : " — paid daily at the MPIR."}
+              {isLump && (breakdown.agedCareDAP ?? 0) > 0
+                ? " — your savings couldn't cover the full lump sum, so the unpaid part is charged daily (DAP)."
+                : isLump
+                  ? " — a lump-sum room is refundable, so there's no daily charge here."
+                  : " — paid daily at the MPIR."}
             </p>
           )}
         </div>

@@ -210,6 +210,25 @@ describe("aged care — fee components reconcile with the full cost", () => {
     }
   }
 
+  it("charges DAP on any lump sum the savings can't cover (room fully paid, not short)", () => {
+    // Low-asset single: a $400k RAD in "keep" mode can't be fully funded from savings.
+    const modest: RetirementPlan = {
+      ...base,
+      people: [{ currentAge: 67, superBalance: 250_000, salary: 0, voluntaryConcessional: 0, voluntaryNonConcessional: 0 }],
+      outsideSuper: 80_000,
+      home: { value: 700_000, growthReal: 2 },
+      targetSpending: 45_000,
+      investmentReturn: 5,
+      agedCare: { enabled: true, framing: "assume", careType: "residential", entryAge: 85, durationYears: 4, accommodation: "rad", radAmount: 400_000, homeAction: "keep-vacant" },
+    };
+    const b = simulate(modest, cfg).rows.find((r) => (r.breakdown.agedCareTotal ?? 0) > 0)!.breakdown;
+    const funded = b.radDrawn ?? 0;
+    const unpaid = (b.agedCareDAP ?? 0) / cfg.agedCare.mpir;
+    expect(funded).toBeGreaterThan(0);
+    expect(b.agedCareDAP ?? 0).toBeGreaterThan(0); // the shortfall is charged daily
+    expect(funded + unpaid).toBeCloseTo(400_000, 0); // the whole room is paid for
+  });
+
   it("respects the RAD choice in probabilistic mode (no DAP for a lump sum)", () => {
     const rad = firstCare(withCare({ framing: "probabilistic", accommodation: "rad", radAmount: 570_000 }));
     const dap = firstCare(withCare({ framing: "probabilistic", accommodation: "dap", radAmount: 570_000 }));
