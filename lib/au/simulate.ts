@@ -1071,8 +1071,10 @@ export function simulate(
     // explicit funding source), hold it as a preserved, assets-test-EXEMPT asset,
     // and route any home cash left over into (assessable) outside savings.
     let radDrawnNow = 0;
+    let acHomeSaleNow = 0; // former-home equity released to help fund the RAD (for the waterfall)
     if (agedCare && acAssume && agedCare.careType === "residential" && !acEntered && oldest >= agedCare.entryAge) {
       acEntered = true;
+      acHomeSaleNow = acHomeCash; // the release captured at the top-of-loop sale (0 if kept)
       const radPrice = Math.max(0, agedCare.radAmount ?? config.agedCare.radNationalAvg);
       const mode = agedCare.accommodation ?? "rad";
       const lumpShare = mode === "rad" ? 1 : mode === "dap" ? 0 : Math.min(1, Math.max(0, (agedCare.radSharePct ?? 100) / 100));
@@ -1719,6 +1721,7 @@ export function simulate(
         agedCareHomeRent: acFormerHomeRent || undefined,
         radDrawn: radDrawnNow || undefined,
         radHeld: radHeld || undefined,
+        agedCareHomeSale: acHomeSaleNow || undefined,
         propertyProceeds,
         propertyCgt,
         propertySales,

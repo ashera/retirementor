@@ -570,6 +570,7 @@ export interface YearBreakdown {
   agedCareHomeRent?: number; // net rent from a kept, rented former home (assessable + offsets the care cost)
   radDrawn?: number;
   radHeld?: number;
+  agedCareHomeSale?: number; // former-home equity released at aged-care entry (helps fund the RAD)
   // Retirement income
   agePension: number;
   pension: PensionBreakdown | null; // means-test working behind agePension (null before pension age)

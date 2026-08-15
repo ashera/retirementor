@@ -3,6 +3,7 @@ import { simulate } from "../lib/au/simulate";
 import { DEFAULT_CONFIG as cfg } from "../lib/au/config";
 import { DEFAULT_PLAN, type AgedCarePlan, type RetirementPlan } from "../lib/au/types";
 import { residentialAnnualCost } from "../lib/au/agedCare";
+import { yearFlow } from "../lib/au/yearFlow";
 
 const AC = cfg.agedCare;
 
@@ -216,6 +217,30 @@ describe("aged care — fee components reconcile with the full cost", () => {
     expect(dap.agedCareDAP ?? 0).toBeGreaterThan(0);
     // A lump-sum room therefore has a lower "if you need care" cost than paying daily.
     expect(rad.agedCareFull ?? 0).toBeLessThan(dap.agedCareFull ?? 0);
+  });
+});
+
+describe("aged care — balance waterfall names the flows (no 'Other adjustments')", () => {
+  const entryFlow = (p: RetirementPlan) => {
+    const row = simulate(p, cfg).rows.find((r) => (r.breakdown.agedCareTotal ?? 0) > 0)!;
+    return yearFlow(row);
+  };
+  it("shows the RAD deposit + home sale, and ties out, for sell + RAD", () => {
+    const wf = entryFlow(withCare({ accommodation: "rad", radAmount: 550_000, homeAction: "sell" }));
+    expect(wf.lines.find((l) => l.key === "agedCareRad")?.amount).toBeLessThan(0);
+    expect(wf.lines.find((l) => l.key === "agedCareHomeSale")?.amount ?? 0).toBeGreaterThan(0);
+    expect(wf.lines.find((l) => l.key === "other")).toBeUndefined();
+    // The waterfall ties exactly (sum of lines === net).
+    expect(wf.lines.reduce((s, l) => s + l.amount, 0)).toBeCloseTo(wf.net, 0);
+  });
+  it("names the RAD deposit (no home sale) for keep + RAD, and ties out", () => {
+    const wf = entryFlow(withCare({ accommodation: "rad", radAmount: 400_000, homeAction: "keep-vacant" }));
+    expect(wf.lines.find((l) => l.key === "agedCareRad")?.amount).toBeLessThan(0);
+    expect(wf.lines.find((l) => l.key === "other")).toBeUndefined();
+  });
+  it("has no leftover residual for keep + DAP (cost funded via the drawdown)", () => {
+    const wf = entryFlow(withCare({ accommodation: "dap", homeAction: "keep-vacant" }));
+    expect(wf.lines.find((l) => l.key === "other")).toBeUndefined();
   });
 });
 
