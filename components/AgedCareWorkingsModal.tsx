@@ -6,7 +6,8 @@ import type { EngineConfig } from "@/lib/au/config";
 import type { RetirementPlan, YearBreakdown } from "@/lib/au/types";
 
 const clamp01 = (x: number) => (x < 0 ? 0 : x > 1 ? 1 : x);
-const pct = (x: number) => `${(x * 100).toFixed(1)}%`;
+// Show real precision without trailing zeros: 0.0796 → "7.96%", 0.33 → "33%".
+const pct = (x: number) => `${(x * 100).toFixed(2).replace(/\.?0+$/, "")}%`;
 
 const FRAMING_LABEL = { probabilistic: "If you need it", assume: "Assume it" } as const;
 const CARE_LABEL = { residential: "Residential", home: "At home" } as const;
@@ -21,12 +22,13 @@ function Chip({ children, accent }: { children: React.ReactNode; accent?: boolea
   );
 }
 
-function Row({ label, formula, value, muted }: { label: string; formula: string; value: string; muted?: boolean }) {
+function Row({ label, formula, note, value, muted }: { label: string; formula: string; note?: string; value: string; muted?: boolean }) {
   return (
-    <div className="flex items-start justify-between gap-3 border-b border-line/60 py-1.5 last:border-0">
+    <div className="flex items-start justify-between gap-3 border-b border-line/60 py-2 last:border-0">
       <div className="min-w-0">
         <div className={`text-sm ${muted ? "text-muted" : "text-slate-200"}`}>{label}</div>
         <div className="text-[11px] text-muted">{formula}</div>
+        {note && <div className="mt-0.5 text-[11px] leading-relaxed text-muted/75">{note}</div>}
       </div>
       <div className={`shrink-0 tabular-nums ${muted ? "text-muted" : "text-slate-100"}`}>{value}</div>
     </div>
@@ -117,6 +119,7 @@ export default function AgedCareWorkingsModal({
             <Row
               label="Means score"
               formula={`(assets − ${fmtCurrency(AC.careAssetFreeArea)}) ÷ (${fmtCurrency(AC.careAssetFullArea)} − ${fmtCurrency(AC.careAssetFreeArea)}), capped 0–1`}
+              note={`${fmtCurrency(AC.careAssetFreeArea)} and ${fmtCurrency(AC.careAssetFullArea)} are the government aged-care asset thresholds: below the first you pay nothing means-tested, at/above the second you pay the maximum. A score of ${score.toFixed(2)} means ${score >= 0.999 ? "the maximum" : `${Math.round(score * 100)}% of the maximum`} charges.`}
               value={score.toFixed(2)}
             />
           </div>
@@ -128,20 +131,51 @@ export default function AgedCareWorkingsModal({
           <div className="mt-2 rounded-xl border border-line bg-panel-2 p-3">
             {residential ? (
               <>
-                <Row label="Basic daily fee" formula={`$${AC.basicDailyFee.toFixed(2)}/day × 365 (flat)`} value={fmtCurrency(Math.round(breakdown.agedCareBasic ?? 0))} />
-                <Row label="Hotelling" formula={`$${AC.hotellingMaxDaily.toFixed(2)}/day × ${score.toFixed(2)} × 365`} value={fmtCurrency(Math.round(breakdown.agedCareHotelling ?? 0))} />
-                <Row label="Care (NCCC)" formula={`$${AC.ncccMaxDaily.toFixed(2)}/day × ${score.toFixed(2)} × 365 · cap ${fmtCurrency(AC.ncccLifetimeCap)}/${AC.ncccMaxYears}yr`} value={fmtCurrency(Math.round(breakdown.agedCareNCCC ?? 0))} />
+                <Row
+                  label="Basic daily fee"
+                  formula={`$${AC.basicDailyFee.toFixed(2)}/day × 365 (flat)`}
+                  note={`$${AC.basicDailyFee.toFixed(2)} is the government basic daily fee — set at 85% of the single Age Pension. Everyone in residential care pays it, whatever their means.`}
+                  value={fmtCurrency(Math.round(breakdown.agedCareBasic ?? 0))}
+                />
+                <Row
+                  label="Hotelling"
+                  formula={`$${AC.hotellingMaxDaily.toFixed(2)}/day × ${score.toFixed(2)} × 365`}
+                  note={`$${AC.hotellingMaxDaily.toFixed(2)} is the government maximum daily hotelling charge (meals, cleaning, laundry, heating); you pay it in proportion to your means score (${score.toFixed(2)}). No cap.`}
+                  value={fmtCurrency(Math.round(breakdown.agedCareHotelling ?? 0))}
+                />
+                <Row
+                  label="Care (NCCC)"
+                  formula={`$${AC.ncccMaxDaily.toFixed(2)}/day × ${score.toFixed(2)} × 365`}
+                  note={`$${AC.ncccMaxDaily.toFixed(2)} is the government maximum daily non-clinical care charge, scaled by your means score and capped at ${fmtCurrency(AC.ncccLifetimeCap)} over ${AC.ncccMaxYears} years. Clinical care (nursing, medical) is free.`}
+                  value={fmtCurrency(Math.round(breakdown.agedCareNCCC ?? 0))}
+                />
                 {isLump ? (
-                  <Row label="Accommodation (RAD)" formula={`${fmtCurrency(room)} lump sum — refundable, no daily charge`} value="$0" muted />
+                  <Row
+                    label="Accommodation (RAD)"
+                    formula={`${fmtCurrency(room)} lump sum — refundable, no daily charge`}
+                    note={`${fmtCurrency(room)} is the room price you set${ac.radAmount == null ? " (defaulting to the ~national average)" : ""}. You chose to pay it as a refundable lump-sum RAD, so nothing is charged here each year.`}
+                    value="$0"
+                    muted
+                  />
                 ) : (
-                  <Row label="Accommodation (DAP)" formula={`room ${fmtCurrency(room)} × MPIR ${pct(AC.mpir)}`} value={fmtCurrency(Math.round(breakdown.agedCareDAP ?? 0))} />
+                  <Row
+                    label="Accommodation (DAP)"
+                    formula={`room ${fmtCurrency(room)} × MPIR ${pct(AC.mpir)}`}
+                    note={`${fmtCurrency(room)} is the room price you set${ac.radAmount == null ? " (defaulting to the ~national average)" : ""}. The MPIR (${pct(AC.mpir)}) is the government rate that turns an unpaid room price into a daily payment — this is the cost of not paying a lump-sum RAD.`}
+                    value={fmtCurrency(Math.round(breakdown.agedCareDAP ?? 0))}
+                  />
                 )}
                 {(breakdown.agedCareHomeRent ?? 0) > 0 && (
-                  <Row label="Less: rent from your home" formula={`home value × ${pct(AC.formerHomeRentYieldNet)} net (assessable)`} value={`−${fmtCurrency(Math.round(breakdown.agedCareHomeRent ?? 0))}`} />
+                  <Row
+                    label="Less: rent from your home"
+                    formula={`${fmtCurrency(Math.round(breakdown.homeValue))} × ${pct(AC.formerHomeRentYieldNet)} net`}
+                    note={`You chose to rent the former home. ${pct(AC.formerHomeRentYieldNet)} is an assumed net rental yield; the rent both helps pay the fees and counts as assessable income.`}
+                    value={`−${fmtCurrency(Math.round(breakdown.agedCareHomeRent ?? 0))}`}
+                  />
                 )}
               </>
             ) : (
-              <Row label="Support at Home contribution" formula={`means-tested (score ${score.toFixed(2)}); clinical care is free`} value={fmtCurrency(Math.round(full))} />
+              <Row label="Support at Home contribution" formula={`means-tested (score ${score.toFixed(2)}); clinical care is free`} note="Under Support at Home you contribute toward everyday-living and independence services in proportion to your means; clinical care is government-funded." value={fmtCurrency(Math.round(full))} />
             )}
             <div className="mt-1 flex items-center justify-between border-t border-line pt-2">
               <span className="text-sm font-semibold text-white">{residential ? "Cost if you need care" : "Total"}</span>
