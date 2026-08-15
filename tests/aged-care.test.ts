@@ -7,7 +7,6 @@ import {
   radRetention,
   radRefund,
   homeCareAnnualCost,
-  entryWeight,
 } from "../lib/au/agedCare";
 
 const AC = DEFAULT_CONFIG.agedCare;
@@ -119,10 +118,5 @@ describe("aged care — home care & framing", () => {
   it("home-care out-of-pocket scales with the means score", () => {
     expect(homeCareAnnualCost({ assets: 1_000_000, income: 0 }, AC)).toBeCloseTo(AC.homeCareAnnualEstimate, 4);
     expect(homeCareAnnualCost({ assets: 0, income: 0 }, AC)).toBe(0);
-  });
-
-  it("entry weight is 1 when assumed and the entry probability when probabilistic", () => {
-    expect(entryWeight("assume", AC)).toBe(1);
-    expect(entryWeight("probabilistic", AC)).toBeCloseTo(AC.entryProbability, 6);
   });
 });

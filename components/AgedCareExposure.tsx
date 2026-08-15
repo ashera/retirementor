@@ -33,16 +33,10 @@ export default function AgedCareExposure({
   const rent = first.agedCareHomeRent ?? 0;
   const isResidential = ac.careType === "residential";
 
-  // The real (un-weighted) fees are the sticker; the components sum to it. When the
-  // framing is "if you need it" the CHARGED cost is weighted below that.
-  const full = first.agedCareFull ?? first.agedCareTotal ?? 0;
-  const charged = first.agedCareTotal ?? 0;
-  const weighted = full > 0 && charged / full < 0.999;
+  const full = first.agedCareFull ?? first.agedCareTotal ?? 0; // annual fees; the components sum to this
 
-  // The lump-sum RAD the user has chosen to pay (room price × lump-sum share). Shown
-  // in BOTH framings — in "assume" mode it's actually drawn (radHeld); in "if you
-  // need it" mode it's the deposit they'd commit. Either way it's a real, refundable
-  // one-off worth seeing next to the annual cost.
+  // The lump-sum RAD the user has chosen to pay (room price × lump-sum share) —
+  // a real, refundable one-off worth seeing next to the annual cost.
   const mode = isResidential ? (ac.accommodation ?? "dap") : "dap";
   const lumpShare = mode === "rad" ? 1 : mode === "combo" ? Math.min(1, Math.max(0, (ac.radSharePct ?? 50) / 100)) : 0;
   const room = ac.radAmount ?? config.agedCare.radNationalAvg;
@@ -79,12 +73,6 @@ export default function AgedCareExposure({
           <div className="mt-2 flex items-center justify-between border-t border-line pt-2 text-[11px]">
             <span className="text-muted">Rent from your home</span>
             <span className="tabular-nums text-accent">+{fmtCurrency(Math.round(rent))}/yr</span>
-          </div>
-        )}
-        {weighted && (
-          <div className="mt-2 flex items-center justify-between border-t border-line pt-2 text-[11px]">
-            <span className="text-muted">Expected (× chance you need it)</span>
-            <span className="tabular-nums text-slate-200">{fmtCurrency(Math.round(charged))}/yr</span>
           </div>
         )}
       </div>

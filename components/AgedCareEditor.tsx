@@ -56,7 +56,6 @@ function Segmented<T extends string>({ value, options, onChange }: {
 
 const DEFAULTS: AgedCarePlan = {
   enabled: true,
-  framing: "probabilistic",
   careType: "residential",
   entryAge: 85,
   durationYears: 3,
@@ -159,18 +158,6 @@ export default function AgedCareEditor({
             </div>
 
             <div className="mt-4 space-y-4 text-sm">
-              <div className="flex items-center justify-between gap-2">
-                <div>
-                  <div className="text-xs font-medium text-muted">Framing</div>
-                  <div className="text-[11px] text-muted/70">{draft.framing === "probabilistic" ? "Weighted by the chance you need care" : "Assume a definite care phase"}</div>
-                </div>
-                <Segmented
-                  value={draft.framing}
-                  options={[{ v: "probabilistic", l: "If you need it" }, { v: "assume", l: "Assume it" }]}
-                  onChange={(framing) => setDraft({ ...draft, framing })}
-                />
-              </div>
-
               <div className="flex items-center justify-between gap-2">
                 <span className="text-xs font-medium text-muted">Care type</span>
                 <Segmented

@@ -108,12 +108,3 @@ export function radRefund(radAmount: number, yearsHeld: number, config: AgedCare
 export function homeCareAnnualCost(means: CareMeans, config: AgedCareConfig, daysInCare = 365): number {
   return config.homeCareAnnualEstimate * meansScore(means, config) * (Math.max(0, daysInCare) / 365);
 }
-
-/**
- * Weight applied to a modelled aged-care cost. "assume" = 1 (a definite care
- * phase); "probabilistic" = the config lifetime entry probability (a gentler
- * "what if you need care?" expected cost).
- */
-export function entryWeight(framing: "assume" | "probabilistic", config: AgedCareConfig): number {
-  return framing === "probabilistic" ? clamp01(config.entryProbability) : 1;
-}

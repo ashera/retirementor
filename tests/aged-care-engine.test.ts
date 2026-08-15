@@ -29,7 +29,6 @@ const withCare = (over: Partial<AgedCarePlan>): RetirementPlan => ({
   ...base,
   agedCare: {
     enabled: true,
-    framing: "assume",
     careType: "residential",
     entryAge: 85,
     durationYears: 3,
@@ -158,7 +157,7 @@ describe("aged care — former-home Age Pension interaction (Phase 2)", () => {
       home: { value: 700_000, growthReal: 0 },
       targetSpending: 38_000,
       investmentReturn: 5,
-      agedCare: { enabled: true, framing: "assume", careType: "residential", entryAge: 85, durationYears: 5, accommodation: "dap", homeAction: "keep-vacant" },
+      agedCare: { enabled: true, careType: "residential", entryAge: 85, durationYears: 5, accommodation: "dap", homeAction: "keep-vacant" },
     };
     const sim = simulate(modest, cfg).rows;
     const p86 = sim.find((r) => r.age === 86)!.agePension; // home still exempt
@@ -185,7 +184,7 @@ describe("aged care — former-home Age Pension interaction (Phase 2)", () => {
         { currentAge: 67, superBalance: 400_000, salary: 0, voluntaryConcessional: 0, voluntaryNonConcessional: 0 },
         { currentAge: 67, superBalance: 300_000, salary: 0, voluntaryConcessional: 0, voluntaryNonConcessional: 0 },
       ],
-      agedCare: { enabled: true, framing: "assume", careType: "residential", entryAge: 85, durationYears: 5, accommodation: "dap", homeAction: "keep-vacant" },
+      agedCare: { enabled: true, careType: "residential", entryAge: 85, durationYears: 5, accommodation: "dap", homeAction: "keep-vacant" },
     };
     const sim = simulate(couple, cfg).rows;
     const yr2 = sim.find((r) => r.age === 86)!.breakdown.pension!;
@@ -201,13 +200,11 @@ describe("aged care — fee components reconcile with the full cost", () => {
   const sumParts = (b: ReturnType<typeof firstCare>) =>
     (b.agedCareBasic ?? 0) + (b.agedCareHotelling ?? 0) + (b.agedCareNCCC ?? 0) + (b.agedCareDAP ?? 0);
 
-  for (const framing of ["assume", "probabilistic"] as const) {
-    for (const accommodation of ["dap", "rad", "combo"] as const) {
-      it(`components sum to agedCareFull (${framing} · ${accommodation})`, () => {
-        const b = firstCare(withCare({ framing, accommodation, radAmount: 570_000, radSharePct: 50 }));
-        expect(sumParts(b)).toBeCloseTo(b.agedCareFull ?? 0, 1);
-      });
-    }
+  for (const accommodation of ["dap", "rad", "combo"] as const) {
+    it(`components sum to agedCareFull (${accommodation})`, () => {
+      const b = firstCare(withCare({ accommodation, radAmount: 570_000, radSharePct: 50 }));
+      expect(sumParts(b)).toBeCloseTo(b.agedCareFull ?? 0, 1);
+    });
   }
 
   it("charges DAP on any lump sum the savings can't cover (room fully paid, not short)", () => {
@@ -219,7 +216,7 @@ describe("aged care — fee components reconcile with the full cost", () => {
       home: { value: 700_000, growthReal: 2 },
       targetSpending: 45_000,
       investmentReturn: 5,
-      agedCare: { enabled: true, framing: "assume", careType: "residential", entryAge: 85, durationYears: 4, accommodation: "rad", radAmount: 400_000, homeAction: "keep-vacant" },
+      agedCare: { enabled: true, careType: "residential", entryAge: 85, durationYears: 4, accommodation: "rad", radAmount: 400_000, homeAction: "keep-vacant" },
     };
     const b = simulate(modest, cfg).rows.find((r) => (r.breakdown.agedCareTotal ?? 0) > 0)!.breakdown;
     const funded = b.radDrawn ?? 0;
@@ -229,12 +226,12 @@ describe("aged care — fee components reconcile with the full cost", () => {
     expect(funded + unpaid).toBeCloseTo(400_000, 0); // the whole room is paid for
   });
 
-  it("respects the RAD choice in probabilistic mode (no DAP for a lump sum)", () => {
-    const rad = firstCare(withCare({ framing: "probabilistic", accommodation: "rad", radAmount: 570_000 }));
-    const dap = firstCare(withCare({ framing: "probabilistic", accommodation: "dap", radAmount: 570_000 }));
+  it("a fully-funded lump-sum room has no DAP (and a lower annual cost than paying daily)", () => {
+    // Wealthy plan so the RAD is fully funded from savings → no shortfall DAP.
+    const rad = firstCare(withCare({ accommodation: "rad", radAmount: 570_000 }));
+    const dap = firstCare(withCare({ accommodation: "dap", radAmount: 570_000 }));
     expect(rad.agedCareDAP ?? 0).toBe(0);
     expect(dap.agedCareDAP ?? 0).toBeGreaterThan(0);
-    // A lump-sum room therefore has a lower "if you need care" cost than paying daily.
     expect(rad.agedCareFull ?? 0).toBeLessThan(dap.agedCareFull ?? 0);
   });
 });
@@ -263,31 +260,12 @@ describe("aged care — balance waterfall names the flows (no 'Other adjustments
   });
 });
 
-describe("aged care — probabilistic framing", () => {
-  it("survival-weights the expected cost so the tail is discounted below entry probability", () => {
-    const sumCost = (p: RetirementPlan) => simulate(p, cfg).rows.reduce((s, r) => s + (r.breakdown.agedCareTotal ?? 0), 0);
-    // Wealthy plan, ≤ NCCC-cap years → identical per-year unweighted cost across
-    // framings, so only the survival weighting differs.
-    const assume = sumCost(withCare({ durationYears: 4, framing: "assume", accommodation: "dap" }));
-    const prob = sumCost(withCare({ durationYears: 4, framing: "probabilistic", accommodation: "dap" }));
-    expect(prob).toBeGreaterThan(0);
-    expect(prob).toBeLessThan(AC.entryProbability * assume); // survival (<1 after entry) discounts the tail
-    expect(prob).toBeGreaterThan(AC.entryProbability * assume * 0.7); // but not wildly so
-  });
-
-
-  it("weights an expected DAP-financed cost by the entry probability, with no balance-sheet events", () => {
-    const prob = rowAt(withCare({ framing: "probabilistic" }), 85).breakdown;
-    const means = {
-      assets: prob.openingOutside + prob.openingSuper + Math.min(prob.homeValue, AC.homeValueCapMeansTest),
-      income: 0,
-    };
-    const full = residentialAnnualCost(
-      { means, radUnpaid: AC.radNationalAvg, ncccPaidToDate: 0, ncccYearsToDate: 0 },
-      AC,
-    );
-    expect(prob.agedCareTotal).toBeCloseTo(full.total * AC.entryProbability, 1);
-    expect(prob.radHeld ?? 0).toBe(0); // no lump sum
-    expect(prob.radDrawn ?? 0).toBe(0);
+describe("aged care — full cost equals the charged cost (no weighting)", () => {
+  it("agedCareFull === agedCareTotal every care year", () => {
+    for (const r of simulate(withCare({ durationYears: 4 }), cfg).rows) {
+      if ((r.breakdown.agedCareTotal ?? 0) > 0) {
+        expect(r.breakdown.agedCareTotal).toBeCloseTo(r.breakdown.agedCareFull ?? 0, 2);
+      }
+    }
   });
 });

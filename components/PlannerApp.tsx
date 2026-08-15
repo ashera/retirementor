@@ -616,11 +616,7 @@ export default function PlannerApp({
       })),
       ...applied.map((s) => ({ key: s.id, kind: "strategy" as const, label: s.label })),
       ...(storable.agedCare?.enabled
-        ? [{
-            key: "aged-care",
-            kind: "agedcare" as const,
-            label: `Aged care from ${storable.agedCare.entryAge}${storable.agedCare.framing === "probabilistic" ? " (if needed)" : ""}`,
-          }]
+        ? [{ key: "aged-care", kind: "agedcare" as const, label: `Aged care from ${storable.agedCare.entryAge}` }]
         : []),
     ],
     [lifeEvents, applied, storable],

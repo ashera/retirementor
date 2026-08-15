@@ -273,12 +273,12 @@ const agedCareMargaret: RetirementPlan = {
 // Keeps the home (idle) and pays the accommodation as a Daily Accommodation Payment.
 const agedCareKeepHome: RetirementPlan = {
   ...agedCareMargaret,
-  agedCare: { enabled: true, framing: "assume", careType: "residential", entryAge: 85, durationYears: 3, accommodation: "dap", homeAction: "keep-vacant" },
+  agedCare: { enabled: true, careType: "residential", entryAge: 85, durationYears: 3, accommodation: "dap", homeAction: "keep-vacant" },
 };
 // Sells the home to pay a Refundable Accommodation Deposit (RAD) as a lump sum.
 const agedCareSellRad: RetirementPlan = {
   ...agedCareMargaret,
-  agedCare: { enabled: true, framing: "assume", careType: "residential", entryAge: 85, durationYears: 3, accommodation: "rad", radAmount: 550_000, homeAction: "sell", radFundedFrom: "auto" },
+  agedCare: { enabled: true, careType: "residential", entryAge: 85, durationYears: 3, accommodation: "rad", radAmount: 550_000, homeAction: "sell", radFundedFrom: "auto" },
 };
 
 export const DEMO_SCENARIOS: DemoScenario[] = [

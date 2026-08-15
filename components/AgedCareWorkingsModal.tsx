@@ -9,7 +9,6 @@ const clamp01 = (x: number) => (x < 0 ? 0 : x > 1 ? 1 : x);
 // Show real precision without trailing zeros: 0.0796 → "7.96%", 0.33 → "33%".
 const pct = (x: number) => `${(x * 100).toFixed(2).replace(/\.?0+$/, "")}%`;
 
-const FRAMING_LABEL = { probabilistic: "If you need it", assume: "Assume it" } as const;
 const CARE_LABEL = { residential: "Residential", home: "At home" } as const;
 const ACC_LABEL = { rad: "Lump sum (RAD)", dap: "Daily (DAP)", combo: "A mix" } as const;
 const HOME_LABEL = { sell: "Sell the home", "keep-vacant": "Keep the home", "keep-rent": "Keep & rent" } as const;
@@ -69,9 +68,6 @@ export default function AgedCareWorkingsModal({
   const score = clamp01((assets - AC.careAssetFreeArea) / Math.max(1, AC.careAssetFullArea - AC.careAssetFreeArea));
 
   const full = breakdown.agedCareFull ?? breakdown.agedCareTotal ?? 0;
-  const charged = breakdown.agedCareTotal ?? 0;
-  const weight = full > 0 ? charged / full : 1;
-  const weighted = weight < 0.999;
 
   const room = ac.radAmount ?? AC.radNationalAvg;
   const isLump = residential && (ac.accommodation ?? "dap") !== "dap";
@@ -93,8 +89,7 @@ export default function AgedCareWorkingsModal({
         <div className="mt-3 rounded-xl border border-line bg-panel-2/60 p-3">
           <div className="text-[11px] font-medium text-muted">Your choices (from the &ldquo;Model aged care&rdquo; dialog)</div>
           <div className="mt-1.5 flex flex-wrap gap-1.5">
-            <Chip accent>{FRAMING_LABEL[ac.framing]}</Chip>
-            <Chip>{CARE_LABEL[ac.careType]}</Chip>
+            <Chip accent>{CARE_LABEL[ac.careType]}</Chip>
             {residential && <Chip>{ACC_LABEL[ac.accommodation ?? "dap"]}</Chip>}
             {residential && <Chip>{HOME_LABEL[ac.homeAction ?? "keep-vacant"]}</Chip>}
             <Chip>From {ac.entryAge} · {ac.durationYears} yr{ac.durationYears === 1 ? "" : "s"}</Chip>
@@ -195,31 +190,6 @@ export default function AgedCareWorkingsModal({
             </p>
           )}
         </div>
-
-        {/* Step 3 — the framing choice */}
-        {weighted ? (
-          <div className="mt-4">
-            <div className="text-[11px] font-semibold uppercase tracking-wide text-accent">3 · Because you chose &ldquo;If you need it&rdquo;</div>
-            <div className="mt-2 rounded-xl border border-line bg-panel-2 p-3">
-              <Row
-                label="Expected cost this year"
-                formula={`${fmtCurrency(Math.round(full))} × ${pct(weight)} (chance of care × chance still alive)`}
-                value={fmtCurrency(Math.round(charged))}
-              />
-              <p className="mt-1 text-[11px] text-muted">
-                You picked the <span className="text-accent">If you need it</span> framing, so the cost above is weighted by the
-                likelihood you actually enter care and are still alive that year — the deep tail is discounted. Switch to
-                <span className="text-slate-300"> Assume it</span> in the dialog to use the full cost instead.
-              </p>
-            </div>
-          </div>
-        ) : (
-          <div className="mt-3 rounded-xl border border-line bg-panel-2 p-3 text-[11px] leading-relaxed text-muted">
-            You picked the <span className="text-accent">Assume it</span> framing, so the full cost above is what your plan uses
-            (not weighted). Switch to <span className="text-slate-300">If you need it</span> in the dialog to weight it by the
-            chance you need care.
-          </div>
-        )}
 
         {/* Terminology */}
         <div className="mt-4">

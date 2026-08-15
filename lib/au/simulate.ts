@@ -30,7 +30,6 @@ import {
 } from "./types";
 import { mortgageActiveAtAge, mortgageAnnualCost, outstandingBalance } from "./mortgage";
 import { residentialAnnualCost, homeCareAnnualCost } from "./agedCare";
-import { survivalCurve } from "./mortality";
 import { budgetSplit, presetCategories } from "./budget";
 import { residentIncomeTax, seniorIncomeTax, nonResidentIncomeTax, medicareLevy, personTax, type CgtParams } from "./tax";
 import { capitalGainsTax, propertySaleDetail, netEquity, netRentCash, propertyValueAt } from "./property";
@@ -247,38 +246,13 @@ export function simulate(
   // price), with no balance-sheet events. Care is active on the OLDEST-person
   // timeline (same axis as life events). See lib/au/agedCare.ts + the v1 spec.
   const agedCare = plan.agedCare?.enabled ? plan.agedCare : undefined;
-  const acAssume = agedCare ? agedCare.framing !== "probabilistic" : false;
   const acActive = (age: number) =>
     !!agedCare && age >= agedCare.entryAge && age < agedCare.entryAge + agedCare.durationYears;
-  // Probabilistic framing weights the expected care cost by survival — you must be
-  // alive to keep paying, so the deep tail is discounted (reuses the same mortality
-  // model as the longevity overlay). Precompute P(entrant alive at oldest-age |
-  // alive at entry), keyed by the OLDEST-person timeline age. Assume framing = weight 1.
-  const acOldestNow = plan.people.length ? Math.max(...plan.people.map((p) => p.currentAge)) : 0;
-  const acEntrantIdx =
-    agedCare && agedCare.person != null && agedCare.person >= 0 && agedCare.person < plan.people.length
-      ? agedCare.person
-      : plan.people.reduce((best, p, i, a) => (p.currentAge > a[best].currentAge ? i : best), 0);
-  let acSurvivalByAge: Map<number, number> | null = null;
-  if (agedCare && !acAssume && plan.people.length) {
-    const entrant = plan.people[acEntrantIdx];
-    const byOwnAge = new Map<number, number>();
-    for (const pt of survivalCurve(entrant.currentAge, entrant.sex)) byOwnAge.set(pt.age, pt.p);
-    const sAtEntry = byOwnAge.get(Math.round(entrant.currentAge + (agedCare.entryAge - acOldestNow))) ?? 1;
-    acSurvivalByAge = new Map();
-    for (const [ownAge, p] of byOwnAge) {
-      acSurvivalByAge.set(acOldestNow + (ownAge - entrant.currentAge), sAtEntry > 0 ? Math.min(1, p / sAtEntry) : 0);
-    }
-  }
-  // Weight applied to a modelled care cost this year: 1 when assumed; the entry
-  // probability × conditional survival when probabilistic.
-  const acYearWeight = (oldestAge: number) =>
-    acAssume ? 1 : config.agedCare.entryProbability * (acSurvivalByAge?.get(oldestAge) ?? 1);
-  let acEntered = false; // RAD entry (assume mode) fired once
-  let acHomeSold = false; // former home sold to help fund the RAD (assume mode)
+  let acEntered = false; // RAD entry fired once
+  let acHomeSold = false; // former home sold to help fund the RAD
   let acHomeCash = 0; // released home equity awaiting RAD funding (not yet assessable)
   let radHeld = 0; // preserved refundable accommodation deposit (exempt from the assets test)
-  let radUnpaid = 0; // accommodation amount charged as DAP (assume mode: the un-lump-summed share)
+  let radUnpaid = 0; // accommodation amount charged as DAP (the un-lump-summed share)
   let ncccPaid = 0; // lifetime non-clinical care contribution paid (cap tracking, unweighted)
   let ncccYears = 0; // whole years of NCCC charged (max-years cap tracking)
   // Keep-super-in-accumulation config (per-person + mode), null when off.
@@ -508,12 +482,11 @@ export function simulate(
       homeVal = 0;
       if (mortgage) mortgageCleared = true; // discharged from the sale
     }
-    // Aged care (assume mode): sell the former home at entry to help fund the RAD.
-    // Mirrors sell-and-rent — releases equity (net of the loan) into a cash bucket
-    // the RAD consumes first (below), and zeroes the home so it drops off net worth.
+    // Aged care: sell the former home at entry to help fund the RAD. Mirrors
+    // sell-and-rent — releases equity (net of the loan) into a cash bucket the RAD
+    // consumes first (below), and zeroes the home so it drops off net worth.
     if (
       agedCare &&
-      acAssume &&
       agedCare.careType === "residential" &&
       agedCare.homeAction === "sell" &&
       !acHomeSold &&
@@ -1072,7 +1045,7 @@ export function simulate(
     // and route any home cash left over into (assessable) outside savings.
     let radDrawnNow = 0;
     let acHomeSaleNow = 0; // former-home equity released to help fund the RAD (for the waterfall)
-    if (agedCare && acAssume && agedCare.careType === "residential" && !acEntered && oldest >= agedCare.entryAge) {
+    if (agedCare && agedCare.careType === "residential" && !acEntered && oldest >= agedCare.entryAge) {
       acEntered = true;
       acHomeSaleNow = acHomeCash; // the release captured at the top-of-loop sale (0 if kept)
       const radPrice = Math.max(0, agedCare.radAmount ?? config.agedCare.radNationalAvg);
@@ -1098,40 +1071,25 @@ export function simulate(
     // (b) Recurring care cost this year (added to what must be funded → flows through
     // the drawdown, MC, stress test and failsafe). v1 means-tests on a banded score
     // from the OPENING assessable assets (super + outside + capped former home if
-    // kept); income is folded in at v2. Probabilistic framing weights the whole cost
-    // by the entry probability and treats accommodation as DAP on the full price.
+    // kept); income is folded in at v2. Accommodation is charged as DAP on the
+    // un-lump-summed share (`radUnpaid`, set at entry).
     let acBasic = 0, acHotelling = 0, acNCCC = 0, acDAP = 0, agedCareCostNow = 0, acFull = 0;
     if (agedCare && acActive(oldest)) {
-      const acWeight = acYearWeight(oldest);
       const keptHome = acHomeSold ? 0 : Math.min(homeVal, config.agedCare.homeValueCapMeansTest);
       const means = { assets: Math.max(0, startOutside) + startSuper + keptHome, income: 0 };
       if (agedCare.careType === "home") {
-        acFull = homeCareAnnualCost(means, config.agedCare); // full "if in care" cost
-        agedCareCostNow = acFull * acWeight;
+        acFull = homeCareAnnualCost(means, config.agedCare);
+        agedCareCostNow = acFull;
       } else {
-        // Accommodation charged as DAP on the UN-lump-summed share. In "assume" mode
-        // `radUnpaid` was set at entry; in "probabilistic" mode there's no lump-sum
-        // event, but we still respect the RAD/DAP/mix choice (a RAD → no daily charge,
-        // so its expected accommodation cost is $0; the refundable capital isn't tied
-        // up here) rather than always charging DAP on the full price.
-        let unpaid: number;
-        if (acAssume) {
-          unpaid = radUnpaid;
-        } else {
-          const room = Math.max(0, agedCare.radAmount ?? config.agedCare.radNationalAvg);
-          const mode = agedCare.accommodation ?? "dap";
-          const lumpShare = mode === "rad" ? 1 : mode === "dap" ? 0 : Math.min(1, Math.max(0, (agedCare.radSharePct ?? 100) / 100));
-          unpaid = room * (1 - lumpShare);
-        }
         const cost = residentialAnnualCost(
-          { means, radUnpaid: unpaid, ncccPaidToDate: ncccPaid, ncccYearsToDate: ncccYears },
+          { means, radUnpaid, ncccPaidToDate: ncccPaid, ncccYearsToDate: ncccYears },
           config.agedCare,
         );
         acBasic = cost.basic; acHotelling = cost.hotelling; acNCCC = cost.nccc; acDAP = cost.dap;
-        acFull = cost.total; // sticker fees (unweighted); the components sum to this
-        ncccPaid += cost.nccc; // track against the cap on the real (unweighted) schedule
+        acFull = cost.total; // the components sum to this
+        ncccPaid += cost.nccc; // track against the cap
         ncccYears += 1;
-        agedCareCostNow = cost.total * acWeight;
+        agedCareCostNow = cost.total;
       }
     }
 
@@ -1263,9 +1221,9 @@ export function simulate(
     // non-homeowner (the higher free area). A rented former home (keep-rent) also earns
     // assessable net rent from entry — real cash that offsets the care cost (v1 doesn't
     // separately income-tax it). A COUPLE keeps the home exempt via the protected
-    // partner, so this bites only for a single. Assume mode only.
+    // partner, so this bites only for a single.
     const acKeepHome =
-      !!agedCare && acAssume && agedCare.careType === "residential" &&
+      !!agedCare && agedCare.careType === "residential" &&
       agedCare.homeAction !== "sell" && !acHomeSold && plan.household === "single" && acActive(oldest);
     const acFormerHomeAssessed = acKeepHome && oldest >= agedCare!.entryAge + 2 ? homeVal : 0;
     const acFormerHomeRent =

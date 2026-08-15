@@ -182,16 +182,14 @@ export interface IncomeStream {
 
 // Aged care (v1, consumer-facing general information). Models a late-life
 // residential- or home-care phase for ONE person (single, or one member of a
-// couple with the partner as the protected person keeping the home exempt).
-// `framing`: "assume" models a definite care phase; "probabilistic" weights the
-// cost by the config entry probability (a gentler "what if you need care?"). All
-// amounts today's dollars. Residential accommodation is paid as a refundable
-// lump sum (RAD), an ongoing daily charge (DAP = RAD × MPIR/365), or a blend;
-// the RAD is preserved as refundable estate value (not consumed) and is exempt
-// from the Age Pension assets test while held. See docs/aged-care-module-v1-spec.md.
+// couple with the partner as the protected person keeping the home exempt) — a
+// definite care phase you toggle on to see its impact. All amounts today's
+// dollars. Residential accommodation is paid as a refundable lump sum (RAD), an
+// ongoing daily charge (DAP = RAD × MPIR/365), or a blend; the RAD is preserved
+// as refundable estate value (not consumed) and is exempt from the Age Pension
+// assets test while held. See docs/aged-care-module-v1-spec.md.
 export interface AgedCarePlan {
   enabled: boolean;
-  framing: "assume" | "probabilistic";
   careType: "residential" | "home";
   person?: number; // person index entering care; default the oldest member
   entryAge: number; // oldest person's age on the timeline when care begins
