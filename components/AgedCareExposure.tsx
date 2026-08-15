@@ -39,6 +39,15 @@ export default function AgedCareExposure({
   const charged = first.agedCareTotal ?? 0;
   const weighted = full > 0 && charged / full < 0.999;
 
+  // The lump-sum RAD the user has chosen to pay (room price × lump-sum share). Shown
+  // in BOTH framings — in "assume" mode it's actually drawn (radHeld); in "if you
+  // need it" mode it's the deposit they'd commit. Either way it's a real, refundable
+  // one-off worth seeing next to the annual cost.
+  const mode = isResidential ? (ac.accommodation ?? "dap") : "dap";
+  const lumpShare = mode === "rad" ? 1 : mode === "combo" ? Math.min(1, Math.max(0, (ac.radSharePct ?? 50) / 100)) : 0;
+  const room = ac.radAmount ?? config.agedCare.radNationalAvg;
+  const lumpSum = radHeld > 0 ? radHeld : room * lumpShare;
+
   const rows: { label: string; value: number }[] = [];
   if (isResidential) {
     if (first.agedCareBasic) rows.push({ label: "Basic daily fee", value: first.agedCareBasic });
@@ -78,11 +87,17 @@ export default function AgedCareExposure({
         )}
       </div>
 
-      {radHeld > 0 && (
-        <div className="mt-2 rounded-xl border border-line bg-panel-2 p-3 text-[11px] leading-relaxed text-muted">
-          <span className="font-semibold text-slate-200">Refundable deposit (RAD): {fmtCurrency(Math.round(radHeld))}</span> — held for
-          your room, refundable to your estate and exempt from the Age Pension assets test. It&apos;s <strong className="text-slate-300">not</strong> part
-          of the spendable balance shown on the chart.
+      {lumpSum > 0 && (
+        <div className="mt-2 rounded-xl border border-rose-400/25 bg-panel-2 p-3">
+          <div className="flex items-baseline justify-between">
+            <span className="text-xs font-medium text-muted">Plus a one-off deposit (RAD)</span>
+            <span className="text-base font-bold tabular-nums text-rose-200">{fmtCurrency(Math.round(lumpSum))}</span>
+          </div>
+          <p className="mt-1 text-[11px] leading-relaxed text-muted">
+            A refundable lump sum for the room, paid once — returned to your estate and exempt from the Age Pension assets
+            test. Separate from the annual cost above
+            {radHeld > 0 ? ", and drawn from your balance at entry (so it isn't part of the spendable balance on the chart)" : ""}.
+          </p>
         </div>
       )}
 
