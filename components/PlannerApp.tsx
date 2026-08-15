@@ -615,8 +615,15 @@ export default function PlannerApp({
           ` ${e.kind === "income" ? "+" : "−"}${fmtCurrency(e.amount)} at ${e.atAge}`,
       })),
       ...applied.map((s) => ({ key: s.id, kind: "strategy" as const, label: s.label })),
+      ...(storable.agedCare?.enabled
+        ? [{
+            key: "aged-care",
+            kind: "agedcare" as const,
+            label: `Aged care from ${storable.agedCare.entryAge}${storable.agedCare.framing === "probabilistic" ? " (if needed)" : ""}`,
+          }]
+        : []),
     ],
-    [lifeEvents, applied],
+    [lifeEvents, applied, storable],
   );
   const mc = useMemo(() => runMonteCarlo(plan, config), [plan, config]);
   const successPct = Math.round(mc.successRate * 100);
@@ -1131,10 +1138,6 @@ export default function PlannerApp({
   const failsafeTotal = Math.min((failsafeLiving ?? safeLiving ?? centralLiving) + confLoan, safeTotal);
   // Apply the safe tier as the new spend (its LIVING part; the engine layers the
   // loan on itself). Edits the base inputs, like the other quick-adjust levers.
-  const setSpendToSafe = (living: number) => {
-    setBase((prev) => withSpend(prev, Math.round(Math.max(0, living))));
-    setNotice("Spend set to your prudent level — fine-tune it any time.");
-  };
   const goalSub =
     goal.loanKind === "pi"
       ? `incl. ${fmtCurrency(goal.loanCost)} home loan · eases to ${fmtCurrency(goal.living)} at ${goal.payoffAge}`
@@ -1490,7 +1493,6 @@ export default function PlannerApp({
         central={centralTotal}
         safe={safeTotal}
         failsafe={failsafeTotal}
-        safeLiving={safeTotal - confLoan}
         confidencePct={successPct}
         assumedReturnPct={plan.investmentReturn}
         lifeExpectancy={plan.lifeExpectancy}
@@ -1498,8 +1500,6 @@ export default function PlannerApp({
         depletedAge={result.depletedAge}
         pending={mcMaxPending}
         loading={safeLiving == null || failsafeLiving == null}
-        spendOverridden={spendOverridden}
-        onSetSpend={setSpendToSafe}
         whatIfHref={whatIfHref}
         stressHref={stressHref}
         scenarioName={shared ? null : activeName}

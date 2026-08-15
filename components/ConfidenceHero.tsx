@@ -16,7 +16,7 @@ const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v
 /** A "what's already in this plan" chip: a committed life event or an applied strategy. */
 export interface PlanChip {
   key: string;
-  kind: "income" | "expense" | "strategy";
+  kind: "income" | "expense" | "strategy" | "agedcare";
   label: string;
 }
 
@@ -26,7 +26,6 @@ export interface ConfidenceHeroProps {
   central: number; // 50% tier, loan-inclusive (cheap — always present)
   safe: number; // 85% tier, loan-inclusive (falls back to central while pending)
   failsafe: number; // 95% tier, loan-inclusive (falls back to safe while pending)
-  safeLiving: number; // living-only safe spend, applied by "Set my spend"
   confidencePct: number; // Monte Carlo chance the current goal lasts (0–100)
   assumedReturnPct: number; // the plan's assumed investment return (e.g. 7)
   lifeExpectancy: number;
@@ -34,8 +33,6 @@ export interface ConfidenceHeroProps {
   depletedAge: number | null;
   pending: boolean; // safe/failsafe tiers recomputing after an edit (keep last numbers, shimmer)
   loading: boolean; // first load — no real safe/failsafe tier yet, so show a skeleton not fallbacks
-  spendOverridden: boolean; // a What-If strategy sets spend → don't offer an inline set
-  onSetSpend: (living: number) => void;
   whatIfHref: string;
   stressHref: string;
   // Folded-in scenario identity (see PlannerApp's Manage modal).
@@ -57,7 +54,6 @@ export default function ConfidenceHero({
   central,
   safe,
   failsafe,
-  safeLiving,
   confidencePct,
   assumedReturnPct,
   lifeExpectancy,
@@ -65,8 +61,6 @@ export default function ConfidenceHero({
   depletedAge,
   pending,
   loading,
-  spendOverridden,
-  onSetSpend,
   whatIfHref,
   stressHref,
   scenarioName,
@@ -203,13 +197,6 @@ export default function ConfidenceHero({
     );
   }
 
-  // "Set my spend to the safe level" — up when there's headroom, down when over it.
-  // Shown whenever the goal is meaningfully off the safe level. When a What-If strategy
-  // owns the spend (spendOverridden), editing the base plan here would be a no-op, so
-  // the button instead routes to What-If where that lever can be changed.
-  const showSet = Math.abs(headroom) >= CONFIDENCE_EPS;
-  const setVerb = headroom > 0 ? `Set my spend to ${fmtCompact(safe)}` : `Trim to ${fmtCompact(safe)}`;
-  const setLabel = spendOverridden ? `${setVerb} in What-If` : setVerb;
   // The "leaving money on the table" nudge — only where there's real headroom.
   const showNudge = (state === "bulletproof" || state === "safe") && headroom >= 3000;
 
@@ -304,23 +291,6 @@ export default function ConfidenceHero({
           )}
 
           <div className="mt-7 flex flex-wrap gap-2.5">
-            {showSet &&
-              (spendOverridden ? (
-                // A What-If lever owns the spend — send them there to change it.
-                <Link
-                  href={whatIfHref}
-                  className="rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-ink transition hover:brightness-110"
-                >
-                  {setLabel} <span aria-hidden>→</span>
-                </Link>
-              ) : (
-                <button
-                  onClick={() => onSetSpend(safeLiving)}
-                  className="rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-ink transition hover:brightness-110"
-                >
-                  {setLabel} <span aria-hidden>→</span>
-                </button>
-              ))}
             <Link
               href={whatIfHref}
               className="rounded-xl border border-line bg-panel-2 px-4 py-2.5 text-sm font-semibold text-slate-200 transition hover:border-accent/50 hover:text-white"
@@ -441,13 +411,21 @@ export default function ConfidenceHero({
                 key={c.key}
                 href={whatIfHref}
                 className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition hover:brightness-125 ${
-                  c.kind === "expense"
-                    ? "border-amber-400/40 bg-amber-400/10 text-amber-300"
-                    : "border-accent/40 bg-accent/10 text-accent"
+                  c.kind === "agedcare"
+                    ? "border-rose-400/40 bg-rose-400/10 text-rose-300"
+                    : c.kind === "expense"
+                      ? "border-amber-400/40 bg-amber-400/10 text-amber-300"
+                      : "border-accent/40 bg-accent/10 text-accent"
                 }`}
-                title={c.kind === "strategy" ? "Edit this strategy in What-If" : "Edit this life event in What-If"}
+                title={
+                  c.kind === "strategy"
+                    ? "Edit this strategy in What-If"
+                    : c.kind === "agedcare"
+                      ? "Edit aged care in What-If"
+                      : "Edit this life event in What-If"
+                }
               >
-                <span aria-hidden>{c.kind === "strategy" ? "✓" : "📌"}</span>
+                <span aria-hidden>{c.kind === "strategy" ? "✓" : c.kind === "agedcare" ? "🏥" : "📌"}</span>
                 {c.label}
               </Link>
             ))}
