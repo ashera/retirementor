@@ -1093,6 +1093,18 @@ export function simulate(
       }
     }
 
+    // In RESIDENTIAL care the fees already cover accommodation, meals, cleaning and
+    // heating, so most of the year's normal living spend is REPLACED rather than paid
+    // on top of the fees — keep only a personal-expenses share (health, personal items,
+    // outings). Otherwise the care year double-counts food/housing/utilities. Home care
+    // (still living at home) keeps the full living spend. Applied AFTER guardrails so
+    // the rail measure is untouched.
+    let agedCareLivingSaved = 0;
+    if (agedCare && agedCare.careType === "residential" && acActive(oldest)) {
+      agedCareLivingSaved = livingSpend * (1 - config.agedCare.residentialLivingRetainedPct);
+      livingSpend -= agedCareLivingSaved;
+    }
+
     // A one-off life-event expense this year is added to what must be funded (an
     // extra draw). It's deliberately kept OUT of the guardrails rail measure below
     // (which uses guardAnchorBase, not `spending`), so a single big expense doesn't
@@ -1680,6 +1692,7 @@ export function simulate(
         agedCareNCCC: acNCCC || undefined,
         agedCareDAP: acDAP || undefined,
         agedCareHomeRent: acFormerHomeRent || undefined,
+        agedCareLivingSaved: agedCareLivingSaved || undefined,
         radDrawn: radDrawnNow || undefined,
         radHeld: radHeld || undefined,
         agedCareHomeSale: acHomeSaleNow || undefined,

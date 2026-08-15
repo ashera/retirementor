@@ -435,7 +435,16 @@ export default function YearDetailModal({
           {!isWorking && (spending > 0 || b.mortgageCleared > 0 || b.lumpSum > 0) && (
             <Section title="Money out — spending">
               {b.livingSpend > 0 && (
-                <Line label="Living costs" value={money(-b.livingSpend)} tone="text-amber-400" />
+                <Line
+                  label="Living costs"
+                  sub={
+                    (b.agedCareLivingSaved ?? 0) > 0
+                      ? `reduced in care — the fees cover ~${fmtCurrency(Math.round(b.agedCareLivingSaved ?? 0))} of your usual housing, meals & utilities`
+                      : undefined
+                  }
+                  value={money(-b.livingSpend)}
+                  tone="text-amber-400"
+                />
               )}
               {b.rentCost > 0 && (
                 <Line label="Rent" sub="renting after selling your home" value={money(-b.rentCost)} tone="text-amber-400" />

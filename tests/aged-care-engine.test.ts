@@ -62,6 +62,18 @@ describe("aged care — engine integration", () => {
     expect(b.radHeld ?? 0).toBe(0); // no lump sum in a DAP plan
   });
 
+  it("nets out living costs the residential fees replace (not home care)", () => {
+    const preCare = rowAt(base, 84).breakdown.livingSpend; // full lifestyle spend before care
+    const resid = rowAt(withCare({ accommodation: "dap", homeAction: "keep-vacant" }), 85).breakdown;
+    // In residential care only a personal-expenses share of living spend remains.
+    expect(resid.livingSpend).toBeCloseTo(preCare * AC.residentialLivingRetainedPct, 0);
+    expect(resid.agedCareLivingSaved ?? 0).toBeCloseTo(preCare * (1 - AC.residentialLivingRetainedPct), 0);
+    // Home care (still living at home) keeps the full living spend.
+    const home = rowAt(withCare({ careType: "home" }), 85).breakdown;
+    expect(home.livingSpend).toBeCloseTo(preCare, 0);
+    expect(home.agedCareLivingSaved ?? 0).toBe(0);
+  });
+
   it("lowers the retirement balance vs the no-care baseline", () => {
     const withB = rowAt(withCare({}), 88).total; // year after care
     const noB = rowAt(base, 88).total;

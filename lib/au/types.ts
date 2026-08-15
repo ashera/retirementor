@@ -566,6 +566,7 @@ export interface YearBreakdown {
   agedCareNCCC?: number;
   agedCareDAP?: number;
   agedCareHomeRent?: number; // net rent from a kept, rented former home (assessable + offsets the care cost)
+  agedCareLivingSaved?: number; // normal living spend NOT paid this year because residential-care fees cover it (housing, meals, utilities)
   radDrawn?: number;
   radHeld?: number;
   agedCareHomeSale?: number; // former-home equity released at aged-care entry (helps fund the RAD)

@@ -100,6 +100,13 @@ export default function AgedCareExposure({
         </div>
       )}
 
+      {isResidential && (first.agedCareLivingSaved ?? 0) > 0 && (
+        <p className="mt-2 text-[11px] leading-relaxed text-muted">
+          Your everyday living costs drop in care — the fees cover housing, meals and utilities
+          (~{fmtCurrency(Math.round(first.agedCareLivingSaved ?? 0))}/yr), so the net hit is less than the fees alone.
+        </p>
+      )}
+
       <div className="mt-2 text-xs text-slate-300">
         With these costs, your money is projected to last <strong className="text-white">{lastsToLabel(result, plan)}</strong>
         {noCareResult && <span className="text-muted"> (vs {lastsToLabel(noCareResult, plan)} without them)</span>}.
