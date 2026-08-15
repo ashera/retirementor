@@ -114,7 +114,6 @@ export default function AgedCareEditor({
   const turnOff = () => { onChange(value ? { ...value, enabled: false } : undefined); setOpen(false); };
 
   const isResidential = draft.careType === "residential";
-  const showRad = isResidential && (draft.accommodation ?? "dap") !== "dap";
 
   return (
     <div className="rounded-2xl border border-line bg-panel p-4">
@@ -216,17 +215,40 @@ export default function AgedCareEditor({
                     />
                   </div>
 
-                  {showRad && (
-                    <div>
-                      <label className="block text-xs font-medium text-muted">Room price (RAD)</label>
-                      <div className="mt-1 flex items-center gap-1 rounded-lg border border-line bg-panel-2 px-2.5 py-2">
-                        <span className="text-muted">$</span>
+                  <div>
+                    <label className="block text-xs font-medium text-muted">Room price</label>
+                    <div className="mt-1 flex items-center gap-1 rounded-lg border border-line bg-panel-2 px-2.5 py-2">
+                      <span className="text-muted">$</span>
+                      <NumberInput
+                        value={draft.radAmount ?? 570_000} min={0} max={5_000_000}
+                        onChange={(n) => setDraft({ ...draft, radAmount: n })}
+                        ariaLabel="Room price"
+                        className="w-full bg-transparent text-white outline-none"
+                      />
+                    </div>
+                    <p className="mt-1 text-[11px] text-muted/70">
+                      {(draft.accommodation ?? "dap") === "dap"
+                        ? "Paid daily (DAP): room price × MPIR ≈ 7.96%/yr."
+                        : (draft.accommodation ?? "dap") === "rad"
+                          ? "Paid as a refundable lump sum (RAD) — no daily charge."
+                          : "Split: a lump-sum RAD plus a daily (DAP) charge on the rest."}
+                    </p>
+                  </div>
+
+                  {(draft.accommodation ?? "dap") === "combo" && (
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <span className="text-xs font-medium text-muted">Paid as a lump sum</span>
+                        <div className="text-[11px] text-muted/70">the rest is charged daily (DAP)</div>
+                      </div>
+                      <div className="flex items-center gap-1 rounded-lg border border-line bg-panel-2 px-2.5 py-2 text-sm">
                         <NumberInput
-                          value={draft.radAmount ?? 570_000} min={0} max={5_000_000}
-                          onChange={(n) => setDraft({ ...draft, radAmount: n })}
-                          ariaLabel="Room price (RAD)"
-                          className="w-full bg-transparent text-white outline-none"
+                          value={draft.radSharePct ?? 50} min={0} max={100}
+                          onChange={(n) => setDraft({ ...draft, radSharePct: n })}
+                          ariaLabel="Percent paid as a lump sum"
+                          className="w-10 bg-transparent text-right text-white outline-none"
                         />
+                        <span className="text-muted">%</span>
                       </div>
                     </div>
                   )}
