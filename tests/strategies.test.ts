@@ -2,7 +2,8 @@ import { describe, it, expect } from "vitest";
 import { simulate } from "../lib/au/simulate";
 import { DEFAULT_CONFIG as cfg } from "../lib/au/config";
 import { DEFAULT_PLAN, getInvestmentProperties, type PropertyDetail, type RetirementPlan } from "../lib/au/types";
-import { buildStrategyCatalog, applyStrategies, resolveValues, maxSustainableSpend, maxSpendForConfidence, essentialsFloor, withSpend, appliedStrategies, stripStrategyFields, strategyGoal, GOAL_ORDER } from "../lib/au/strategies";
+import { buildStrategyCatalog, applyStrategies, resolveValues, maxSustainableSpend, maxSpendForConfidence, essentialsFloor, withSpend, withBudgetSpend, appliedStrategies, stripStrategyFields, strategyGoal, GOAL_ORDER } from "../lib/au/strategies";
+import { budgetTotal, budgetSplit, presetCategories } from "../lib/au/budget";
 import { runMonteCarlo } from "../lib/au/montecarlo";
 import { incomeTax, medicareLevy } from "../lib/au/tax";
 import { rowNetWorth } from "../lib/au/networth";
@@ -706,5 +707,37 @@ describe("appliedStrategies — What-If changes baked into a saved plan", () => 
     const labels = appliedStrategies(plan, cfg).map((s) => s.label);
     expect(labels).toContain("Sell Pimpama"); // named
     expect(labels).toContain("Sell Investment Property 2"); // unnamed → 1-based index
+  });
+});
+
+describe("adjust discretionary spending keeps the budget in sync", () => {
+  const withBudget = (spend: number): RetirementPlan => {
+    const cats = presetCategories(cfg, "single", true, "comfortable");
+    return base({ spendingMode: "flat", targetSpending: budgetTotal(cats), budget: { tenure: "own", lifestyle: "comfortable", categories: cats, applyPhases: true } });
+  };
+
+  it("rescales the budget total to the new goal, essentials held fixed", () => {
+    const plan = withBudget(0);
+    const ess = budgetSplit(plan.budget!.categories).essential;
+    const up = withBudgetSpend(plan, plan.targetSpending + 15_000);
+    expect(budgetTotal(up.budget!.categories)).toBeCloseTo(plan.targetSpending + 15_000, 0);
+    expect(budgetSplit(up.budget!.categories).essential).toBeCloseTo(ess, 0); // essentials untouched
+    expect(up.targetSpending).toBe(plan.targetSpending + 15_000);
+  });
+
+  it("is non-destructive — the base budget is unchanged (so removing the strategy reverts)", () => {
+    const plan = withBudget(0);
+    const before = budgetTotal(plan.budget!.categories);
+    withBudgetSpend(plan, plan.targetSpending + 20_000);
+    expect(budgetTotal(plan.budget!.categories)).toBe(before);
+  });
+
+  it("flows through the composed plan via the adjust-spending strategy", () => {
+    const plan = withBudget(0);
+    const cat = buildStrategyCatalog(plan, { superAtAge: () => 0, outsideAtAge: () => 0, config: cfg });
+    const newSpend = plan.targetSpending + 12_000;
+    const composed = applyStrategies(plan, cat, new Set(["adjust-spending"]), { "adjust-spending": { spend: newSpend } });
+    expect(composed.targetSpending).toBe(newSpend);
+    expect(budgetTotal(composed.budget!.categories)).toBeCloseTo(newSpend, 0);
   });
 });

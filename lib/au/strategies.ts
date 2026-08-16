@@ -8,7 +8,7 @@ import type { RetirementPlan, SimResult } from "./types";
 import { getCareerBreaks, getInvestmentProperties, personRetirementOffset, startingSuperBalances } from "./types";
 import { fmtCurrency } from "./format";
 import { propertyValueAt, capitalGainsTax, netSaleProceeds } from "./property";
-import { budgetSplit, presetCategories } from "./budget";
+import { budgetSplit, budgetTotal, isEssential, presetCategories } from "./budget";
 import { incomeTax, medicareLevy } from "./tax";
 import { simulate } from "./simulate";
 import { runMonteCarlo } from "./montecarlo";
@@ -129,6 +129,28 @@ export function withSpend(p: RetirementPlan, spend: number): RetirementPlan {
       noGo: Math.round(p.spendingStages.noGo * f),
     },
   };
+}
+
+/**
+ * Set the plan's spend AND, if it has a guided budget, rescale its DISCRETIONARY
+ * categories so the budget stays consistent with the new goal — ESSENTIALS held
+ * fixed (matching the "Adjust discretionary spending" lever's own semantics). So the
+ * budget wizard, opened on this composed plan, shows the adjusted goal rather than
+ * the stale base total. Used only in the strategy layer, so it's non-destructive:
+ * removing the strategy re-derives the composed plan and reverts to the base budget.
+ */
+export function withBudgetSpend(p: RetirementPlan, spend: number): RetirementPlan {
+  const out = withSpend(p, spend);
+  const cats = p.budget?.categories;
+  if (!cats) return out;
+  const essential = budgetSplit(cats).essential;
+  const currentDisc = budgetTotal(cats) - essential; // discretionary sum
+  if (currentDisc <= 0) return out; // nothing discretionary to flex
+  const targetDisc = Math.max(0, Math.round(spend) - essential);
+  const factor = targetDisc / currentDisc;
+  const scaled: Record<string, number> = {};
+  for (const [k, v] of Object.entries(cats)) scaled[k] = isEssential(k) ? v : Math.round(v * factor);
+  return { ...out, budget: { ...p.budget!, categories: scaled } };
 }
 
 /**
@@ -642,7 +664,7 @@ export function buildStrategyCatalog(
           `down faster (fewer years); spending less makes them last longer.`
         );
       },
-      apply: (p, v) => withSpend(p, v.spend),
+      apply: (p, v) => withBudgetSpend(p, v.spend),
     });
   }
 
