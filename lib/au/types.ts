@@ -266,6 +266,7 @@ export interface RetirementPlan {
   lifeEvents?: LifeEvent[]; // committed one-off cashflows at an age: an income (windfall/inheritance) lands in outside savings untaxed; an expense is an extra draw that year (from savings while working, from the retirement drawdown once retired). Today's dollars. Flows through the means test, MC, stress test, failsafe and guardrails automatically.
   incomeStreams?: IncomeStream[]; // recurring income (defined-benefit / annuity / foreign pension e.g. US Social Security): offsets the drawdown, assessed under the Age Pension INCOME test (not deemed/not asset-tested) and taxed as ordinary income by default; indexed (constant real) unless flagged otherwise. See IncomeStream.
   agedCare?: AgedCarePlan; // optional late-life aged-care phase (cost overlay + RAD/DAP accommodation + former-home & Age Pension interaction). General information; flows through the projection, MC, stress test and failsafe. See AgedCarePlan.
+  superBeneficiary?: "dependant" | "non-dependant"; // who inherits your super on death, for the death-benefit-tax estimate: "non-dependant" (adult children — the taxable component is taxed ~15%+Medicare; the DEFAULT/planning case) or "dependant" (spouse — tax-free). Display-only: it does not change the living projection, only the estate/death-benefit figures. See config.superDeathBenefit.
   // Tax residency for the WHOLE projection. "non-resident" (foreign resident, e.g. a
   // retiree living permanently overseas) uses the foreign-resident tax scale (no
   // tax-free threshold, no Medicare, no LITO/SAPTO), taxes only AU-sourced income
@@ -600,6 +601,18 @@ export interface YearBreakdown {
   homeProceedsToSuper: number; // portion contributed to super as a downsizer (rest → savings)
   homeValue: number; // the home's (exempt) market value this year — for the net-worth view
   homeEquity: number; // homeValue less any outstanding mortgage — the net-worth band uses this
+  // Super death-benefit tax (estate view). The closing super splits into a tax-free
+  // component (from non-concessional contributions, recontribution and downsizer —
+  // tracked as `superTaxFree`) and the taxable remainder (`superTaxable` = concessional
+  // contributions + all earnings). If you died this year and your super passed to a
+  // NON-dependant (adult children), the taxable component would be taxed at
+  // ~15%+Medicare (`deathBenefitTax`); a spouse/dependant receives it tax-free.
+  // `estateValue` = closing super (net of that tax) + outside savings + home equity +
+  // any refundable RAD. Display-only — none of this changes the living projection.
+  superTaxFree?: number;
+  superTaxable?: number;
+  deathBenefitTax?: number; // death-benefit tax if you died this year (0 for a dependant beneficiary or if super is depleted)
+  estateValue?: number; // net wealth to beneficiaries if you died this year, after the death-benefit tax
 }
 
 export interface YearRow {

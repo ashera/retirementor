@@ -149,6 +149,15 @@ export interface EngineConfig {
     breakdown: AsfaBreakdown;
   };
 
+  // Super death-benefit tax: paid on the TAXABLE component of super left at death
+  // when it goes to a NON-dependant (adult children). Tax-free to a tax dependant
+  // (spouse). Verify at build (indexed).
+  superDeathBenefit: {
+    taxedElementRatePct: number; // 15% on the taxed element (the usual taxable component)
+    untaxedElementRatePct: number; // 30% on any untaxed element (insurance/some public-sector) — v2
+    medicareLevyPct: number; // + 2% Medicare
+  };
+
   // Aged care (post-1 Nov 2025 Aged Care Act; figures are a 2026 vintage and are
   // indexed — re-verify at build). Residential fees = a non-means-tested basic
   // daily fee + a means-tested hotelling contribution (no cap) + a means-tested
@@ -320,6 +329,13 @@ export const DEFAULT_CONFIG: EngineConfig = {
     medianDurationYears: 2.6,
     homeCareAnnualEstimate: 8_000, // simplified Support-at-Home out-of-pocket (v1)
   },
+
+  // Super death-benefit tax (taxable component → non-dependant). 2026 vintage.
+  superDeathBenefit: {
+    taxedElementRatePct: 15,
+    untaxedElementRatePct: 30,
+    medicareLevyPct: 2,
+  },
 };
 
 /** Minimum drawdown rate for a given age, from the config's age bands. */
@@ -378,6 +394,12 @@ export function withDefaults(data: EngineConfig): EngineConfig {
     out = { ...out, agedCare: DEFAULT_CONFIG.agedCare };
   } else {
     out = { ...out, agedCare: { ...DEFAULT_CONFIG.agedCare, ...out.agedCare } };
+  }
+  // Super death-benefit tax block, added after the initial seed.
+  if (out.superDeathBenefit == null) {
+    out = { ...out, superDeathBenefit: DEFAULT_CONFIG.superDeathBenefit };
+  } else {
+    out = { ...out, superDeathBenefit: { ...DEFAULT_CONFIG.superDeathBenefit, ...out.superDeathBenefit } };
   }
   // Monte Carlo return model, added after the initial seed.
   if (out.returnModel == null) {

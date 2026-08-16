@@ -85,6 +85,14 @@ export function simulate(
   const pension = plan.people.map(() => 0);
   const transferred = plan.people.map(() => false);
   const superOf = (i: number) => accum[i] + pension[i];
+  // Tax-free component of each person's super, for the death-benefit-tax estimate.
+  // Builds up from non-concessional contributions (voluntary after-tax, recontribution,
+  // downsizer); concessional contributions and ALL earnings are the taxable component.
+  // A PASSIVE tracker — it never feeds back into any balance, so the living projection
+  // is byte-identical whether or not the death-benefit view is used. v1 accumulation-rule
+  // approximation: the starting balance is treated as entirely taxable (conservative;
+  // the common case), and withdrawals draw the tax-free component down pro-rata.
+  const taxFreeComp = plan.people.map(() => 0);
   const totalSuper = () => plan.people.reduce((s, _p, i) => s + superOf(i), 0);
   // Add a contribution to super: into the pension pool up to Transfer Balance Cap
   // room (only once a pension exists), the remainder into accumulation.
@@ -94,6 +102,9 @@ export function simulate(
     const toPension = Math.min(amount, room);
     pension[i] += toPension;
     accum[i] += amount - toPension;
+    // The only callers are the downsizer contribution and the recontribution lever —
+    // both non-concessional, so the whole amount is tax-free component.
+    taxFreeComp[i] += amount;
   };
   // Draw `amount` from the accessible members' super, ACCUMULATION first (to
   // preserve the tax-free pension pool), proportionally within each pool. Returns
@@ -101,6 +112,7 @@ export function simulate(
   const drawSuper = (accessible: number[], amount: number) => {
     let remaining = amount;
     const drawn = { accum: 0, pension: 0 };
+    const before = accessible.map((i) => superOf(i)); // for the pro-rata tax-free draw-down
     for (const key of ["accum", "pension"] as const) {
       if (remaining <= EPS) break;
       const pool = key === "accum" ? accum : pension;
@@ -112,7 +124,33 @@ export function simulate(
       drawn[key] = take;
       remaining -= take;
     }
+    // A withdrawal draws the tax-free and taxable components down proportionally.
+    accessible.forEach((i, k) => {
+      if (before[k] > EPS) taxFreeComp[i] *= superOf(i) / before[k];
+    });
     return drawn;
+  };
+  // Death-benefit-tax / estate snapshot at the CURRENT (closing) super position. Called
+  // when a year's breakdown is built. The tax-free component is clamped per person to
+  // that person's balance (fees and any untracked reductions can't leave more tax-free
+  // than exists) and the clamp persists so it can't drift back up on later growth.
+  const deathBenefitFields = (outsideNet: number, homeEquityNow: number, radHeldNow: number) => {
+    let taxFree = 0;
+    plan.people.forEach((_p, i) => {
+      taxFreeComp[i] = Math.max(0, Math.min(taxFreeComp[i], superOf(i)));
+      taxFree += taxFreeComp[i];
+    });
+    const closingSuper = totalSuper();
+    const taxable = Math.max(0, closingSuper - taxFree);
+    const sdb = config.superDeathBenefit;
+    // Default (and undefined) = non-dependant (adult children) → taxed; spouse = tax-free.
+    const deathBenefitTax =
+      plan.superBeneficiary === "dependant"
+        ? 0
+        : taxable * (sdb.taxedElementRatePct + sdb.medicareLevyPct) / 100;
+    const estateValue =
+      closingSuper - deathBenefitTax + Math.max(0, outsideNet) + Math.max(0, homeEquityNow) + Math.max(0, radHeldNow);
+    return { superTaxFree: taxFree, superTaxable: taxable, deathBenefitTax, estateValue };
   };
   let outside = plan.outsideSuper;
   // Deferred-CGT bookkeeping for the outside-super pool: the running UNREALISED
@@ -404,6 +442,7 @@ export function simulate(
         contribGross: concessional,
         contribTax: concessional * config.contributionsTax + extra293,
         contribNet: added,
+        nccAdded: ncc, // non-concessional (after-tax) portion → tax-free component of super
         feesPaid: fee,
         earningsTax: opening * (superPensionReturn - superAccumReturn),
         superGrowth: newBalance - opening - net,
@@ -547,6 +586,7 @@ export function simulate(
         const ttrPerson = (plan.ttr?.who ?? [0]).includes(i);
         const r = contribute(person, accum[i], 1, ttrPerson && ages[i] >= preservationAge && !brk, ages[i] >= pensionAge);
         accum[i] = r.newBalance;
+        taxFreeComp[i] += r.nccAdded;
         contribGross += r.contribGross;
         contribTax += r.contribTax;
         contribNet += r.contribNet;
@@ -802,6 +842,7 @@ export function simulate(
           homeProceedsToSuper: 0,
           homeValue: homeValueThisYear,
           homeEquity: homeEquityThisYear,
+          ...deathBenefitFields(outside - drLoan, homeEquityThisYear, 0),
         }),
       );
       continue;
@@ -878,6 +919,7 @@ export function simulate(
       const ttrGap = (plan.ttr?.who ?? [0]).includes(i);
       const r = contribute(person, accum[i], gapScale, ttrGap && ages[i] >= preservationAge && !brk, ages[i] >= pensionAge);
       accum[i] = r.newBalance;
+      taxFreeComp[i] += r.nccAdded;
       workContribGross += r.contribGross;
       workContribTax += r.contribTax;
       workContribNet += r.contribNet;
@@ -1458,7 +1500,13 @@ export function simulate(
       return { age: ages[i], balance: pension[i], rate, amount: pension[i] * rate };
     });
     const minDraw = minDrawdownParts.reduce((s, pt) => s + pt.amount, 0);
-    accessibleIdx.forEach((i) => (pension[i] -= pension[i] * minDrawdownRate(ages[i], config)));
+    accessibleIdx.forEach((i) => {
+      const beforeSuper = superOf(i);
+      pension[i] -= pension[i] * minDrawdownRate(ages[i], config);
+      // The minimum drawdown leaves super, so it draws the tax-free component down
+      // pro-rata too (it bypasses drawSuper, which handles the discretionary draws).
+      if (beforeSuper > EPS) taxFreeComp[i] *= superOf(i) / beforeSuper;
+    });
 
     // Fund the remaining private need in a tax-aware order: OUTSIDE super (taxed at
     // your marginal rate) first, then ACCUMULATION super (15% on earnings), then the
@@ -1488,10 +1536,14 @@ export function simulate(
     plan.people.forEach((_, i) => {
       if (t < retireOffsets[i]) return; // still working — handled by contribute()
       // Fixed admin fee — deducted from accumulation first, then pension.
+      const feeBeforeSuper = superOf(i);
       const fee = Math.min(fixedAdmin, Math.max(0, superOf(i)));
       const feeFromAccum = Math.min(fee, accum[i]);
       accum[i] -= feeFromAccum;
       pension[i] -= fee - feeFromAccum;
+      // Draw the tax-free component down pro-rata for the fee (before this year's growth,
+      // which is all taxable earnings and must not lift the tax-free component).
+      if (feeBeforeSuper > EPS) taxFreeComp[i] *= superOf(i) / feeBeforeSuper;
       feesPaid += fee;
       // The accumulation pool is taxed 15% on earnings whether it's the excess over
       // the Transfer Balance Cap (retired, over preservation) or preserved bridge
@@ -1711,6 +1763,7 @@ export function simulate(
         homeProceedsToSuper: homeToSuperThisYear,
         homeValue: homeValueThisYear,
         homeEquity: homeEquityThisYear,
+        ...deathBenefitFields(outside - drLoan, homeEquityThisYear, radHeld),
         onBreak: workOnBreak, // a still-working partner on a gap year → charts shade it
       }),
     );
