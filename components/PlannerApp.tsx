@@ -10,6 +10,7 @@ import YearDetailModal from "@/components/YearDetailModal";
 import IncomeYearModal from "@/components/IncomeYearModal";
 import IncomeChart from "@/components/IncomeChart";
 import TaxChart from "@/components/TaxChart";
+import DeathBenefitCard from "@/components/DeathBenefitCard";
 import TaxYearModal from "@/components/TaxYearModal";
 import FanChart from "@/components/FanChart";
 import MonteCarloMark from "@/components/MonteCarloMark";
@@ -1906,6 +1907,15 @@ export default function PlannerApp({
           </p>
         </div>
       </div>
+
+      {/* Estate — super death-benefit tax at the planning age */}
+      <DeathBenefitCard
+        plan={plan}
+        result={result}
+        config={config}
+        whatIfHref={whatIfHref}
+        onBeneficiaryChange={(who) => quickAdjust({ superBeneficiary: who })}
+      />
 
       {/* Likelihood (Monte Carlo) */}
       <div
