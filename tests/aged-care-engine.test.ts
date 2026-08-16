@@ -4,6 +4,8 @@ import { DEFAULT_CONFIG as cfg } from "../lib/au/config";
 import { DEFAULT_PLAN, type AgedCarePlan, type RetirementPlan } from "../lib/au/types";
 import { residentialAnnualCost } from "../lib/au/agedCare";
 import { yearFlow } from "../lib/au/yearFlow";
+import { runMonteCarlo } from "../lib/au/montecarlo";
+import { runStressTest } from "../lib/au/stresstest";
 
 const AC = cfg.agedCare;
 
@@ -322,5 +324,56 @@ describe("aged care — full cost equals the charged cost (no weighting)", () =>
         expect(r.breakdown.agedCareTotal).toBeCloseTo(r.breakdown.agedCareFull ?? 0, 2);
       }
     }
+  });
+});
+
+describe("aged care — cross-cutting (MC / stress / guardrails / persona)", () => {
+  const mc = { iterations: 300, seed: 12345 } as const;
+  const depAge = (p: RetirementPlan) => simulate(p, cfg).depletedAge ?? p.lifeExpectancy + 100;
+
+  it("lowers the Monte Carlo success rate — the care cost flows through MC", () => {
+    const noCare = runMonteCarlo(base, cfg, mc).successRate;
+    const withC = runMonteCarlo(withCare({ durationYears: 4, accommodation: "dap" }), cfg, mc).successRate;
+    expect(withC).toBeLessThan(noCare);
+  });
+
+  it("never improves historical stress survival — the cost flows through the stress test", () => {
+    const noCare = runStressTest(base, cfg).survived;
+    const withC = runStressTest(withCare({ durationYears: 4, accommodation: "dap" }), cfg).survived;
+    expect(withC).toBeLessThanOrEqual(noCare);
+  });
+
+  it("never makes the plan last longer than without care (opt-in, monotonic)", () => {
+    expect(depAge(withCare({ durationYears: 4, accommodation: "dap" }))).toBeLessThanOrEqual(depAge(base));
+  });
+
+  it("runs with guardrails on, and the care cost still bites", () => {
+    const guardedCare = { ...withCare({ durationYears: 3, accommodation: "dap" }), guardrails: {} };
+    const row = simulate(guardedCare, cfg).rows.find((r) => r.age === 85)!;
+    expect(row.breakdown.agedCareTotal ?? 0).toBeGreaterThan(0); // care still charged under guardrails
+    expect(depAge(guardedCare)).toBeLessThanOrEqual(depAge({ ...base, guardrails: {} })); // no better than guardrails alone
+  });
+
+  it("persona — age-gapped couple: illness-separated pension in care, home stays protected", () => {
+    const coupleGap: RetirementPlan = {
+      ...base,
+      household: "couple",
+      people: [
+        { currentAge: 67, superBalance: 300_000, salary: 0, voluntaryConcessional: 0, voluntaryNonConcessional: 0 },
+        { currentAge: 62, superBalance: 250_000, salary: 0, voluntaryConcessional: 0, voluntaryNonConcessional: 0 }, // 5-yr gap
+      ],
+      outsideSuper: 150_000,
+      targetSpending: 60_000,
+      agedCare: { enabled: true, careType: "residential", entryAge: 85, durationYears: 3, accommodation: "dap", homeAction: "keep-vacant" },
+    };
+    const noCare = { ...coupleGap, agedCare: undefined };
+    const care85 = simulate(coupleGap, cfg).rows.find((r) => r.age === 85)!;
+    const base85 = simulate(noCare, cfg).rows.find((r) => r.age === 85)!;
+    expect(care85.agePension).toBeGreaterThan(base85.agePension); // illness-separated uplift, even age-gapped
+    expect(care85.breakdown.homeValue).toBeGreaterThan(0); // couple keeps the home (protected person)
+    // Protected home means no former-home assessment jump (couple, unlike a single).
+    const care87 = simulate(coupleGap, cfg).rows.find((r) => r.age === 87)!.breakdown.pension!;
+    const care86 = simulate(coupleGap, cfg).rows.find((r) => r.age === 86)!.breakdown.pension!;
+    expect(Math.abs(care87.assessableAssets - care86.assessableAssets)).toBeLessThan(200_000);
   });
 });
