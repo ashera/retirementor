@@ -130,11 +130,56 @@ describe("super death-benefit tax — beneficiary + strategy", () => {
   });
 });
 
+describe("super death-benefit tax — cash-out-and-recontribute (source: super)", () => {
+  // Already retired at 67, super all in pension, modest spend so it persists.
+  const retiree: RetirementPlan = {
+    ...base,
+    people: [{ currentAge: 67, superBalance: 900_000, salary: 0, voluntaryConcessional: 0, voluntaryNonConcessional: 0 }],
+    outsideSuper: 100_000,
+    retirementAge: 67,
+    targetSpending: 55_000,
+  };
+  const cashOut: RetirementPlan = {
+    ...retiree,
+    recontribute: { perYear: 120_000, fromAge: 67, untilAge: 71, source: "super" },
+  };
+
+  it("is balance-neutral: the whole super/outside/spending path is byte-identical to no recontribution", () => {
+    const sig = (p: RetirementPlan) =>
+      run(p)
+        .map((r) => `${Math.round(r.totalSuper)}|${Math.round(r.outside)}|${Math.round(r.spending)}`)
+        .join(",");
+    expect(sig(cashOut)).toBe(sig(retiree));
+  });
+
+  it("converts taxable component into tax-free component", () => {
+    const plain = bAt(retiree, 92);
+    const conv = bAt(cashOut, 92);
+    expect(conv.superTaxFree ?? 0).toBeGreaterThan(plain.superTaxFree ?? 0);
+    expect(conv.superTaxable ?? 0).toBeLessThan(plain.superTaxable ?? 0);
+    expect(conv.closingSuper).toBeCloseTo(plain.closingSuper, 2); // same balance, different split
+  });
+
+  it("cuts the death-benefit tax and lifts the estate by the same amount", () => {
+    const plain = bAt(retiree, 92);
+    const conv = bAt(cashOut, 92);
+    const taxSaved = (plain.deathBenefitTax ?? 0) - (conv.deathBenefitTax ?? 0);
+    expect(taxSaved).toBeGreaterThan(0);
+    expect((conv.estateValue ?? 0) - (plain.estateValue ?? 0)).toBeCloseTo(taxSaved, 2);
+  });
+
+  it("never manufactures more tax-free component than was cashed out (bounded by the recontributed total)", () => {
+    // 120k/yr x 5 years = 600k recontributed; the tax-free GAINED can't exceed that.
+    const plain = bAt(cashOut, 71).superTaxFree ?? 0; // just after the recontribution window
+    expect(plain).toBeLessThanOrEqual(600_000 + 1e-6);
+  });
+});
+
 describe("super death-benefit tax — config", () => {
   it("withDefaults backfills the superDeathBenefit block for configs seeded before it existed", () => {
     const legacy = { ...cfg } as Record<string, unknown>;
     delete legacy.superDeathBenefit;
-    const restored = withDefaults(legacy as typeof cfg);
+    const restored = withDefaults(legacy as unknown as typeof cfg);
     expect(restored.superDeathBenefit).toEqual(cfg.superDeathBenefit);
   });
 });

@@ -1019,28 +1019,41 @@ export function simulate(
       lumpSumTaken = true;
     }
 
-    // Recontribution: each year (to age 75) move an after-tax amount from outside
-    // savings back INTO super — a non-concessional contribution. It shelters money
-    // in super's tax-free environment and pushes back against the age-based minimum
-    // drawdown that would otherwise leak super into taxable savings. Capped at the
-    // annual NCC cap, available savings, and the room under the total-super cap.
+    // Recontribution: each year (to age 75) move an after-tax amount INTO super as a
+    // non-concessional contribution. Two sources:
+    //   "savings" (default) — top super up from OUTSIDE savings: shelters money in
+    //     super's tax-free environment and pushes back against the age-based minimum
+    //     drawdown that would otherwise leak super into taxable savings.
+    //   "super" — the cash-out-and-recontribute death-tax play: person 0 withdraws
+    //     from their OWN super (tax-free over 60) and re-contributes it as an NCC. A
+    //     balance-neutral round trip that converts take×(taxable proportion) from the
+    //     taxable component to the tax-free component, cutting the death-benefit tax.
+    // Both are capped at the annual NCC cap (and "savings" also at available savings +
+    // the room under the total-super cap; "super" is balance-neutral so needs neither).
     let recontributionNow = 0;
     const reconFrom = recontribute?.fromAge ?? 60;
     const reconUntil = Math.max(reconFrom, recontribute?.untilAge ?? reconFrom);
-    if (
+    const reconEligible =
       recontribute &&
       t >= retireOffsets[0] && // person 0 has actually retired — recontribution is a
-      // retiree tax-shelter move; firing it while they're still working (a staggered
-      // gap) would double their NCC (cap breach) and shift assessed savings into
-      // still-accumulating, means-test-exempt super.
+      // retiree tax move; firing it while they're still working (a staggered gap) would
+      // double their NCC (cap breach) and shift assessed savings into means-test-exempt
+      // still-accumulating super.
       ages[0] >= reconFrom &&
       ages[0] <= reconUntil &&
-      ages[0] <= 75 &&
-      outside > EPS &&
-      totalSuper() < config.transferBalanceCap
-    ) {
+      ages[0] <= 75;
+    if (reconEligible && recontribute!.source === "super") {
+      // Cash out from person 0's OWN accessible super and recontribute it as tax-free.
+      const p0Accessible = accessibleIdx.includes(0) ? superOf(0) : 0;
+      const take = Math.min(Math.max(0, recontribute!.perYear), config.nonConcessionalCap, p0Accessible);
+      if (take > EPS) {
+        drawSuper([0], take); // withdraw pro-rata (draws taxable + tax-free down together)
+        addToSuper(0, take); // re-contribute 100% as tax-free component — balance-neutral
+        recontributionNow = take; // accessibleSuper unchanged (out and back in the same year)
+      }
+    } else if (reconEligible && outside > EPS && totalSuper() < config.transferBalanceCap) {
       const room = config.transferBalanceCap - totalSuper();
-      const take = Math.min(Math.max(0, recontribute.perYear), config.nonConcessionalCap, outside, room);
+      const take = Math.min(Math.max(0, recontribute!.perYear), config.nonConcessionalCap, outside, room);
       if (take > 0) {
         realizeOutside(take); // moving units into super realises their gain
         outside -= take;
