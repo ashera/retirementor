@@ -83,6 +83,10 @@ export default function AgedCareWorkingsModal({
   const livingNow = Math.max(0, breakdown.livingSpend); // personal living the model still funds
   const livingFull = livingNow + livingSaved; // the pre-care lifestyle spend
   const isCouple = plan.household === "couple";
+  // Per-partner split of the household living during care (couple only).
+  const perShare = livingFull / Math.max(1, plan.people.length);
+  const careShare = perShare * AC.residentialLivingRetainedPct; // partner in care keeps a personal share
+  const homeShare = perShare; // partner at home keeps their full share
   const homeAction = ac.homeAction ?? "keep-vacant";
   const entryPension = breakdown.agePension ?? 0;
 
@@ -112,7 +116,7 @@ export default function AgedCareWorkingsModal({
             {onEdit ? (
               <button
                 type="button"
-                onClick={() => { onClose(); onEdit(); }}
+                onClick={() => onEdit()} // opens the dialog ON TOP; closing it returns here
                 className="mt-2 text-[11px] font-medium text-accent hover:underline"
               >
                 Edit the aged-care model →
@@ -275,13 +279,25 @@ export default function AgedCareWorkingsModal({
                 <span className="text-slate-200">{fmtCurrency(Math.round(livingNow))}/yr</span> of personal living costs (health,
                 personal items, outings) — down from {fmtCurrency(Math.round(livingFull))}/yr, with the fees covering the
                 ~{fmtCurrency(Math.round(livingSaved))} difference.
-                {isCouple ? " For a couple, only the partner in care's share is replaced — the at-home partner keeps their full living costs." : ""}
+                {isCouple ? " Only the partner in care's share is replaced — the at-home partner keeps theirs:" : ""}
               </p>
             ) : (
               <p>
                 <span className="font-semibold text-slate-200">Living costs.</span> At-home care keeps your normal living costs
                 (~{fmtCurrency(Math.round(livingNow))}/yr) — you&apos;re still living at home.
               </p>
+            )}
+            {isCouple && residential && livingSaved > 0 && (
+              <ul className="mt-1.5 space-y-1">
+                <li className="flex items-baseline justify-between gap-3">
+                  <span>• Partner in care <span className="text-muted/70">(personal expenses)</span></span>
+                  <span className="tabular-nums text-slate-200">~{fmtCurrency(Math.round(careShare))}/yr</span>
+                </li>
+                <li className="flex items-baseline justify-between gap-3">
+                  <span>• Partner at home <span className="text-muted/70">(full living costs)</span></span>
+                  <span className="tabular-nums text-slate-200">~{fmtCurrency(Math.round(homeShare))}/yr</span>
+                </li>
+              </ul>
             )}
             <p className="mt-2">
               <span className="font-semibold text-slate-200">Age Pension.</span>{" "}
