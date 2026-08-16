@@ -79,6 +79,10 @@ const FEATURE_GROUPS: { group: string; features: { label: string; tags: string[]
     { label: "Part-time work", tags: ["Part-time work"] },
     { label: "Work Bonus", tags: ["Work Bonus"] },
   ] },
+  { group: "Aged care", features: [
+    { label: "Aged care", tags: ["Aged care"] },
+    { label: "Residential care", tags: ["Residential care"] },
+  ] },
 ];
 
 // A feature × persona grid so an auditor can see, at a glance, which persona

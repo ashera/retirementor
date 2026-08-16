@@ -17,6 +17,7 @@ import {
   type Person,
   type PropertyDetail,
   type RetirementPlan,
+  type YearBreakdown,
 } from "../types";
 import * as ref from "./reference";
 
@@ -82,6 +83,34 @@ function pensionCheckpoint(
     `Age ${config.agePensionAge}`,
     "Services Australia income & assets tests — the lower applies (independent formula)",
     workings, Math.round(pen.annual), Math.round(actual),
+  );
+}
+
+// Independent re-derivation of the first-year RESIDENTIAL aged-care fees from the
+// published 2026 schedule — computed from the engine's own opening assessable
+// position but with the fee arithmetic done here from config rates, NOT via the
+// aged-care module. (Same spirit as pensionCheckpoint: engine inputs, independent
+// formula.) Entry year, so the NCCC cap hasn't bitten yet.
+function agedCareCheckpoint(b: YearBreakdown, careAge: number, roomPrice: number, config: EngineConfig): CheckpointResult {
+  const AC = config.agedCare;
+  const assets = Math.max(0, b.openingOutside) + b.openingSuper + Math.min(b.homeValue, AC.homeValueCapMeansTest);
+  const score = Math.min(1, Math.max(0, (assets - AC.careAssetFreeArea) / (AC.careAssetFullArea - AC.careAssetFreeArea)));
+  const basic = AC.basicDailyFee * 365;
+  const hotelling = AC.hotellingMaxDaily * score * 365;
+  const nccc = AC.ncccMaxDaily * score * 365;
+  const dap = roomPrice * AC.mpir;
+  const expected = basic + hotelling + nccc + dap;
+  const workings =
+    `Means score = clamp((assets ${m(Math.round(assets))} − ${m(AC.careAssetFreeArea)}) ÷ (${m(AC.careAssetFullArea)} − ${m(AC.careAssetFreeArea)}), 0–1) = ${score.toFixed(2)}. ` +
+    `Basic $${AC.basicDailyFee.toFixed(2)}/day × 365 = ${m(Math.round(basic))} (flat) + ` +
+    `Hotelling $${AC.hotellingMaxDaily.toFixed(2)}/day × ${score.toFixed(2)} × 365 = ${m(Math.round(hotelling))} + ` +
+    `NCCC $${AC.ncccMaxDaily.toFixed(2)}/day × ${score.toFixed(2)} × 365 = ${m(Math.round(nccc))} + ` +
+    `DAP room ${m(roomPrice)} × MPIR ${(AC.mpir * 100).toFixed(2)}% = ${m(Math.round(dap))}. Total = ${m(Math.round(expected))}.`;
+  return moneyCheck(
+    "Aged-care cost, first care year",
+    `Age ${careAge}`,
+    "Aged Care Act (2026 vintage) residential fee schedule — independent formula",
+    workings, Math.round(expected), Math.round(b.agedCareTotal ?? 0), 2,
   );
 }
 
@@ -1010,11 +1039,59 @@ function fireFern(config: EngineConfig): PersonaReport {
   });
 }
 
+// ── Care-needing Carol ───────────────────────────────────────────────────────
+function careCarol(config: EngineConfig): PersonaReport {
+  const person: Person = { currentAge: 60, superBalance: 300_000, salary: 90_000, voluntaryConcessional: 0, voluntaryNonConcessional: 0 };
+  const roomPrice = 570_000;
+  const plan: RetirementPlan = {
+    ...DEFAULT_PLAN, household: "single", people: [person], superMode: "individual",
+    homeowner: true, home: { value: 900_000, growthReal: 0 },
+    outsideSuper: 50_000, annualOutsideSavings: 5_000,
+    retirementAge: 67, spendingMode: "flat", targetSpending: 45_000,
+    investmentReturn: 6, inflation: 0, lifeExpectancy: 92,
+    agedCare: { enabled: true, careType: "residential", entryAge: 85, durationYears: 3, accommodation: "dap", radAmount: roomPrice, homeAction: "keep-vacant" },
+  };
+  const r = simulate(plan, config);
+  const years = 67 - 60;
+  const row67 = r.rows.find((x) => x.age === 67)!;
+  const care85 = r.rows.find((x) => x.age === 85)!.breakdown;
+
+  return finish({
+    key: "care-carol",
+    name: "Care-needing Carol",
+    blurb: "Single homeowner who needs 3 years of residential aged care from 85, paying the room daily (DAP).",
+    covers: ["Single", "Homeowner", "Standard retirement", "Aged care", "Residential care"],
+    assumptions: [
+      "All figures in today's dollars — inflation 0%, so the accumulation closed forms are exact.",
+      "Aged care from age 85: the residential fees are re-derived from the published 2026 schedule using the engine's own opening assessable position that year (independent of the aged-care module).",
+      `Pays the room via a Daily Accommodation Payment (DAP) on a ${m(roomPrice)} room; keeps the (exempt) family home.`,
+      `Reference data: FY${config.financialYear} config seed.`,
+    ],
+    inputs: [
+      { label: "Household", value: "Single" },
+      { label: "Age now → retire", value: "60 → 67" },
+      { label: "Super today", value: `${m(300_000)}` },
+      { label: "Salary", value: `${m(90_000)}/yr (Super Guarantee only)` },
+      { label: "Outside super", value: `${m(50_000)} + ${m(5_000)}/yr` },
+      { label: "Home", value: "Owner (kept, exempt)" },
+      { label: "Aged care", value: `Residential from 85 for 3 yrs · DAP on ${m(roomPrice)} room` },
+      { label: "Return / inflation", value: "6% / 0%" },
+      { label: "Spending", value: `${m(45_000)}/yr flat` },
+    ],
+    checkpoints: [
+      superCheckpoint([{ name: "Carol", person }], 6, 0, years, row67.totalSuper, config),
+      outsideCheckpoint(50_000, 5_000, 6, 0, years, row67.outside, config, [90_000]),
+      pensionCheckpoint("single", true, row67.totalSuper, row67.outside, 0, 0, row67.agePension, config),
+      agedCareCheckpoint(care85, 85, roomPrice, config),
+    ],
+  });
+}
+
 export const PERSONAS: ((config: EngineConfig) => PersonaReport)[] = [
   soloSandra, coupledCraigKim, bridgingBen, landlordLena, interestOnlyIan,
   sellingSam, smsfSamSue, cappedCarl, fullPensionFiona, clearingClare,
   downsizingDot, sellUpRita, workingWendy, ttrTom,
-  div293Dan, cutoutCora, preservationPia, fireFern,
+  div293Dan, cutoutCora, preservationPia, fireFern, careCarol,
 ];
 
 export function evaluatePersonas(config: EngineConfig): PersonaReport[] {
