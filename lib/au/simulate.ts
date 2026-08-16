@@ -284,8 +284,15 @@ export function simulate(
   // price), with no balance-sheet events. Care is active on the OLDEST-person
   // timeline (same axis as life events). See lib/au/agedCare.ts + the v1 spec.
   const agedCare = plan.agedCare?.enabled ? plan.agedCare : undefined;
-  const acActive = (age: number) =>
-    !!agedCare && age >= agedCare.entryAge && age < agedCare.entryAge + agedCare.durationYears;
+  // Permanent RESIDENTIAL care is terminal — it runs from entry until death (the
+  // projection horizon), so `durationYears` is derived (life expectancy − entry age),
+  // not a sub-window you recover from. Home care (Support at Home) is NOT terminal, so
+  // it lasts the chosen duration.
+  const acActive = (age: number) => {
+    if (!agedCare || age < agedCare.entryAge) return false;
+    if (agedCare.careType === "residential") return true;
+    return age < agedCare.entryAge + agedCare.durationYears;
+  };
   let acEntered = false; // RAD entry fired once
   let acHomeSold = false; // former home sold to help fund the RAD
   let acHomeCash = 0; // released home equity awaiting RAD funding (not yet assessable)
@@ -1168,21 +1175,13 @@ export function simulate(
     // RAD retention (2026 Aged Care Act): while the deposit is held, the provider keeps
     // 2%/yr of it for up to 5 years (max 10%) — NOT refunded on exit. Reduces the
     // refundable balance (and the estate), but not the spendable pool (the deposit
-    // already left it at entry). Then, if a care phase ENDS while the person is alive,
-    // the remaining deposit (net of retention) is refunded into savings.
+    // already left it at entry). Residential care is terminal, so the net-of-retention
+    // deposit is held to the estate; there is no "left care alive" refund.
     let agedCareRadRetentionNow = 0;
-    let agedCareRadRefundNow = 0;
     if (radHeld > EPS && acActive(oldest) && radYearsHeld < config.agedCare.radRetentionMaxYears) {
       agedCareRadRetentionNow = Math.min(radHeld, radBase * config.agedCare.radRetentionPctPerYear);
       radHeld -= agedCareRadRetentionNow;
       radYearsHeld += 1;
-    }
-    if (radHeld > EPS && acEntered && !acActive(oldest)) {
-      // Care ended (duration elapsed) but the projection continues → they left care
-      // alive and get the refundable deposit back into (assessable, spendable) savings.
-      agedCareRadRefundNow = radHeld;
-      outside += radHeld;
-      radHeld = 0;
     }
 
     // A one-off life-event expense this year is added to what must be funded (an
@@ -1792,7 +1791,6 @@ export function simulate(
         radDrawn: radDrawnNow || undefined,
         radHeld: radHeld || undefined,
         agedCareRadRetention: agedCareRadRetentionNow || undefined,
-        agedCareRadRefund: agedCareRadRefundNow || undefined,
         agedCareHomeSale: acHomeSaleNow || undefined,
         propertyProceeds,
         propertyCgt,

@@ -83,7 +83,6 @@ export function yearFlow(row: YearRow): YearFlow {
     // the recurring care cost is funded through the drawdown (in the funding term).
     { key: "agedCareHomeSale", label: "Home sold for aged care", amount: b.agedCareHomeSale ?? 0 },
     { key: "agedCareRad", label: "Aged-care RAD deposit", amount: -(b.radDrawn ?? 0) },
-    { key: "agedCareRadRefund", label: "RAD deposit refunded (left care)", amount: b.agedCareRadRefund ?? 0 },
     { key: "loan", label: "Home loan cleared from super", amount: -b.mortgageCleared },
     { key: "lumpSum", label: "Lump sum withdrawn from super", amount: -(b.lumpSum ?? 0) },
     { key: "outsideTax", label: "Tax on savings (dividends + realised gains)", amount: -b.outsideTax },

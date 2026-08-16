@@ -79,7 +79,7 @@ function summary(ac: AgedCarePlan): string {
   if (ac.careType === "home") return `At-home care from ${ac.entryAge} for ${ac.durationYears} yr${ac.durationYears === 1 ? "" : "s"}`;
   const acc = ACC_LABEL[ac.accommodation ?? "dap"];
   const home = HOME_LABEL[ac.homeAction ?? "keep-vacant"];
-  return `Residential from ${ac.entryAge} · ${ac.durationYears} yr${ac.durationYears === 1 ? "" : "s"} · ${acc} · ${home}`;
+  return `Residential from ${ac.entryAge} to end of life · ${acc} · ${home}`;
 }
 
 // The "aged care" committed panel of the What-If board: a possible late-life cost
@@ -101,11 +101,17 @@ export default function AgedCareEditor({
 
   const start = () => { setDraft(value ?? DEFAULTS); setOpen(true); };
   const save = () => {
+    const entryAge = Math.min(maxAge, Math.max(minAge, Math.round(draft.entryAge)));
     const clean: AgedCarePlan = {
       ...draft,
       enabled: true,
-      entryAge: Math.min(maxAge, Math.max(minAge, Math.round(draft.entryAge))),
-      durationYears: Math.max(1, Math.round(draft.durationYears)),
+      entryAge,
+      // Residential care is terminal — it runs from entry to life expectancy, so the
+      // duration is derived (not user-set). Home care keeps its chosen duration.
+      durationYears:
+        draft.careType === "residential"
+          ? Math.max(1, maxAge - entryAge)
+          : Math.max(1, Math.round(draft.durationYears)),
     };
     onChange(clean);
     setOpen(false);
@@ -182,12 +188,21 @@ export default function AgedCareEditor({
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-muted">For (years)</label>
-                  <NumberInput
-                    value={draft.durationYears} min={1} max={30}
-                    onChange={(n) => setDraft({ ...draft, durationYears: n })}
-                    ariaLabel="Duration in years"
-                    className="mt-1 w-full rounded-lg border border-line bg-panel-2 px-2.5 py-2 text-white outline-none focus:border-accent"
-                  />
+                  {isResidential ? (
+                    <div
+                      className="mt-1 w-full rounded-lg border border-line bg-panel-2/60 px-2.5 py-2 text-muted"
+                      title="Permanent residential care runs until end of life"
+                    >
+                      until life exp. <span className="text-slate-300">(~{Math.max(1, maxAge - Math.round(draft.entryAge))} yrs)</span>
+                    </div>
+                  ) : (
+                    <NumberInput
+                      value={draft.durationYears} min={1} max={30}
+                      onChange={(n) => setDraft({ ...draft, durationYears: n })}
+                      ariaLabel="Duration in years"
+                      className="mt-1 w-full rounded-lg border border-line bg-panel-2 px-2.5 py-2 text-white outline-none focus:border-accent"
+                    />
+                  )}
                 </div>
               </div>
 

@@ -49,12 +49,12 @@ describe("aged care — engine integration", () => {
     expect(disabled.map((r) => r.total)).toEqual(off.map((r) => r.total));
   });
 
-  it("adds a care-cost overlay in the care years only", () => {
+  it("adds a care-cost overlay from entry until death (residential care is terminal)", () => {
     const sim = simulate(withCare({}), cfg).rows;
     expect(sim.find((r) => r.age === 84)!.breakdown.agedCareTotal ?? 0).toBe(0); // before entry
     expect(sim.find((r) => r.age === 85)!.breakdown.agedCareTotal ?? 0).toBeGreaterThan(0); // entry
-    expect(sim.find((r) => r.age === 87)!.breakdown.agedCareTotal ?? 0).toBeGreaterThan(0); // last care year
-    expect(sim.find((r) => r.age === 88)!.breakdown.agedCareTotal ?? 0).toBe(0); // after
+    expect(sim.find((r) => r.age === 88)!.breakdown.agedCareTotal ?? 0).toBeGreaterThan(0); // still in care
+    expect(sim.find((r) => r.age === 92)!.breakdown.agedCareTotal ?? 0).toBeGreaterThan(0); // last year of life
   });
 
   it("charges the basic daily fee flat and DAP = RAD × MPIR in a DAP plan", () => {
@@ -125,16 +125,15 @@ describe("aged care — engine integration", () => {
 });
 
 describe("aged care — RAD accommodation & means test", () => {
-  it("pays a refundable deposit at entry, retains 2%/yr, and refunds the balance when care ends", () => {
+  it("pays a refundable deposit at entry, retains 2%/yr, and holds the net deposit to the estate", () => {
     const sim = simulate(withCare({ accommodation: "rad", radAmount: 400_000, radFundedFrom: "outside" }), cfg).rows;
     const entry = sim.find((r) => r.age === 85)!.breakdown;
     expect(entry.radDrawn ?? 0).toBeGreaterThan(0);
     expect(entry.radHeld ?? 0).toBeCloseTo(392_000, 0); // 400k less the first year's 2% retention
     expect(entry.agedCareDAP ?? 0).toBe(0); // fully lump-summed → no DAP
-    // Care runs 85–87 (3 years); when it ends the deposit is refunded, net of the 6% retained.
-    const refund = sim.find((r) => (r.breakdown.agedCareRadRefund ?? 0) > 0)!.breakdown;
-    expect(refund.agedCareRadRefund ?? 0).toBeCloseTo(376_000, 0); // 400k × (1 − 3×2%)
-    expect(sim.find((r) => r.age === 90)!.breakdown.radHeld ?? 0).toBe(0); // refunded, no longer held
+    // Residential care is terminal (runs 85→92 here); retention caps at 5 years (10%),
+    // so 90% of the deposit is held to the estate — never refunded mid-projection.
+    expect(sim[sim.length - 1].breakdown.radHeld ?? 0).toBeCloseTo(360_000, 0); // 400k × 0.9
   });
 
   it("the RAD (exempt from the assets test) lifts the Age Pension vs an equivalent DAP plan", () => {
@@ -155,51 +154,40 @@ describe("aged care — RAD accommodation & means test", () => {
   });
 });
 
-describe("aged care — RAD retention (2026 Aged Care Act: 2%/yr, capped at 5 years / 10%)", () => {
+describe("aged care — RAD retention (2026 Aged Care Act: 2%/yr, capped at 5 years / 10%; held to the estate)", () => {
   const AC = cfg.agedCare;
-  // A long-lived resident so we can watch the retention accrue over 5+ years.
-  const longStay = (durationYears: number): RetirementPlan => ({
+  // Residential care is terminal, so the length in care is (life expectancy − entry age).
+  const stay = (entryAge: number, lifeExpectancy: number): RetirementPlan => ({
     ...base,
     people: [{ currentAge: 67, superBalance: 300_000, salary: 0, voluntaryConcessional: 0, voluntaryNonConcessional: 0 }],
     outsideSuper: 900_000,
-    lifeExpectancy: 99,
-    agedCare: { enabled: true, careType: "residential", entryAge: 85, durationYears, accommodation: "rad", radAmount: 500_000, homeAction: "keep-vacant" },
+    lifeExpectancy,
+    agedCare: { enabled: true, careType: "residential", entryAge, durationYears: 3, accommodation: "rad", radAmount: 500_000, homeAction: "keep-vacant" },
+  });
+  const retained = (sim: ReturnType<typeof simulate>["rows"]) =>
+    sim.reduce((s, r) => s + (r.breakdown.agedCareRadRetention ?? 0), 0);
+
+  it("caps the retention at 5 years / 10% for a long stay, holding 90% to the estate", () => {
+    const sim = simulate(stay(85, 96), cfg).rows; // ~11 years in care
+    expect(retained(sim)).toBeCloseTo(500_000 * 0.1, 0); // capped at 10%, not 22%
+    expect(sim[sim.length - 1].breakdown.radHeld ?? 0).toBeCloseTo(500_000 * 0.9, 0);
   });
 
-  it("retains 2% of the deposit per year while in care", () => {
-    const sim = simulate(longStay(3), cfg).rows;
-    const totalRetained = sim.reduce((s, r) => s + (r.breakdown.agedCareRadRetention ?? 0), 0);
-    expect(totalRetained).toBeCloseTo(500_000 * AC.radRetentionPctPerYear * 3, 0); // 3 years × 2% = 30k
+  it("retains 2%/yr for a shorter stay (fewer than 5 years) and holds the rest to the estate", () => {
+    const sim = simulate(stay(89, 91), cfg).rows; // a short terminal stay
+    const retYears = sim.filter((r) => (r.breakdown.agedCareRadRetention ?? 0) > 0).length;
+    expect(retYears).toBeLessThan(AC.radRetentionMaxYears); // not capped
+    expect(retained(sim)).toBeCloseTo(500_000 * AC.radRetentionPctPerYear * retYears, 0);
+    const held = sim[sim.length - 1].breakdown.radHeld ?? 0;
+    expect(held).toBeCloseTo(500_000 - retained(sim), 0); // net deposit held to the estate
+    expect(held).toBeGreaterThan(0);
   });
 
-  it("caps the retention at 5 years (max 10%), even for a longer stay", () => {
-    const sim = simulate(longStay(8), cfg).rows;
-    const totalRetained = sim.reduce((s, r) => s + (r.breakdown.agedCareRadRetention ?? 0), 0);
-    expect(totalRetained).toBeCloseTo(500_000 * 0.1, 0); // capped at 10%, not 16%
-  });
-
-  it("refunds the deposit net of retention when a care phase ends while alive", () => {
-    const sim = simulate(longStay(3), cfg).rows;
-    const refund = sim.find((r) => (r.breakdown.agedCareRadRefund ?? 0) > 0)!.breakdown;
-    expect(refund.agedCareRadRefund ?? 0).toBeCloseTo(500_000 * (1 - 3 * AC.radRetentionPctPerYear), 0); // 470k
-    // ...and once refunded it is no longer held.
-    expect(sim[sim.length - 1].breakdown.radHeld ?? 0).toBe(0);
-  });
-
-  it("hands the deposit (net of the 10% retention) to the estate if the resident dies in care", () => {
-    const sim = simulate(longStay(20), cfg).rows; // outlives the projection in care
-    const last = sim[sim.length - 1].breakdown;
-    expect(last.radHeld ?? 0).toBeCloseTo(500_000 * 0.9, 0); // 90% still refundable to the estate
-    expect(last.agedCareRadRefund ?? 0).toBe(0); // no living refund — it flows through the estate
-  });
-
-  it("the refund is a named balance-sheet flow (never lands in 'Other adjustments')", () => {
-    const sim = simulate(longStay(3), cfg).rows;
-    const refundRow = sim.find((r) => (r.breakdown.agedCareRadRefund ?? 0) > 0)!;
-    const wf = yearFlow(refundRow);
-    expect(wf.lines.find((l) => l.key === "agedCareRadRefund")?.amount ?? 0).toBeGreaterThan(0);
-    expect(wf.lines.find((l) => l.key === "other")).toBeUndefined(); // ties out with no residual
-    expect(wf.lines.reduce((s, l) => s + l.amount, 0)).toBeCloseTo(wf.net, 0);
+  it("holds the net deposit continuously to the estate — never refunded mid-projection (care is terminal)", () => {
+    const sim = simulate(stay(85, 90), cfg).rows;
+    const heldInCare = sim.filter((r) => r.age >= 85).map((r) => r.breakdown.radHeld ?? 0);
+    expect(Math.min(...heldInCare)).toBeGreaterThan(0); // radHeld never drops to 0 while alive
+    expect(sim[sim.length - 1].breakdown.radHeld ?? 0).toBeGreaterThan(0);
   });
 });
 

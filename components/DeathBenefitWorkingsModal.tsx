@@ -126,7 +126,7 @@ export default function DeathBenefitWorkingsModal({
               <Row label="Super after the tax" formula={`${fmtCurrency(Math.round(superAt))} − ${fmtCurrency(Math.round(tax))}`} value={fmtCurrency(Math.round(superAt - tax))} />
               {outside > 0 && <Row label="Savings outside super" formula="pass without this tax" value={fmtCurrency(Math.round(outside))} />}
               {home > 0 && <Row label="Home equity" formula="passes without this tax" value={fmtCurrency(Math.round(home))} />}
-              {rad > 0 && <Row label="Refundable deposit (RAD)" formula="returned to your estate" value={fmtCurrency(Math.round(rad))} />}
+              {rad > 0 && <Row label="Refundable deposit (RAD)" formula="returned to your estate, net of retention" value={fmtCurrency(Math.round(rad))} />}
               <Row label="To your beneficiaries" strong value={fmtCurrency(Math.round(estate))} />
             </div>
           </div>

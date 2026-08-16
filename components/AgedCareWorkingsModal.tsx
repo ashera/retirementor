@@ -111,7 +111,7 @@ export default function AgedCareWorkingsModal({
               <Chip accent>{CARE_LABEL[ac.careType]}</Chip>
               {residential && <Chip accent>{ACC_LABEL[ac.accommodation ?? "dap"]}</Chip>}
               {residential && <Chip accent>{HOME_LABEL[ac.homeAction ?? "keep-vacant"]}</Chip>}
-              <Chip accent>From {ac.entryAge} · {ac.durationYears} yr{ac.durationYears === 1 ? "" : "s"}</Chip>
+              <Chip accent>{residential ? `From ${ac.entryAge} to end of life` : `From ${ac.entryAge} · ${ac.durationYears} yr${ac.durationYears === 1 ? "" : "s"}`}</Chip>
             </div>
             {onEdit ? (
               <button
