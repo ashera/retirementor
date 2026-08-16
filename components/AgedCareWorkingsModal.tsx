@@ -79,6 +79,8 @@ export default function AgedCareWorkingsModal({
   const partialRad = fundedLump > 0 && chosenLump - fundedLump > 1;
 
   const livingSaved = breakdown.agedCareLivingSaved ?? 0;
+  const livingNow = Math.max(0, breakdown.livingSpend); // personal living the model still funds
+  const livingFull = livingNow + livingSaved; // the pre-care lifestyle spend
   const isCouple = plan.household === "couple";
   const homeAction = ac.homeAction ?? "keep-vacant";
   const entryPension = breakdown.agePension ?? 0;
@@ -86,7 +88,7 @@ export default function AgedCareWorkingsModal({
   return (
     <div className="fixed inset-0 z-50 grid place-items-center p-4" role="dialog" aria-modal="true">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-line bg-panel p-5 shadow-2xl">
+      <div className="relative max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-line bg-panel p-5 shadow-2xl md:max-w-3xl">
         <div className="flex items-center justify-between">
           <h4 className="font-semibold text-white">How the cost is worked out</h4>
           <button onClick={onClose} aria-label="Close" className="text-muted transition hover:text-white">✕</button>
@@ -108,8 +110,10 @@ export default function AgedCareWorkingsModal({
           <p className="mt-2 text-[11px] text-muted">Change any of these in the dialog and this working updates.</p>
         </div>
 
+        {/* Steps 1–4 flow into two columns on desktop, one on mobile. */}
+        <div className="mt-4 grid gap-4 md:grid-cols-2 md:gap-x-5 md:[&>div]:mt-0">
         {/* Step 1 — the means test */}
-        <div className="mt-4">
+        <div className="mt-0">
           <div className="text-[11px] font-semibold uppercase tracking-wide text-accent">1 · Your means score</div>
           <p className="mt-1 text-xs text-muted">
             The means-tested charges scale with your assessable position. This version uses assets (income is added in a
@@ -132,7 +136,7 @@ export default function AgedCareWorkingsModal({
         </div>
 
         {/* Step 2 — the fees */}
-        <div className="mt-4">
+        <div className="mt-0">
           <div className="text-[11px] font-semibold uppercase tracking-wide text-accent">2 · The annual fees</div>
           <div className="mt-2 rounded-xl border border-line bg-panel-2 p-3">
             {residential ? (
@@ -204,7 +208,7 @@ export default function AgedCareWorkingsModal({
 
         {/* Step 3 — the lump sum owed to the provider */}
         {residential && (
-          <div className="mt-4">
+          <div className="mt-0">
             <div className="text-[11px] font-semibold uppercase tracking-wide text-accent">3 · The lump sum (RAD) to pay the provider</div>
             <div className="mt-2 rounded-xl border border-line bg-panel-2 p-3 text-[11px] leading-relaxed text-muted">
               {chosenLump > 0 ? (
@@ -235,20 +239,22 @@ export default function AgedCareWorkingsModal({
         )}
 
         {/* Step 4 — what happens to living costs & the Age Pension */}
-        <div className="mt-4">
+        <div className="mt-0">
           <div className="text-[11px] font-semibold uppercase tracking-wide text-accent">4 · Living costs &amp; the Age Pension</div>
           <div className="mt-2 rounded-xl border border-line bg-panel-2 p-3 text-[11px] leading-relaxed text-muted">
             {residential && livingSaved > 0 ? (
               <p>
                 <span className="font-semibold text-slate-200">Living costs.</span> In residential care the fees cover housing,
-                meals, cleaning and heating, so your everyday living spend drops by ~{fmtCurrency(Math.round(livingSaved))}/yr —
-                only a personal-expenses share (health, personal items, outings) remains.
+                meals, cleaning and heating, so the model now funds only{" "}
+                <span className="text-slate-200">{fmtCurrency(Math.round(livingNow))}/yr</span> of personal living costs (health,
+                personal items, outings) — down from {fmtCurrency(Math.round(livingFull))}/yr, with the fees covering the
+                ~{fmtCurrency(Math.round(livingSaved))} difference.
                 {isCouple ? " For a couple, only the partner in care's share is replaced — the at-home partner keeps their full living costs." : ""}
               </p>
             ) : (
               <p>
-                <span className="font-semibold text-slate-200">Living costs.</span> At-home care keeps your normal living costs —
-                you&apos;re still living at home.
+                <span className="font-semibold text-slate-200">Living costs.</span> At-home care keeps your normal living costs
+                (~{fmtCurrency(Math.round(livingNow))}/yr) — you&apos;re still living at home.
               </p>
             )}
             <p className="mt-2">
@@ -280,10 +286,12 @@ export default function AgedCareWorkingsModal({
           </div>
         </div>
 
+        </div>
+
         {/* Terminology */}
         <div className="mt-4">
           <div className="text-[11px] font-semibold uppercase tracking-wide text-accent">Terminology</div>
-          <dl className="mt-2 space-y-1.5">
+          <dl className="mt-2 space-y-1.5 md:grid md:grid-cols-2 md:gap-2 md:space-y-0">
             {TERMS.filter((t) => residential || ["Means score", "NCCC"].includes(t.term) || t.term === "Basic daily fee").map((t) => (
               <div key={t.term} className="rounded-lg border border-line bg-panel-2 px-3 py-2">
                 <dt className="text-xs font-semibold text-slate-200">{t.term}</dt>
