@@ -109,9 +109,9 @@ export default function AgedCareWorkingsModal({
             <div className="text-[11px] font-medium text-muted">Your choices (from the &ldquo;Model aged care&rdquo; dialog)</div>
             <div className="mt-1.5 flex flex-wrap gap-1.5">
               <Chip accent>{CARE_LABEL[ac.careType]}</Chip>
-              {residential && <Chip>{ACC_LABEL[ac.accommodation ?? "dap"]}</Chip>}
-              {residential && <Chip>{HOME_LABEL[ac.homeAction ?? "keep-vacant"]}</Chip>}
-              <Chip>From {ac.entryAge} · {ac.durationYears} yr{ac.durationYears === 1 ? "" : "s"}</Chip>
+              {residential && <Chip accent>{ACC_LABEL[ac.accommodation ?? "dap"]}</Chip>}
+              {residential && <Chip accent>{HOME_LABEL[ac.homeAction ?? "keep-vacant"]}</Chip>}
+              <Chip accent>From {ac.entryAge} · {ac.durationYears} yr{ac.durationYears === 1 ? "" : "s"}</Chip>
             </div>
             {onEdit ? (
               <button
