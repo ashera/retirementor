@@ -217,7 +217,12 @@ export default function AgedCareWorkingsModal({
                 )}
               </>
             ) : (
-              <Row label="Support at Home contribution" formula={`means-tested (score ${score.toFixed(2)}); clinical care is free`} note="Under Support at Home you contribute toward everyday-living and independence services in proportion to your means; clinical care is government-funded." value={fmtCurrency(Math.round(full))} />
+              <Row
+                label="Support at Home contribution"
+                formula={`≈ ${fmtCurrency(AC.homeCareAnnualEstimate)}/yr (rough placeholder) × ${score.toFixed(2)} means score`}
+                note={`Home care isn't modelled in detail yet — ${fmtCurrency(AC.homeCareAnnualEstimate)}/yr is a rough placeholder for a self-funded retiree's out-of-pocket, scaled by your means score (${score.toFixed(2)}). The real Support at Home cost varies widely by your assessed care level and service mix; clinical care is government-funded.`}
+                value={fmtCurrency(Math.round(full))}
+              />
             )}
             <div className="mt-1 flex items-center justify-between border-t border-line pt-2">
               <span className="text-sm font-semibold text-white">{residential ? "Cost if you need care" : "Total"}</span>
@@ -247,6 +252,7 @@ export default function AgedCareWorkingsModal({
                 <li>You contribute to <span className="text-slate-200">everyday-living</span> services (cleaning, gardening, meals — the highest rate) and <span className="text-slate-200">independence</span> services (personal care, transport — a moderate rate), scaled by your means.</li>
                 <li>A combined <span className="text-slate-200">lifetime cap</span> (~$135k across home and residential care) limits what you contribute.</li>
                 <li>Because you stay home, you keep your <span className="text-slate-200">normal living costs</span> — the fees are on top, not instead.</li>
+                <li className="text-muted/70">Our figure is a <span className="text-slate-300">rough placeholder</span> — home care isn&apos;t modelled in detail yet (a proper care-level model is planned).</li>
               </ul>
             </div>
           )}
