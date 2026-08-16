@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, cloneElement, isValidElement, type ReactNode, type ReactElement } from "react";
 import Link from "next/link";
 import { fmtCurrency } from "@/lib/au/format";
 import type { AgedCarePlan } from "@/lib/au/types";
@@ -136,7 +136,10 @@ export default function AgedCareEditor({
             <span className="min-w-0 flex-1 truncate text-slate-200">{summary(value)}</span>
             <span className="shrink-0 text-xs text-muted">edit</span>
           </button>
-          {children}
+          {/* Give the exposure/workings a way to open this dialog directly. */}
+          {isValidElement(children)
+            ? cloneElement(children as ReactElement<{ onEdit?: () => void }>, { onEdit: start })
+            : children}
         </>
       ) : (
         <button

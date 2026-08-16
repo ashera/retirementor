@@ -48,13 +48,14 @@ const TERMS: { term: string; def: string }[] = [
 // score, the per-line fee arithmetic (with this scenario's real numbers), any
 // probabilistic weighting, and a glossary. General information, not advice.
 export default function AgedCareWorkingsModal({
-  plan, breakdown, config, careAge, onClose,
+  plan, breakdown, config, careAge, onClose, onEdit,
 }: {
   plan: RetirementPlan;
   breakdown: YearBreakdown;
   config: EngineConfig;
   careAge: number;
   onClose: () => void;
+  onEdit?: () => void; // open the "Model aged care" dialog directly
 }) {
   const ac = plan.agedCare!;
   const AC = config.agedCare;
@@ -90,7 +91,7 @@ export default function AgedCareWorkingsModal({
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
       <div className="relative max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-line bg-panel p-5 shadow-2xl md:max-w-3xl">
         <div className="flex items-center justify-between">
-          <h4 className="font-semibold text-white">How the cost is worked out</h4>
+          <h4 className="font-semibold text-white">How the Aged Care numbers work</h4>
           <button onClick={onClose} aria-label="Close" className="text-muted transition hover:text-white">✕</button>
         </div>
         <p className="mt-1 text-xs text-muted">
@@ -108,7 +109,17 @@ export default function AgedCareWorkingsModal({
               {residential && <Chip>{HOME_LABEL[ac.homeAction ?? "keep-vacant"]}</Chip>}
               <Chip>From {ac.entryAge} · {ac.durationYears} yr{ac.durationYears === 1 ? "" : "s"}</Chip>
             </div>
-            <p className="mt-2 text-[11px] text-muted">Change any of these in the dialog and this working updates.</p>
+            {onEdit ? (
+              <button
+                type="button"
+                onClick={() => { onClose(); onEdit(); }}
+                className="mt-2 text-[11px] font-medium text-accent hover:underline"
+              >
+                Edit the aged-care model →
+              </button>
+            ) : (
+              <p className="mt-2 text-[11px] text-muted">Change any of these in the dialog and this working updates.</p>
+            )}
           </div>
           <span className="hidden shrink-0 select-none text-4xl leading-none md:block" aria-hidden>🏥</span>
         </div>

@@ -15,12 +15,13 @@ const lastsToLabel = (res: SimResult, plan: RetirementPlan): string =>
 // context), the REFUNDABLE deposit (so the chart's drop isn't read as money lost),
 // the effect on longevity, and a "full workings" explainer. Not advice.
 export default function AgedCareExposure({
-  plan, result, noCareResult, config,
+  plan, result, noCareResult, config, onEdit,
 }: {
   plan: RetirementPlan;
   result: SimResult;
   noCareResult: SimResult | null;
   config: EngineConfig;
+  onEdit?: () => void; // open the "Model aged care" dialog (injected by AgedCareEditor)
 }) {
   const [workings, setWorkings] = useState(false);
   const ac = plan.agedCare;
@@ -124,7 +125,7 @@ export default function AgedCareExposure({
       </span>
 
       {workings && firstRow && (
-        <AgedCareWorkingsModal plan={plan} breakdown={first} config={config} careAge={firstRow.age} onClose={() => setWorkings(false)} />
+        <AgedCareWorkingsModal plan={plan} breakdown={first} config={config} careAge={firstRow.age} onClose={() => setWorkings(false)} onEdit={onEdit} />
       )}
     </div>
   );
