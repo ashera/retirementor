@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { fmtCurrency, fmtCompact } from "@/lib/au/format";
 import { confidenceState, CONFIDENCE_EPS, type ConfidenceState } from "@/lib/au/confidence";
+import InfoBlastBanner from "@/components/InfoBlastBanner";
 
 const ZONE = {
   bullet: "#0f9d6e",
@@ -46,6 +47,7 @@ export interface ConfidenceHeroProps {
   onDismissNudge?: () => void;
   ioSlot?: React.ReactNode; // guest import/export buttons (local-first backup)
   chips?: PlanChip[]; // committed life events + applied strategies, shown at the foot
+  showInfoBlasts?: boolean; // show the backoffice-managed rotating announcement banner (main dashboard only)
 }
 
 export default function ConfidenceHero({
@@ -71,6 +73,7 @@ export default function ConfidenceHero({
   onDismissNudge,
   ioSlot,
   chips,
+  showInfoBlasts,
 }: ConfidenceHeroProps) {
   const state: ConfidenceState = confidenceState(goalTotal, { failsafe, safe, central });
   const headroom = safe - goalTotal; // + = room to spend more; − = above the safe level
@@ -280,15 +283,21 @@ export default function ConfidenceHero({
             </div>
           </div>
 
-          {showNudge && (
-            <div className="mt-4 flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/[0.08] px-4 py-3">
-              <span aria-hidden className="text-base">💡</span>
-              <p className="text-[13px] leading-snug text-slate-200">
-                At the same 85% confidence, your plan models capacity for about{" "}
-                <b className="text-amber-300">{fmtCurrency(headroom)}/yr</b> more than your current goal.
-              </p>
-            </div>
-          )}
+          {/* Announcement slot: a backoffice-managed rotating InfoBlast banner, falling
+              back to the "spending headroom" nudge when there are no active blasts.
+              Shared/read-only views skip the InfoBlasts and just show the nudge. */}
+          {(() => {
+            const headroomNudge = showNudge ? (
+              <div className="mt-4 flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/[0.08] px-4 py-3">
+                <span aria-hidden className="text-base">💡</span>
+                <p className="text-[13px] leading-snug text-slate-200">
+                  At the same 85% confidence, your plan models capacity for about{" "}
+                  <b className="text-amber-300">{fmtCurrency(headroom)}/yr</b> more than your current goal.
+                </p>
+              </div>
+            ) : null;
+            return showInfoBlasts ? <InfoBlastBanner fallback={headroomNudge} /> : headroomNudge;
+          })()}
 
           <div className="mt-7 flex flex-wrap gap-2.5">
             <Link

@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-type Tab = "review" | "parameters" | "sources" | "returns" | "tests" | "scenarios" | "moneysmart" | "users" | "media" | "feedback" | "advisers" | "marketing" | "reddit" | "releases" | "audits";
+type Tab = "review" | "parameters" | "sources" | "returns" | "tests" | "scenarios" | "moneysmart" | "users" | "media" | "feedback" | "advisers" | "marketing" | "reddit" | "releases" | "audits" | "infoblasts";
 
 export default function AdminTabs({
   active,
@@ -58,6 +58,7 @@ export default function AdminTabs({
       <div className="flex flex-wrap items-center gap-1 rounded-lg border border-line bg-panel-2 p-1">
         <span className="px-2 text-[11px] font-semibold uppercase tracking-wide text-muted">Marketing</span>
         {tab("/admin/marketing", "marketing", "Kit", 0)}
+        {tab("/admin/infoblasts", "infoblasts", "InfoBlasts", 0)}
         {tab("/admin/reddit-scenarios", "reddit", "Scenarios", 0)}
         {tab("/admin/feedback", "feedback", "Feedback", feedbackCount)}
         {tab("/admin/advisers", "advisers", "Advisers", adviserCount)}

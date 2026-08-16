@@ -1507,6 +1507,7 @@ export default function PlannerApp({
         onDismissNudge={dismissNudge}
         ioSlot={!user && !shared ? renderIOButtons() : null}
         chips={planChips}
+        showInfoBlasts={!shared}
       />
 
       {/* Stat cards */}

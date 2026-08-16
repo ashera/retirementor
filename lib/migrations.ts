@@ -306,6 +306,21 @@ create table if not exists releases (
 create index if not exists releases_pub_idx on releases(published, released_at desc, build desc);
 create unique index if not exists releases_version_uidx on releases(version);
 
+-- InfoBlasts: backoffice-managed announcements ("New Feature Available") that rotate in
+-- the hero-card banner. Each has an attention icon (emoji), a title and subtext, and can
+-- be enabled/disabled; enabled rows rotate on the dashboard every 30 seconds.
+create table if not exists info_blasts (
+  id uuid primary key default gen_random_uuid(),
+  icon text not null default '',
+  title text not null,
+  subtext text not null default '',
+  enabled boolean not null default true,
+  sort_order integer not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists info_blasts_active_idx on info_blasts(enabled, sort_order, created_at);
+
 -- Compliance audit runs (e.g. ASIC RG 276 reviews): one row per run, plus its
 -- findings, each with a remediation status so fixes can be tracked across runs.
 create table if not exists compliance_audits (
