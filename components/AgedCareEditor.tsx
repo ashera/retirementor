@@ -201,7 +201,14 @@ export default function AgedCareEditor({
                     <Segmented
                       value={draft.accommodation ?? "dap"}
                       options={[{ v: "dap", l: "Daily" }, { v: "rad", l: "Lump sum" }, { v: "combo", l: "Mix" }]}
-                      onChange={(accommodation) => setDraft({ ...draft, accommodation })}
+                      onChange={(accommodation) =>
+                        setDraft({
+                          ...draft,
+                          accommodation,
+                          // Initialise the split so "Mix" is explicit (defaults to 50/50).
+                          radSharePct: accommodation === "combo" ? (draft.radSharePct ?? 50) : draft.radSharePct,
+                        })
+                      }
                     />
                   </div>
 

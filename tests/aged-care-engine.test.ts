@@ -238,6 +238,18 @@ describe("aged care — fee components reconcile with the full cost", () => {
     expect(funded + unpaid).toBeCloseTo(400_000, 0); // the whole room is paid for
   });
 
+  it("a Mix pays part as a RAD lump sum and part as DAP (reconciling to the room)", () => {
+    const mpir = cfg.agedCare.mpir;
+    // Explicit 50/50, and an untouched Mix (no radSharePct) which must default to 50/50
+    // — NOT behave as a full lump sum.
+    for (const over of [{ accommodation: "combo" as const, radSharePct: 50 }, { accommodation: "combo" as const }]) {
+      const b = firstCare(withCare({ ...over, radAmount: 500_000 }));
+      expect(b.radDrawn ?? 0).toBeGreaterThan(0); // a lump-sum portion is paid
+      expect(b.agedCareDAP ?? 0).toBeGreaterThan(0); // AND a daily portion
+      expect((b.radDrawn ?? 0) + (b.agedCareDAP ?? 0) / mpir).toBeCloseTo(500_000, 0); // together = the room
+    }
+  });
+
   it("a fully-funded lump-sum room has no DAP (and a lower annual cost than paying daily)", () => {
     // Wealthy plan so the RAD is fully funded from savings → no shortfall DAP.
     const rad = firstCare(withCare({ accommodation: "rad", radAmount: 570_000 }));

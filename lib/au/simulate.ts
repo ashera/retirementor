@@ -1050,7 +1050,7 @@ export function simulate(
       acHomeSaleNow = acHomeCash; // the release captured at the top-of-loop sale (0 if kept)
       const radPrice = Math.max(0, agedCare.radAmount ?? config.agedCare.radNationalAvg);
       const mode = agedCare.accommodation ?? "rad";
-      const lumpShare = mode === "rad" ? 1 : mode === "dap" ? 0 : Math.min(1, Math.max(0, (agedCare.radSharePct ?? 100) / 100));
+      const lumpShare = mode === "rad" ? 1 : mode === "dap" ? 0 : Math.min(1, Math.max(0, (agedCare.radSharePct ?? 50) / 100));
       let need = radPrice * lumpShare; // the lump sum the user wants to pay
       const src = agedCare.radFundedFrom ?? "auto";
       if (src !== "outside" && src !== "super") {
