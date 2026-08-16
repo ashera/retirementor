@@ -70,7 +70,18 @@ export default function AgedCareWorkingsModal({
   const full = breakdown.agedCareFull ?? breakdown.agedCareTotal ?? 0;
 
   const room = ac.radAmount ?? AC.radNationalAvg;
-  const isLump = residential && (ac.accommodation ?? "dap") !== "dap";
+  const mode = residential ? (ac.accommodation ?? "dap") : "dap";
+  const isLump = mode !== "dap";
+  const lumpShare = mode === "rad" ? 1 : mode === "combo" ? clamp01((ac.radSharePct ?? 50) / 100) : 0;
+  const chosenLump = room * lumpShare; // the RAD the provider is owed
+  const fundedLump = breakdown.radHeld ?? 0; // paid as a refundable deposit
+  const homeSale = breakdown.agedCareHomeSale ?? 0; // former-home equity that helped fund it
+  const partialRad = fundedLump > 0 && chosenLump - fundedLump > 1;
+
+  const livingSaved = breakdown.agedCareLivingSaved ?? 0;
+  const isCouple = plan.household === "couple";
+  const homeAction = ac.homeAction ?? "keep-vacant";
+  const entryPension = breakdown.agePension ?? 0;
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center p-4" role="dialog" aria-modal="true">
@@ -189,6 +200,84 @@ export default function AgedCareWorkingsModal({
                   : " — paid daily at the MPIR."}
             </p>
           )}
+        </div>
+
+        {/* Step 3 — the lump sum owed to the provider */}
+        {residential && (
+          <div className="mt-4">
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-accent">3 · The lump sum (RAD) to pay the provider</div>
+            <div className="mt-2 rounded-xl border border-line bg-panel-2 p-3 text-[11px] leading-relaxed text-muted">
+              {chosenLump > 0 ? (
+                <>
+                  <div className="flex items-baseline justify-between">
+                    <span className="font-semibold text-slate-200">Refundable deposit (RAD)</span>
+                    <span className="text-sm font-bold tabular-nums text-rose-200">{fmtCurrency(Math.round(chosenLump))}</span>
+                  </div>
+                  <p className="mt-1">
+                    A one-off lump sum paid to the provider for the room —{" "}
+                    {homeSale > 0
+                      ? `funded here from the ${fmtCurrency(Math.round(homeSale))} home sale, `
+                      : "drawn from your savings, "}
+                    refundable to your estate and exempt from the Age Pension assets test.
+                    {partialRad
+                      ? ` Your savings covered ${fmtCurrency(Math.round(fundedLump))}; the remaining ${fmtCurrency(Math.round(chosenLump - fundedLump))} is paid daily (DAP), shown in the fees above.`
+                      : ""}
+                  </p>
+                </>
+              ) : (
+                <p>
+                  You chose to pay the room <span className="text-slate-200">daily (DAP)</span>, so there&apos;s no lump sum to
+                  pay upfront — the accommodation cost is the DAP line in the fees above.
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Step 4 — what happens to living costs & the Age Pension */}
+        <div className="mt-4">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-accent">4 · Living costs &amp; the Age Pension</div>
+          <div className="mt-2 rounded-xl border border-line bg-panel-2 p-3 text-[11px] leading-relaxed text-muted">
+            {residential && livingSaved > 0 ? (
+              <p>
+                <span className="font-semibold text-slate-200">Living costs.</span> In residential care the fees cover housing,
+                meals, cleaning and heating, so your everyday living spend drops by ~{fmtCurrency(Math.round(livingSaved))}/yr —
+                only a personal-expenses share (health, personal items, outings) remains.
+                {isCouple ? " For a couple, only the partner in care's share is replaced — the at-home partner keeps their full living costs." : ""}
+              </p>
+            ) : (
+              <p>
+                <span className="font-semibold text-slate-200">Living costs.</span> At-home care keeps your normal living costs —
+                you&apos;re still living at home.
+              </p>
+            )}
+            <p className="mt-2">
+              <span className="font-semibold text-slate-200">Age Pension.</span>{" "}
+              {isCouple ? (
+                <>
+                  With one partner in residential care you become an <span className="text-slate-200">illness-separated couple</span> —
+                  assessed on your combined assets, but each paid the higher <span className="text-slate-200">single</span> rate,
+                  which usually increases your pension. The family home stays exempt while your partner lives there (a &ldquo;protected person&rdquo;).
+                </>
+              ) : homeAction === "sell" ? (
+                <>
+                  Selling the home makes the leftover proceeds assessable, but the RAD you pay is <span className="text-slate-200">exempt</span> from
+                  the assets test — so your pension can actually rise as you draw down.
+                </>
+              ) : homeAction === "keep-rent" ? (
+                <>
+                  Your former home is exempt for 2 years, then assessed for the pension (you&apos;re treated as a non-homeowner);
+                  the rent it earns is assessable income.
+                </>
+              ) : (
+                <>
+                  Your former home is exempt for 2 years, then assessed for the pension at its market value (you&apos;re treated as a
+                  non-homeowner), which can reduce it.
+                </>
+              )}
+              {entryPension > 0 ? ` This year the modelled Age Pension is ${fmtCurrency(Math.round(entryPension))}.` : ""}
+            </p>
+          </div>
         </div>
 
         {/* Terminology */}
