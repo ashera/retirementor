@@ -71,7 +71,7 @@ const HOME_LABEL: Record<NonNullable<AgedCarePlan["homeAction"]>, string> = {
   "keep-rent": "Keep & rent it",
 };
 const ACC_LABEL: Record<NonNullable<AgedCarePlan["accommodation"]>, string> = {
-  rad: "Lump sum (RAD)", dap: "Daily (DAP)", combo: "A mix",
+  rad: "Lump sum (RAD)", dap: "Daily (DAP)", combo: "A mix of lump sum and daily payment",
 };
 
 /** A one-line summary for the collapsed pill. */

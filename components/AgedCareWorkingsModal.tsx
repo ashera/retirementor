@@ -10,7 +10,7 @@ const clamp01 = (x: number) => (x < 0 ? 0 : x > 1 ? 1 : x);
 const pct = (x: number) => `${(x * 100).toFixed(2).replace(/\.?0+$/, "")}%`;
 
 const CARE_LABEL = { residential: "Residential", home: "At home" } as const;
-const ACC_LABEL = { rad: "Lump sum (RAD)", dap: "Daily (DAP)", combo: "A mix" } as const;
+const ACC_LABEL = { rad: "Lump sum (RAD)", dap: "Daily (DAP)", combo: "A mix of lump sum and daily payment" } as const;
 const HOME_LABEL = { sell: "Sell the home", "keep-vacant": "Keep the home", "keep-rent": "Keep & rent" } as const;
 
 function Chip({ children, accent }: { children: React.ReactNode; accent?: boolean }) {
