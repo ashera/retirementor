@@ -160,7 +160,7 @@ export default function AgedCareWorkingsModal({
             <ul className="mt-2 space-y-1.5 text-[11px] leading-relaxed text-muted">
               <li>About <span className="text-slate-200">1 in {Math.max(2, Math.round(1 / AC.entryProbability))}</span> people use permanent residential aged care at some point.</li>
               <li>Most enter around <span className="text-slate-200">age {AC.medianEntryAge}</span>, typically for <span className="text-slate-200">~{AC.medianDurationYears} years</span>.</li>
-              <li>Clinical care (nursing, medical) is <span className="text-slate-200">fully government-funded</span> — these fees are for accommodation and non-clinical care.</li>
+              <li>Clinical care (nursing, medical) is <span className="text-slate-200">fully government-funded</span> — you contribute to the rest, scaled by your means.</li>
             </ul>
           </div>
         </div>
@@ -233,6 +233,22 @@ export default function AgedCareWorkingsModal({
                   ? " — a lump-sum room is refundable, so there's no daily charge here."
                   : " — paid daily at the MPIR."}
             </p>
+          )}
+
+          {/* Home care has no accommodation/RAD, so fill the column with program context. */}
+          {!residential && (
+            <div className="mt-3 rounded-xl border border-line bg-panel-2/50 p-3">
+              <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted">
+                <span aria-hidden>🏠</span> Support at Home in context
+              </div>
+              <ul className="mt-2 space-y-1.5 text-[11px] leading-relaxed text-muted">
+                <li>Support at Home replaced Home Care Packages in 2025 — care delivered while you stay in your own home.</li>
+                <li><span className="text-slate-200">Clinical care</span> (nursing, physio, allied health) is fully government-funded — no contribution.</li>
+                <li>You contribute to <span className="text-slate-200">everyday-living</span> services (cleaning, gardening, meals — the highest rate) and <span className="text-slate-200">independence</span> services (personal care, transport — a moderate rate), scaled by your means.</li>
+                <li>A combined <span className="text-slate-200">lifetime cap</span> (~$135k across home and residential care) limits what you contribute.</li>
+                <li>Because you stay home, you keep your <span className="text-slate-200">normal living costs</span> — the fees are on top, not instead.</li>
+              </ul>
+            </div>
           )}
         </div>
 
