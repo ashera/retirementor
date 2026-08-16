@@ -1094,14 +1094,16 @@ export function simulate(
     }
 
     // In RESIDENTIAL care the fees already cover accommodation, meals, cleaning and
-    // heating, so most of the year's normal living spend is REPLACED rather than paid
+    // heating, so most of the ENTRANT's normal living spend is REPLACED rather than paid
     // on top of the fees — keep only a personal-expenses share (health, personal items,
-    // outings). Otherwise the care year double-counts food/housing/utilities. Home care
+    // outings). Only ONE person enters care, so only their share of household living is
+    // replaced: for a couple the at-home partner keeps their full share. Home care
     // (still living at home) keeps the full living spend. Applied AFTER guardrails so
     // the rail measure is untouched.
     let agedCareLivingSaved = 0;
     if (agedCare && agedCare.careType === "residential" && acActive(oldest)) {
-      agedCareLivingSaved = livingSpend * (1 - config.agedCare.residentialLivingRetainedPct);
+      const entrantShare = 1 / Math.max(1, plan.people.length); // 1 (single) or ~½ (couple)
+      agedCareLivingSaved = livingSpend * (1 - config.agedCare.residentialLivingRetainedPct) * entrantShare;
       livingSpend -= agedCareLivingSaved;
     }
 
@@ -1271,6 +1273,11 @@ export function simulate(
       // assets (the property's own loan is already netted via propertyEquity), so a
       // shortfall shouldn't understate assets and inflate the pension.
       const financialAssets = Math.max(0, outside) + assessedSuper;
+      // A couple with one partner in permanent RESIDENTIAL care is "illness-separated":
+      // assessed as a couple (combined means, couple thresholds) but each paid the
+      // higher single rate → usually a higher combined pension.
+      const illnessSeparated =
+        plan.household === "couple" && !!agedCare && agedCare.careType === "residential" && acActive(oldest);
       const ap = agePension(
         {
           household: plan.household,
@@ -1278,6 +1285,7 @@ export function simulate(
           assessableAssets: financialAssets + propertyEquity + acFormerHomeAssessed,
           financialAssets,
           otherIncome: assessableOther,
+          illnessSeparated,
         },
         config,
       );

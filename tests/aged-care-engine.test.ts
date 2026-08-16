@@ -272,6 +272,37 @@ describe("aged care — balance waterfall names the flows (no 'Other adjustments
   });
 });
 
+describe("aged care — couples", () => {
+  const couple: RetirementPlan = {
+    ...base,
+    household: "couple",
+    people: [
+      { currentAge: 67, superBalance: 300_000, salary: 0, voluntaryConcessional: 0, voluntaryNonConcessional: 0 },
+      { currentAge: 67, superBalance: 300_000, salary: 0, voluntaryConcessional: 0, voluntaryNonConcessional: 0 },
+    ],
+    outsideSuper: 150_000,
+    targetSpending: 60_000,
+    agedCare: { enabled: true, careType: "residential", entryAge: 85, durationYears: 3, accommodation: "dap", homeAction: "keep-vacant" },
+  };
+  const at = (rows: ReturnType<typeof simulate>["rows"], age: number) => rows.find((r) => r.age === age)!;
+
+  it("only nets out the care-entrant's share of living (the at-home partner keeps theirs)", () => {
+    const sim = simulate(couple, cfg).rows;
+    const pre = at(sim, 84).breakdown.livingSpend;
+    const inCare = at(sim, 85).breakdown;
+    // A couple replaces only ~half the household living (one entrant), so the saving
+    // is half what a single loses — not the full (1 − retained) share.
+    expect(inCare.agedCareLivingSaved ?? 0).toBeCloseTo(pre * (1 - AC.residentialLivingRetainedPct) * 0.5, 0);
+    expect(inCare.livingSpend).toBeGreaterThan(pre * 0.5); // clearly more than a single would keep
+  });
+
+  it("pays the illness-separated (higher) pension when one partner is in residential care", () => {
+    const normal = at(simulate({ ...couple, agedCare: undefined }, cfg).rows, 85).agePension;
+    const inCare = at(simulate(couple, cfg).rows, 85).agePension;
+    expect(inCare).toBeGreaterThan(normal);
+  });
+});
+
 describe("aged care — full cost equals the charged cost (no weighting)", () => {
   it("agedCareFull === agedCareTotal every care year", () => {
     for (const r of simulate(withCare({ durationYears: 4 }), cfg).rows) {

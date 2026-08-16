@@ -222,7 +222,7 @@ export const KB_ARTICLES: KbArticle[] = [
             "**Exempt for 2 years** from the day you enter care, if you keep it.",
             "**After 2 years**, a kept home becomes an **assessable asset** for the Age Pension (at market value), and you're treated as a **non-homeowner** (a higher assets free area partly offsets it).",
             "**Rent it out** and the rent is assessable income that helps pay the fees — but it can reduce your pension.",
-            "**A couple**: if your partner still lives there, the home stays **exempt** — they're a 'protected person'.",
+            "**A couple**: if your partner still lives there, the home stays **exempt** — they're a 'protected person'. You also become an **'illness-separated' couple** — still assessed on your combined assets, but each paid the higher **single** rate of Age Pension, which usually **increases** your combined pension.",
           ] },
         ],
       },

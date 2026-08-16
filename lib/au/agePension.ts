@@ -24,6 +24,11 @@ export interface AgePensionInput {
   assessableAssets: number; // excludes the principal home
   financialAssets: number; // subset used for deeming (≈ assessableAssets here)
   otherIncome?: number; // non-deemed income (e.g. employment); usually 0 in retirement
+  // "Illness-separated" couple — one partner in permanent residential aged care.
+  // Still assessed as a couple (combined means, couple thresholds & taper) but each
+  // is paid the higher SINGLE rate, so the combined max is 2× single. Usually lifts
+  // the pension. Ignored unless household === "couple".
+  illnessSeparated?: boolean;
 }
 
 export interface AgePensionResult {
@@ -39,7 +44,10 @@ export function agePension(
 ): AgePensionResult {
   const ap = config.agePension;
   const cfg = input.household === "single" ? ap.single : ap.couple;
-  const maxAnnual = cfg.maxAnnual;
+  // Illness-separated couples keep the couple thresholds/taper/deeming (via `cfg`)
+  // but are each paid the single rate → combined max is 2× the single maximum.
+  const maxAnnual =
+    input.illnessSeparated && input.household === "couple" ? 2 * ap.single.maxAnnual : cfg.maxAnnual;
 
   // Income test
   const income =
