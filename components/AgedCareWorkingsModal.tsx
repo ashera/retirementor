@@ -75,7 +75,7 @@ export default function AgedCareWorkingsModal({
   const isLump = mode !== "dap";
   const lumpShare = mode === "rad" ? 1 : mode === "combo" ? clamp01((ac.radSharePct ?? 50) / 100) : 0;
   const chosenLump = room * lumpShare; // the RAD the provider is owed
-  const fundedLump = breakdown.radHeld ?? 0; // paid as a refundable deposit
+  const fundedLump = breakdown.radDrawn ?? 0; // deposit PAID at entry (before the 2%/yr retention)
   const homeSale = breakdown.agedCareHomeSale ?? 0; // former-home equity that helped fund it
   const partialRad = fundedLump > 0 && chosenLump - fundedLump > 1;
 
@@ -274,7 +274,9 @@ export default function AgedCareWorkingsModal({
                     {homeSale > 0
                       ? `funded here from the ${fmtCurrency(Math.round(homeSale))} home sale, `
                       : "drawn from your savings, "}
-                    refundable to your estate and exempt from the Age Pension assets test.
+                    mostly refundable to your estate and exempt from the Age Pension assets test — the provider retains{" "}
+                    {Math.round(AC.radRetentionPctPerYear * 100)}%/yr for up to {AC.radRetentionMaxYears} years (max{" "}
+                    {Math.round(AC.radRetentionPctPerYear * AC.radRetentionMaxYears * 100)}%), the rest is returned.
                     {partialRad
                       ? ` Your savings covered ${fmtCurrency(Math.round(fundedLump))}; the remaining ${fmtCurrency(Math.round(chosenLump - fundedLump))} is paid daily (DAP), shown in the fees above.`
                       : ""}

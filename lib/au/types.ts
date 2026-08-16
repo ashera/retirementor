@@ -570,6 +570,8 @@ export interface YearBreakdown {
   agedCareLivingSaved?: number; // normal living spend NOT paid this year because residential-care fees cover it (housing, meals, utilities)
   radDrawn?: number;
   radHeld?: number;
+  agedCareRadRetention?: number; // RAD retention kept by the provider this year (2%/yr of the deposit, up to 5 years) — reduces the refundable balance
+  agedCareRadRefund?: number; // refundable deposit (net of retention) returned to savings when a care phase ends while alive
   agedCareHomeSale?: number; // former-home equity released at aged-care entry (helps fund the RAD)
   // Retirement income
   agePension: number;

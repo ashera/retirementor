@@ -290,6 +290,8 @@ export function simulate(
   let acHomeSold = false; // former home sold to help fund the RAD
   let acHomeCash = 0; // released home equity awaiting RAD funding (not yet assessable)
   let radHeld = 0; // preserved refundable accommodation deposit (exempt from the assets test)
+  let radBase = 0; // the deposit actually paid — the basis for the retention (unchanged by retention)
+  let radYearsHeld = 0; // whole years the deposit has been held (caps the retention at radRetentionMaxYears)
   let radUnpaid = 0; // accommodation amount charged as DAP (the un-lump-summed share)
   let ncccPaid = 0; // lifetime non-clinical care contribution paid (cap tracking, unweighted)
   let ncccYears = 0; // whole years of NCCC charged (max-years cap tracking)
@@ -1118,6 +1120,7 @@ export function simulate(
       const unfundedLump = Math.max(0, need); // lump the liquid assets couldn't cover
       radDrawnNow = radPrice * lumpShare - unfundedLump; // actually paid as a refundable deposit
       radHeld += radDrawnNow;
+      radBase += radDrawnNow;
       // Any lump we couldn't fund is charged daily (DAP) on the unpaid balance — just
       // like the real system — so the room is always fully paid for, not silently short.
       radUnpaid = radPrice * (1 - lumpShare) + unfundedLump;
@@ -1160,6 +1163,26 @@ export function simulate(
       const entrantShare = 1 / Math.max(1, plan.people.length); // 1 (single) or ~½ (couple)
       agedCareLivingSaved = livingSpend * (1 - config.agedCare.residentialLivingRetainedPct) * entrantShare;
       livingSpend -= agedCareLivingSaved;
+    }
+
+    // RAD retention (2026 Aged Care Act): while the deposit is held, the provider keeps
+    // 2%/yr of it for up to 5 years (max 10%) — NOT refunded on exit. Reduces the
+    // refundable balance (and the estate), but not the spendable pool (the deposit
+    // already left it at entry). Then, if a care phase ENDS while the person is alive,
+    // the remaining deposit (net of retention) is refunded into savings.
+    let agedCareRadRetentionNow = 0;
+    let agedCareRadRefundNow = 0;
+    if (radHeld > EPS && acActive(oldest) && radYearsHeld < config.agedCare.radRetentionMaxYears) {
+      agedCareRadRetentionNow = Math.min(radHeld, radBase * config.agedCare.radRetentionPctPerYear);
+      radHeld -= agedCareRadRetentionNow;
+      radYearsHeld += 1;
+    }
+    if (radHeld > EPS && acEntered && !acActive(oldest)) {
+      // Care ended (duration elapsed) but the projection continues → they left care
+      // alive and get the refundable deposit back into (assessable, spendable) savings.
+      agedCareRadRefundNow = radHeld;
+      outside += radHeld;
+      radHeld = 0;
     }
 
     // A one-off life-event expense this year is added to what must be funded (an
@@ -1768,6 +1791,8 @@ export function simulate(
         agedCareLivingSaved: agedCareLivingSaved || undefined,
         radDrawn: radDrawnNow || undefined,
         radHeld: radHeld || undefined,
+        agedCareRadRetention: agedCareRadRetentionNow || undefined,
+        agedCareRadRefund: agedCareRadRefundNow || undefined,
         agedCareHomeSale: acHomeSaleNow || undefined,
         propertyProceeds,
         propertyCgt,

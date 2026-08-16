@@ -31,6 +31,10 @@ export default function AgedCareExposure({
   if (!ac?.enabled || !first) return null;
 
   const radHeld = Math.max(0, ...result.rows.map((r) => r.breakdown.radHeld ?? 0));
+  // The deposit actually PAID at entry (before the 2%/yr retention nibbles it) — the
+  // right basis for "did savings cover the chosen lump", separate from the running held
+  // balance which now declines with retention.
+  const radPaid = Math.max(0, ...result.rows.map((r) => r.breakdown.radDrawn ?? 0));
   const rent = first.agedCareHomeRent ?? 0;
   const isResidential = ac.careType === "residential";
 
@@ -42,7 +46,7 @@ export default function AgedCareExposure({
   const lumpShare = mode === "rad" ? 1 : mode === "combo" ? Math.min(1, Math.max(0, (ac.radSharePct ?? 50) / 100)) : 0;
   const room = ac.radAmount ?? config.agedCare.radNationalAvg;
   const chosenLump = room * lumpShare; // the deposit the user chose to pay
-  const fundedLump = radHeld; // actually paid as a refundable deposit (assume mode; 0 when probabilistic)
+  const fundedLump = radPaid; // actually paid as a refundable deposit at entry (assume mode; 0 when probabilistic)
   const partialRad = fundedLump > 0 && chosenLump - fundedLump > 1; // savings couldn't cover the full lump
 
   const rows: { label: string; value: number }[] = [];
@@ -93,8 +97,10 @@ export default function AgedCareExposure({
             </p>
           ) : (
             <p className="mt-1 text-[11px] leading-relaxed text-muted">
-              A refundable lump sum for the room, paid once — returned to your estate and exempt from the Age Pension assets
-              test. Separate from the annual cost above
+              A mostly-refundable lump sum for the room, paid once — exempt from the Age Pension assets test. The provider
+              keeps a retention of {Math.round(config.agedCare.radRetentionPctPerYear * 100)}%/yr for up to{" "}
+              {config.agedCare.radRetentionMaxYears} years (max {Math.round(config.agedCare.radRetentionPctPerYear * config.agedCare.radRetentionMaxYears * 100)}%);
+              the balance is returned to you (or your estate). Separate from the annual cost above
               {radHeld > 0 ? ", and drawn from your balance at entry (so it isn't part of the spendable balance on the chart)" : ""}.
             </p>
           )}
