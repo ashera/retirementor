@@ -99,15 +99,18 @@ export default function AgedCareWorkingsModal({
 
         {/* Your choices — echoes the Model aged care dialog so the working below is
             traceable to what the user picked. */}
-        <div className="mt-3 rounded-xl border border-line bg-panel-2/60 p-3">
-          <div className="text-[11px] font-medium text-muted">Your choices (from the &ldquo;Model aged care&rdquo; dialog)</div>
-          <div className="mt-1.5 flex flex-wrap gap-1.5">
-            <Chip accent>{CARE_LABEL[ac.careType]}</Chip>
-            {residential && <Chip>{ACC_LABEL[ac.accommodation ?? "dap"]}</Chip>}
-            {residential && <Chip>{HOME_LABEL[ac.homeAction ?? "keep-vacant"]}</Chip>}
-            <Chip>From {ac.entryAge} · {ac.durationYears} yr{ac.durationYears === 1 ? "" : "s"}</Chip>
+        <div className="mt-3 flex items-start justify-between gap-3 rounded-xl border border-line bg-panel-2/60 p-3">
+          <div className="min-w-0">
+            <div className="text-[11px] font-medium text-muted">Your choices (from the &ldquo;Model aged care&rdquo; dialog)</div>
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
+              <Chip accent>{CARE_LABEL[ac.careType]}</Chip>
+              {residential && <Chip>{ACC_LABEL[ac.accommodation ?? "dap"]}</Chip>}
+              {residential && <Chip>{HOME_LABEL[ac.homeAction ?? "keep-vacant"]}</Chip>}
+              <Chip>From {ac.entryAge} · {ac.durationYears} yr{ac.durationYears === 1 ? "" : "s"}</Chip>
+            </div>
+            <p className="mt-2 text-[11px] text-muted">Change any of these in the dialog and this working updates.</p>
           </div>
-          <p className="mt-2 text-[11px] text-muted">Change any of these in the dialog and this working updates.</p>
+          <span className="hidden shrink-0 select-none text-4xl leading-none md:block" aria-hidden>🏥</span>
         </div>
 
         {/* Steps 1–4 flow into two columns on desktop, one on mobile. */}
@@ -132,6 +135,18 @@ export default function AgedCareWorkingsModal({
               note={`${fmtCurrency(AC.careAssetFreeArea)} and ${fmtCurrency(AC.careAssetFullArea)} are the government aged-care asset thresholds: below the first you pay nothing means-tested, at/above the second you pay the maximum. A score of ${score.toFixed(2)} means ${score >= 0.999 ? "the maximum" : `${Math.round(score * 100)}% of the maximum`} charges.`}
               value={score.toFixed(2)}
             />
+          </div>
+
+          {/* Desktop-only factoid — fills the column beside the taller fees list. */}
+          <div className="mt-3 hidden rounded-xl border border-line bg-panel-2/50 p-3 md:block">
+            <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted">
+              <span aria-hidden>💡</span> Aged care in context
+            </div>
+            <ul className="mt-2 space-y-1.5 text-[11px] leading-relaxed text-muted">
+              <li>About <span className="text-slate-200">1 in {Math.max(2, Math.round(1 / AC.entryProbability))}</span> people use permanent residential aged care at some point.</li>
+              <li>Most enter around <span className="text-slate-200">age {AC.medianEntryAge}</span>, typically for <span className="text-slate-200">~{AC.medianDurationYears} years</span>.</li>
+              <li>Clinical care (nursing, medical) is <span className="text-slate-200">fully government-funded</span> — these fees are for accommodation and non-clinical care.</li>
+            </ul>
           </div>
         </div>
 
