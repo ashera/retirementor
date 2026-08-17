@@ -107,11 +107,16 @@ interface Marginal {
   netWorth: number; // change in total net worth (incl. home + property) at life expectancy
   takeHomeNow: number; // working-year take-home pay with this lever alone (salary-sacrifice hit)
   deathTaxSaved: number; // reduction in the super death-benefit tax at the planning age (+ = less tax for beneficiaries)
+  taxFreeGained: number; // increase in super's tax-free component at the planning age (the amount converted)
 }
 
 /** Super death-benefit tax at the projection horizon (0 if none / depleted). */
 function horizonDeathTax(res: SimResult): number {
   return res.rows.length ? res.rows[res.rows.length - 1].breakdown.deathBenefitTax ?? 0 : 0;
+}
+/** Super tax-free component at the projection horizon. */
+function horizonTaxFree(res: SimResult): number {
+  return res.rows.length ? res.rows[res.rows.length - 1].breakdown.superTaxFree ?? 0 : 0;
 }
 
 /** On-demand state for a lever's 85% "Extra you could spend" figure. null when the
@@ -381,6 +386,7 @@ export default function WhatIfView({
     const baseParts = planParts(baseRes);
     const baseTermNW = baseRes.rows.length ? rowNetWorth(baseRes.rows[baseRes.rows.length - 1]) : 0;
     const baseDeathTax = horizonDeathTax(baseRes);
+    const baseTaxFree = horizonTaxFree(baseRes);
     const out: Record<string, Marginal> = {};
     for (const card of catalog) {
       const single = card.apply(baseline, resolveValues(card, values[card.id]));
@@ -396,6 +402,7 @@ export default function WhatIfView({
         netWorth: termNW - baseTermNW,
         takeHomeNow: res.rows[0]?.takeHome ?? 0,
         deathTaxSaved: baseDeathTax - horizonDeathTax(res),
+        taxFreeGained: horizonTaxFree(res) - baseTaxFree,
       };
     }
     return out;
@@ -427,6 +434,7 @@ export default function WhatIfView({
       netWorth: setNW - baseNW,
       takeHomeNow: setR.rows[0]?.takeHome ?? 0,
       deathTaxSaved: horizonDeathTax(baseR) - horizonDeathTax(setR),
+      taxFreeGained: horizonTaxFree(setR) - horizonTaxFree(baseR),
     } as Marginal;
   }, [baseline, catalog, active, values, config]);
 
@@ -684,6 +692,7 @@ export default function WhatIfView({
         netWorth: 0,
         takeHomeNow: 0,
         deathTaxSaved: 0,
+        taxFreeGained: 0,
       },
     income:
       card.id === "adjust-spending"
@@ -742,6 +751,7 @@ export default function WhatIfView({
             },
           }
         : undefined,
+    deathTaxRatePct: config.superDeathBenefit.taxedElementRatePct + config.superDeathBenefit.medicareLevyPct,
   });
 
   // Heading back to the planner: flush the active scenario to BOTH the working plan
@@ -1412,6 +1422,42 @@ function Sparkline({
   );
 }
 
+// The cash-out recontribution is balance-neutral, so its death-tax saving is exactly the
+// super it converts from taxable to tax-free × the death-benefit tax rate. Spell that out
+// so the "$X saved" number is traceable.
+function RecontributionBreakdown({ delta, life, ratePct }: { delta: Marginal; life: number; ratePct: number }) {
+  const converted = Math.max(0, delta.taxFreeGained);
+  const saved = Math.max(0, delta.deathTaxSaved);
+  return (
+    <div className="mt-2 rounded-lg border border-accent/25 bg-accent/5 px-3 py-2 text-xs">
+      <div className="mb-1.5 text-[10px] uppercase tracking-wide text-accent">How the tax saving is worked out</div>
+      <div className="space-y-1">
+        <div className="flex items-baseline justify-between gap-3">
+          <span className="text-muted">
+            Taxable super moved to tax-free<span className="ml-1 text-[10px] text-muted/70">by age {life}</span>
+          </span>
+          <span className="shrink-0 font-semibold tabular-nums text-slate-200">{fmtCurrency(Math.round(converted))}</span>
+        </div>
+        <div className="flex items-baseline justify-between gap-3">
+          <span className="text-muted">
+            Death-benefit tax rate<span className="ml-1 text-[10px] text-muted/70">to adult children</span>
+          </span>
+          <span className="shrink-0 font-semibold tabular-nums text-slate-200">× {ratePct}%</span>
+        </div>
+        <div className="flex items-baseline justify-between gap-3 border-t border-line pt-1">
+          <span className="font-medium text-slate-200">Tax your beneficiaries save</span>
+          <span className="shrink-0 font-semibold tabular-nums text-accent">≈ {fmtCurrency(Math.round(saved))}</span>
+        </div>
+      </div>
+      <p className="mt-1.5 text-[10px] leading-relaxed text-muted/75">
+        Only the taxable component is taxed on death, so the saving is the amount converted × the rate. It&apos;s measured at
+        age {life} — the figure is what&apos;s left of the converted amount after your drawdown to then, not the total ever
+        recontributed.
+      </p>
+    </div>
+  );
+}
+
 function ImpactBreakdown({ delta, income, life }: { delta: Marginal; income: IncomeCalc; life: number }) {
   const nwDiffers = Math.abs(delta.netWorth - delta.moneyLeft) >= 2_000;
   const incomeReady = !!income && income.value != null && !income.stale;
@@ -1544,10 +1590,12 @@ function StrategyCardRow({
   onTimeline,
   guardrails,
   sustainable,
+  deathTaxRatePct,
 }: {
   card: StrategyCard;
   on: boolean;
   delta: Marginal;
+  deathTaxRatePct: number;
   // The 85% "Extra you could spend" figure — computed on demand (null for cards where
   // it isn't meaningful, e.g. Adjust spending). `stale` = inputs changed since it ran.
   income: IncomeCalc;
@@ -1732,6 +1780,9 @@ function StrategyCardRow({
             </div>
           ) : (
             <ImpactBreakdown delta={delta} income={income} life={life} />
+          )}
+          {card.id === "recontribute-super" && delta.deathTaxSaved >= 500 && (
+            <RecontributionBreakdown delta={delta} life={life} ratePct={deathTaxRatePct} />
           )}
           {card.params.map((pm) => {
             // A discrete CHOICE param (who / mode) → a segmented control, not a slider.
