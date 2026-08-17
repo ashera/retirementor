@@ -52,6 +52,17 @@ export interface KbArticle {
   sections: KbSection[];
   examples?: KbExample[];
   related?: string[]; // slugs of related articles
+  published?: string; // YYYY-MM-DD first-published date (for Article schema + sitemap); defaults to KB_PUBLISHED_DEFAULT
+}
+
+// Baseline publish date for the batch-authored library, used where an article has no
+// explicit `published`. Kept STABLE (not the build date) so Article dateModified and the
+// sitemap lastModified don't churn on every deploy, which reads as manipulative.
+export const KB_PUBLISHED_DEFAULT = "2026-08-01";
+
+/** The first-published date for an article (its own, or the library baseline). */
+export function articleDate(a: KbArticle): string {
+  return a.published ?? KB_PUBLISHED_DEFAULT;
 }
 
 export const KB_ARTICLES: KbArticle[] = [

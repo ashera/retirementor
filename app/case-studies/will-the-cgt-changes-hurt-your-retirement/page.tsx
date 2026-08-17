@@ -9,6 +9,7 @@ import { DEFAULT_PLAN, type RetirementPlan, type Person } from "@/lib/au/types";
 import type { EngineConfig } from "@/lib/au/config";
 import { SITE_URL } from "@/lib/site";
 import { caseStudyBySlug } from "@/lib/caseStudies";
+import { articleLd, breadcrumbLd } from "@/lib/seo";
 
 export const revalidate = 3600;
 
@@ -67,6 +68,14 @@ export default async function CgtCaseStudy() {
 
   return (
     <main className="mx-auto max-w-3xl px-5 py-12">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify([
+        articleLd({ headline: meta.title, description: meta.dek, path: `/case-studies/${meta.slug}`, datePublished: meta.date, section: "Case study" }),
+        breadcrumbLd([
+          { name: "Home", path: "/" },
+          { name: "Case studies", path: "/case-studies" },
+          { name: meta.title, path: `/case-studies/${meta.slug}` },
+        ]),
+      ]) }} />
       <div className="mb-6 text-sm">
         <Link href="/case-studies" className="text-muted hover:text-white">← Case studies</Link>
       </div>

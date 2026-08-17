@@ -9,6 +9,7 @@ import { DEFAULT_PLAN, type RetirementPlan } from "@/lib/au/types";
 import { fmtCurrency } from "@/lib/au/format";
 import { SITE_URL } from "@/lib/site";
 import { caseStudyBySlug } from "@/lib/caseStudies";
+import { articleLd, breadcrumbLd } from "@/lib/seo";
 
 export const revalidate = 3600; // marketing content — recompute at most hourly
 
@@ -80,8 +81,18 @@ export default async function StressTestCaseStudy() {
     );
   };
 
+  const jsonLd = [
+    articleLd({ headline: meta.title, description: meta.dek, path: `/case-studies/${SLUG}`, datePublished: meta.date, section: "Case study" }),
+    breadcrumbLd([
+      { name: "Home", path: "/" },
+      { name: "Case studies", path: "/case-studies" },
+      { name: meta.title, path: `/case-studies/${SLUG}` },
+    ]),
+  ];
+
   return (
     <main className="mx-auto max-w-3xl px-5 py-12">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <div className="mb-6 text-sm">
         <Link href="/case-studies" className="text-muted hover:text-white">← Case studies</Link>
       </div>

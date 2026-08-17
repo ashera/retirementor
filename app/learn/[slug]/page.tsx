@@ -2,7 +2,8 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { SITE_URL } from "@/lib/site";
-import { KB_ARTICLES, getArticle } from "@/lib/knowledgeBase";
+import { KB_ARTICLES, getArticle, articleDate } from "@/lib/knowledgeBase";
+import { articleLd, breadcrumbLd } from "@/lib/seo";
 import KbContent from "@/components/KbContent";
 import TtrFlowButton from "@/components/TtrFlowButton";
 import { TTR_FLOW_EXAMPLE } from "@/lib/au/ttrFlow";
@@ -31,14 +32,20 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
 
   const related = (a.related ?? []).map(getArticle).filter((x): x is NonNullable<typeof x> => !!x);
 
-  const jsonLd = {
-    "@context": "https://schema.org",
-    "@type": "Article",
-    headline: a.title,
-    description: a.summary,
-    url: `${SITE_URL}/learn/${a.slug}`,
-    isPartOf: { "@type": "WebSite", name: "RetireWiz", url: SITE_URL },
-  };
+  const jsonLd = [
+    articleLd({
+      headline: a.title,
+      description: a.summary,
+      path: `/learn/${a.slug}`,
+      datePublished: articleDate(a),
+      section: a.category,
+    }),
+    breadcrumbLd([
+      { name: "Home", path: "/" },
+      { name: "Knowledge base", path: "/learn" },
+      { name: a.title, path: `/learn/${a.slug}` },
+    ]),
+  ];
 
   return (
     <main className="mx-auto max-w-3xl px-5 py-10">

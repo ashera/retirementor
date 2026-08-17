@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { SITE_URL } from "@/lib/site";
+import { breadcrumbLd } from "@/lib/seo";
 import AgedCareCalculator from "@/components/AgedCareCalculator";
 
 const title = "Aged care cost calculator — Australia (2026)";
@@ -14,16 +15,25 @@ export const metadata: Metadata = {
   openGraph: { title, description, url: `${SITE_URL}/learn/aged-care-calculator`, type: "website" },
 };
 
-const jsonLd = {
-  "@context": "https://schema.org",
-  "@type": "WebApplication",
-  name: "Aged care cost calculator",
-  applicationCategory: "FinanceApplication",
-  operatingSystem: "Web",
-  url: `${SITE_URL}/learn/aged-care-calculator`,
-  description,
-  offers: { "@type": "Offer", price: "0", priceCurrency: "AUD" },
-};
+const jsonLd = [
+  {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    name: "Aged care cost calculator",
+    applicationCategory: "FinanceApplication",
+    operatingSystem: "Web",
+    url: `${SITE_URL}/learn/aged-care-calculator`,
+    description,
+    inLanguage: "en-AU",
+    isAccessibleForFree: true,
+    offers: { "@type": "Offer", price: "0", priceCurrency: "AUD" },
+  },
+  breadcrumbLd([
+    { name: "Home", path: "/" },
+    { name: "Knowledge base", path: "/learn" },
+    { name: "Aged care cost calculator", path: "/learn/aged-care-calculator" },
+  ]),
+];
 
 export default function AgedCareCalculatorPage() {
   return (
