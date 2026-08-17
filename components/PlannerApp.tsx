@@ -26,6 +26,7 @@ import GuidedIntro from "@/components/GuidedIntro";
 import GetStartedPanel from "@/components/GetStartedPanel";
 import NewScenarioModal from "@/components/NewScenarioModal";
 import ConfidenceHero, { type PlanChip } from "@/components/ConfidenceHero";
+import { useHeavyMetrics } from "@/components/useHeavyMetrics";
 import {
   AgePensionExplainer,
   LikelihoodExplainer,
@@ -33,10 +34,10 @@ import {
   RetirementIncomeGoalExplainer,
   SuperAtRetirementExplainer,
 } from "@/components/explainers";
-import { runMonteCarlo, MC_CONFIDENCE_TARGET, MC_CONFIDENCE_MC, MC_CONFIDENCE_VERIFY } from "@/lib/au/montecarlo";
+import { MC_CONFIDENCE_TARGET, MC_CONFIDENCE_MC, MC_CONFIDENCE_VERIFY } from "@/lib/au/montecarlo";
 import { failsafeSpend as historicalFailsafe } from "@/lib/au/stresstest";
 import { streamNamesLabel } from "@/lib/au/yearIncome";
-import { whatWillItTake, earliestRetirement } from "@/lib/au/goalseek";
+import { whatWillItTake } from "@/lib/au/goalseek";
 import { maxSpendForConfidence, withSpend, appliedStrategies } from "@/lib/au/strategies";
 import { composeScenario, toActiveScenario, EMPTY_LAYER, type StrategyLayer } from "@/lib/au/scenario";
 import { initialWithdrawal, withdrawalBand } from "@/lib/au/withdrawal";
@@ -622,14 +623,17 @@ export default function PlannerApp({
     ],
     [lifeEvents, applied, storable],
   );
-  const mc = useMemo(() => runMonteCarlo(plan, config), [plan, config]);
-  const successPct = Math.round(mc.successRate * 100);
+  // The confidence Monte Carlo (~350ms) and the earliest-retirement solver (~700ms) are
+  // the two heaviest computations; running them synchronously here blocked first paint
+  // (badly on iOS/Safari). They now run in a Web Worker, computed after paint — the page
+  // renders immediately and these fill in when ready (`mc`/`earliest` are null until the
+  // first result, then hold the last value while a plan change recomputes). The cheap
+  // deterministic goal-seek (~20ms) stays synchronous — lots of UI reads it inline.
+  const { mc, earliest } = useHeavyMetrics(plan, config, ready && configured);
+  const successPct = mc ? Math.round(mc.successRate * 100) : null;
   const successTone: "accent" | "amber" | "red" =
-    mc.successRate >= 0.85 ? "accent" : mc.successRate >= 0.6 ? "amber" : "red";
+    !mc ? "amber" : mc.successRate >= 0.85 ? "accent" : mc.successRate >= 0.6 ? "amber" : "red";
   const gs = useMemo(() => whatWillItTake(plan, config), [plan, config]);
-  // "How early can I retire?" — earliest retirement age that still clears the
-  // Monte Carlo confidence bar, holding spend fixed (the FIRE lens).
-  const earliest = useMemo(() => earliestRetirement(plan, config), [plan, config]);
 
   // Prudent max spend: the most you can spend while Monte Carlo success still
   // clears the shared 85% bar (matching the What-If safe spend and the boost
@@ -1499,13 +1503,13 @@ export default function PlannerApp({
         central={centralTotal}
         safe={safeTotal}
         failsafe={failsafeTotal}
-        confidencePct={successPct}
+        confidencePct={successPct ?? 0}
         assumedReturnPct={plan.investmentReturn}
         lifeExpectancy={plan.lifeExpectancy}
         lastsToLE={result.lastsToLifeExpectancy}
         depletedAge={result.depletedAge}
         pending={mcMaxPending}
-        loading={safeLiving == null || failsafeLiving == null}
+        loading={successPct == null || safeLiving == null || failsafeLiving == null}
         whatIfHref={whatIfHref}
         stressHref={stressHref}
         scenarioName={shared ? null : activeName}
@@ -1610,7 +1614,7 @@ export default function PlannerApp({
                 <WithdrawalRateStatExplainer
                   result={result}
                   plan={plan}
-                  successPct={successPct}
+                  successPct={successPct ?? 0}
                   safeRate={safeRate}
                   flexSafeRate={flexSafeRate}
                   safePending={safeRatePending}
@@ -1757,7 +1761,7 @@ export default function PlannerApp({
                 locked={retireOverridden}
                 lockNote={lockNote("Retire later")}
               />
-              {!retireOverridden && earliest.age != null && earliest.age < plan.retirementAge && (
+              {!retireOverridden && earliest?.age != null && earliest.age < plan.retirementAge && (
                 <button
                   onClick={() => retireEveryoneAt(earliest.age!)}
                   className="mt-1.5 text-xs font-medium text-accent transition hover:underline"
@@ -1942,7 +1946,7 @@ export default function PlannerApp({
             </div>
             <h2 className="flex items-center gap-2 font-semibold text-white">
               How likely is this plan to work?
-              <LikelihoodExplainer plan={plan} mc={mc} />
+              {mc && <LikelihoodExplainer plan={plan} mc={mc} />}
             </h2>
             <button
               onClick={() => setShowReturnSeries(true)}
@@ -1966,7 +1970,15 @@ export default function PlannerApp({
           config={config}
         />
 
-        {(() => {
+        {!mc ? (
+          <div className="mt-3 flex items-center gap-2.5 text-slate-300" aria-busy="true">
+            <svg className="h-5 w-5 animate-spin text-accent" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-90" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V0C5.4 0 0 5.4 0 12h4z" />
+            </svg>
+            <span className="text-sm">Running thousands of market scenarios…</span>
+          </div>
+        ) : (() => {
           const s = mc.successRate;
           const hex = s >= 0.85 ? "#34d399" : s >= 0.6 ? "#f59e0b" : "#ef4444";
           const cls =
@@ -1993,6 +2005,7 @@ export default function PlannerApp({
               </div>
               {(() => {
                 const e = earliest;
+                if (!e) return null;
                 if (e.age == null) {
                   return (
                     <p className="mt-2.5 text-sm text-amber-300">
@@ -2073,6 +2086,8 @@ export default function PlannerApp({
           );
         })()}
 
+        {mc && (
+        <>
         <FanChart
           fan={mc.fan}
           retirementAge={result.retirementAge}
@@ -2130,7 +2145,10 @@ export default function PlannerApp({
             </>
           );
         })()}
+        </>
+        )}
       </div>
+      {/* end likelihood */}
 
       {/* What will it take? (goal-seek) */}
       <div id="what-will-it-take" className="mt-4 scroll-mt-6 rounded-2xl border border-line bg-panel p-6">
@@ -2414,7 +2432,7 @@ export default function PlannerApp({
           plan={plan}
           config={config}
           result={result}
-          successPct={successPct}
+          successPct={successPct ?? 0}
           applied={applied}
           scenarioId={activePlan.id}
           scenarioName={activeName ?? activePlan.name}
@@ -2648,6 +2666,7 @@ export default function PlannerApp({
         })()}
 
       {fanAge != null &&
+        mc &&
         (() => {
           const point = mc.fan.find((f) => f.age === fanAge);
           if (!point) return null;
