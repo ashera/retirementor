@@ -737,6 +737,15 @@ export const KB_ARTICLES: KbArticle[] = [
         ],
       },
       {
+        heading: "Where the money lands: pension, accumulation and the cap",
+        body: [
+          { p: "There's a wrinkle worth understanding, because it's where the strategy can trip up. A non-concessional contribution **can't go into an existing account-based pension** — it has to land in an **accumulation** account. And in accumulation, earnings are **taxed at 15%**, not tax-free as they are in pension phase." },
+          { p: "So a recontribution actually moves money **out of the tax-free pension environment and into accumulation**. To get it back to earning tax-free, you **start a fresh account-based pension** with it — which is why the strategy is usually run as a **commute → recontribute → restart the pension** refresh, resetting the tax-free/taxable split across your whole balance in one go." },
+          { note: "The limit on all this is the [Transfer Balance Cap](/learn/transfer-balance-cap) — the lifetime ceiling (around $2 million) on how much you can hold in a tax-free pension. You can only move the money back into pension phase if you have **cap room**. If you're already at the cap, the recontributed amount is stranded in **accumulation** and its earnings are taxed at 15% — a drag that can eat into, or even outweigh, the death-tax saving." },
+          { p: "RetireWiz models the refresh: it routes the recontributed amount back into your pension pool up to your remaining Transfer Balance Cap, so for a retiree under the cap the money stays in retirement phase and keeps earning tax-free. Only an amount that would push you over the cap is left in accumulation." },
+        ],
+      },
+      {
         heading: "A worked example",
         body: [
           { p: "Meg, 66 and retired, has **$500,000** in super — all of it the taxable component. If she died today and left it to her adult son, he'd pay about **17% × $500,000 ≈ $85,000** in death-benefit tax." },
@@ -846,7 +855,7 @@ export const KB_ARTICLES: KbArticle[] = [
       {
         heading: "What it doesn't do",
         body: [
-          { p: "Since 2017 a TTR pension's **earnings are taxed at 15%**, the same as accumulation — so there's **no earnings advantage**, only the contribution swap. TTR pension payments must be between **4% and 10%** of the pension balance each year. And the extra sacrifice is capped by your **[concessional contributions cap](/learn/contribution-caps)** (~$32,500/yr including the Super Guarantee)." },
+          { p: "Since 2017 a TTR pension's **earnings are taxed at 15%**, the same as accumulation — so there's **no earnings advantage**, only the contribution swap. TTR pension payments must be between **4% and 10%** of the pension balance each year. And the extra sacrifice is capped by your [concessional contributions cap](/learn/contribution-caps) (~$32,500/yr including the Super Guarantee)." },
           { p: "It's most powerful in the years just before you retire, while you're still on a high marginal rate. Once you stop work, an ordinary account-based pension takes over." },
         ],
       },
