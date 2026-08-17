@@ -107,7 +107,8 @@ interface Marginal {
   netWorth: number; // change in total net worth (incl. home + property) at life expectancy
   takeHomeNow: number; // working-year take-home pay with this lever alone (salary-sacrifice hit)
   deathTaxSaved: number; // reduction in the super death-benefit tax at the planning age (+ = less tax for beneficiaries)
-  taxFreeGained: number; // increase in super's tax-free component at the planning age (the amount converted)
+  taxFreeGained: number; // increase in super's tax-free component at the planning age (the amount converted, net at horizon)
+  taxFreePeak: number; // the highest the tax-free component reaches with this lever (peak, before it's drawn down)
 }
 
 /** Super death-benefit tax at the projection horizon (0 if none / depleted). */
@@ -403,6 +404,7 @@ export default function WhatIfView({
         takeHomeNow: res.rows[0]?.takeHome ?? 0,
         deathTaxSaved: baseDeathTax - horizonDeathTax(res),
         taxFreeGained: horizonTaxFree(res) - baseTaxFree,
+        taxFreePeak: Math.max(0, ...res.rows.map((r) => r.breakdown.superTaxFree ?? 0)),
       };
     }
     return out;
@@ -435,6 +437,7 @@ export default function WhatIfView({
       takeHomeNow: setR.rows[0]?.takeHome ?? 0,
       deathTaxSaved: horizonDeathTax(baseR) - horizonDeathTax(setR),
       taxFreeGained: horizonTaxFree(setR) - horizonTaxFree(baseR),
+      taxFreePeak: 0,
     } as Marginal;
   }, [baseline, catalog, active, values, config]);
 
@@ -693,6 +696,7 @@ export default function WhatIfView({
         takeHomeNow: 0,
         deathTaxSaved: 0,
         taxFreeGained: 0,
+        taxFreePeak: 0,
       },
     income:
       card.id === "adjust-spending"
@@ -1428,13 +1432,16 @@ function Sparkline({
 function RecontributionBreakdown({ delta, life, ratePct }: { delta: Marginal; life: number; ratePct: number }) {
   const converted = Math.max(0, delta.taxFreeGained);
   const saved = Math.max(0, delta.deathTaxSaved);
+  // Only mention the peak when it's meaningfully bigger than what's left at the horizon
+  // (i.e. drawdown has eroded it) — that's what explains "why not the full amount I recontributed".
+  const eroded = delta.taxFreePeak > converted * 1.25 && delta.taxFreePeak - converted > 50_000;
   return (
     <div className="mt-2 rounded-lg border border-accent/25 bg-accent/5 px-3 py-2 text-xs">
       <div className="mb-1.5 text-[10px] uppercase tracking-wide text-accent">How the tax saving is worked out</div>
       <div className="space-y-1">
         <div className="flex items-baseline justify-between gap-3">
           <span className="text-muted">
-            Taxable super moved to tax-free<span className="ml-1 text-[10px] text-muted/70">by age {life}</span>
+            Extra tax-free super<span className="ml-1 text-[10px] text-muted/70">still tax-free at age {life}</span>
           </span>
           <span className="shrink-0 font-semibold tabular-nums text-slate-200">{fmtCurrency(Math.round(converted))}</span>
         </div>
@@ -1450,9 +1457,15 @@ function RecontributionBreakdown({ delta, life, ratePct }: { delta: Marginal; li
         </div>
       </div>
       <p className="mt-1.5 text-[10px] leading-relaxed text-muted/75">
-        Only the taxable component is taxed on death, so the saving is the amount converted × the rate. It&apos;s measured at
-        age {life} — the figure is what&apos;s left of the converted amount after your drawdown to then, not the total ever
-        recontributed.
+        This is a snapshot at age {life} (when the death-benefit tax is worked out), not the total you recontribute — only the
+        taxable part is taxed on death, so the saving is the tax-free amount that&apos;s <em>still there then</em> × the rate.
+        {eroded && (
+          <>
+            {" "}The strategy converts much more during the recontribution years — your tax-free component peaks near{" "}
+            <span className="text-slate-300">{fmtCompact(delta.taxFreePeak)}</span> — but it&apos;s drawn down over the years to {life}.
+          </>
+        )}{" "}
+        It cuts the tax most if death comes closer to when you recontribute.
       </p>
     </div>
   );

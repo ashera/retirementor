@@ -141,7 +141,7 @@ export default function DeathBenefitCard({
                 <p className="mt-1.5 flex items-start gap-1 text-[11px] leading-relaxed text-accent">
                   <span aria-hidden>↓</span>
                   <span>
-                    Your recontribution strategy is cutting this by ≈{fmtCurrency(Math.round(reconSaving))}.
+                    Your recontribution strategy has saved your beneficiaries ≈{fmtCurrency(Math.round(reconSaving))} in tax.
                   </span>
                 </p>
               )}
