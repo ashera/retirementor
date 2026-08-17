@@ -696,6 +696,90 @@ export const KB_ARTICLES: KbArticle[] = [
     related: ["super-vs-outside", "transfer-balance-cap", "fees"],
   },
   {
+    slug: "recontribution-strategy",
+    title: "Recontribution: turning taxable super into tax-free",
+    category: "Super, tax & contributions",
+    summary:
+      "Withdraw a lump sum from super after 60 and put it straight back as an after-tax contribution. It doesn't change how much you have — it converts the 'taxable' part of your super into the 'tax-free' part, which mainly cuts the tax your beneficiaries pay when you die.",
+    keywords: ["recontribution", "recontribution strategy", "cash out and recontribute", "taxable component", "tax-free component", "super death benefit tax", "death benefit tax", "non-dependant", "adult children", "spouse equalisation", "non-concessional contribution"],
+    sections: [
+      {
+        body: [
+          { p: "A **recontribution strategy** is simple in outline: once you're over 60 and can access your super, you **withdraw a lump sum** (tax-free), then **put it straight back in** as an after-tax (non-concessional) contribution. Your balance ends up the same — but the **tax character** of your super changes." },
+        ],
+      },
+      {
+        heading: "Why it works: the two components of super",
+        body: [
+          { p: "Every super balance is made of two components, and they're taxed differently **when someone else inherits it**:" },
+          {
+            table: {
+              headers: ["Component", "Where it comes from", "Tax on death to a non-dependant"],
+              rows: [
+                ["**Taxable**", "Employer (SG) and salary-sacrifice contributions, plus all fund earnings", "Taxed at about **15% (+2% Medicare)**"],
+                ["**Tax-free**", "The after-tax (non-concessional) contributions you've made", "**Nothing** — passes tax-free"],
+              ],
+            },
+          },
+          { p: "For most people super is **mostly taxable** — a whole career of pre-tax contributions and decades of earnings. That's fine while you're alive (from 60 it's all tax-free to you). It only bites when your super passes to a **non-dependant** — typically your **adult children**, who then pay tax on the taxable component. A spouse or a financially-dependent child pays nothing." },
+        ],
+      },
+      {
+        heading: "How the swap works",
+        body: [
+          { steps: [
+            "**Withdraw** a lump sum. From age 60 (once you've met a condition of release) this is **tax-free**, and it comes out of the taxable and tax-free components **proportionally**.",
+            "**Re-contribute** the same amount as a **non-concessional** (after-tax) contribution — it goes back in as **100% tax-free component**.",
+            "**Net effect:** your balance is unchanged, but a slice of your **taxable** component has become **tax-free**.",
+          ] },
+          { formula: "Converted this swap = withdrawal × (taxable component ÷ total balance)" },
+          { p: "Because each swap only converts the taxable **share** of what you take out, you repeat it over a few years (each within the contribution cap) to convert most of your balance — a little less converts each time as the tax-free share grows." },
+        ],
+      },
+      {
+        heading: "A worked example",
+        body: [
+          { p: "Meg, 66 and retired, has **$500,000** in super — all of it the taxable component. If she died today and left it to her adult son, he'd pay about **17% × $500,000 ≈ $85,000** in death-benefit tax." },
+          { p: "She withdraws **$130,000** (tax-free — she's over 60) and re-contributes it as a non-concessional contribution. Her balance is back to $500,000, but now **$130,000 is tax-free** and **$370,000 is taxable**." },
+          { note: "Her son's potential tax drops to about **17% × $370,000 ≈ $62,900** — roughly **$22,000 less**, from one swap. Repeating it over a few years converts most of the balance." },
+        ],
+      },
+      {
+        heading: "What it's used for",
+        body: [
+          { list: [
+            "**Cutting the death-benefit tax** for non-dependant beneficiaries (adult children) — the main use.",
+            "**Evening up super between spouses** — withdraw from one and contribute to the other, to balance two accounts (useful for making the most of **two** tax-free pension caps).",
+            "**Sheltering super from the Age Pension assets test** — moving money into a younger spouse's accumulation account, which isn't assessed until they reach [pension age](/learn/means-testing).",
+          ] },
+        ],
+      },
+      {
+        heading: "The rules and the catch",
+        body: [
+          { list: [
+            "You must be able to **access** your super (a condition of release — usually **age 60 and retired**, or **65** regardless).",
+            "The re-contribution is a **non-concessional contribution**, so it's capped — around **$130,000 a year**, or roughly three years' worth at once under the **bring-forward** rule (see [contribution caps](/learn/contribution-caps)).",
+            "You must be **under 75**, and your **total super balance** must be under the limit to make non-concessional contributions.",
+            "It only helps if you have a **taxable component** and a **non-dependant** beneficiary — for a spouse it makes no difference to the death-benefit tax.",
+          ] },
+          { note: "The mechanics — the caps, the bring-forward trigger, and timing — are technical, and a mistimed contribution can breach a cap. This is **general information, not advice**; get personal advice before acting." },
+        ],
+      },
+      {
+        heading: "In the planner",
+        body: [
+          { p: "RetireWiz tracks your taxable and tax-free components through the whole projection and shows, on your dashboard, the **tax your beneficiaries would pay** if you died at your planning age. The **Recontribute** lever on the [What-If board](/what-if) lets you model the strategy and see the effect." },
+        ],
+      },
+    ],
+    examples: [
+      { href: "/what-if", label: "What-If board", note: "Toggle the Recontribute lever and watch how it shifts the taxable/tax-free split." },
+    ],
+    related: ["super-vs-outside", "contribution-caps", "transfer-balance-cap", "drawdown-order"],
+    published: "2026-08-17",
+  },
+  {
     slug: "transfer-balance-cap",
     title: "The Transfer Balance Cap (tax-free super limit)",
     category: "Super, tax & contributions",
