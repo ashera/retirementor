@@ -106,6 +106,12 @@ interface Marginal {
   shortfallAvoided: number; // reduction in unfunded spending
   netWorth: number; // change in total net worth (incl. home + property) at life expectancy
   takeHomeNow: number; // working-year take-home pay with this lever alone (salary-sacrifice hit)
+  deathTaxSaved: number; // reduction in the super death-benefit tax at the planning age (+ = less tax for beneficiaries)
+}
+
+/** Super death-benefit tax at the projection horizon (0 if none / depleted). */
+function horizonDeathTax(res: SimResult): number {
+  return res.rows.length ? res.rows[res.rows.length - 1].breakdown.deathBenefitTax ?? 0 : 0;
 }
 
 /** On-demand state for a lever's 85% "Extra you could spend" figure. null when the
@@ -374,6 +380,7 @@ export default function WhatIfView({
     const baseScore = lastsScore(baseRes, life);
     const baseParts = planParts(baseRes);
     const baseTermNW = baseRes.rows.length ? rowNetWorth(baseRes.rows[baseRes.rows.length - 1]) : 0;
+    const baseDeathTax = horizonDeathTax(baseRes);
     const out: Record<string, Marginal> = {};
     for (const card of catalog) {
       const single = card.apply(baseline, resolveValues(card, values[card.id]));
@@ -388,6 +395,7 @@ export default function WhatIfView({
         shortfallAvoided,
         netWorth: termNW - baseTermNW,
         takeHomeNow: res.rows[0]?.takeHome ?? 0,
+        deathTaxSaved: baseDeathTax - horizonDeathTax(res),
       };
     }
     return out;
@@ -418,6 +426,7 @@ export default function WhatIfView({
       shortfallAvoided: bp.shortfall - sp.shortfall,
       netWorth: setNW - baseNW,
       takeHomeNow: setR.rows[0]?.takeHome ?? 0,
+      deathTaxSaved: horizonDeathTax(baseR) - horizonDeathTax(setR),
     } as Marginal;
   }, [baseline, catalog, active, values, config]);
 
@@ -674,6 +683,7 @@ export default function WhatIfView({
         shortfallAvoided: 0,
         netWorth: 0,
         takeHomeNow: 0,
+        deathTaxSaved: 0,
       },
     income:
       card.id === "adjust-spending"
@@ -1411,6 +1421,7 @@ function ImpactBreakdown({ delta, income, life }: { delta: Marginal; income: Inc
     { label: `Spendable funds at ${life}`, sub: "liquid super + savings", v: delta.moneyLeft },
     { label: "Spending shortfall avoided", sub: "spending you can now cover", v: delta.shortfallAvoided },
     ...(nwDiffers ? [{ label: `Net worth at ${life}`, sub: "adds your home & property", v: delta.netWorth }] : []),
+    ...(delta.deathTaxSaved >= 2_000 ? [{ label: "Death-benefit tax saved", sub: "less tax for your beneficiaries", v: delta.deathTaxSaved }] : []),
   ].filter((r) => "str" in r || Math.abs(r.v) >= 2_000);
   if (!rows.length && !income) return null;
   return (

@@ -532,9 +532,10 @@ export function buildStrategyCatalog(
     cards.push({
       id: "recontribute",
       group: "timing",
+      exclusive: "recontribute",
       label: "Recontribute savings to super",
       blurb:
-        "Move money from your outside-super savings back INTO super as an after-tax (non-concessional) contribution — a one-off, or every year over a range. Inside super its earnings are tax-free, instead of taxed in your own name outside, so the bigger your outside balance the more this saves. Allowed to age 75, within the non-concessional cap, your available savings and the total-super cap. (Its other real benefit — lower tax for your beneficiaries on death — isn't modelled here.)",
+        "Move money from your outside-super savings back INTO super as an after-tax (non-concessional) contribution — a one-off, or every year over a range. Inside super its earnings are tax-free, instead of taxed in your own name outside, so the bigger your outside balance the more this saves. Allowed to age 75, within the non-concessional cap, your available savings and the total-super cap. (To cut the tax your beneficiaries pay on your super, use the 'Recontribution (cut death-benefit tax)' lever instead — it recontributes from within super.)",
       params: [
         {
           key: "amount",
@@ -569,6 +570,51 @@ export function buildStrategyCatalog(
         );
       },
       apply: (p, v) => ({ ...p, recontribute: { perYear: v.amount, fromAge: v.fromAge, untilAge: Math.max(v.fromAge, v.untilAge) } }),
+    });
+  }
+
+  // --- Recontribution to cut death-benefit tax (cash out & recontribute WITHIN super) ---
+  // Unlike the savings top-up above, this withdraws from super itself and puts it back as
+  // a non-concessional contribution — a balance-neutral swap that converts the taxable
+  // component into tax-free, cutting the tax a non-dependant beneficiary pays on death.
+  if (plan.people.some((pp) => (pp.superBalance ?? 0) > 0)) {
+    const superAtAge = opts?.superAtAge;
+    const startAge = Math.min(75, Math.max(60, Math.round(plan.retirementAge)));
+    cards.push({
+      id: "recontribute-super",
+      group: "timing",
+      exclusive: "recontribute",
+      label: "Recontribution (cut death-benefit tax)",
+      blurb:
+        "After 60 you can withdraw from super tax-free and re-contribute it as an after-tax (non-concessional) contribution. It's balance-neutral — your projection barely moves — but it converts the TAXABLE part of your super into the TAX-FREE part, cutting the tax your beneficiaries (typically adult children) pay on your super when you die. See the 'Learn' article on recontribution for how it works, and your dashboard's estate card for the current tax.",
+      params: [
+        {
+          key: "amount",
+          label: "Amount (each year in the range)",
+          min: 0,
+          max: 130_000,
+          step: 5_000,
+          prefix: "$",
+          default: 120_000,
+          // Can't cash out more in a year than your accessible super holds then.
+          dynamicMax: (v) => (superAtAge ? Math.max(0, superAtAge(v.fromAge ?? startAge)) : Infinity),
+        },
+        { key: "fromAge", label: "From age", min: startAge, max: 75, step: 1, default: startAge, suffix: "yrs" },
+        { key: "untilAge", label: "Until age (same as From = one-off)", min: startAge, max: 75, step: 1, default: 75, suffix: "yrs" },
+      ],
+      note: (v) => {
+        const until = Math.max(v.fromAge, v.untilAge);
+        const when =
+          v.fromAge === until
+            ? `Cash out and recontribute ${fmtCurrency(v.amount)} at age ${v.fromAge}`
+            : `Cash out and recontribute ${fmtCurrency(v.amount)} each year from ${v.fromAge} to ${until}`;
+        return (
+          `${when} — a balance-neutral swap that moves that year's taxable share of your super into the tax-free ` +
+          `component. Your projected balance is unchanged; the payoff is less death-benefit tax for a non-dependant ` +
+          `beneficiary. Capped at the non-concessional limit (~$130k/yr) and your accessible super; not past 75.`
+        );
+      },
+      apply: (p, v) => ({ ...p, recontribute: { perYear: v.amount, fromAge: v.fromAge, untilAge: Math.max(v.fromAge, v.untilAge), source: "super" } }),
     });
   }
 
