@@ -1225,6 +1225,15 @@ export default function PlannerApp({
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3 text-sm">
         <Logo />
         <div className="flex items-center gap-3">
+        <Link
+          href="/learn"
+          className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-medium text-slate-200 transition hover:text-white"
+          title="Plain-English explainers for the concepts behind the planner"
+        >
+          <span aria-hidden>📚</span>
+          <span className="hidden sm:inline">Learn the concepts</span>
+          <span className="sm:hidden">Learn</span>
+        </Link>
         {country && (
           <span className="flex items-center" title="Your location">
             <CountryFlag code={country} showCode={false} />
