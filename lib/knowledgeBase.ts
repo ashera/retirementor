@@ -147,6 +147,74 @@ export const KB_ARTICLES: KbArticle[] = [
 
   // ─────────────────────────────── Aged care ─────────────────────────────────
   {
+    slug: "aged-care-in-australia",
+    title: "Aged care in Australia: costs, funding and the means test",
+    category: "Aged care",
+    summary:
+      "A complete guide to paying for aged care in Australia — the two types of care, the four residential fees, the RAD-vs-DAP room decision, the means test, and how it all flows through to your retirement plan and your estate.",
+    keywords: ["aged care australia", "my aged care", "residential aged care", "nursing home costs", "support at home", "aged care fees", "aged care means test", "aged care act 2025", "how much does aged care cost", "paying for aged care"],
+    sections: [
+      {
+        body: [
+          { p: "Aged care in Australia comes in two forms — **Support at Home** (help while you stay in your own home) and **residential aged care** (moving into a care home). The government fully funds the **clinical care**; you contribute to everyday living, accommodation and non-clinical care, scaled by a **means test**. This guide ties the pieces together — each section links to a deeper explainer, and you can put your own numbers into the [aged care cost calculator](/learn/aged-care-calculator)." },
+        ],
+      },
+      {
+        heading: "The two types of care",
+        body: [
+          { list: [
+            "**Support at Home** — the newer home-care program. Clinical care is free; everyday-living and independence services attract means-tested contributions under a combined lifetime cap.",
+            "**Residential aged care** — moving into a care home permanently. It carries four charges (below) plus the cost of your room.",
+          ] },
+        ],
+      },
+      {
+        heading: "What residential care costs",
+        body: [
+          { p: "Residential care has **four fees**. Clinical care (nursing, medical, allied health) is **fully government-funded** and never charged." },
+          {
+            table: {
+              headers: ["Fee", "What it is", "Amount (2026 vintage)"],
+              rows: [
+                ["Basic daily fee", "Flat — everyone pays; 85% of the single Age Pension", "~$65.55/day (~$23,900/yr)"],
+                ["Hotelling", "**Means-tested** — meals, cleaning, laundry, heating (no cap)", "up to ~$22.15/day (~$8,100/yr)"],
+                ["Care contribution (NCCC)", "**Means-tested**, **capped** at $137,917 or 4 years", "up to ~$107.32/day (~$39,200/yr)"],
+                ["Accommodation", "Your room — paid as a RAD, a DAP, or a mix", "~$570k RAD, or ~$45k/yr DAP"],
+              ],
+            },
+          },
+          { p: "Each fee — and what the acronyms mean — is broken down in [What aged care costs](/learn/aged-care-costs)." },
+        ],
+      },
+      {
+        heading: "Paying for the room: RAD or DAP",
+        body: [
+          { p: "You pay for the room as a **refundable lump sum (RAD)**, a **daily payment (DAP)**, or a mix. The RAD is refundable and **exempt from the Age Pension assets test** (so it can lift your pension); the DAP is an ongoing cost. Under the 2026 Aged Care Act the provider retains ~2%/yr of a RAD for up to 5 years (max 10%). See [Paying for aged care](/learn/aged-care-funding) for the full RAD-vs-DAP comparison and how your home fits in." },
+        ],
+      },
+      {
+        heading: "The means test",
+        body: [
+          { p: "How much of the hotelling and NCCC fees you pay scales with your **assessable assets and income** — from nothing (a full pensioner with modest savings) up to the maximums (a self-funded retiree). It's a **separate** test from the [Age Pension means test](/learn/means-testing), with its own rules — notably, your **former home is counted only up to a cap (~$214,884)**." },
+        ],
+      },
+      {
+        heading: "How it flows through your retirement plan",
+        body: [
+          { p: "Aged care isn't a one-off number — it's a late-life phase that interacts with the rest of your plan: the fees draw down your savings, a RAD moves money into an exempt (pension-lifting) asset, keeping or selling the home changes both your Age Pension and your care cost, and the net-of-retention deposit passes to your estate." },
+          { note: "Estimate your own fees — residential or at home, RAD vs DAP, keep vs sell — with the free [aged care cost calculator](/learn/aged-care-calculator), or model a full care phase inside your whole retirement plan in the [planner](/)." },
+        ],
+      },
+    ],
+    examples: [
+      { href: "/learn/aged-care-calculator", label: "Aged care cost calculator", note: "Estimate the fees, the means test and the RAD/DAP room payment for your situation." },
+      { href: "/scenario/aged-care-keep-home", label: "Margaret · keep the home + DAP", note: "~$116k/yr; the plan runs short at 87." },
+      { href: "/scenario/aged-care-sell-rad", label: "Margaret · sell to fund a RAD", note: "~$71k/yr; the RAD is refundable and assets-test exempt." },
+    ],
+    related: ["aged-care-costs", "aged-care-funding", "means-testing"],
+    published: "2026-08-17",
+  },
+  {
     slug: "aged-care-costs",
     title: "What aged care costs: the fees explained",
     category: "Aged care",
@@ -201,7 +269,7 @@ export const KB_ARTICLES: KbArticle[] = [
       { href: "/scenario/aged-care-keep-home", label: "Margaret · keep the home + DAP", note: "The four fees plus a ~$45k/yr DAP — ~$116k/yr, and the plan runs short at 87." },
       { href: "/scenario/aged-care-sell-rad", label: "Margaret · sell to fund a RAD", note: "No DAP, so ~$71k/yr; the RAD is refundable and assets-test exempt." },
     ],
-    related: ["aged-care-funding", "means-testing"],
+    related: ["aged-care-in-australia", "aged-care-funding", "means-testing"],
   },
   {
     slug: "aged-care-funding",
@@ -270,7 +338,7 @@ export const KB_ARTICLES: KbArticle[] = [
       { href: "/scenario/aged-care-keep-home", label: "Margaret · keep the home + DAP", note: "The idle-home trap: ~$116k/yr and the plan runs short at 87." },
       { href: "/scenario/aged-care-sell-rad", label: "Margaret · sell to fund a RAD", note: "The RAD route: ~$71k/yr, pension rises, plan lasts past 92, deposit refundable." },
     ],
-    related: ["aged-care-costs", "means-testing"],
+    related: ["aged-care-in-australia", "aged-care-costs", "means-testing"],
   },
 
   // ─────────────────────────── How the model works ───────────────────────────

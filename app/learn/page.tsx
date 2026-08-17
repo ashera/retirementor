@@ -46,22 +46,36 @@ export default function LearnIndex() {
         </p>
       </header>
 
-      <Link
-        href="/learn/aged-care-calculator"
-        className="mt-8 flex items-center gap-4 rounded-2xl border border-accent/30 bg-accent/[0.07] p-5 transition hover:border-accent/50 hover:bg-accent/10"
-      >
-        <span aria-hidden className="text-3xl">🏥</span>
-        <span className="min-w-0 flex-1">
-          <span className="flex items-center gap-2">
-            <span className="font-semibold text-white">Aged care cost calculator</span>
-            <span className="rounded-full bg-accent/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-accent">Interactive</span>
+      <div className="mt-8 grid gap-3 sm:grid-cols-2">
+        <Link
+          href="/learn/aged-care-calculator"
+          className="flex items-center gap-4 rounded-2xl border border-accent/30 bg-accent/[0.07] p-5 transition hover:border-accent/50 hover:bg-accent/10"
+        >
+          <span aria-hidden className="text-3xl">🏥</span>
+          <span className="min-w-0 flex-1">
+            <span className="flex items-center gap-2">
+              <span className="font-semibold text-white">Aged care calculator</span>
+              <span className="rounded-full bg-accent/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-accent">Interactive</span>
+            </span>
+            <span className="mt-0.5 block text-sm text-muted">Estimate residential or at-home care fees, the means test and the RAD/DAP room payment.</span>
           </span>
-          <span className="mt-0.5 block text-sm text-muted">
-            Estimate residential or at-home care fees — the means test, the RAD/DAP room payment and its retention.
+          <span aria-hidden className="text-accent">→</span>
+        </Link>
+        <Link
+          href="/learn/australian-retirement-statistics"
+          className="flex items-center gap-4 rounded-2xl border border-line bg-panel p-5 transition hover:border-accent/50 hover:bg-panel-2"
+        >
+          <span aria-hidden className="text-3xl">📊</span>
+          <span className="min-w-0 flex-1">
+            <span className="flex items-center gap-2">
+              <span className="font-semibold text-white">Retirement in numbers</span>
+              <span className="rounded-full bg-panel-2 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted">Reference</span>
+            </span>
+            <span className="mt-0.5 block text-sm text-muted">Age Pension rates, super caps, the ASFA standard, aged-care fees and longevity — with sources.</span>
           </span>
-        </span>
-        <span aria-hidden className="text-accent">→</span>
-      </Link>
+          <span aria-hidden className="text-accent">→</span>
+        </Link>
+      </div>
 
       <div className="mt-8">
         <KbSearch index={index} />
