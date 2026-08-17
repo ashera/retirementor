@@ -29,7 +29,8 @@ export type KbBlock =
   | { list: string[] } // bullet list
   | { steps: string[] } // numbered steps
   | { note: string } // highlighted callout
-  | { formula: string }; // monospace formula / worked line
+  | { formula: string } // monospace formula / worked line
+  | { table: { headers: string[]; rows: string[][]; caption?: string } }; // comparison table (cells support **bold** + [links]); LLM-friendly for AI summaries
 
 export interface KbSection {
   heading?: string;
@@ -218,11 +219,19 @@ export const KB_ARTICLES: KbArticle[] = [
       {
         heading: "RAD vs DAP: lump sum or daily",
         body: [
-          { list: [
-            "**RAD (lump sum)** — you pay the room price upfront. It's **refundable** (to you or your estate, less a small retained share) and **exempt from the Age Pension assets test** — so paying a RAD from assessable savings can actually **lift** your pension. The catch: it ties up a large sum and depends on the provider being able to refund it.",
-            "**DAP (daily)** — you pay interest on the room price at the MPIR (~7.96%) instead. Nothing large is tied up, but it's a real ongoing cost (~$45k/yr on a $570k room) that never comes back.",
-            "Many people pay a **combination** of the two.",
-          ] },
+          {
+            table: {
+              headers: ["", "RAD — lump sum", "DAP — daily"],
+              rows: [
+                ["What you pay", "The room price upfront (e.g. ~$570k)", "Interest on the room price at the MPIR (~7.96%)"],
+                ["Refundable?", "**Yes** — to you or your estate, less a small retained share", "**No** — an ongoing cost that never comes back"],
+                ["Age Pension assets test", "**Exempt** — paying it can **lift** your pension", "The money stays assessable"],
+                ["Cash tied up", "A large lump sum", "Nothing large tied up"],
+                ["Typical cost", "Retention ~2%/yr, capped at 10%", "~$45k/yr on a $570k room"],
+              ],
+              caption: "Many people pay a combination of the two. Figures are a 2026 vintage.",
+            },
+          },
           { formula: "DAP per year = unpaid room price × MPIR   (e.g. $570,000 × 7.96% ≈ $45,000)" },
         ],
       },
@@ -361,6 +370,17 @@ export const KB_ARTICLES: KbArticle[] = [
       {
         body: [
           { p: "A **steady** SWR assumes you spend the same real amount every year no matter what markets do. A **flexible** SWR assumes you'll respond: ease back a little when your portfolio falls a long way, and spend a bit more when it does well. Because you're not locked into overspending through a downturn, you can safely *start* from a higher rate — typically **1.5–2 percentage points** higher." },
+          {
+            table: {
+              headers: ["", "Fixed (steady) spending", "Flexible (guardrails) spending"],
+              rows: [
+                ["Starting withdrawal rate", "Lower — must survive the worst market", "**1.5–2pp higher**"],
+                ["In a downturn", "Hold spending (higher risk of running out)", "Trim ~10% at the rail (never below your essentials floor)"],
+                ["In a boom", "Hold spending", "Raise spending ~10%"],
+                ["Trade-off", "Predictable income, but you leave money unspent to be safe", "More income on average, but you must accept real cuts in bad years"],
+              ],
+            },
+          },
         ],
       },
       {
@@ -551,10 +571,17 @@ export const KB_ARTICLES: KbArticle[] = [
       {
         heading: "Two pools, two tax treatments",
         body: [
-          { list: [
-            "**Super (pension phase)** — once you retire and start an account-based pension, earnings and withdrawals are **tax-free** from age 60. The catch is access: it's locked until [preservation age](/learn/preservation-age-bridge).",
-            "**Outside super** — savings, shares, ETFs you can reach any time. **Dividends/distributions are taxed each year** at your marginal rate, and **capital growth is taxed only when you sell** (with the 50% CGT discount for assets held over a year).",
-          ] },
+          {
+            table: {
+              headers: ["", "Super (pension phase)", "Outside super"],
+              rows: [
+                ["Tax on earnings", "**Tax-free** from age 60", "Dividends/distributions taxed each year at your marginal rate"],
+                ["Tax on capital gains", "**None** in pension phase", "Taxed on sale (50% discount if held 12+ months)"],
+                ["Access", "Locked until [preservation age](/learn/preservation-age-bridge)", "Any time"],
+                ["Best used for", "Long-term tax-free compounding", "The early-retirement **bridge** before super unlocks"],
+              ],
+            },
+          },
         ],
       },
       {

@@ -60,6 +60,13 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
       <header className="mt-5">
         <h1 className="text-3xl font-bold text-white sm:text-4xl">{a.title}</h1>
         <p className="mt-3 text-lg leading-relaxed text-slate-300">{a.summary}</p>
+        <p className="mt-3 text-xs text-muted">
+          Updated{" "}
+          <time dateTime={articleDate(a)}>
+            {new Date(articleDate(a)).toLocaleDateString("en-AU", { day: "numeric", month: "long", year: "numeric" })}
+          </time>
+          {" · "}General information, not financial advice
+        </p>
       </header>
 
       <article className="mt-8">

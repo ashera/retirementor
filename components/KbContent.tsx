@@ -88,6 +88,39 @@ export default function KbContent({ sections }: { sections: KbSection[] }) {
                     <code className="whitespace-pre text-[13px] text-slate-200">{b.formula}</code>
                   </div>
                 );
+              if ("table" in b)
+                return (
+                  <figure key={j} className="overflow-x-auto rounded-xl border border-line">
+                    <table className="w-full border-collapse text-sm">
+                      <thead>
+                        <tr className="bg-panel-2">
+                          {b.table.headers.map((h, k) => (
+                            <th key={k} className="border-b border-line px-3 py-2 text-left font-semibold text-white">
+                              {renderInline(h)}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {b.table.rows.map((row, r) => (
+                          <tr key={r} className="odd:bg-panel/40">
+                            {row.map((cell, c) => (
+                              <td
+                                key={c}
+                                className={`border-b border-line/60 px-3 py-2 align-top leading-relaxed ${c === 0 ? "font-medium text-slate-200" : "text-slate-300"}`}
+                              >
+                                {renderInline(cell)}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    {b.table.caption && (
+                      <figcaption className="border-t border-line/60 bg-panel-2/50 px-3 py-2 text-[11px] text-muted">{renderInline(b.table.caption)}</figcaption>
+                    )}
+                  </figure>
+                );
               return null;
             })}
           </div>
