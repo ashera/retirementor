@@ -1051,15 +1051,22 @@ export function simulate(
       ages[0] >= reconFrom &&
       ages[0] <= reconUntil &&
       ages[0] <= 75;
-    if (reconEligible && recontribute!.source === "super") {
-      // Cash out from person 0's OWN accessible super and recontribute it as tax-free.
-      const p0Accessible = accessibleIdx.includes(0) ? superOf(0) : 0;
-      const take = Math.min(Math.max(0, recontribute!.perYear), config.nonConcessionalCap, p0Accessible);
-      if (take > EPS) {
-        drawSuper([0], take); // withdraw pro-rata (draws taxable + tax-free down together)
-        addToSuper(0, take); // re-contribute 100% as tax-free component — balance-neutral
-        recontributionNow = take; // accessibleSuper unchanged (out and back in the same year)
+    if (recontribute?.source === "super") {
+      // Cash-out recontribution: EACH partner who can access their super and is in the
+      // age window converts their OWN super — a per-person, balance-neutral swap. Each
+      // has their own non-concessional cap, so both can run it in the same year (for a
+      // couple this roughly doubles the taxable→tax-free conversion vs one partner).
+      let reconTotal = 0;
+      for (const i of accessibleIdx) {
+        if (ages[i] < reconFrom || ages[i] > reconUntil || ages[i] > 75) continue;
+        const take = Math.min(Math.max(0, recontribute.perYear), config.nonConcessionalCap, superOf(i));
+        if (take > EPS) {
+          drawSuper([i], take); // withdraw pro-rata (draws taxable + tax-free down together)
+          addToSuper(i, take); // re-contribute 100% as tax-free component — balance-neutral
+          reconTotal += take; // super unchanged (out and back in the same year)
+        }
       }
+      recontributionNow = reconTotal;
     } else if (reconEligible && outside > EPS && totalSuper() < config.transferBalanceCap) {
       const room = config.transferBalanceCap - totalSuper();
       const take = Math.min(Math.max(0, recontribute!.perYear), config.nonConcessionalCap, outside, room);

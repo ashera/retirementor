@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import Link from "next/link";
 import { fmtCurrency } from "@/lib/au/format";
+import { simulate } from "@/lib/au/simulate";
 import type { EngineConfig } from "@/lib/au/config";
 import type { RetirementPlan, SimResult } from "@/lib/au/types";
 import DeathBenefitWorkingsModal from "@/components/DeathBenefitWorkingsModal";
@@ -28,6 +29,18 @@ export default function DeathBenefitCard({
   onBeneficiaryChange: (b: Beneficiary) => void;
 }) {
   const [workings, setWorkings] = useState(false);
+
+  // If a cash-out recontribution strategy is active, how much death-benefit tax it saves
+  // vs the same plan without it (one extra deterministic sim). Declared BEFORE the early
+  // returns below so the hook order is stable.
+  const reconSaving = useMemo(() => {
+    if (plan.recontribute?.source !== "super") return 0;
+    const withRows = result.rows;
+    const withTax = withRows.length ? withRows[withRows.length - 1].breakdown.deathBenefitTax ?? 0 : 0;
+    const withoutRows = simulate({ ...plan, recontribute: undefined }, config).rows;
+    const withoutTax = withoutRows.length ? withoutRows[withoutRows.length - 1].breakdown.deathBenefitTax ?? 0 : 0;
+    return Math.max(0, withoutTax - withTax);
+  }, [plan, config, result]);
 
   const rows = result.rows;
   const horizon = rows[rows.length - 1];
@@ -124,6 +137,14 @@ export default function DeathBenefitCard({
                   Tax-free to a spouse/dependant. It can be taxed later when it passes from them to a non-dependant.
                 </p>
               )}
+              {reconSaving >= 500 && (
+                <p className="mt-1.5 flex items-start gap-1 text-[11px] leading-relaxed text-accent">
+                  <span aria-hidden>↓</span>
+                  <span>
+                    Your recontribution strategy is cutting this by ≈{fmtCurrency(Math.round(reconSaving))}.
+                  </span>
+                </p>
+              )}
             </div>
             <div className="rounded-xl border border-line bg-panel-2 p-4">
               <div className="text-xs font-medium text-muted">Your beneficiaries receive</div>
@@ -134,11 +155,19 @@ export default function DeathBenefitCard({
 
           <p className="mt-3 text-xs leading-relaxed text-muted">
             Your savings and home pass to your estate without this tax — it applies only to the taxable component of super.
-            {tax > 0 && beneficiary === "non-dependant" && (
+            {tax > 0 && beneficiary === "non-dependant" && reconSaving < 500 && (
               <>
                 {" "}
                 <Link href={whatIfHref} className="font-medium text-accent hover:underline">
                   A recontribution strategy could reduce this →
+                </Link>
+              </>
+            )}
+            {reconSaving >= 500 && (
+              <>
+                {" "}
+                <Link href={whatIfHref} className="font-medium text-accent hover:underline">
+                  Adjust it in What-If →
                 </Link>
               </>
             )}
