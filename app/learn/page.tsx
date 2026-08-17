@@ -46,6 +46,23 @@ export default function LearnIndex() {
         </p>
       </header>
 
+      <Link
+        href="/learn/aged-care-calculator"
+        className="mt-8 flex items-center gap-4 rounded-2xl border border-accent/30 bg-accent/[0.07] p-5 transition hover:border-accent/50 hover:bg-accent/10"
+      >
+        <span aria-hidden className="text-3xl">🏥</span>
+        <span className="min-w-0 flex-1">
+          <span className="flex items-center gap-2">
+            <span className="font-semibold text-white">Aged care cost calculator</span>
+            <span className="rounded-full bg-accent/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-accent">Interactive</span>
+          </span>
+          <span className="mt-0.5 block text-sm text-muted">
+            Estimate residential or at-home care fees — the means test, the RAD/DAP room payment and its retention.
+          </span>
+        </span>
+        <span aria-hidden className="text-accent">→</span>
+      </Link>
+
       <div className="mt-8">
         <KbSearch index={index} />
       </div>

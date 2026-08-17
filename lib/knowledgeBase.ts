@@ -185,6 +185,7 @@ export const KB_ARTICLES: KbArticle[] = [
       },
     ],
     examples: [
+      { href: "/learn/aged-care-calculator", label: "Aged care cost calculator", note: "Move the sliders to estimate the four fees, the RAD/DAP room payment and the means test for your own situation." },
       { href: "/scenario/aged-care-keep-home", label: "Margaret · keep the home + DAP", note: "The four fees plus a ~$45k/yr DAP — ~$116k/yr, and the plan runs short at 87." },
       { href: "/scenario/aged-care-sell-rad", label: "Margaret · sell to fund a RAD", note: "No DAP, so ~$71k/yr; the RAD is refundable and assets-test exempt." },
     ],
@@ -245,6 +246,7 @@ export const KB_ARTICLES: KbArticle[] = [
       },
     ],
     examples: [
+      { href: "/learn/aged-care-calculator", label: "Aged care cost calculator", note: "Try RAD vs DAP and keep-vs-sell yourself, and watch the estimated cost move." },
       { href: "/scenario/aged-care-keep-home", label: "Margaret · keep the home + DAP", note: "The idle-home trap: ~$116k/yr and the plan runs short at 87." },
       { href: "/scenario/aged-care-sell-rad", label: "Margaret · sell to fund a RAD", note: "The RAD route: ~$71k/yr, pension rises, plan lasts past 92, deposit refundable." },
     ],
