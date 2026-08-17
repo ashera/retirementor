@@ -125,9 +125,9 @@ export default function AgedCareCalculator() {
           </div>
 
           <MoneySlider
-            label="Savings, super & investments"
+            label="Savings, super & investments at entry"
             value={assets} min={0} max={3_000_000} step={10_000} onChange={(n) => setAssets(n)}
-            hint="Your assessable assets — everything except your home."
+            hint="Your assessable assets (everything except your home) at the time you ENTER care — that's when aged care means-tests you. If care is years away, use what you expect to have left then, not today's balance."
           />
 
           <div>
