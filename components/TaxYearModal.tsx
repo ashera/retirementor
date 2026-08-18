@@ -107,6 +107,36 @@ function PropertySaleBlock({ s }: { s: PropertySaleDetail }) {
   );
 }
 
+// Explains WHAT triggered the outside-super realised gains this year — units are sold to
+// fund spending, an aged-care deposit, or a recontribution, and each realises the pool's
+// built-up gain. So the "on $X of realised gains" figure isn't a mystery.
+const GAIN_SOURCE_LABELS: { key: "agedCare" | "recontribution" | "spending"; label: string }[] = [
+  { key: "agedCare", label: "Selling investments to fund your aged-care deposit (RAD)" },
+  { key: "recontribution", label: "Selling investments to recontribute into super" },
+  { key: "spending", label: "Selling investments to fund your retirement spending" },
+];
+
+function OutsideGainBlock({ sources }: { sources: { spending: number; agedCare: number; recontribution: number } }) {
+  const rows = GAIN_SOURCE_LABELS.filter((s) => sources[s.key] > 0.5);
+  const total = sources.spending + sources.agedCare + sources.recontribution;
+  if (total < 0.5) return null;
+  return (
+    <div className="rounded-xl border border-line bg-panel px-4 py-2">
+      {rows.map((s) => (
+        <Line key={s.key} label={s.label} value={`${cur(sources[s.key])} gain`} />
+      ))}
+      <div className="border-t border-line">
+        <Line label="= Realised capital gain" value={cur(total)} strong />
+      </div>
+      <p className="mt-1 text-[11px] leading-snug text-muted">
+        Your outside-super savings carry a built-up (unrealised) gain; selling units to raise cash realises a proportional
+        slice of it. Held over 12 months, half the gain is discounted, and each owner is taxed on their share at their own
+        marginal rate — that&apos;s the per-person capital gains tax shown above.
+      </p>
+    </div>
+  );
+}
+
 export default function TaxYearModal({
   row, plan, onClose, onPrev, onNext, canPrev, canNext,
 }: {
@@ -260,6 +290,16 @@ export default function TaxYearModal({
                   </div>
                 </section>
               )}
+
+              {b.outsideGainSources &&
+                b.outsideGainSources.spending + b.outsideGainSources.agedCare + b.outsideGainSources.recontribution > 0.5 && (
+                  <section>
+                    <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted">
+                      Realised investment gains — where they came from
+                    </h3>
+                    <OutsideGainBlock sources={b.outsideGainSources} />
+                  </section>
+                )}
 
               <div className="flex items-baseline justify-between gap-4 rounded-xl border border-accent/30 bg-accent/5 px-4 py-2.5">
                 <span className="text-sm font-semibold text-white">Total tax</span>

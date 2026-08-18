@@ -596,6 +596,10 @@ export interface YearBreakdown {
   propertyProceeds: number; // net proceeds added to outside super
   propertyCgt: number; // CGT paid on the sale
   propertySales?: PropertySaleDetail[]; // per-property sale working behind propertyCgt (which one, gain, discount, CGT)
+  // What triggered the OUTSIDE-super realised gains this year (the gross gain realised by
+  // selling units, by cause) — so the tax modal can explain their origin. Excludes the
+  // property sale (that has its own propertySales working).
+  outsideGainSources?: { spending: number; agedCare: number; recontribution: number };
   // Home equity freed this year (downsize / sell-up-and-rent). Lands in the
   // opening balance, so it explains a step-up rather than a mid-year inflow.
   homeProceeds: number; // total equity freed (0 normally)

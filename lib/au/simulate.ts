@@ -886,12 +886,15 @@ export function simulate(
 
     // Capital gains realised this year by selling outside-super units (to fund
     // spending, or to transfer into super) — taxed, with the discount, at year end.
+    // Tracked BY SOURCE so the tax breakdown can explain what triggered the sale.
     let realizedGain = 0;
-    const realizeOutside = (amount: number) => {
+    const realizedBySource = { spending: 0, agedCare: 0, recontribution: 0 };
+    const realizeOutside = (amount: number, source: keyof typeof realizedBySource = "spending") => {
       if (amount <= 0 || outside <= EPS) return;
       const gainFrac = Math.min(1, Math.max(0, unrealizedGain) / outside); // never realise more gain than the amount sold
       const g = amount * gainFrac;
       realizedGain += g;
+      realizedBySource[source] += g;
       unrealizedGain -= g;
     };
 
@@ -1071,7 +1074,7 @@ export function simulate(
       const room = config.transferBalanceCap - totalSuper();
       const take = Math.min(Math.max(0, recontribute!.perYear), config.nonConcessionalCap, outside, room);
       if (take > 0) {
-        realizeOutside(take); // moving units into super realises their gain
+        realizeOutside(take, "recontribution"); // moving units into super realises their gain
         outside -= take;
         addToSuper(0, take); // routes into the pension pool (tax-free) up to the cap
         if (ages[0] >= preservationAge) accessibleSuper += take; // joins the drawable/assessed pool
@@ -1128,7 +1131,7 @@ export function simulate(
         const u = Math.min(need, acHomeCash); acHomeCash -= u; need -= u; // home cash first
       }
       if (need > 0 && src !== "super") {
-        const u = Math.min(need, Math.max(0, outside)); realizeOutside(u); outside -= u; need -= u;
+        const u = Math.min(need, Math.max(0, outside)); realizeOutside(u, "agedCare"); outside -= u; need -= u;
       }
       if (need > 0) { const s = drawSuper(accessibleIdx, need); need -= s.accum + s.pension; }
       const unfundedLump = Math.max(0, need); // lump the liquid assets couldn't cover
@@ -1772,6 +1775,8 @@ export function simulate(
         incomeTax: retTaxDetail.reduce((s, d) => s + d.incomeTax, 0),
         medicare: retTaxDetail.reduce((s, d) => s + d.medicare, 0),
         capitalGains: retTaxDetail.reduce((s, d) => s + d.cgt, 0) + propertyCgt,
+        outsideGainSources:
+          realizedGain > 0.5 ? { ...realizedBySource } : undefined,
         taxDetail: retTaxDetail,
         agePension: agePensionAmt,
         pension: pensionBreakdown,
