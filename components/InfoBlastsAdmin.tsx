@@ -9,6 +9,8 @@ interface FormState {
   icon: string;
   title: string;
   subtext: string;
+  link_url: string;
+  link_label: string;
   enabled: boolean;
   sort_order: string;
 }
@@ -21,14 +23,14 @@ export default function InfoBlastsAdmin({ blasts }: { blasts: InfoBlast[] }) {
   const [pending, start] = useTransition();
   const [msg, setMsg] = useState<string | null>(null);
 
-  const blank = (): FormState => ({ icon: "✨", title: "", subtext: "", enabled: true, sort_order: String(blasts.length) });
+  const blank = (): FormState => ({ icon: "✨", title: "", subtext: "", link_url: "", link_label: "", enabled: true, sort_order: String(blasts.length) });
   const [form, setForm] = useState<FormState>(blank());
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) => setForm((f) => ({ ...f, [k]: v }));
   const editing = !!form.id;
 
   const loadForEdit = (b: InfoBlast) => {
     setMsg(null);
-    setForm({ id: b.id, icon: b.icon, title: b.title, subtext: b.subtext, enabled: b.enabled, sort_order: String(b.sort_order) });
+    setForm({ id: b.id, icon: b.icon, title: b.title, subtext: b.subtext, link_url: b.link_url ?? "", link_label: b.link_label ?? "", enabled: b.enabled, sort_order: String(b.sort_order) });
     if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -44,6 +46,8 @@ export default function InfoBlastsAdmin({ blasts }: { blasts: InfoBlast[] }) {
         icon: form.icon.trim(),
         title: form.title.trim(),
         subtext: form.subtext.trim(),
+        link_url: form.link_url.trim(),
+        link_label: form.link_label.trim(),
         enabled: form.enabled,
         sort_order: form.sort_order.trim() === "" ? 0 : Number(form.sort_order),
       });
@@ -111,15 +115,33 @@ export default function InfoBlastsAdmin({ blasts }: { blasts: InfoBlast[] }) {
           />
         </div>
 
+        <div className="mt-3 grid gap-3 sm:grid-cols-3">
+          <div className="sm:col-span-2">
+            <span className={label}>Link URL (optional)</span>
+            <input className={input} value={form.link_url} onChange={(e) => set("link_url", e.target.value)} placeholder="/learn/aged-care-calculator or https://…" />
+          </div>
+          <div>
+            <span className={label}>Button label</span>
+            <input className={input} value={form.link_label} onChange={(e) => set("link_label", e.target.value)} placeholder="Learn more" />
+          </div>
+        </div>
+
         {/* Live preview — matches the hero banner */}
         <div className="mt-4">
           <span className={label}>Preview</span>
-          <div className="flex items-start gap-3 rounded-2xl border border-accent/40 bg-accent/[0.08] px-4 py-3.5 ring-1 ring-inset ring-accent/10">
-            <span aria-hidden className="mt-0.5 text-2xl leading-none">{form.icon || "✨"}</span>
-            <div className="min-w-0 flex-1">
-              <div className="text-sm font-bold text-white">{form.title || "Your title here"}</div>
-              {form.subtext && <p className="mt-0.5 text-[13px] leading-snug text-slate-300">{form.subtext}</p>}
+          <div className="flex flex-col gap-2 rounded-2xl border border-accent/40 bg-accent/[0.08] px-3.5 py-3 ring-1 ring-inset ring-accent/10">
+            <div className="flex items-start gap-2.5">
+              <span aria-hidden className="text-xl leading-none">{form.icon || "✨"}</span>
+              <div className="min-w-0 flex-1">
+                <div className="text-[13px] font-bold leading-snug text-white">{form.title || "Your title here"}</div>
+                {form.subtext && <p className="mt-0.5 text-[11.5px] leading-snug text-slate-300">{form.subtext}</p>}
+              </div>
             </div>
+            {form.link_url.trim() && (
+              <span className="mt-0.5 inline-flex w-fit items-center gap-1 rounded-lg bg-accent px-2.5 py-1 text-[11px] font-semibold text-ink">
+                {form.link_label.trim() || "Learn more"} <span aria-hidden>→</span>
+              </span>
+            )}
           </div>
         </div>
 

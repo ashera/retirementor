@@ -1,7 +1,25 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { getActiveInfoBlasts, type InfoBlast } from "@/app/actions/infoblasts";
+
+// Optional call-to-action button for a blast. Internal paths use next/link; external
+// URLs open in a new tab.
+function BlastLink({ url, label }: { url: string; label: string }) {
+  const text = label.trim() || "Learn more";
+  const cls =
+    "inline-flex w-fit items-center gap-1 rounded-lg bg-accent px-2.5 py-1 text-[11px] font-semibold text-ink transition hover:brightness-110";
+  return url.startsWith("/") ? (
+    <Link href={url} className={cls}>
+      {text} <span aria-hidden>→</span>
+    </Link>
+  ) : (
+    <a href={url} target="_blank" rel="noopener noreferrer" className={cls}>
+      {text} <span aria-hidden>→</span>
+    </a>
+  );
+}
 
 const ROTATE_MS = 30_000;
 
@@ -49,12 +67,19 @@ export default function InfoBlastBanner() {
       role="status"
       aria-live="polite"
     >
-      <div className={`flex items-start gap-2.5 transition-opacity duration-300 ${entering ? "opacity-100" : "opacity-0"}`}>
-        <span aria-hidden className="text-xl leading-none">{b.icon || "✨"}</span>
-        <div className="min-w-0 flex-1">
-          <div className="text-[13px] font-bold leading-snug text-white">{b.title}</div>
-          {b.subtext && <p className="mt-0.5 text-[11.5px] leading-snug text-slate-300">{b.subtext}</p>}
+      <div className={`transition-opacity duration-300 ${entering ? "opacity-100" : "opacity-0"}`}>
+        <div className="flex items-start gap-2.5">
+          <span aria-hidden className="text-xl leading-none">{b.icon || "✨"}</span>
+          <div className="min-w-0 flex-1">
+            <div className="text-[13px] font-bold leading-snug text-white">{b.title}</div>
+            {b.subtext && <p className="mt-0.5 text-[11.5px] leading-snug text-slate-300">{b.subtext}</p>}
+          </div>
         </div>
+        {b.link_url && (
+          <div className="mt-2 pl-[30px]">
+            <BlastLink url={b.link_url} label={b.link_label} />
+          </div>
+        )}
       </div>
       {blasts.length > 1 && (
         <div className="flex items-center gap-1.5 pl-[30px]" aria-hidden>

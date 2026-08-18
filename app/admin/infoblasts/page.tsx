@@ -28,8 +28,8 @@ export default async function InfoBlastsAdminPage() {
         <div className="text-sm font-semibold uppercase tracking-widest text-accent">Marketing · InfoBlasts</div>
         <h1 className="mt-1 text-3xl font-bold text-white">Hero banner announcements</h1>
         <p className="mt-2 text-muted">
-          Announcements shown in the banner on the dashboard hero card, above the What-If and Pressure Test buttons.
-          Enabled InfoBlasts rotate every 30 seconds; disable one to hide it without deleting it.
+          Announcements shown in the banner at the foot of the dashboard hero card&apos;s right column. Each can carry an
+          optional link button. Enabled InfoBlasts rotate every 30 seconds; disable one to hide it without deleting it.
         </p>
       </header>
 

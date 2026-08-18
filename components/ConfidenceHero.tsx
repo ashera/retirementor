@@ -297,16 +297,24 @@ export default function ConfidenceHero({
             </div>
           )}
 
-          <div className="mt-7 flex flex-wrap gap-2.5">
+          <p className="mt-7 text-sm leading-relaxed text-muted">
+            Two ways to go further with this plan.{" "}
+            <b className="font-semibold text-slate-200">What-If</b> lets you try strategies — downsizing, retiring earlier,
+            recontributing to super — and see the effect on your income and how long your money lasts.{" "}
+            <b className="font-semibold text-slate-200">Pressure testing</b> replays your plan through real market history —
+            the 1929 crash, the GFC, 2022 — to check it would have held up through the worst.
+          </p>
+
+          <div className="mt-3 flex flex-wrap gap-2.5">
             <Link
               href={whatIfHref}
-              className="rounded-xl border border-line bg-panel-2 px-4 py-2.5 text-sm font-semibold text-slate-200 transition hover:border-accent/50 hover:text-white"
+              className="rounded-xl border border-accent/40 bg-accent/10 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:border-accent/70 hover:bg-accent/20"
             >
               Boost it with What-If&apos;s <span aria-hidden className="text-accent">→</span>
             </Link>
             <Link
               href={stressHref}
-              className="rounded-xl border border-line bg-panel-2 px-4 py-2.5 text-sm font-semibold text-slate-200 transition hover:border-accent/50 hover:text-white"
+              className="rounded-xl border border-accent/40 bg-accent/10 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:border-accent/70 hover:bg-accent/20"
             >
               Pressure test it with History <span aria-hidden className="text-accent">→</span>
             </Link>

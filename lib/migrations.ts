@@ -314,11 +314,16 @@ create table if not exists info_blasts (
   icon text not null default '',
   title text not null,
   subtext text not null default '',
+  link_url text not null default '',
+  link_label text not null default '',
   enabled boolean not null default true,
   sort_order integer not null default 0,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+-- Optional call-to-action link (added after the initial info_blasts table).
+alter table info_blasts add column if not exists link_url text not null default '';
+alter table info_blasts add column if not exists link_label text not null default '';
 create index if not exists info_blasts_active_idx on info_blasts(enabled, sort_order, created_at);
 
 -- Compliance audit runs (e.g. ASIC RG 276 reviews): one row per run, plus its

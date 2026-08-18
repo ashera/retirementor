@@ -12,6 +12,8 @@ export interface InfoBlastInput {
   icon: string;
   title: string;
   subtext: string;
+  link_url: string;
+  link_label: string;
   enabled: boolean;
   sort_order: number;
 }
@@ -48,12 +50,17 @@ export async function saveInfoBlast(input: InfoBlastInput): Promise<Result> {
   const icon = (input.icon ?? "").trim();
   const subtext = (input.subtext ?? "").trim();
   const sort = Number.isFinite(input.sort_order) ? Math.round(input.sort_order) : 0;
+  const linkUrl = (input.link_url ?? "").trim();
+  if (linkUrl && !/^(https?:\/\/|\/)/.test(linkUrl)) {
+    return { error: "Link must start with http(s):// or / (an internal path)." };
+  }
+  const linkLabel = (input.link_label ?? "").trim();
 
   if (input.id) {
     const r = await query(
-      `update info_blasts set icon=$1, title=$2, subtext=$3, enabled=$4, sort_order=$5, updated_at=now()
-       where id=$6`,
-      [icon, title, subtext, input.enabled, sort, input.id],
+      `update info_blasts set icon=$1, title=$2, subtext=$3, link_url=$4, link_label=$5, enabled=$6, sort_order=$7, updated_at=now()
+       where id=$8`,
+      [icon, title, subtext, linkUrl, linkLabel, input.enabled, sort, input.id],
     );
     if (!r.rowCount) return { error: "InfoBlast not found." };
     revalidatePath("/admin/infoblasts");
@@ -62,9 +69,9 @@ export async function saveInfoBlast(input: InfoBlastInput): Promise<Result> {
   }
 
   const r = await query<{ id: string }>(
-    `insert into info_blasts (icon, title, subtext, enabled, sort_order)
-     values ($1, $2, $3, $4, $5) returning id`,
-    [icon, title, subtext, input.enabled, sort],
+    `insert into info_blasts (icon, title, subtext, link_url, link_label, enabled, sort_order)
+     values ($1, $2, $3, $4, $5, $6, $7) returning id`,
+    [icon, title, subtext, linkUrl, linkLabel, input.enabled, sort],
   );
   revalidatePath("/admin/infoblasts");
   revalidatePath("/");
