@@ -832,6 +832,72 @@ export const KB_ARTICLES: KbArticle[] = [
     related: ["todays-dollars", "contribution-caps"],
   },
   {
+    slug: "lito-sapto",
+    title: "LITO & SAPTO: the offsets that keep retirees' tax low",
+    category: "Super, tax & contributions",
+    summary:
+      "Two tax offsets — the Low Income Tax Offset (for everyone) and the Seniors and Pensioners Tax Offset (from Age Pension age) — cut the tax you owe. Together with the tax-free threshold and tax-free super, they're why most retirees pay little or no income tax.",
+    keywords: ["lito", "sapto", "low income tax offset", "seniors and pensioners tax offset", "senior tax offset", "retiree tax", "tax offset", "effective tax-free threshold", "how much can a retiree earn tax free", "rebate income", "pensioner tax"],
+    sections: [
+      {
+        body: [
+          { p: "**LITO** and **SAPTO** are **tax offsets** — they reduce the **tax you owe**, dollar for dollar, rather than reducing your income. Both are **non-refundable**: they can take a tax bill down to zero, but not below (there's no cash refund of an unused offset). The ATO works them out and applies them automatically." },
+        ],
+      },
+      {
+        heading: "LITO — the Low Income Tax Offset",
+        body: [
+          { p: "Available to **every** resident, LITO is worth up to **$700** and is clawed back as income rises:" },
+          { list: [
+            "Full **$700** while taxable income is up to about **$37,500**.",
+            "Withdrawn at **5c per $1** from there to about **$45,000** (leaving $325).",
+            "Then **1.5c per $1** until it cuts out completely near **$66,667**.",
+          ] },
+          { p: "With the **$18,200 tax-free threshold**, LITO means a working-age person pays no income tax until they earn about **$22,000**." },
+        ],
+      },
+      {
+        heading: "SAPTO — the Seniors and Pensioners Tax Offset",
+        body: [
+          { p: "SAPTO is an **extra** offset for people who have reached [Age Pension age](/learn/age-pension) (67) and pass an income test. It's worth up to **$2,230** for a single, or **$1,602 each** for a couple, and shades out at **12.5c per $1** of rebate income above the threshold — fully gone by about **$50,000** (single)." },
+          { note: "You don't have to actually receive the Age Pension to get SAPTO — a self-funded retiree over Age Pension age can still claim it, as long as their assessable income is low enough." },
+        ],
+      },
+      {
+        heading: "What it adds up to: the effective tax-free threshold",
+        body: [
+          { p: "Stack the tax-free threshold, LITO and (for seniors) SAPTO, and here's roughly how much assessable income each person can have before paying any income tax:" },
+          { table: {
+            headers: ["Situation", "Tax-free up to (per person)"],
+            rows: [
+              ["Working age — tax-free threshold + LITO", "~$22,000"],
+              ["Senior, single — adds SAPTO", "~$35,800"],
+              ["Senior, member of a couple — adds SAPTO", "~$32,000 each"],
+            ],
+            caption: "Approximate figures on current rates; the ATO indexes them over time.",
+          } },
+        ],
+      },
+      {
+        heading: "Why most retirees pay little or no tax",
+        body: [
+          { p: "The offsets are only half the story. From age 60 your [account-based pension is tax-free](/learn/super-vs-outside) and doesn't even count as assessable income — so it never uses up your tax-free threshold or your SAPTO. A retiree drawing, say, $60,000 a year mostly from a tax-free super pension can have very little **assessable** income, keep the full SAPTO, and pay **no income tax at all**. That combination is a big part of why retirement is such a low-tax phase of life." },
+        ],
+      },
+      {
+        heading: "In the planner",
+        body: [
+          { p: "RetireWiz applies LITO to everyone and adds SAPTO once each person reaches Age Pension age (a couple is assessed per person, each with their own offset and threshold). Click any year on the **tax chart** to see the LITO and SAPTO reconciliation behind that year's income tax." },
+        ],
+      },
+    ],
+    examples: [
+      { href: "/", label: "Open the planner", note: "Click a year on the tax chart to see LITO and SAPTO applied per person." },
+    ],
+    related: ["super-vs-outside", "age-pension", "contribution-caps"],
+    published: "2026-08-18",
+  },
+  {
     slug: "transition-to-retirement",
     title: "Transition to Retirement: same take-home, more super, less tax",
     category: "Super, tax & contributions",
