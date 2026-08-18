@@ -1504,6 +1504,7 @@ export default function PlannerApp({
         safe={safeTotal}
         failsafe={failsafeTotal}
         confidencePct={successPct ?? 0}
+        confidenceLoading={successPct == null}
         assumedReturnPct={plan.investmentReturn}
         lifeExpectancy={plan.lifeExpectancy}
         lastsToLE={result.lastsToLifeExpectancy}

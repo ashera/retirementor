@@ -48,6 +48,7 @@ export interface ConfidenceHeroProps {
   ioSlot?: React.ReactNode; // guest import/export buttons (local-first backup)
   chips?: PlanChip[]; // committed life events + applied strategies, shown at the foot
   showInfoBlasts?: boolean; // show the backoffice-managed rotating announcement banner (main dashboard only)
+  confidenceLoading?: boolean; // the Monte Carlo % isn't ready yet (runs in a worker) — show a spinner in the dial, not 0%
 }
 
 export default function ConfidenceHero({
@@ -74,6 +75,7 @@ export default function ConfidenceHero({
   ioSlot,
   chips,
   showInfoBlasts,
+  confidenceLoading,
 }: ConfidenceHeroProps) {
   const state: ConfidenceState = confidenceState(goalTotal, { failsafe, safe, central });
   const headroom = safe - goalTotal; // + = room to spend more; − = above the safe level
@@ -320,18 +322,31 @@ export default function ConfidenceHero({
         {/* ── RIGHT: confidence dial + folded-in scenario ─────────────────── */}
         <div className="flex flex-col gap-4 border-t border-line pt-5 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
           <div className="flex items-center gap-3">
-            <div
-              className="relative grid h-[76px] w-[76px] shrink-0 place-items-center rounded-full"
-              style={{ background: `conic-gradient(${dialColor} ${confidencePct}%, #263048 ${confidencePct}% 100%)` }}
-            >
-              <div className="absolute inset-[7px] rounded-full bg-panel" />
-              <span className="relative text-lg font-bold tabular-nums text-white">{confidencePct}%</span>
-            </div>
+            {confidenceLoading ? (
+              <div
+                className="grid h-[76px] w-[76px] shrink-0 place-items-center rounded-full bg-panel-2/50 ring-1 ring-inset ring-line"
+                aria-busy="true"
+                aria-label="Calculating the chance your money lasts"
+              >
+                <svg className="h-7 w-7 animate-spin text-accent" viewBox="0 0 24 24" fill="none" aria-hidden>
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-90" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V0C5.4 0 0 5.4 0 12h4z" />
+                </svg>
+              </div>
+            ) : (
+              <div
+                className="relative grid h-[76px] w-[76px] shrink-0 place-items-center rounded-full"
+                style={{ background: `conic-gradient(${dialColor} ${confidencePct}%, #263048 ${confidencePct}% 100%)` }}
+              >
+                <div className="absolute inset-[7px] rounded-full bg-panel" />
+                <span className="relative text-lg font-bold tabular-nums text-white">{confidencePct}%</span>
+              </div>
+            )}
             <p className="min-w-0 flex-1 text-xs leading-snug text-muted">
               <b className="font-semibold text-slate-200">
                 {lastsToLE ? `Chance your money lasts to ${lifeExpectancy}+` : "Chance your money lasts"}
               </b>{" "}
-              — {dialLabel}
+              — {confidenceLoading ? "assessing across thousands of market scenarios…" : dialLabel}
             </p>
             {dialExplainer && <span className="shrink-0 self-start">{dialExplainer}</span>}
           </div>
