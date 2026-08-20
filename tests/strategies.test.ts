@@ -708,6 +708,24 @@ describe("appliedStrategies — What-If changes baked into a saved plan", () => 
     expect(labels).toContain("Sell Pimpama"); // named
     expect(labels).toContain("Sell Investment Property 2"); // unnamed → 1-based index
   });
+
+  it("attaches an age phrase to age-pinned strategies (for the dashboard chips)", () => {
+    const plan = base({
+      people: [{ currentAge: 60, superBalance: 700_000, salary: 0, voluntaryConcessional: 0, voluntaryNonConcessional: 0 }],
+      retirementAge: 65, outsideSuper: 200_000, targetSpending: 55_000,
+      home: { value: 900_000, growthReal: 0, downsize: { atAge: 75, newValue: 500_000, toSuper: 0 } },
+      lumpSum: { atAge: 68, amount: 50_000 },
+      recontribute: { perYear: 60_000, fromAge: 62, untilAge: 70 },
+      whatIf: { active: ["retire-later"], values: {}, baselineId: "current" },
+    });
+    const by = Object.fromEntries(appliedStrategies(plan, cfg).map((s) => [s.id, s]));
+    expect(by["downsize"].agePhrase).toBe("at 75"); // matches the user's example
+    expect(by["lump-sum"].agePhrase).toBe("at 68");
+    expect(by["recontribute"].agePhrase).toBe("from 62 to 70"); // a range → both ends
+    expect(by["retire-later"].agePhrase).toBe("to 65"); // bookmark lever → the raised age
+    // Strategies with no age component carry no phrase.
+    expect(appliedStrategies(base({ guardrails: {} }), cfg)[0].agePhrase).toBeUndefined();
+  });
 });
 
 describe("adjust discretionary spending keeps the budget in sync", () => {

@@ -992,6 +992,9 @@ export function applyStrategies(
 export interface AppliedStrategy {
   id: string;
   label: string;
+  // Age qualifier for chips/timelines when the strategy is pinned to an age or age
+  // range, e.g. "at 75", "from 62 to 75", "until 70". Undefined when it has no age.
+  agePhrase?: string;
 }
 
 // Labels by strategy id — a fallback for `appliedStrategies` when a card is no longer
@@ -1056,26 +1059,33 @@ export function stripStrategyFields(plan: RetirementPlan, activeIds: string[]): 
  */
 export function appliedStrategies(plan: RetirementPlan, config: EngineConfig): AppliedStrategy[] {
   const detected: AppliedStrategy[] = [];
-  const add = (id: string, label: string) => detected.push({ id, label });
+  const add = (id: string, label: string, agePhrase?: string) => detected.push({ id, label, agePhrase });
   if (plan.guardrails) add("guardrails", "Flexible spending (guardrails)");
-  if (plan.home?.downsize) add("downsize", "Downsize your home");
-  if (plan.home?.sellAndRent) add("sell-and-rent", "Sell up and rent");
-  if (plan.mortgage?.strategy === "clear_at_retirement") add("clear-mortgage", "Clear the mortgage with super");
+  const dz = plan.home?.downsize;
+  if (dz) add("downsize", "Downsize your home", `at ${dz.atAge}`);
+  const sar = plan.home?.sellAndRent;
+  if (sar) add("sell-and-rent", "Sell up and rent", `at ${sar.atAge}`);
+  if (plan.mortgage?.strategy === "clear_at_retirement") add("clear-mortgage", "Clear the mortgage with super", `at ${plan.retirementAge}`);
   if (plan.keepSuperInAccumulation) add("keep-accumulation", "Keep super in accumulation");
-  if (plan.recontribute) add("recontribute", "Recontribute savings to super");
-  if (plan.lumpSum) add("lump-sum", "Take a lump sum");
+  const recon = plan.recontribute;
+  if (recon) add("recontribute", "Recontribute savings to super", recon.fromAge === recon.untilAge ? `at ${recon.fromAge}` : `from ${recon.fromAge} to ${recon.untilAge}`);
+  const ls = plan.lumpSum;
+  if (ls) add("lump-sum", "Take a lump sum", `at ${ls.atAge}`);
   if (plan.ttr) add("ttr", "Transition to Retirement");
-  if (plan.debtRecycle) add("debt-recycle", "Debt recycling");
-  if (plan.workIncome) add("part-time-work", "Work part-time in early retirement");
+  const dr = plan.debtRecycle;
+  if (dr) add("debt-recycle", "Debt recycling", `until ${dr.untilAge}`);
+  const wi = plan.workIncome;
+  if (wi) add("part-time-work", "Work part-time in early retirement", `until ${wi.untilAge}`);
   const couple = plan.people.length > 1;
   getCareerBreaks(plan).forEach((brk) =>
     add(
       brk.who > 0 ? `gap-years-${brk.who}` : "gap-years",
       couple ? `Take gap years off — ${brk.who === 0 ? "you" : "your partner"}` : "Take gap years off work",
+      brk.years > 1 ? `from ${brk.atAge} for ${brk.years} yrs` : `at ${brk.atAge}`,
     ),
   );
   getInvestmentProperties(plan).forEach((pr, i) => {
-    if (pr.strategy === "sell") add(`sell-prop-${i}`, `Sell ${pr.name?.trim() || `Investment Property ${i + 1}`}`);
+    if (pr.strategy === "sell") add(`sell-prop-${i}`, `Sell ${pr.name?.trim() || `Investment Property ${i + 1}`}`, `at ${pr.sellAtAge}`);
   });
 
   const detectedIds = new Set(detected.map((s) => s.id));
@@ -1087,6 +1097,8 @@ export function appliedStrategies(plan: RetirementPlan, config: EngineConfig): A
   const extra = bookmark.map((id): AppliedStrategy => ({
     id,
     label: catalog.find((c) => c.id === id)?.label ?? STRATEGY_LABELS[id] ?? prettify(id),
+    // retire-later has no field footprint; its age is simply the (raised) retirement age.
+    agePhrase: id === "retire-later" ? `to ${plan.retirementAge}` : undefined,
   }));
   return [...detected, ...extra];
 }

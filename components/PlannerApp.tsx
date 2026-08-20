@@ -616,7 +616,7 @@ export default function PlannerApp({
           (e.label?.trim() || (e.kind === "income" ? "Windfall" : "Expense")) +
           ` ${e.kind === "income" ? "+" : "−"}${fmtCurrency(e.amount)} at ${e.atAge}`,
       })),
-      ...applied.map((s) => ({ key: s.id, kind: "strategy" as const, label: s.label })),
+      ...applied.map((s) => ({ key: s.id, kind: "strategy" as const, label: s.agePhrase ? `${s.label} ${s.agePhrase}` : s.label })),
       ...(storable.agedCare?.enabled
         ? [{ key: "aged-care", kind: "agedcare" as const, label: `Aged care from ${storable.agedCare.entryAge}` }]
         : []),
