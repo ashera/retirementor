@@ -448,7 +448,7 @@ export default function ConfidenceHero({
           <div className="text-[11px] font-semibold uppercase tracking-wide text-muted">
             What-if boosts and life events already applied to this scenario
           </div>
-          <p className="mb-2 mt-0.5 text-[11px] text-muted/80">Tap any to open its editor →</p>
+          <p className="mb-2 mt-0.5 text-[11px] text-muted/80">Tap any to navigate to the What-If page and open its editor →</p>
           <div className="flex flex-wrap gap-2">
             {chips.map((c) => (
               <Link
