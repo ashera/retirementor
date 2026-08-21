@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, cloneElement, isValidElement, type ReactNode, type ReactElement } from "react";
+import { useEffect, useRef, useState, cloneElement, isValidElement, type ReactNode, type ReactElement } from "react";
 import Link from "next/link";
 import { fmtCurrency } from "@/lib/au/format";
 import type { AgedCarePlan } from "@/lib/au/types";
@@ -87,19 +87,28 @@ function summary(ac: AgedCarePlan): string {
 // base plan (baseline.agedCare). Presented as neutral, user-driven scenarios —
 // general information, not advice.
 export default function AgedCareEditor({
-  value, minAge, maxAge, onChange, children,
+  value, minAge, maxAge, onChange, children, autoOpen,
 }: {
   value: AgedCarePlan | undefined;
   minAge: number;
   maxAge: number;
   onChange: (agedCare: AgedCarePlan | undefined) => void;
   children?: ReactNode; // exposure/result content, rendered inside the card when enabled
+  autoOpen?: boolean; // deep-link: open the editor dialog on mount (once)
 }) {
   const enabled = !!value?.enabled;
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<AgedCarePlan>(value ?? DEFAULTS);
 
   const start = () => { setDraft(value ?? DEFAULTS); setOpen(true); };
+
+  // A dashboard aged-care chip can link here to open the editor straight away.
+  const autoOpened = useRef(false);
+  useEffect(() => {
+    if (autoOpened.current || !autoOpen) return;
+    autoOpened.current = true;
+    start();
+  }, [autoOpen]); // eslint-disable-line react-hooks/exhaustive-deps
   const save = () => {
     const entryAge = Math.min(maxAge, Math.max(minAge, Math.round(draft.entryAge)));
     const clean: AgedCarePlan = {

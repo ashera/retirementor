@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { fmtCurrency } from "@/lib/au/format";
 import type { LifeEvent } from "@/lib/au/types";
 
@@ -99,15 +99,28 @@ export default function LifeEventsEditor({
   maxAge,
   defaultAge,
   onChange,
+  autoOpenId,
 }: {
   events: LifeEvent[];
   minAge: number;
   maxAge: number;
   defaultAge: number;
   onChange: (events: LifeEvent[]) => void;
+  autoOpenId?: string; // deep-link: open this event's edit modal on mount (once)
 }) {
   // The event currently open in the add/edit modal (a draft; only committed on Save).
   const [draft, setDraft] = useState<LifeEvent | null>(null);
+
+  // A dashboard chip can link here to edit one specific event — open it straight away.
+  const autoOpened = useRef(false);
+  useEffect(() => {
+    if (autoOpened.current || !autoOpenId) return;
+    const ev = events.find((e) => e.id === autoOpenId);
+    if (ev) {
+      setDraft(ev);
+      autoOpened.current = true;
+    }
+  }, [autoOpenId, events]);
   const isNew = draft != null && !events.some((e) => e.id === draft.id);
 
   const clampAge = (a: number) => Math.min(maxAge, Math.max(minAge, Math.round(a)));

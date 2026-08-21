@@ -21,6 +21,17 @@ export interface PlanChip {
   label: string;
 }
 
+// Deep-link a chip to the What-If page with the matching editor pre-opened on
+// arrival (WhatIfView reads ?open=…). The chip's `key` is the strategy id / life-event
+// id; aged care needs no id (there's only one). Avoids dumping the user on the board
+// to hunt for the thing they clicked.
+function chipHref(base: string, c: PlanChip): string {
+  const sep = base.includes("?") ? "&" : "?";
+  if (c.kind === "agedcare") return `${base}${sep}open=agedcare`;
+  if (c.kind === "income" || c.kind === "expense") return `${base}${sep}open=event&id=${encodeURIComponent(c.key)}`;
+  return `${base}${sep}open=strategy&id=${encodeURIComponent(c.key)}`;
+}
+
 export interface ConfidenceHeroProps {
   goalTotal: number; // loan-inclusive annual income goal (today's $)
   loan: number; // ongoing home-loan cost baked into the goal
@@ -434,14 +445,15 @@ export default function ConfidenceHero({
           applied What-If strategies (moved here from the old What-If promo card). */}
       {chips && chips.length > 0 && (
         <div className="mt-6 border-t border-line pt-4">
-          <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-muted">
             What-if boosts and life events already applied to this scenario
           </div>
+          <p className="mb-2 mt-0.5 text-[11px] text-muted/80">Tap any to open its editor →</p>
           <div className="flex flex-wrap gap-2">
             {chips.map((c) => (
               <Link
                 key={c.key}
-                href={whatIfHref}
+                href={chipHref(whatIfHref, c)}
                 className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition hover:brightness-125 ${
                   c.kind === "agedcare"
                     ? "border-rose-400/40 bg-rose-400/10 text-rose-300"

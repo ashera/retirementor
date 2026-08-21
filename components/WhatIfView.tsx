@@ -181,6 +181,11 @@ export default function WhatIfView({
   // The strategy whose detail card is open in the modal (params + impact). Set by
   // clicking a strategy pill in column 2; null = no modal.
   const [detailCard, setDetailCard] = useState<StrategyCard | null>(null);
+  // Deep-link from a dashboard chip (?open=strategy|event|agedcare): the editor to
+  // open on arrival, so the user lands straight in it instead of on the board.
+  const [autoOpenEventId, setAutoOpenEventId] = useState<string | null>(null);
+  const [autoOpenAgedCare, setAutoOpenAgedCare] = useState(false);
+  const openParamHandled = useRef(false);
 
   // Don't sync back to storage until the initial restore has been applied, so the
   // empty first render can't clobber the working plan.
@@ -270,6 +275,31 @@ export default function WhatIfView({
     () => (baseline ? applyStrategies(baseline, catalog, active, values) : null),
     [baseline, catalog, active, values],
   );
+
+  // Honour a ?open=… deep-link once the scenario has loaded: open the strategy detail
+  // modal / life-events editor / aged-care editor that the dashboard chip pointed at,
+  // then strip the query so a refresh doesn't reopen it. `catalog` recomputes
+  // synchronously when `baseline` is set, so a strategy id resolves on the first pass.
+  useEffect(() => {
+    if (openParamHandled.current || !baseline) return;
+    const params = new URLSearchParams(window.location.search);
+    const open = params.get("open");
+    if (!open) {
+      openParamHandled.current = true;
+      return;
+    }
+    const id = params.get("id");
+    if (open === "strategy" && id) {
+      const card = catalog.find((c) => c.id === id);
+      if (card) setDetailCard(card);
+    } else if (open === "event" && id) {
+      setAutoOpenEventId(id);
+    } else if (open === "agedcare") {
+      setAutoOpenAgedCare(true);
+    }
+    openParamHandled.current = true;
+    window.history.replaceState(null, "", window.location.pathname);
+  }, [baseline, catalog]);
 
 
   // Sync the active scenario back to the shared working plan so the dashboard
@@ -1138,6 +1168,7 @@ export default function WhatIfView({
         maxAge={baseline.lifeExpectancy}
         defaultAge={Math.max(oldestCurrentAge(baseline) + 1, baseline.retirementAge + 3)}
         onChange={(lifeEvents: LifeEvent[]) => setBaseline({ ...baseline, lifeEvents })}
+        autoOpenId={autoOpenEventId ?? undefined}
       />
 
       {/* Committed bucket: aged care (a possible late-life cost the user can model).
@@ -1148,6 +1179,7 @@ export default function WhatIfView({
         minAge={Math.max(oldestCurrentAge(baseline), baseline.retirementAge)}
         maxAge={baseline.lifeExpectancy}
         onChange={(agedCare) => setBaseline({ ...baseline, agedCare })}
+        autoOpen={autoOpenAgedCare}
       >
         {composed?.agedCare?.enabled && compRes && (
           <AgedCareExposure plan={composed} result={compRes} noCareResult={noCareRes} config={config} />
