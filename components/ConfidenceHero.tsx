@@ -200,15 +200,17 @@ export default function ConfidenceHero({
   } else if (state === "ambitious") {
     verdict = (
       <>
-        Your {goalStr} retirement income goal is funded on the assumed {assumedReturnPct}% return, but sits{" "}
-        <b>above your prudent (85%) level</b> — a higher modelled chance of running short if markets disappoint.
+        Your {goalStr} retirement income goal holds up on the assumed {assumedReturnPct}% return, but it&apos;s{" "}
+        <b>more than the {fmtCompact(safe)} you could spend with an 85% chance of lasting</b> — so there&apos;s a higher
+        modelled chance of running short if markets disappoint.
       </>
     );
   } else {
     verdict = (
       <>
-        Your {goalStr} retirement income goal is <b>above even a 50/50 chance of lasting</b>. Easing toward{" "}
-        {fmtCompact(safe)}, or strengthening the plan, brings it back within your prudent (85%) level.
+        At your {goalStr} retirement income goal, your money is modelled to{" "}
+        <b>run short before age {lifeExpectancy} more often than not</b> — the highest-risk zone. Easing toward{" "}
+        {fmtCompact(safe)}, or strengthening the plan, brings it back to your prudent (85%) level.
       </>
     );
   }
