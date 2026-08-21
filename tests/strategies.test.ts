@@ -199,15 +199,66 @@ describe("What-If strategies", () => {
     // $130k salary, no voluntary → SG uses part of the cap; the rest is the max TTR top-up.
     const p = base({ people: [{ currentAge: 60, superBalance: 400_000, salary: 130_000, voluntaryConcessional: 0, voluntaryNonConcessional: 0 }], retirementAge: 65 });
     const ttr = cardById(p, "ttr");
-    const extra = ttr.params.find((x) => x.key === "extra")!;
+    const extra = ttr.params.find((x) => x.key === "extra0")!;
     const room = cfg.concessionalCap - 130_000 * cfg.sgRate; // cap − SG
-    expect(extra.dynamicMax!({ extra: 30_000 })).toBeCloseTo(room, 0);
-    expect(ttr.note!({ extra: 15_000 })).toMatch(/concessional room left|most you can add/i);
+    expect(extra.dynamicMax!({})).toBeCloseTo(room, 0);
+    expect(ttr.note!({})).toMatch(/cap room|add up to/i);
+
+    // Carried-forward unused cap raises the ceiling by that amount.
+    expect(extra.dynamicMax!({ carry0: 40_000 })).toBeCloseTo(room + 40_000, 0);
+    expect(ttr.note!({ carry0: 40_000 })).toMatch(/carried forward/i);
 
     // Voluntary salary sacrifice eats further into the cap → less TTR room.
     const p2 = base({ people: [{ currentAge: 60, superBalance: 400_000, salary: 130_000, voluntaryConcessional: 5_000, voluntaryNonConcessional: 0 }], retirementAge: 65 });
-    const extra2 = cardById(p2, "ttr").params.find((x) => x.key === "extra")!;
-    expect(extra2.dynamicMax!({ extra: 30_000 })).toBeCloseTo(room - 5_000, 0);
+    const extra2 = cardById(p2, "ttr").params.find((x) => x.key === "extra0")!;
+    expect(extra2.dynamicMax!({})).toBeCloseTo(room - 5_000, 0);
+  });
+
+  it("TTR gives each partner their own slider — separate per-person amounts flow through", () => {
+    const couple = base({
+      household: "couple",
+      superMode: "individual",
+      people: [
+        { currentAge: 60, superBalance: 400_000, salary: 120_000, voluntaryConcessional: 0, voluntaryNonConcessional: 0, retirementAge: 65 },
+        { currentAge: 60, superBalance: 400_000, salary: 120_000, voluntaryConcessional: 0, voluntaryNonConcessional: 0, retirementAge: 65 },
+      ],
+      retirementAge: 65,
+    });
+    const card = cardById(couple, "ttr");
+    // Two sliders (+ two carry-forward inputs), no single "who" control.
+    expect(card.params.some((p) => p.key === "who")).toBe(false);
+    expect(card.params.map((p) => p.key)).toEqual(["extra0", "carry0", "extra1", "carry1"]);
+
+    const applied = applyOne(couple, "ttr", { extra0: 8_000, extra1: 14_000 });
+    expect(applied.ttr?.amounts).toEqual([8_000, 14_000]); // per person, not uniform
+    expect(applied.ttr?.who).toEqual([0, 1]);
+    // Distinct amounts → a different projection than sacrificing 8k each.
+    const uneven = simulate(applied, cfg).superAtRetirement;
+    const even = simulate(applyOne(couple, "ttr", { extra0: 8_000, extra1: 8_000 }), cfg).superAtRetirement;
+    expect(uneven).toBeGreaterThan(even); // partner sacrifices more → more super
+
+    // Setting one slider to $0 drops that person from the TTR.
+    const soloYou = applyOne(couple, "ttr", { extra0: 10_000, extra1: 0 });
+    expect(soloYou.ttr?.who).toEqual([0]);
+  });
+
+  it("TTR carry-forward lifts the sacrifice above the annual cap, then depletes", () => {
+    // $130k salary → SG fills part of the cap; annual TTR room ≈ $14.4k. Sacrifice more
+    // than that, funded from a $40k carried-forward pool.
+    const p = base({ people: [{ currentAge: 60, superBalance: 400_000, salary: 130_000, voluntaryConcessional: 0, voluntaryNonConcessional: 0 }], retirementAge: 65 });
+    const at = (rows: ReturnType<typeof simulate>["rows"], age: number) => rows.find((r) => r.age === age)!;
+    const noCarry = applyOne(p, "ttr", { extra0: 30_000, carry0: 0 });
+    const withCarry = applyOne(p, "ttr", { extra0: 30_000, carry0: 40_000 });
+    expect(withCarry.ttr?.carryForward).toEqual([40_000]);
+
+    const nc = simulate(noCarry, cfg);
+    const wc = simulate(withCarry, cfg);
+    // Carry-forward lets more go in → more super at retirement, and a bigger first-year swap.
+    expect(wc.superAtRetirement).toBeGreaterThan(nc.superAtRetirement);
+    expect(at(wc.rows, 60).breakdown.ttrBenefit).toBeGreaterThan(at(nc.rows, 60).breakdown.ttrBenefit);
+    // The pool is finite: by the last working year it's used up, so the sacrifice (and
+    // its benefit) falls back to the plain annual-cap amount.
+    expect(at(wc.rows, 64).breakdown.ttrBenefit).toBeCloseTo(at(nc.rows, 64).breakdown.ttrBenefit, 0);
   });
 
   it("maxSustainableSpend finds the highest spend that still lasts to life expectancy", () => {

@@ -256,7 +256,12 @@ export interface RetirementPlan {
   mortgage?: MortgageDetail; // optional home loan carried into retirement
   home?: HomeDetail; // the principal home as an asset (exempt; net-worth context only)
   workIncome?: { perYear: number; untilAge: number }; // part-time work in early retirement (offsets drawdown; income-test assessable net of the Work Bonus)
-  ttr?: { extraSacrifice: number; who?: number[] }; // Transition to Retirement: extra pre-tax sacrifice/yr from preservation age → retirement, take-home held by a tax-free TTR pension. `who` = person indices it applies to (defaults to [0] for backward compatibility); each named person sacrifices `extraSacrifice` in the years they are 60+ and still working.
+  ttr?: {
+    extraSacrifice: number; // uniform per-person sacrifice/yr — legacy plans + the single-worker case (kept for back-compat)
+    who?: number[]; // person indices running a TTR (defaults to [0]); each sacrifices in the years they are 60+ and still working
+    amounts?: number[]; // per-person extra sacrifice/yr, index = person — overrides `extraSacrifice` when present (separate sliders for a couple)
+    carryForward?: number[]; // per-person unused concessional cap carried forward from prior years (index = person), a FINITE pool the sacrifice can draw on above the annual cap; depletes as it's used
+  }; // Transition to Retirement: extra pre-tax sacrifice from preservation age → retirement, take-home held by a tax-free TTR pension.
   keepSuperInAccumulation?: boolean | KeepAccumulation; // keep super in accumulation instead of starting an account-based pension. Legacy `true` = every member, for life. The object form is per-person: keep a member in accumulation until they reach Age-Pension age (shields it from the means test — the age-gapped-couple strategy) then convert to pension, or keep it in accumulation for life (avoids the forced minimum drawdown). 15% earnings tax while in accumulation vs tax-free in pension.
   guardrails?: { guardPct?: number; adjustPct?: number; floorPct?: number }; // Guyton-Klinger dynamic spending: flex living-spend with the portfolio. If the net-of-pension withdrawal RATE drifts guardPct% (default 20) above its initial level, cut spending adjustPct% (default 10); if it drifts guardPct% below, raise it — never below the greater of essentials or floorPct% (default 70) of the initial spend. Presence enables it.
   lumpSum?: { atAge: number; amount: number }; // one-off tax-free super withdrawal at an age (spent), capped at the accessible super balance then

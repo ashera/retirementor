@@ -891,13 +891,6 @@ export function buildStrategyCatalog(
   if (ttrWorkers.length > 0) {
     const bothWork = isCouple && ttrWorkers.length > 1;
     const soloWho = ttrWorkers[0]; // the only earner when just one works
-    // For a couple, offer You / Your partner / Both; the amount is per person (each
-    // named earner sacrifices it). Default to Both so the lever includes the partner.
-    const resolveWho = (v: Record<string, number>): number[] => {
-      if (!bothWork) return [soloWho];
-      const choice = v.who ?? 2;
-      return choice === 2 ? ttrWorkers : [choice];
-    };
     const perPersonBenefit = (i: number, extra: number) => {
       const pp = plan.people[i];
       const taxable = Math.max(0, pp.salary - pp.voluntaryConcessional);
@@ -906,58 +899,109 @@ export function buildStrategyCatalog(
       const taxSaved = incomeTax(taxable) - incomeTax(lower) + (medicareLevy(taxable) - medicareLevy(lower));
       return Math.max(0, taxSaved - extra * 0.15);
     };
-    // Remaining concessional-cap room this year for a person = cap − (SG + any
-    // voluntary sacrifice). The TTR top-up can't exceed it, so it's the max they can
-    // add — used to cap the slider and shown in the note.
+    // Remaining ANNUAL concessional-cap room this year for a person = cap − (SG + any
+    // regular salary sacrifice). Carry-forward (below) adds a finite extra pool on top.
     const ttrCfg = opts?.config ?? DEFAULT_CONFIG;
     const cap = ttrCfg.concessionalCap;
     const TTR_STEP = 100; // the slider step; round the room to it so the max is reachable and the note matches
+    const CARRY_MAX = 150_000; // ~5 years of unused cap — the most anyone can carry forward
+    const CARRY_STEP = 500;
     const roomLeft = (i: number) => {
       const raw = Math.max(0, cap - Math.min(plan.people[i].salary * ttrCfg.sgRate + plan.people[i].voluntaryConcessional, cap));
       return Math.floor(raw / TTR_STEP) * TTR_STEP;
     };
+    const extraDefault = (i: number) => Math.min(15_000, roomLeft(i));
+    const extraKey = (i: number) => `extra${i}`;
+    const carryKey = (i: number) => `carry${i}`;
+    // Per-person label suffix so a couple gets one slider (and one carry-forward box)
+    // each, side by side — no ambiguous single "amount applies to both" control.
+    const whoLabel = (i: number) => (!isCouple ? "" : i === 0 ? " — you" : " — your partner");
+    const whoName = (i: number) => (!isCouple ? "You" : i === 0 ? "You" : "Your partner");
+
+    // One sacrifice slider + one carry-forward input per TTR-eligible earner. The
+    // slider's ceiling is that person's annual room PLUS whatever they carry forward.
+    const params: StrategyParam[] = [];
+    for (const i of ttrWorkers) {
+      params.push({
+        key: extraKey(i),
+        label: `Extra sacrifice via TTR${whoLabel(i)}`,
+        min: 0,
+        max: cap + CARRY_MAX, // the live dynamicMax governs; this just leaves room for carry-forward
+        step: TTR_STEP,
+        default: extraDefault(i),
+        prefix: "$",
+        suffix: "/yr",
+        // Can't exceed this person's annual cap room + their carried-forward pool.
+        dynamicMax: (v) => roomLeft(i) + Math.max(0, v[carryKey(i)] ?? 0),
+      });
+      params.push({
+        key: carryKey(i),
+        label: `Unused cap carried forward${whoLabel(i)}`,
+        min: 0,
+        max: CARRY_MAX,
+        step: CARRY_STEP,
+        default: 0,
+        prefix: "$",
+        hint: "Unused concessional cap from the past 5 years — available only if your total super was under $500k. A one-off pool: it lifts the sacrifice ceiling until it's used up, then you're back to the annual cap.",
+      });
+    }
+
     cards.push({
       id: "ttr",
       group: "timing",
       label: "Transition to Retirement",
-      blurb: "From age 60 you can salary-sacrifice more and draw a tax-free TTR pension to replace the pay you give up — shifting income from your marginal rate down to 15% tax. Take-home holds; the tax saved builds super. In a couple, each partner who keeps working past 60 can run their own.",
-      params: [
-        { key: "extra", label: "Extra sacrifice via TTR", min: 0, max: 30_000, step: TTR_STEP, default: 15_000, prefix: "$", suffix: "/yr",
-          // Can't exceed the largest remaining concessional room among the TTR earners.
-          dynamicMax: (v) => Math.max(0, ...resolveWho(v).map(roomLeft)) },
-        ...(bothWork
-          ? [
-              {
-                key: "who",
-                label: "Who runs a TTR",
-                min: 0,
-                max: 2,
-                step: 1,
-                default: 2,
-                options: [
-                  { value: 0, label: "You" },
-                  { value: 1, label: "Your partner" },
-                  { value: 2, label: "Both" },
-                ],
-              },
-            ]
-          : []),
-      ],
+      blurb: "From age 60 you can salary-sacrifice more and draw a tax-free TTR pension to replace the pay you give up — shifting income from your marginal rate down to 15% tax. Take-home holds; the tax saved builds super. In a couple, each partner who keeps working past 60 gets their own slider.",
+      params,
       note: (v) => {
-        const who = resolveWho(v);
-        const benefit = who.reduce((s, i) => s + perPersonBenefit(i, v.extra), 0);
-        // Who + the "until … retire" clause, framed from the resolved selection so a
-        // couple where only the partner works reads correctly too.
-        const both = who.length > 1;
-        const partnerOnly = !both && who[0] === 1;
-        const whoTxt = !isCouple ? "" : both ? " (both of you)" : partnerOnly ? " (your partner)" : " (you)";
-        const retireTxt = both ? "each of you retires" : partnerOnly ? "your partner retires" : "you retire";
-        const roomTxt = both
-          ? `Concessional room left this year — you ${fmtCurrency(roomLeft(who[0]))}, partner ${fmtCurrency(roomLeft(who[1]))} (of the ${fmtCurrency(cap)} cap, after SG).`
-          : `${who[0] === 1 ? "Your partner has" : "You have"} ${fmtCurrency(roomLeft(who[0]))} of concessional room left (of the ${fmtCurrency(cap)} cap, after SG${plan.people[who[0]].voluntaryConcessional > 0 ? " + salary sacrifice" : ""}) — the most you can add via TTR.`;
-        return `From age 60 until ${retireTxt}: take-home unchanged, about ${fmtCurrency(benefit)}/yr of tax saving into super${whoTxt}. ${roomTxt} Pairs with working past 60.`;
+        // Legacy saves (pre-per-person sliders) carried a single `extra` (+ optional
+        // `who`); read the per-person amount the same way `apply` does so the note matches.
+        const isLegacy = v.extra !== undefined || v.who !== undefined;
+        const legacyWho = v.who ?? 2;
+        const legacyIn = (i: number) => (!bothWork ? i === soloWho : legacyWho === 2 ? true : legacyWho === i);
+        const amountOf = (i: number) => {
+          const nk = v[extraKey(i)];
+          if (isLegacy && (nk === undefined || nk === extraDefault(i))) return legacyIn(i) ? Math.max(0, v.extra ?? 0) : 0;
+          return Math.max(0, nk ?? 0);
+        };
+        const rows = ttrWorkers.map((i) => {
+          const carry = Math.max(0, v[carryKey(i)] ?? 0);
+          const room = roomLeft(i) + carry;
+          const slice = Math.min(amountOf(i), room);
+          return { i, carry, room, slice };
+        });
+        const benefit = rows.reduce((s, r) => s + perPersonBenefit(r.i, r.slice), 0);
+        const roomTxt = rows
+          .map((r) => `${whoName(r.i)} can add up to ${fmtCurrency(r.room)}/yr (${fmtCurrency(roomLeft(r.i))} cap room${r.carry > 0 ? ` + ${fmtCurrency(r.carry)} carried forward` : ""})`)
+          .join("; ");
+        const carryTxt = rows.some((r) => r.carry > 0)
+          ? " Carried-forward cap is a one-off pool — it lifts the first year(s), then it's back to the annual cap."
+          : "";
+        return `From age 60 until you retire: take-home unchanged, about ${fmtCurrency(benefit)}/yr of tax saving into super. ${roomTxt}.${carryTxt} Pairs with working past 60.`;
       },
-      apply: (p, v) => ({ ...p, ttr: { extraSacrifice: v.extra, who: resolveWho(v) } }),
+      apply: (p, v) => {
+        // Back-compat: a scenario saved before per-person sliders carries `extra` (+ maybe
+        // `who`). Honour it until the user moves a new per-person slider off its default.
+        const isLegacy = v.extra !== undefined || v.who !== undefined;
+        const legacyWho = v.who ?? 2;
+        const legacyIn = (i: number) => (!bothWork ? i === soloWho : legacyWho === 2 ? true : legacyWho === i);
+        const amountOf = (i: number) => {
+          const nk = v[extraKey(i)];
+          if (isLegacy && (nk === undefined || nk === extraDefault(i))) return legacyIn(i) ? Math.max(0, v.extra ?? 0) : 0;
+          return Math.max(0, nk ?? 0);
+        };
+        const amounts = plan.people.map((_, i) => (ttrWorkers.includes(i) ? amountOf(i) : 0));
+        const carryForward = plan.people.map((_, i) => (ttrWorkers.includes(i) ? Math.max(0, v[carryKey(i)] ?? 0) : 0));
+        const who = ttrWorkers.filter((i) => amounts[i] > 0);
+        return {
+          ...p,
+          ttr: {
+            extraSacrifice: amounts[who[0] ?? soloWho] ?? 0, // representative uniform value for back-compat reads
+            who: who.length ? who : ttrWorkers,
+            amounts,
+            carryForward,
+          },
+        };
+      },
     });
   }
 

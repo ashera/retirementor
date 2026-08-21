@@ -84,6 +84,10 @@ export function simulate(
   const accum = startingSuperBalances(plan);
   const pension = plan.people.map(() => 0);
   const transferred = plan.people.map(() => false);
+  // Per-person unused concessional cap carried forward (previous 5 years) that the TTR
+  // strategy can draw on ABOVE the annual cap. A FINITE pool: it depletes as it's used,
+  // so a multi-year TTR can't re-spend it each year. Absent → all zero (no effect).
+  const ttrCarryRemaining = plan.people.map((_, i) => Math.max(0, plan.ttr?.carryForward?.[i] ?? 0));
   const superOf = (i: number) => accum[i] + pension[i];
   // Tax-free component of each person's super, for the death-benefit-tax estimate.
   // Builds up from non-concessional contributions (voluntary after-tax, recontribution,
@@ -390,7 +394,7 @@ export function simulate(
     // keeps working carries the same real wage growth their contributions had
     // before the boundary. Returns the new balance and ledger deltas.
     const superHalf = Math.pow(1 + superAccumReturn, 0.5);
-    const contribute = (p: Person, opening: number, scale: number, ttrEligible: boolean, senior: boolean) => {
+    const contribute = (p: Person, opening: number, scale: number, ttrEligible: boolean, senior: boolean, ttrExtra: number, carryAvail: number) => {
       const salary = p.salary * scale;
       const cap = config.concessionalCap * scale;
       const nccCap = config.nonConcessionalCap * scale;
@@ -410,10 +414,15 @@ export function simulate(
       // pension equals the after-tax value of the slice, restoring take-home exactly.
       // The NET effect on super is identical to booking a lump benefit (taxSaved−15%),
       // so balances/oracle are unchanged — only the ledger attribution differs.
+      // Room to lift concessional contributions to the annual cap, PLUS any unused cap
+      // carried forward (a finite pool, passed in and depleted by the caller). Without
+      // carry-forward this is identical to the plain cap headroom (byte-for-byte).
+      const ttrBaseRoom = Math.max(0, cap - baseConcessional);
       const ttrSacrificed =
-        ttrEligible && plan.ttr && plan.ttr.extraSacrifice > 0
-          ? Math.min(plan.ttr.extraSacrifice * scale, Math.max(0, cap - baseConcessional))
+        ttrEligible && ttrExtra > 0
+          ? Math.min(ttrExtra * scale, ttrBaseRoom + Math.max(0, carryAvail))
           : 0;
+      const ttrCarryUsed = Math.max(0, ttrSacrificed - ttrBaseRoom); // portion drawn from the carry-forward pool
       const concessional = baseConcessional + ttrSacrificed; // TTR lifts the pre-tax contribution
       const taxable = Math.max(0, preTtrTaxable - ttrSacrificed); // assessable income after the TTR slice
       // Take-home is real cash the household spends/banks, so it must include the 2%
@@ -461,6 +470,7 @@ export function simulate(
         medicareLevyPaid: medicareLevy(taxable),
         ttrBenefit,
         ttrPension,
+        ttrCarryUsed,
       };
     };
 
@@ -593,7 +603,9 @@ export function simulate(
         // TTR applies to each person named in plan.ttr.who (defaults to [0]) — in the
         // years they are 60+ (preservation age) and still working.
         const ttrPerson = (plan.ttr?.who ?? [0]).includes(i);
-        const r = contribute(person, accum[i], 1, ttrPerson && ages[i] >= preservationAge && !brk, ages[i] >= pensionAge);
+        const ttrExtra = plan.ttr ? (plan.ttr.amounts?.[i] ?? plan.ttr.extraSacrifice ?? 0) : 0;
+        const r = contribute(person, accum[i], 1, ttrPerson && ages[i] >= preservationAge && !brk, ages[i] >= pensionAge, ttrExtra, ttrCarryRemaining[i]);
+        ttrCarryRemaining[i] = Math.max(0, ttrCarryRemaining[i] - r.ttrCarryUsed);
         accum[i] = r.newBalance;
         taxFreeComp[i] += r.nccAdded;
         contribGross += r.contribGross;
@@ -929,7 +941,9 @@ export function simulate(
       // TTR applies to a partner still working through a staggered gap too (they're
       // 60+ and earning) — same who-list as the accumulation branch.
       const ttrGap = (plan.ttr?.who ?? [0]).includes(i);
-      const r = contribute(person, accum[i], gapScale, ttrGap && ages[i] >= preservationAge && !brk, ages[i] >= pensionAge);
+      const ttrExtra = plan.ttr ? (plan.ttr.amounts?.[i] ?? plan.ttr.extraSacrifice ?? 0) : 0;
+      const r = contribute(person, accum[i], gapScale, ttrGap && ages[i] >= preservationAge && !brk, ages[i] >= pensionAge, ttrExtra, ttrCarryRemaining[i]);
+      ttrCarryRemaining[i] = Math.max(0, ttrCarryRemaining[i] - r.ttrCarryUsed);
       accum[i] = r.newBalance;
       taxFreeComp[i] += r.nccAdded;
       workContribGross += r.contribGross;

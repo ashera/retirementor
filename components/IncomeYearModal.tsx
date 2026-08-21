@@ -185,16 +185,18 @@ export default function IncomeYearModal({
   // of). Only shown when it reconciles to the household total the engine recorded —
   // guards against deflated staggered-gap years and cap edge cases.
   const ttrWho = plan.ttr?.who ?? [0];
-  const perPersonTtr = plan.people.map((p, i) =>
-    plan.ttr && ttrWho.includes(i) && p.salary > 0
-      ? Math.min(plan.ttr.extraSacrifice, Math.max(0, config.concessionalCap - Math.min(p.salary * config.sgRate + p.voluntaryConcessional, config.concessionalCap)))
-      : 0,
-  );
+  const ttrAmountOf = (i: number) => plan.ttr?.amounts?.[i] ?? plan.ttr?.extraSacrifice ?? 0;
+  const perPersonTtr = plan.people.map((p, i) => {
+    if (!(plan.ttr && ttrWho.includes(i) && p.salary > 0)) return 0;
+    const room = Math.max(0, config.concessionalCap - Math.min(p.salary * config.sgRate + p.voluntaryConcessional, config.concessionalCap));
+    const carry = plan.ttr.carryForward?.[i] ?? 0; // extra ceiling from carried-forward cap (first year(s) only)
+    return Math.min(ttrAmountOf(i), room + carry);
+  });
   const showTtrPerPerson =
     couple && ttrSlice > 0.5 && perPersonTtr.filter((x) => x > 0.5).length > 1 &&
     Math.abs(perPersonTtr.reduce((s, x) => s + x, 0) - ttrSlice) < 2;
   const ttrOnly = ttrSlice > 0.5 && voluntarySac <= 0.5; // TTR is the whole sacrifice → no redundant sub-line
-  const ttrTipText = `Extra pay sacrificed into super via Transition to Retirement${couple ? ", summed across each partner running it" : ""}. Each person's amount is capped at their remaining concessional cap (${cur(config.concessionalCap)}/yr — which already counts their Super Guarantee and any regular salary sacrifice), so the total can be less than the ${cur(plan.ttr?.extraSacrifice ?? 0)}${couple ? " per person" : ""} you set.`;
+  const ttrTipText = `Extra pay sacrificed into super via Transition to Retirement${couple ? ", summed across each partner running it" : ""}. Each person's amount is capped at their remaining concessional cap (${cur(config.concessionalCap)}/yr — which already counts their Super Guarantee and any regular salary sacrifice, plus any unused cap they carried forward), so the total can be less than the amount you set.`;
   const afterTaxContrib = plan.people.reduce((s, p) => s + Math.min(p.voluntaryNonConcessional, config.nonConcessionalCap), 0);
   const leftToSpend = Math.max(0, row.takeHome - afterTaxContrib);
   // Label for a property line: its custom name, else "Property N" (or a lone
@@ -327,7 +329,7 @@ export default function IncomeYearModal({
                             amt > 0.5 ? (
                               <span key={i} className="tabular-nums">
                                 {i === 0 ? "You" : "Partner"} {cur(amt)}
-                                {plan.ttr && amt < plan.ttr.extraSacrifice - 0.5 ? " (capped)" : ""}
+                                {plan.ttr && amt < ttrAmountOf(i) - 0.5 ? " (capped)" : ""}
                               </span>
                             ) : null,
                           )}
