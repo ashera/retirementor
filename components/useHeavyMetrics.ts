@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { runMonteCarlo } from "@/lib/au/montecarlo";
 import { earliestRetirement } from "@/lib/au/goalseek";
+import { metricsKey, getMetrics, setMetrics } from "@/lib/au/mcCache";
 import type { RetirementPlan } from "@/lib/au/types";
 import type { EngineConfig } from "@/lib/au/config";
 
@@ -25,6 +26,19 @@ export function useHeavyMetrics(
 
   useEffect(() => {
     if (!enabled) return;
+
+    // These two metrics are deterministic in (plan, config), so if we've already computed
+    // them for this exact model — this session or a prior one (localStorage) — reuse the
+    // result instead of re-running ~1s of work on every load when nothing has changed.
+    const key = metricsKey(plan, config);
+    const cached = getMetrics(key);
+    if (cached) {
+      setMc(cached.mc as MC);
+      setEarliest(cached.earliest as Earliest);
+      setPending(false);
+      return;
+    }
+
     setPending(true);
     const id = ++reqId.current;
 
@@ -42,6 +56,7 @@ export function useHeavyMetrics(
         if (e.data?.id !== id) return; // ignore stale results (a newer plan is in flight)
         if (e.data.mc) setMc(e.data.mc as MC);
         if (e.data.earliest) setEarliest(e.data.earliest as Earliest);
+        if (e.data.mc && e.data.earliest) setMetrics(key, e.data.mc, e.data.earliest);
         setPending(false);
         w.removeEventListener("message", onMsg);
       };
@@ -53,8 +68,11 @@ export function useHeavyMetrics(
     // No Worker (SSR / very old browser): still defer past first paint.
     const t = setTimeout(() => {
       if (id !== reqId.current) return;
-      setMc(runMonteCarlo(plan, config));
-      setEarliest(earliestRetirement(plan, config));
+      const freshMc = runMonteCarlo(plan, config);
+      const freshEarliest = earliestRetirement(plan, config);
+      setMc(freshMc);
+      setEarliest(freshEarliest);
+      setMetrics(key, freshMc, freshEarliest);
       setPending(false);
     }, 0);
     return () => clearTimeout(t);
