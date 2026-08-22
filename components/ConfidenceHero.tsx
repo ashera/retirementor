@@ -60,6 +60,10 @@ export interface ConfidenceHeroProps {
   chips?: PlanChip[]; // committed life events + applied strategies, shown at the foot
   showInfoBlasts?: boolean; // show the backoffice-managed rotating announcement banner (main dashboard only)
   confidenceLoading?: boolean; // the Monte Carlo % isn't ready yet (runs in a worker) — show a spinner in the dial, not 0%
+  // The full Age Pension the household falls back to once savings run low — shown as a
+  // safety-net note under a "running short" verdict. Null when it doesn't apply (e.g. a
+  // non-resident not claiming it from abroad).
+  agePension?: { annual: number; household: "single" | "couple" } | null;
 }
 
 export default function ConfidenceHero({
@@ -87,6 +91,7 @@ export default function ConfidenceHero({
   chips,
   showInfoBlasts,
   confidenceLoading,
+  agePension = null,
 }: ConfidenceHeroProps) {
   const state: ConfidenceState = confidenceState(goalTotal, { failsafe, safe, central });
   const headroom = safe - goalTotal; // + = room to spend more; − = above the safe level
@@ -276,6 +281,15 @@ export default function ConfidenceHero({
           >
             {verdict}
           </p>
+
+          {/* Safety-net reassurance under a "running short" verdict — the Age Pension is
+              the floor income once savings run low. Kept to one compact muted line. */}
+          {(state === "ambitious" || state === "short") && agePension && (
+            <p className="mt-2 text-[13px] leading-snug text-muted">
+              <span aria-hidden>🛟</span> Even then, the <b className="font-semibold text-slate-200">Age Pension</b> is your safety net — up to about{" "}
+              <b className="font-semibold text-slate-200">{fmtCompact(agePension.annual)}/yr</b> for a {agePension.household === "couple" ? "couple" : "single person"} once your savings run low.
+            </p>
+          )}
 
           {/* Three-tier range */}
           <div className={`mt-6 ${pending ? "animate-pulse opacity-70" : ""}`}>
