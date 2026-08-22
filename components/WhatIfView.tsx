@@ -992,6 +992,7 @@ export default function WhatIfView({
               ages={ageGapInfo(composed)}
               lifeEvents={composed.lifeEvents ?? []}
               agedCare={composed.agedCare?.enabled ? { entryAge: composed.agedCare.entryAge, durationYears: composed.agedCare.durationYears } : null}
+              plan={composed}
             />
             <div className="mt-3 flex flex-wrap gap-4">
               {[

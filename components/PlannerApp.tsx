@@ -1701,6 +1701,7 @@ export default function PlannerApp({
           ages={ageGapInfo(plan)}
           lifeEvents={lifeEvents}
           agedCare={plan.agedCare?.enabled ? { entryAge: plan.agedCare.entryAge, durationYears: plan.agedCare.durationYears } : null}
+          plan={plan}
         />
         <p className="mt-2 text-center text-xs text-muted">
           Tip: click any year for a full breakdown of income, tax and spending.

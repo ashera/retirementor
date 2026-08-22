@@ -4,6 +4,7 @@ import {
   Area,
   AreaChart,
   CartesianGrid,
+  Customized,
   ReferenceArea,
   ReferenceLine,
   ResponsiveContainer,
@@ -11,12 +12,13 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import type { LifeEvent, SimResult, YearRow } from "@/lib/au/types";
+import type { LifeEvent, RetirementPlan, SimResult, YearRow } from "@/lib/au/types";
 import { fmtCompact, fmtCurrency } from "@/lib/au/format";
 import { breakSpans, breakSpanLabel } from "@/lib/au/breakSpans";
 import { rowNetWorth } from "@/lib/au/networth";
+import { strategyEventPins, strategyEventBands, type EventPin } from "@/lib/au/chartEvents";
 import { DualAgeTick, dualAgeLabel, type AgeGapInfo } from "@/components/ageAxis";
-import { placeMarkers, type MarkerInput } from "@/components/markerPlacement";
+import { placeMarkers, clusterPins, type MarkerInput, type PinItem } from "@/components/markerPlacement";
 
 export interface SpendingBand {
   x1: number;
@@ -39,6 +41,46 @@ function markerLabel(text: string, fill: string, topOffset: number) {
   };
 }
 
+// The bottom-axis pin layer: quiet glyph chips for the What-If / life-event overlay,
+// with no in-plot text (detail lives in the year tooltip + a native <title>). Rendered
+// via Recharts <Customized> so it can read the live age→pixel scale and cluster any
+// chips that would overlap. `cp` is Recharts' internal layout (xAxisMap + plot offset).
+function renderPinLayer(cp: {
+  xAxisMap?: Record<string, { scale?: (v: number) => number }>;
+  offset?: { top: number; left: number; width: number; height: number };
+}, pins: PinItem[]) {
+  const xMap = cp.xAxisMap;
+  const off = cp.offset;
+  if (!xMap || !off) return <g />;
+  const axis = xMap[Object.keys(xMap)[0]];
+  const scale = axis?.scale;
+  if (!scale) return <g />;
+  const xOf = (age: number) => scale(age) as number;
+  const yBase = off.top + off.height - 9; // just above the x-axis, inside the plot
+  const clusters = clusterPins(pins, xOf, 20);
+  return (
+    <g>
+      {clusters.map((c) => {
+        const single = c.members.length === 1;
+        const m = c.members[0];
+        const w = single ? 20 : 18;
+        const title = c.members.map((mm) => `${mm.label}${mm.detail ? ` — ${mm.detail}` : ""} (age ${mm.age})`).join("\n");
+        return (
+          <g key={`${m.key}-${c.x.toFixed(0)}`} transform={`translate(${c.x}, ${yBase})`} style={{ pointerEvents: "all" }}>
+            <title>{title}</title>
+            <rect x={-w / 2} y={-8} width={w} height={16} rx={4} fill="#0b1220" fillOpacity={0.88} stroke={m.color} strokeWidth={1} />
+            {single ? (
+              <text x={0} y={1} textAnchor="middle" dominantBaseline="central" fontSize={11}>{m.icon}</text>
+            ) : (
+              <text x={0} y={1} textAnchor="middle" dominantBaseline="central" fontSize={10} fontWeight={700} fill="#e2e8f0">{c.members.length}</text>
+            )}
+          </g>
+        );
+      })}
+    </g>
+  );
+}
+
 type ChartRow = Partial<YearRow> & {
   age: number;
   baselineTotal?: number;
@@ -53,17 +95,20 @@ function AssetsTooltip({
   baselineLabel = "Saved plan",
   showHome = false,
   ages = null,
+  eventsByAge = null,
 }: {
   active?: boolean;
   payload?: { payload: ChartRow }[];
   baselineLabel?: string;
   showHome?: boolean;
   ages?: AgeGapInfo | null;
+  eventsByAge?: Map<number, EventPin[]> | null;
 }) {
   if (!active || !payload?.length) return null;
   const r = payload[0].payload;
   const home = showHome ? Math.max(0, r.homeEquity ?? 0) : 0;
   const property = showHome ? Math.max(0, r.propertyNW ?? 0) : 0;
+  const events = eventsByAge?.get(r.age) ?? [];
   return (
     <div className="rounded-lg border border-line bg-panel px-3 py-2 text-sm shadow-xl">
       <div className="font-semibold text-white">{ages ? dualAgeLabel(ages, r.age) : `Age ${r.age}`}</div>
@@ -118,6 +163,17 @@ function AssetsTooltip({
       {r.phase && (
         <div className="mt-0.5 text-xs capitalize text-muted">{r.phase} phase</div>
       )}
+      {events.length > 0 && (
+        <div className="mt-1.5 border-t border-line pt-1.5">
+          <div className="text-[10px] font-semibold uppercase tracking-wide text-muted">This age</div>
+          {events.map((e) => (
+            <div key={e.key} className="text-[11.5px] leading-snug" style={{ color: e.color }}>
+              {e.icon} {e.label}
+              {e.detail ? <span className="text-slate-400"> · {e.detail}</span> : null}
+            </div>
+          ))}
+        </div>
+      )}
       {r.total !== undefined && (
         <div className="mt-1 text-[11px] text-accent">Click for a full breakdown →</div>
       )}
@@ -140,6 +196,7 @@ export default function RetirementChart({
   ages = null,
   lifeEvents,
   agedCare = null,
+  plan = null,
 }: {
   result: SimResult;
   bands?: SpendingBand[];
@@ -161,6 +218,9 @@ export default function RetirementChart({
   lifeEvents?: readonly LifeEvent[];
   // Aged care → a pin at the entry age (same oldest-person axis).
   agedCare?: { entryAge: number; durationYears: number } | null;
+  // The composed plan → age-pinned What-If strategy markers (downsize, lump sum, a
+  // property sale…) as quiet bottom-axis pins + the recontribution window as a band.
+  plan?: RetirementPlan | null;
 }) {
   const { retirementAge, partnerRetirementAge, depletedAge } = result;
   // Markers sit on the OLDEST-person age axis, but each partner's OWN retirement age
@@ -260,24 +320,37 @@ export default function RetirementChart({
   if (depletedAge !== null) {
     markerInputs.push({ key: "deplete", x: depletedAge, color: "#ef4444", name: `Depletes ~${depletedAge}`, dash: "2 2" });
   }
-  // Committed life events — a pin per event (green for money in, amber for money out).
-  // They join the same lane solver, so their labels never collide with the pins above.
-  (lifeEvents ?? [])
-    .filter((e) => e.amount > 0 && e.atAge >= (result.rows[0]?.age ?? 0))
-    .forEach((e, i) =>
-      markerInputs.push({
-        key: `life-${e.id ?? i}`,
-        x: e.atAge,
-        color: e.kind === "income" ? "#34d399" : "#fb923c",
-        name: e.label?.trim() || (e.kind === "income" ? "Windfall" : "Expense"),
-        dash: "4 3",
-      }),
-    );
-  // Aged care → a pin at the entry age (joins the same lane solver).
+  // Aged care → a labelled line at the entry age (a structural, singular event).
   if (agedCare && agedCare.entryAge >= (result.rows[0]?.age ?? 0)) {
     markerInputs.push({ key: "aged-care", x: agedCare.entryAge, color: "#f472b6", name: "Aged care", dash: "5 3" });
   }
   const { placed, rows: markerRows } = placeMarkers(markerInputs);
+
+  // The OVERLAY: age-pinned What-If strategies + committed life events, shown as quiet
+  // bottom-axis PINS (no in-plot text) rather than more labelled lines — the detail lives
+  // in the year tooltip. Ranges (recontribution) render as faint bands; gap years already
+  // draw as break spans. Life events keep their green/amber money-in/out colours.
+  const firstAge = result.rows[0]?.age ?? 0;
+  const lifePins: PinItem[] = (lifeEvents ?? [])
+    .filter((e) => e.amount > 0 && e.atAge >= firstAge)
+    .map((e, i) => ({
+      key: `life-${e.id ?? i}`,
+      age: e.atAge,
+      icon: e.kind === "income" ? "💰" : "💸",
+      label: e.label?.trim() || (e.kind === "income" ? "Windfall" : "Expense"),
+      detail: `${e.kind === "income" ? "+" : "−"}${fmtCompact(e.amount)}`,
+      color: e.kind === "income" ? "#34d399" : "#fb923c",
+    }));
+  const stratPins: PinItem[] = (plan ? strategyEventPins(plan) : []).filter((p) => p.age >= firstAge);
+  const eventPins: PinItem[] = [...stratPins, ...lifePins];
+  const eventBands = (plan ? strategyEventBands(plan) : []).filter((b) => b.x2 >= firstAge);
+  // Group by age for the tooltip's "This age" section.
+  const eventsByAge = new Map<number, EventPin[]>();
+  for (const p of eventPins) {
+    const list = eventsByAge.get(p.age) ?? [];
+    list.push(p);
+    eventsByAge.set(p.age, list);
+  }
   const rowStepPx = 14;
   const rowTopPx = 6;
   // Reserve enough of the plot height at the top for the label rows, then inflate the
@@ -338,6 +411,20 @@ export default function RetirementChart({
             label={{ value: breakSpanLabel(s), position: "center", fill: "#fbbf24", fontSize: 10 }}
           />
         ))}
+        {/* Age-range strategy windows (recontribution) — a faint band, no label (the
+            detail is on the pins/tooltip); keeps the plot calm. */}
+        {eventBands.map((b) => (
+          <ReferenceArea
+            key={`evb-${b.key}`}
+            x1={b.x1}
+            x2={b.x2}
+            fill={b.color}
+            fillOpacity={0.07}
+            stroke={b.color}
+            strokeOpacity={0.25}
+            strokeDasharray="2 3"
+          />
+        ))}
         <defs>
           <linearGradient id="superFill" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#34d399" stopOpacity={0.5} />
@@ -380,9 +467,9 @@ export default function RetirementChart({
           domain={yDomainMax != null ? [0, yDomainMax] : undefined}
           allowDataOverflow={yDomainMax != null}
         />
-        <Tooltip content={<AssetsTooltip baselineLabel={baselineLabel} showHome={showHome} ages={ages} />} />
-        {/* Life-event markers — the lane solver assigns each label a row so they
-            never overlap, and the reserved top headroom keeps them off the line. */}
+        <Tooltip content={<AssetsTooltip baselineLabel={baselineLabel} showHome={showHome} ages={ages} eventsByAge={eventsByAge} />} />
+        {/* Structural markers (retire, Age Pension, super→pension, depletion, aged care)
+            — labelled lines, lane-packed so labels never overlap. */}
         {placed.map((m) => (
           <ReferenceLine
             key={m.key}
@@ -392,6 +479,8 @@ export default function RetirementChart({
             label={markerLabel(m.name, m.color, rowTopPx + m.row * rowStepPx)}
           />
         ))}
+        {/* Overlay pins (What-If strategies + life events) on the bottom axis. */}
+        {eventPins.length > 0 && <Customized component={(cp: object) => renderPinLayer(cp, eventPins)} />}
         {showHome && (
           <Area
             type="monotone"
