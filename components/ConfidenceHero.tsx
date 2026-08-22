@@ -188,13 +188,13 @@ export default function ConfidenceHero({
       headroom >= CONFIDENCE_EPS ? (
         <>
           Your plan is <b>projected to fund</b> your {goalStr} retirement income goal — with modelled room for{" "}
-          <b>~{fmtCurrency(headroom)}/yr more</b> at the same 85% confidence.
+          <b>~{fmtCurrency(headroom)}/yr more</b> while still keeping an 85% chance of your money lasting.
         </>
       ) : (
         <>
           Your plan is <b>projected to fund</b> your {goalStr} retirement income goal — it sits right at your{" "}
-          <b>prudent (85%) spending level</b>, modelled to last to your planning age of {lifeExpectancy} in
-          about 85% of return scenarios, including poor ones.
+          <b>prudent spending level</b>: the most you could spend and still have an 85% chance of your money lasting
+          to your planning age of {lifeExpectancy}, including in poor markets.
         </>
       );
   } else if (state === "ambitious") {
@@ -210,7 +210,7 @@ export default function ConfidenceHero({
       <>
         At your {goalStr} retirement income goal, your money is modelled to{" "}
         <b>run short before age {lifeExpectancy} more often than not</b> — the highest-risk zone. Easing toward{" "}
-        {fmtCompact(safe)}, or strengthening the plan, brings it back to your prudent (85%) level.
+        {fmtCompact(safe)}, or strengthening the plan, would lift your chance of your money lasting back to a prudent 85%.
       </>
     );
   }
@@ -304,7 +304,7 @@ export default function ConfidenceHero({
             <div className="mt-4 flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/[0.08] px-4 py-3">
               <span aria-hidden className="text-base">💡</span>
               <p className="text-[13px] leading-snug text-slate-200">
-                At the same 85% confidence, your plan models capacity for about{" "}
+                At the same 85% chance of your money lasting, your plan models capacity for about{" "}
                 <b className="text-amber-300">{fmtCurrency(headroom)}/yr</b> more than your current goal.
               </p>
             </div>

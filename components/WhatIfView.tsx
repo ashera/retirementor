@@ -1076,7 +1076,7 @@ export default function WhatIfView({
                 {safeGap >= 500 ? (
                   <>
                     Your plan models room for <span className="font-semibold text-accent">{fmtCurrency(safeGap)}/yr</span> more than your{" "}
-                    {fmtCurrency(spendMix.total)} goal at the same 85% confidence — your prudent (85%) level is{" "}
+                    {fmtCurrency(spendMix.total)} goal while still keeping an 85% chance of your money lasting — that prudent level is{" "}
                     <span className="font-semibold text-slate-200">{fmtCurrency(safeSpendTotal)}/yr</span>.
                   </>
                 ) : safeGap <= -500 ? (
