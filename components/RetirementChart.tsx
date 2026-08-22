@@ -389,6 +389,9 @@ export default function RetirementChart({
             label={{
               value: b.label,
               position: "insideBottom",
+              // Lift the phase labels (go-go / slow-go / no-go) clear of the bottom-axis
+              // event pins when there are any, so they don't overlap the chips.
+              offset: eventPins.length > 0 ? 22 : 5,
               fill: b.fill,
               fontSize: 11,
             }}
