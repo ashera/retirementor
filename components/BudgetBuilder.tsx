@@ -24,7 +24,7 @@ import type {
   SpendingStages,
 } from "@/lib/au/types";
 import Field from "@/components/Field";
-import HomeEditor, { DEFAULT_HOME, defaultMortgage } from "@/components/HomeEditor";
+import { DEFAULT_HOME, defaultMortgage } from "@/components/HomeEditor";
 import BudgetCategoryIcon, { CATEGORY_COLOR } from "@/components/BudgetCategoryIcon";
 import TrimSpendingModal from "@/components/TrimSpendingModal";
 import BoostSpendingModal from "@/components/BoostSpendingModal";
@@ -48,7 +48,6 @@ const LIFESTYLES: { key: BudgetLifestyle; label: string; blurb: string }[] = [
 // The "home" step only appears when the user owns their home (see stepKeys below).
 const STEP_TITLES: Record<string, string> = {
   setup: "Setup",
-  home: "Your Home",
   budget: "Your budget",
   phases: "Later years",
   goal: "Your goal",
@@ -75,13 +74,12 @@ export default function BudgetBuilder({ plan, config, onApply, onProgress, onClo
   // Returning to edit an existing budget? Jump straight to the last (goal) page
   // — safeStep clamps this to the real last index. New budgets start at Setup.
   const [step, setStep] = useState(plan.budget ? 99 : 0);
-  const [tenure, setTenure] = useState<HomeTenure>(
-    plan.budget?.tenure ?? (plan.homeowner ? "own" : "rent"),
-  );
-  const [mortgage, setMortgage] = useState<MortgageDetail>(
-    plan.mortgage ?? defaultMortgage(oldestAtRetire),
-  );
-  const [home, setHome] = useState<HomeDetail>(plan.home ?? DEFAULT_HOME);
+  // The family home now lives in the plan (its own "Your home" wizard step). The budget
+  // only READS it — to drive the ASFA presets, model any loan, and show a summary — so
+  // there's one place to edit it. Tenure is derived from the plan's home fields.
+  const tenure: HomeTenure = !plan.homeowner ? "rent" : plan.mortgage ? "mortgage" : "own";
+  const mortgage: MortgageDetail = plan.mortgage ?? defaultMortgage(oldestAtRetire);
+  const home: HomeDetail = plan.home ?? DEFAULT_HOME;
   const [lifestyle, setLifestyle] = useState<BudgetLifestyle>(
     plan.budget?.lifestyle ?? "comfortable",
   );
@@ -148,24 +146,6 @@ export default function BudgetBuilder({ plan, config, onApply, onProgress, onClo
     if (patch.budget?.categories) setCategories(patch.budget.categories);
   };
 
-  // Compare carry vs clear-at-retirement so we can show the pension uplift. Debounced
-  // (via debouncedWorkingPlan, which carries the mortgage) — two more full sims that
-  // must not run on every drag frame.
-  const strategyCompare = useMemo(() => {
-    if (tenure !== "mortgage" || !debouncedWorkingPlan.mortgage) return null;
-    const run = (strategy: MortgageDetail["strategy"]) =>
-      simulate({ ...debouncedWorkingPlan, mortgage: { ...debouncedWorkingPlan.mortgage!, strategy } }, config);
-    const firstPension = (r: ReturnType<typeof simulate>) =>
-      r.rows.find((x) => x.phase === "pension")?.agePension ?? 0;
-    const carry = run("carry");
-    const clear = run("clear_at_retirement");
-    return {
-      carryLasts: carry.lastsToLifeExpectancy ? null : carry.depletedAge,
-      clearLasts: clear.lastsToLifeExpectancy ? null : clear.depletedAge,
-      pensionUplift: Math.round(firstPension(clear) - firstPension(carry)),
-    };
-  }, [tenure, debouncedWorkingPlan, config]);
-
   const setCat = (key: string, annual: number) =>
     setCategories((prev) => ({ ...prev, [key]: Math.max(0, Math.round(annual)) }));
 
@@ -196,21 +176,6 @@ export default function BudgetBuilder({ plan, config, onApply, onProgress, onClo
     setCategories(presetCategories(config, household, homeowner, ls));
   };
 
-  const changeTenure = (t: HomeTenure) => {
-    setTenure(t);
-    // Re-seed just the housing default (own/mortgage share owner costs; rent differs).
-    setCategories((prev) => ({
-      ...prev,
-      housing: presetCategories(config, household, t !== "rent", lifestyle).housing,
-    }));
-  };
-
-  const setMort = (patch: Partial<MortgageDetail>) =>
-    setMortgage((prev) => ({ ...prev, ...patch }));
-
-  const setHomeField = (patch: Partial<HomeDetail>) =>
-    setHome((prev) => ({ ...prev, ...patch }));
-
   const toggleOpen = (key: string) =>
     setOpen((prev) => {
       const next = new Set(prev);
@@ -220,14 +185,14 @@ export default function BudgetBuilder({ plan, config, onApply, onProgress, onClo
 
   // The plan patch this budget produces — used both by the explicit Apply button
   // and the continuous auto-save below, so they can never disagree.
+  // The budget no longer owns the home — it doesn't write homeowner/home/mortgage (the
+  // plan's "Your home" step does). It keeps `budget.tenure` as a derived mirror so old
+  // plans and the presets stay consistent.
   const budgetUpdate: Partial<RetirementPlan> = {
     targetSpending: total,
     spendingMode: applyPhases ? "stages" : "flat",
     ...(applyPhases ? { spendingStages: stages } : {}),
-    homeowner,
     budget: { tenure, lifestyle, categories, applyPhases } as RetirementBudget,
-    mortgage: activeMortgage,
-    home: activeHome,
   };
   const handleApply = () => onApply(budgetUpdate);
 
@@ -257,11 +222,9 @@ export default function BudgetBuilder({ plan, config, onApply, onProgress, onClo
   const essentials = BUDGET_CATEGORY_META.filter((m) => m.essential);
   const discretionaries = BUDGET_CATEGORY_META.filter((m) => !m.essential);
 
-  // A dedicated "Your Home" step is inserted after Setup for homeowners (it holds
-  // the home value and, when there's a mortgage, the loan). Renters skip it.
-  const stepKeys = homeowner
-    ? ["setup", "home", "budget", "phases", "goal"]
-    : ["setup", "budget", "phases", "goal"];
+  // The home is set in the plan's own "Your home" step now, so the budget has no home
+  // step — just a read-only summary on Setup.
+  const stepKeys = ["setup", "budget", "phases", "goal"];
   const safeStep = Math.min(step, stepKeys.length - 1);
   const currentKey = stepKeys[safeStep];
   const isLast = safeStep === stepKeys.length - 1;
@@ -383,32 +346,12 @@ export default function BudgetBuilder({ plan, config, onApply, onProgress, onClo
             <SetupStep
               household={household}
               tenure={tenure}
-              changeTenure={changeTenure}
+              home={home}
+              mortgage={mortgage}
               lifestyle={lifestyle}
               applyPreset={applyPreset}
               config={config}
             />
-          )}
-
-          {currentKey === "home" && (
-            <div className="space-y-4">
-              <p className="text-sm text-muted">
-                Your home is <strong className="text-slate-200">exempt</strong> from the Age
-                Pension assets test — we track its value for your net-worth picture only
-                {tenure === "mortgage" ? ", separate from the loan below." : "."}
-              </p>
-              <HomeEditor
-                tenure={tenure}
-                onTenure={changeTenure}
-                home={home}
-                onHome={setHomeField}
-                mortgage={mortgage}
-                onMortgage={setMort}
-                oldestAtRetire={oldestAtRetire}
-                lifeExpectancy={plan.lifeExpectancy}
-                strategyCompare={strategyCompare}
-              />
-            </div>
           )}
 
           {currentKey === "budget" && (
@@ -524,18 +467,26 @@ export default function BudgetBuilder({ plan, config, onApply, onProgress, onClo
 function SetupStep({
   household,
   tenure,
-  changeTenure,
+  home,
+  mortgage,
   lifestyle,
   applyPreset,
   config,
 }: {
   household: "single" | "couple";
   tenure: HomeTenure;
-  changeTenure: (t: HomeTenure) => void;
+  home: HomeDetail;
+  mortgage: MortgageDetail;
   lifestyle: BudgetLifestyle;
   applyPreset: (ls: BudgetLifestyle) => void;
   config: EngineConfig;
 }) {
+  const homeSummary =
+    tenure === "rent"
+      ? "Renting"
+      : tenure === "mortgage"
+        ? `Own with a ${fmtCurrency(mortgage.balance)} mortgage · home ${fmtCurrency(home.value)}`
+        : `Own outright · home ${fmtCurrency(home.value)}`;
   return (
     <div className="space-y-6">
       <p className="text-sm text-muted">
@@ -544,23 +495,18 @@ function SetupStep({
         anything that doesn’t fit. Nothing here is set in stone.
       </p>
 
-      <div>
-        <div className="mb-2 text-sm font-semibold text-slate-200">Home ownership</div>
-        <Segmented
-          value={tenure}
-          options={[
-            { value: "own", label: "Own outright" },
-            { value: "mortgage", label: "Mortgage" },
-            { value: "rent", label: "Renting" },
-          ]}
-          onChange={(v) => changeTenure(v as HomeTenure)}
-        />
-        <p className="mt-2 text-xs text-muted">
+      {/* The home is set in the plan (its own "Your home" step) — shown here read-only
+          so the budget uses the right figures without asking twice. */}
+      <div className="rounded-xl border border-line bg-panel-2 px-4 py-3">
+        <div className="flex items-center justify-between gap-3">
+          <div className="text-sm font-semibold text-slate-200">🏠 Your home</div>
+          <div className="text-sm tabular-nums text-white">{homeSummary}</div>
+        </div>
+        <p className="mt-1.5 text-xs text-muted">
           {tenure === "rent"
-            ? "Renters carry a much bigger housing cost — we use ASFA’s renter figures."
-            : tenure === "mortgage"
-              ? "ASFA already covers rates, insurance and upkeep — we’ll add the loan on the next step."
-              : "The ASFA benchmark assumes you own your home outright."}
+            ? "Renters carry a bigger housing cost — we use ASFA’s renter figures."
+            : "ASFA covers rates, insurance and upkeep; any loan is added on top."}{" "}
+          Change it in the <span className="text-slate-300">“Your home”</span> step of your plan.
         </p>
       </div>
 
