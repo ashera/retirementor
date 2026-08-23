@@ -334,6 +334,16 @@ export default function PlanWizard({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [homeTenure, homeDetail, homeMortgage, draft, config]);
+  // A homeowner's plan should carry a home value from the outset (net worth, the nav
+  // summary, the budget presets) rather than sitting at $0 until they open the step.
+  // Seed the default once when it's missing; existing plans with a home are untouched,
+  // and renters get none.
+  useEffect(() => {
+    if (draft.homeowner && !draft.home) {
+      patch(homeTenure === "mortgage" ? { home: homeDetail, mortgage: homeMortgage } : { home: homeDetail });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Build steps dynamically (partner step only for couples).
   const personStep = (i: number, title: string, subtitle: string) => ({
@@ -1312,7 +1322,10 @@ export default function PlanWizard({
             const isCurrent = i === safeStep;
             // Assumptions is a bonus (★ when fine-tuned) — never an amber "＋" gap.
             const isAssump = s.key === "assumptions";
-            const complete = isAssump ? tuned : sec?.complete;
+            // "Your home" isn't in the shared completeness meter (kept out so the meter's
+            // denominator is unchanged for existing plans), but it always has a value
+            // (owner/renter defaults) — so treat it as complete for the nav tick.
+            const complete = isAssump ? tuned : s.key === "home" ? true : sec?.complete;
             const opportunity = !isAssump && !complete && sec?.optional;
             const cls = isCurrent
               ? "bg-accent text-ink"
