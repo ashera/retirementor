@@ -13,7 +13,7 @@ import {
   presetCategories,
   type BudgetCategoryMeta,
 } from "@/lib/au/budget";
-import { mortgageAnnualCost, suggestPayoffAge } from "@/lib/au/mortgage";
+import { mortgageAnnualCost } from "@/lib/au/mortgage";
 import type {
   BudgetLifestyle,
   HomeDetail,
@@ -24,26 +24,12 @@ import type {
   SpendingStages,
 } from "@/lib/au/types";
 import Field from "@/components/Field";
-import HomeEditor from "@/components/HomeEditor";
+import HomeEditor, { DEFAULT_HOME, defaultMortgage } from "@/components/HomeEditor";
 import BudgetCategoryIcon, { CATEGORY_COLOR } from "@/components/BudgetCategoryIcon";
 import TrimSpendingModal from "@/components/TrimSpendingModal";
 import BoostSpendingModal from "@/components/BoostSpendingModal";
 import { boostSpending } from "@/lib/au/goalseek";
 
-const DEFAULT_HOME: HomeDetail = { value: 900_000, growthReal: 2 };
-
-function defaultMortgage(oldestAtRetire: number): MortgageDetail {
-  const balance = 180_000;
-  const repayment = 24_000;
-  return {
-    type: "principal_interest",
-    balance,
-    interestRate: 6,
-    annualRepayment: repayment,
-    payoffAge: suggestPayoffAge(balance, 6, repayment, oldestAtRetire), // null when the repayment can't amortise it → runs "for life", not forgiven at a fake age
-    strategy: "carry",
-  };
-}
 
 interface BudgetBuilderProps {
   plan: RetirementPlan;

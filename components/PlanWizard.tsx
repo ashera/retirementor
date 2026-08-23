@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Field from "@/components/Field";
+import HomeEditor, { DEFAULT_HOME, defaultMortgage } from "@/components/HomeEditor";
 import CompletenessRing from "@/components/CompletenessRing";
 import BudgetBuilder from "@/components/BudgetBuilder";
 import PropertyCard from "@/components/PropertyCard";
@@ -23,7 +24,10 @@ import {
   getInvestmentProperties,
   hasInvestmentProperty,
   personRetirementAge,
+  type HomeDetail,
+  type HomeTenure,
   type Household,
+  type MortgageDetail,
   type Person,
   type PropertyDetail,
   type RetirementPlan,
@@ -295,6 +299,41 @@ export default function PlanWizard({
   );
   const successPct = previewMc ? Math.round(previewMc.successRate * 100) : 0;
   const passesBar = previewMc ? previewMc.successRate >= MC_CONFIDENCE_TARGET : false;
+
+  // ── Family home (its own wizard step) ──────────────────────────────────────
+  // Edits the same plan fields the budget reads (homeowner / home / mortgage). Tenure
+  // is derived from those; local state preserves a home's value/loan if the user flips
+  // to "renting" and back within the step.
+  const oldestAtRetire =
+    Math.max(...draft.people.map((p) => p.currentAge)) +
+    Math.max(0, draft.retirementAge - draft.people[0].currentAge);
+  const [homeTenure, setHomeTenure] = useState<HomeTenure>(
+    !draft.homeowner ? "rent" : draft.mortgage ? "mortgage" : "own",
+  );
+  const [homeDetail, setHomeDetail] = useState<HomeDetail>(draft.home ?? DEFAULT_HOME);
+  const [homeMortgage, setHomeMortgage] = useState<MortgageDetail>(draft.mortgage ?? defaultMortgage(oldestAtRetire));
+  // Write the ACTIVE values through to the draft (renter → no home/loan; owner-outright
+  // → no loan), mirroring how the budget resolved them.
+  const syncHome = (t: HomeTenure, h: HomeDetail, m: MortgageDetail) =>
+    patch({
+      homeowner: t !== "rent",
+      home: t !== "rent" ? h : undefined,
+      mortgage: t === "mortgage" ? m : undefined,
+    });
+  const homeStrategyCompare = useMemo(() => {
+    if (homeTenure !== "mortgage") return null;
+    const base = { ...draft, homeowner: true, home: homeDetail, mortgage: homeMortgage };
+    const run = (strategy: MortgageDetail["strategy"]) => simulate({ ...base, mortgage: { ...homeMortgage, strategy } }, config);
+    const firstPension = (r: ReturnType<typeof simulate>) => r.rows.find((x) => x.phase === "pension")?.agePension ?? 0;
+    const carry = run("carry");
+    const clear = run("clear_at_retirement");
+    return {
+      carryLasts: carry.lastsToLifeExpectancy ? null : carry.depletedAge,
+      clearLasts: clear.lastsToLifeExpectancy ? null : clear.depletedAge,
+      pensionUplift: Math.round(firstPension(clear) - firstPension(carry)),
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [homeTenure, homeDetail, homeMortgage, draft, config]);
 
   // Build steps dynamically (partner step only for couples).
   const personStep = (i: number, title: string, subtitle: string) => ({
@@ -588,6 +627,45 @@ export default function PlanWizard({
           </div>
         )}
 
+      </div>
+    ),
+  };
+
+  const homeStep = {
+    key: "home",
+    nav: "Your home",
+    title: "Your family home",
+    subtitle: "",
+    body: (
+      <div className="space-y-5">
+        <WizardHeaderCard
+          page="home"
+          eyebrow="Your home"
+          blurb="Your home is exempt from the Age Pension assets test. We track its value for your net-worth picture, and model any mortgage you carry into retirement."
+        />
+        <HomeEditor
+          showTenure
+          tenure={homeTenure}
+          onTenure={(t) => {
+            setHomeTenure(t);
+            syncHome(t, homeDetail, homeMortgage);
+          }}
+          home={homeDetail}
+          onHome={(p) => {
+            const h = { ...homeDetail, ...p };
+            setHomeDetail(h);
+            syncHome(homeTenure, h, homeMortgage);
+          }}
+          mortgage={homeMortgage}
+          onMortgage={(p) => {
+            const m = { ...homeMortgage, ...p };
+            setHomeMortgage(m);
+            syncHome(homeTenure, homeDetail, m);
+          }}
+          oldestAtRetire={oldestAtRetire}
+          lifeExpectancy={draft.lifeExpectancy}
+          strategyCompare={homeStrategyCompare}
+        />
       </div>
     ),
   };
@@ -990,24 +1068,6 @@ export default function PlanWizard({
             ]}
           />
         </div>
-        <div className="flex items-center justify-between">
-          <div>
-            <span className="text-sm font-medium text-slate-200">
-              Own your home?
-            </span>
-            <p className="text-xs text-muted">
-              Your home is exempt from the assets test; renters get higher thresholds.
-            </p>
-          </div>
-          <Segmented
-            value={draft.homeowner ? "yes" : "no"}
-            onChange={(v) => patch({ homeowner: v === "yes" })}
-            options={[
-              { value: "yes", label: "Own" },
-              { value: "no", label: "Rent" },
-            ]}
-          />
-        </div>
         {isCouple && (
           <div className="flex items-center justify-between">
             <div>
@@ -1040,6 +1100,7 @@ export default function PlanWizard({
     contributionsStep,
     outsideStep,
     propertyStep,
+    homeStep,
     incomeStep,
     goalStep,
     assumptionsStep,
@@ -1083,7 +1144,13 @@ export default function PlanWizard({
       : 0;
   const stepValue = (key: string): string => {
     switch (key) {
-      case "household": return `${isCouple ? "Couple" : "Single"} · ${draft.homeowner ? "Owner" : "Renter"}`;
+      case "household": return isCouple ? "Couple" : "Single";
+      case "home":
+        return !draft.homeowner
+          ? "Renting"
+          : draft.mortgage
+            ? `${fmtCurrency(draft.home?.value ?? 0)} · mortgage`
+            : `${fmtCurrency(draft.home?.value ?? 0)} · owned`;
       case "you": return Number.isFinite(previewSuper) ? `${fmtCurrency(previewSuper)} super` : "Not set yet";
       case "partner": return draft.people[1] && Number.isFinite(draft.people[1].superBalance) ? `${fmtCurrency(draft.people[1].superBalance)} super` : "";
       case "contributions": return contribMode === undefined ? "Not set yet" : contribMode === "no" ? "None" : `${fmtCurrency(contribTotal)}/yr`;
@@ -1102,6 +1169,8 @@ export default function PlanWizard({
   };
   const stepStatus = (key: string): { text: string; tone: string } => {
     if (key === "assumptions") return tuned ? { text: "★ Tuned", tone: "text-cyan-300" } : { text: "Defaults", tone: "text-muted" };
+    // The home always has a value (owner/renter defaults), so it's never "needs info".
+    if (key === "home") return { text: "✓ Done", tone: "text-accent" };
     const sec = sectionState[key];
     if (!sec?.complete) return sec?.optional ? { text: "＋ Add", tone: "text-amber-300" } : { text: "Needs info", tone: "text-amber-300" };
     // Complete — for enrichments, show what they add to the projection.

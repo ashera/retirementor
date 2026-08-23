@@ -10,6 +10,21 @@ import type { HomeDetail, HomeTenure, MortgageDetail } from "@/lib/au/types";
 // Wizard and the Budget Builder edit the SAME plan fields (homeowner / home / mortgage)
 // from one shared component instead of two divergent copies.
 
+// Shared starting points, so the plan wizard and the budget seed the home identically.
+export const DEFAULT_HOME: HomeDetail = { value: 900_000, growthReal: 2 };
+export function defaultMortgage(oldestAtRetire: number): MortgageDetail {
+  const balance = 180_000;
+  const repayment = 24_000;
+  return {
+    type: "principal_interest",
+    balance,
+    interestRate: 6,
+    annualRepayment: repayment,
+    payoffAge: suggestPayoffAge(balance, 6, repayment, oldestAtRetire), // null → can't amortise, runs "for life"
+    strategy: "carry",
+  };
+}
+
 function Segmented<T extends string>({
   value,
   options,
