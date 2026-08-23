@@ -162,7 +162,16 @@ export default function GuidedIntro({
   }, [couple, mode, age1, age2, super1, super2, joint, sal1, sal2, homeowner, outsideSuper, retireAge, staged, targetSpending, invReturn, volatility]);
 
   const result = useMemo(() => simulate(plan, config), [plan, config]);
-  const mc = useMemo(() => runMonteCarlo(plan, config), [plan, config]);
+  // The Monte Carlo is the heavy compute (~1,000 runs). Running it on every render made
+  // the phase-2 sliders janky, since each drag re-derives `plan`. Debounce it: the cheap
+  // deterministic `result` updates live (chart, super-at-retirement), while the MC
+  // recomputes ~250ms after the user stops moving a slider, off the drag's critical path.
+  const [mcPlan, setMcPlan] = useState(plan);
+  useEffect(() => {
+    const t = setTimeout(() => setMcPlan(plan), 250);
+    return () => clearTimeout(t);
+  }, [plan]);
+  const mc = useMemo(() => runMonteCarlo(mcPlan, config), [mcPlan, config]);
   const successPct = Math.round(mc.successRate * 100);
   const lasts = result.lastsToLifeExpectancy;
   const tone = lasts ? "text-emerald-400" : "text-amber-400";
