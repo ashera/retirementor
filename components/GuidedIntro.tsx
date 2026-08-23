@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import type { EngineConfig } from "@/lib/au/config";
 import {
@@ -33,9 +33,10 @@ const money = (n: number) => fmtCurrency(Math.round(n));
 // Which phase a given step (panel) belongs to. 1=welcome, 2/3=Phase 1, 4=P2, 5=P3, 6=P4.
 const phaseOf = (step: number) => (step <= 3 ? 1 : step - 2);
 
-function Panel({ children }: { children: React.ReactNode }) {
+function Panel({ children, id }: { children: React.ReactNode; id?: string }) {
   return (
-    <section className="reveal mt-4 rounded-2xl border border-line bg-panel p-6 first:mt-0">
+    // scroll-mt gives a small gap when a newly revealed step is scrolled to the top.
+    <section id={id} className="reveal mt-4 scroll-mt-4 rounded-2xl border border-line bg-panel p-6 first:mt-0">
       {children}
     </section>
   );
@@ -185,9 +186,10 @@ export default function GuidedIntro({
         ? { head: "Around the average for your age", rel: "about the same as", tone: "text-white" }
         : { head: "Below the average for your age", rel: "below", tone: "text-white" };
 
-  const bottomRef = useRef<HTMLDivElement>(null);
+  // When a new step is revealed, put the TOP of its card at the top of the screen — so
+  // users don't scroll past the fields at the top of the card (block: "end" did that).
   useEffect(() => {
-    if (step > 1) bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    if (step > 1) document.getElementById(`guide-step-${step}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [step]);
 
   // Funnel: which panel of the guided walkthrough a visitor reaches before leaving.
@@ -267,7 +269,7 @@ export default function GuidedIntro({
 
       {/* Phase 1 — inputs */}
       {step >= 2 && (
-        <Panel>
+        <Panel id="guide-step-2">
           <div className="text-xs font-semibold uppercase tracking-wide text-accent">Phase 1 · About you</div>
           <h2 className="mt-1 text-lg font-bold text-white">You and your super</h2>
           <p className="mt-1 text-sm text-muted">
@@ -318,7 +320,7 @@ export default function GuidedIntro({
 
       {/* Phase 1 — assertion */}
       {step >= 3 && (
-        <Panel>
+        <Panel id="guide-step-3">
           <h2 className={`text-xl font-bold ${track.tone}`}>{track.head}</h2>
           <p className="mt-2 text-slate-200">
             For {couple ? "your ages" : "your age"}, the typical super balance is
@@ -336,7 +338,7 @@ export default function GuidedIntro({
 
       {/* Phase 2 — super at retirement */}
       {step >= 4 && (
-        <Panel>
+        <Panel id="guide-step-4">
           <div className="text-xs font-semibold uppercase tracking-wide text-accent">Phase 2 · Growth</div>
           <h2 className="mt-1 flex items-center gap-2 text-lg font-bold text-white">
             Your super at retirement
@@ -395,7 +397,7 @@ export default function GuidedIntro({
 
       {/* Phase 3 — retirement income */}
       {step >= 5 && (
-        <Panel>
+        <Panel id="guide-step-5">
           <div className="text-xs font-semibold uppercase tracking-wide text-accent">Phase 3 · Income</div>
           <h2 className="mt-1 flex items-center gap-2 text-lg font-bold text-white">
             Your retirement income
@@ -444,7 +446,7 @@ export default function GuidedIntro({
 
       {/* Phase 4 — reliability */}
       {step >= 6 && (
-        <Panel>
+        <Panel id="guide-step-6">
           <div className="text-xs font-semibold uppercase tracking-wide text-accent">Phase 4 · Reliability</div>
           <h2 className="mt-1 flex items-center gap-2 text-lg font-bold text-white">
             How reliable is this?
@@ -492,8 +494,6 @@ export default function GuidedIntro({
           {step === 6 && <Actions label="Take me to the full dashboard →" onClick={() => onExit(plan, true)} />}
         </Panel>
       )}
-
-      <div ref={bottomRef} />
     </main>
   );
 }
