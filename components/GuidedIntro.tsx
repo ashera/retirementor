@@ -496,8 +496,8 @@ export default function GuidedIntro({
               you&apos;re ready: <span className="text-slate-200">extra super contributions</span> (salary
               sacrifice or after-tax), <span className="text-slate-200">savings &amp; investments outside
               super</span>, an <span className="text-slate-200">investment property</span> or{" "}
-              <span className="text-slate-200">mortgage</span>, and the return/fee assumptions. Just tap the
-              completeness ring (<span className="text-slate-200">&ldquo;Edit scenario · add detail&rdquo;</span>) any time.
+              <span className="text-slate-200">mortgage</span>, and the return/fee assumptions. Just tap{" "}
+              <span className="text-slate-200">&ldquo;✎ Refine scenario&rdquo;</span> on the dashboard any time.
             </p>
           </div>
           {step === 6 && <Actions label="Take me to the full dashboard →" onClick={() => onExit(plan, true)} />}
