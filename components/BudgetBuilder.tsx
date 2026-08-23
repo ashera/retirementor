@@ -24,6 +24,7 @@ import type {
   SpendingStages,
 } from "@/lib/au/types";
 import Field from "@/components/Field";
+import HomeEditor from "@/components/HomeEditor";
 import BudgetCategoryIcon, { CATEGORY_COLOR } from "@/components/BudgetCategoryIcon";
 import TrimSpendingModal from "@/components/TrimSpendingModal";
 import BoostSpendingModal from "@/components/BoostSpendingModal";
@@ -410,12 +411,13 @@ export default function BudgetBuilder({ plan, config, onApply, onProgress, onClo
                 Pension assets test — we track its value for your net-worth picture only
                 {tenure === "mortgage" ? ", separate from the loan below." : "."}
               </p>
-              <HomePanel
-                home={home}
-                setHomeField={setHomeField}
+              <HomeEditor
                 tenure={tenure}
+                onTenure={changeTenure}
+                home={home}
+                onHome={setHomeField}
                 mortgage={mortgage}
-                setMort={setMort}
+                onMortgage={setMort}
                 oldestAtRetire={oldestAtRetire}
                 lifeExpectancy={plan.lifeExpectancy}
                 strategyCompare={strategyCompare}
@@ -616,222 +618,6 @@ function SetupStep({
   );
 }
 
-// ---------------------------------------------------------------------------
-
-function HomePanel({
-  home,
-  setHomeField,
-  tenure,
-  mortgage,
-  setMort,
-  oldestAtRetire,
-  lifeExpectancy,
-  strategyCompare,
-}: {
-  home: HomeDetail;
-  setHomeField: (patch: Partial<HomeDetail>) => void;
-  tenure: HomeTenure;
-  mortgage: MortgageDetail;
-  setMort: (patch: Partial<MortgageDetail>) => void;
-  oldestAtRetire: number;
-  lifeExpectancy: number;
-  strategyCompare: { carryLasts: number | null; clearLasts: number | null; pensionUplift: number } | null;
-}) {
-  const isPI = mortgage.type === "principal_interest";
-  const cost = mortgageAnnualCost(mortgage);
-  const equity = Math.max(0, home.value - (tenure === "mortgage" ? mortgage.balance : 0));
-  const suggested = suggestPayoffAge(
-    mortgage.balance,
-    mortgage.interestRate,
-    mortgage.annualRepayment,
-    oldestAtRetire,
-  );
-
-  return (
-    <div className="space-y-4">
-      {/* The home as an asset (exempt) */}
-      <div className="space-y-4 rounded-2xl border border-line bg-panel-2 p-4">
-        <div className="flex items-center justify-between gap-3 text-sm font-semibold text-white">
-          <span>🏠 Your home</span>
-          <span className="text-xs font-normal text-muted">
-            {fmtCurrency(home.value)} · {fmtCurrency(equity)} equity
-          </span>
-        </div>
-        <Field
-          label="Current market value"
-          value={home.value}
-          onChange={(v) => setHomeField({ value: v })}
-          min={0}
-          max={10_000_000}
-          step={25_000}
-          prefix="$"
-          hint="Exempt from the Age Pension — for your net-worth picture."
-        />
-        <Field
-          label="Capital growth (real, after inflation)"
-          value={home.growthReal}
-          onChange={(v) => setHomeField({ growthReal: v })}
-          min={-2}
-          max={6}
-          step={0.5}
-          suffix="% p.a."
-        />
-        {tenure === "own" && (
-          <div className="rounded-lg border border-line bg-panel px-3 py-2.5 text-xs text-muted">
-            Owned outright — no loan to carry into retirement.
-          </div>
-        )}
-      </div>
-
-      {tenure !== "mortgage" ? null : (
-    <div className="space-y-4 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
-      <div className="flex items-center gap-2 text-sm font-semibold text-amber-200">
-        🏦 Your home loan
-      </div>
-
-      <Segmented
-        value={mortgage.type}
-        options={[
-          { value: "principal_interest", label: "Principal & interest" },
-          { value: "interest_only", label: "Interest-only" },
-        ]}
-        onChange={(v) => setMort({ type: v as MortgageDetail["type"] })}
-      />
-
-      <Field
-        label="Balance owing"
-        value={mortgage.balance}
-        onChange={(v) => setMort({ balance: v })}
-        min={0}
-        max={1_000_000}
-        step={5_000}
-        prefix="$"
-        hint="Roughly what you’ll still owe when you retire (today’s dollars)."
-      />
-
-      <Field
-        label="Interest rate"
-        value={mortgage.interestRate}
-        onChange={(v) => setMort({ interestRate: v })}
-        min={1}
-        max={12}
-        step={0.1}
-        suffix="%"
-      />
-
-      {isPI ? (
-        <>
-          <Field
-            label="Repayments"
-            value={mortgage.annualRepayment}
-            onChange={(v) => setMort({ annualRepayment: v })}
-            min={0}
-            max={120_000}
-            step={600}
-            prefix="$"
-            suffix="/yr"
-            hint={`about ${fmtCurrency(Math.round(mortgage.annualRepayment / 12))} a month`}
-          />
-          <div>
-            <Field
-              label="Paid off by age"
-              value={mortgage.payoffAge ?? suggested ?? oldestAtRetire + 10}
-              onChange={(v) => setMort({ payoffAge: v })}
-              min={oldestAtRetire}
-              max={lifeExpectancy}
-              step={1}
-              suffix="yrs"
-            />
-            {suggested != null && suggested !== mortgage.payoffAge && (
-              <button
-                onClick={() => setMort({ payoffAge: suggested })}
-                className="mt-1 text-xs text-accent underline-offset-2 hover:underline"
-              >
-                Work it out from balance & rate → age {suggested}
-              </button>
-            )}
-            {suggested == null && (
-              <p className="mt-1 text-xs text-amber-300">
-                These repayments barely cover the interest — the loan hardly shrinks.
-              </p>
-            )}
-          </div>
-        </>
-      ) : (
-        <div className="rounded-lg border border-line bg-panel px-3 py-2.5 text-xs text-muted">
-          Interest-only: about{" "}
-          <span className="font-semibold text-white">{fmtCurrency(Math.round(cost))}/yr</span> in
-          interest, and the{" "}
-          <span className="font-semibold text-white">{fmtCurrency(mortgage.balance)}</span> balance
-          never shrinks — it’s cleared by downsizing, selling, or from your estate. Some people
-          model clearing it with super at retirement (below); whether that suits you is a personal
-          decision.
-        </div>
-      )}
-
-      <div>
-        <div className="mb-1.5 text-sm font-semibold text-slate-200">
-          What will you do with it?
-        </div>
-        <div className="space-y-2">
-          <StrategyCard
-            active={mortgage.strategy === "carry"}
-            onClick={() => setMort({ strategy: "carry" })}
-            title="Keep repaying"
-            desc={`Adds ${fmtCurrency(Math.round(cost / 12))}/mo to your budget ${
-              isPI && mortgage.payoffAge ? `until age ${mortgage.payoffAge}` : "for life"
-            }.`}
-          />
-          <StrategyCard
-            active={mortgage.strategy === "clear_at_retirement"}
-            onClick={() => setMort({ strategy: "clear_at_retirement" })}
-            title="Clear it at retirement with super"
-            desc={`Pay the ${fmtCurrency(mortgage.balance)} off from super (tax-free from 60).${
-              strategyCompare && strategyCompare.pensionUplift > 0
-                ? ` Could lift your Age Pension ~${fmtCurrency(strategyCompare.pensionUplift)}/yr.`
-                : ""
-            }`}
-          />
-        </div>
-      </div>
-    </div>
-      )}
-    </div>
-  );
-}
-
-function StrategyCard({
-  active,
-  onClick,
-  title,
-  desc,
-}: {
-  active: boolean;
-  onClick: () => void;
-  title: string;
-  desc: string;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={`flex w-full items-start gap-3 rounded-xl border px-3 py-2.5 text-left transition ${
-        active ? "border-accent bg-accent/10" : "border-line bg-panel-2 hover:border-accent/40"
-      }`}
-    >
-      <span
-        className={`mt-0.5 inline-block h-4 w-4 shrink-0 rounded-full border-2 ${
-          active ? "border-accent bg-accent" : "border-line"
-        }`}
-      />
-      <span>
-        <span className={`block text-sm font-semibold ${active ? "text-accent" : "text-white"}`}>
-          {title}
-        </span>
-        <span className="block text-xs text-muted">{desc}</span>
-      </span>
-    </button>
-  );
-}
 
 // ---------------------------------------------------------------------------
 
