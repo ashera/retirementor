@@ -284,18 +284,6 @@ export default function ConfidenceHero({
             {verdict}
           </p>
 
-          {/* Celebration: a bulletproof plan survives even the worst market on record.
-              Bert is decorative here — the factual claim (not a recommendation) is the
-              tier's own definition, so the "not advice" framing holds. */}
-          {state === "bulletproof" && (
-            <div className="mt-3 flex items-center gap-3 rounded-xl border border-accent/25 bg-accent/[0.07] px-4 py-2.5">
-              <Bert pose="eureka" size={58} className="shrink-0" />
-              <p className="text-[13px] font-medium leading-snug text-accent">
-                🎉 This plan holds up even through the worst market on record — about as resilient as a retirement plan gets.
-              </p>
-            </div>
-          )}
-
           {/* Safety-net reassurance under a "running short" verdict — the Age Pension is
               the floor income once savings run low. Kept to one compact muted line. */}
           {(state === "ambitious" || state === "short") && agePension && (

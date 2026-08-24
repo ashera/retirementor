@@ -37,6 +37,7 @@ import {
 import { toActiveScenario, fromActiveScenario } from "@/lib/au/scenario";
 import RetirementChart from "@/components/RetirementChart";
 import { ageGapInfo } from "@/components/ageAxis";
+import Bert from "@/components/Bert";
 import IncomeChart from "@/components/IncomeChart";
 import YearDetailModal from "@/components/YearDetailModal";
 import IncomeYearModal from "@/components/IncomeYearModal";
@@ -846,11 +847,16 @@ export default function WhatIfView({
            the intro here lets column 2 rise to the top, filling the old dead space. ── */}
       <div className="space-y-4 lg:col-span-2">
       <header>
-        <h1 className="text-3xl font-bold text-white">What if…</h1>
-        <p className="mt-2 max-w-2xl text-muted">
-          Turn retirement strategies on and off and see the effect on your super, your income, and
-          how long it lasts. Each toggle shows its own impact; the numbers up top show them combined.
-        </p>
+        <div className="flex items-start justify-between gap-5">
+          <div className="min-w-0">
+            <h1 className="text-3xl font-bold text-white">What if…</h1>
+            <p className="mt-2 max-w-2xl text-muted">
+              Turn retirement strategies on and off and see the effect on your super, your income, and
+              how long it lasts. Each toggle shows its own impact; the numbers up top show them combined.
+            </p>
+          </div>
+          <Bert pose="flask" size={112} className="hidden shrink-0 sm:block" />
+        </div>
         <p className="mt-3 flex max-w-2xl items-start gap-2 rounded-lg border border-line bg-panel-2 px-3 py-2 text-sm text-slate-300">
           <span aria-hidden>✏️</span>
           <span>

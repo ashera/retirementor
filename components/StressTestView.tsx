@@ -18,6 +18,7 @@ import { fmtCurrency } from "@/lib/au/format";
 import { stressNarrative } from "@/lib/au/stressNarrative";
 import { track } from "@/lib/analytics";
 import StressChart from "@/components/StressChart";
+import Bert from "@/components/Bert";
 import { ageGapInfo } from "@/components/ageAxis";
 import AssumptionsModal from "@/components/AssumptionsModal";
 import CutDetailModal from "@/components/CutDetailModal";
@@ -266,14 +267,17 @@ export default function StressTestView({
         </span>
       </div>
 
-      <header className="mb-6">
-        <h1 className="text-2xl font-bold text-white">
-          <span aria-hidden>🏛</span> Historical stress test
-        </h1>
-        <p className="mt-1 text-sm text-muted">
-          How your plan would have held up if you&apos;d retired at {plan?.retirementAge ?? "…"} straight into each
-          major market downturn of the last century — the returns as they actually happened, at full severity.
-        </p>
+      <header className="mb-6 flex items-start justify-between gap-5">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-bold text-white">
+            <span aria-hidden>🏛</span> Historical stress test
+          </h1>
+          <p className="mt-1 text-sm text-muted">
+            How your plan would have held up if you&apos;d retired at {plan?.retirementAge ?? "…"} straight into each
+            major market downturn of the last century — the returns as they actually happened, at full severity.
+          </p>
+        </div>
+        <Bert pose="atom" size={104} className="hidden shrink-0 sm:block" />
       </header>
 
       {!plan || !result ? (
