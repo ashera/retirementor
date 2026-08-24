@@ -13,7 +13,6 @@ const POSES = {
   glasses: { w: 223, h: 281 }, // reading / reviewing
   violin: { w: 226, h: 268 }, // life after work
   bicycle: { w: 200, h: 333 }, // the journey
-  clock: { w: 296, h: 251 }, // retirement timing (watch + calendar)
   blackboard: { w: 360, h: 309 }, // "RETIRING GENIUS!" scene — hero / celebration
 } as const;
 

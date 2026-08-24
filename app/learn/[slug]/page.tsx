@@ -12,7 +12,7 @@ import Bert, { type BertPose } from "@/components/Bert";
 // Bert brings each article's subject to life — a pose per knowledge-base category.
 const CATEGORY_POSE: Record<string, BertPose> = {
   "Super, tax & contributions": "flask",
-  "Age Pension": "clock",
+  "Age Pension": "eureka",
   "Spending & withdrawal": "bicycle",
   "Risk & simulation": "atom",
   "How the model works": "blackboard",
