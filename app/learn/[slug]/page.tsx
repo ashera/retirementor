@@ -7,6 +7,17 @@ import { articleLd, breadcrumbLd } from "@/lib/seo";
 import KbContent from "@/components/KbContent";
 import TtrFlowButton from "@/components/TtrFlowButton";
 import { TTR_FLOW_EXAMPLE } from "@/lib/au/ttrFlow";
+import Bert, { type BertPose } from "@/components/Bert";
+
+// Bert brings each article's subject to life — a pose per knowledge-base category.
+const CATEGORY_POSE: Record<string, BertPose> = {
+  "Super, tax & contributions": "flask",
+  "Age Pension": "clock",
+  "Spending & withdrawal": "bicycle",
+  "Risk & simulation": "atom",
+  "How the model works": "blackboard",
+  "Aged care": "glasses",
+};
 
 export function generateStaticParams() {
   return KB_ARTICLES.map((a) => ({ slug: a.slug }));
@@ -57,16 +68,19 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
         <span className="text-accent">{a.category}</span>
       </div>
 
-      <header className="mt-5">
-        <h1 className="text-3xl font-bold text-white sm:text-4xl">{a.title}</h1>
-        <p className="mt-3 text-lg leading-relaxed text-slate-300">{a.summary}</p>
-        <p className="mt-3 text-xs text-muted">
-          Updated{" "}
-          <time dateTime={articleDate(a)}>
-            {new Date(articleDate(a)).toLocaleDateString("en-AU", { day: "numeric", month: "long", year: "numeric" })}
-          </time>
-          {" · "}General information, not financial advice
-        </p>
+      <header className="mt-5 flex items-start justify-between gap-5">
+        <div className="min-w-0">
+          <h1 className="text-3xl font-bold text-white sm:text-4xl">{a.title}</h1>
+          <p className="mt-3 text-lg leading-relaxed text-slate-300">{a.summary}</p>
+          <p className="mt-3 text-xs text-muted">
+            Updated{" "}
+            <time dateTime={articleDate(a)}>
+              {new Date(articleDate(a)).toLocaleDateString("en-AU", { day: "numeric", month: "long", year: "numeric" })}
+            </time>
+            {" · "}General information, not financial advice
+          </p>
+        </div>
+        <Bert pose={CATEGORY_POSE[a.category] ?? "eureka"} size={104} className="hidden shrink-0 sm:block" />
       </header>
 
       <article className="mt-8">
