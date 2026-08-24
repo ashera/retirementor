@@ -24,6 +24,8 @@ import Disclosures from "@/components/Disclosures";
 import LifestageModal from "@/components/LifestageModal";
 import GuidedIntro from "@/components/GuidedIntro";
 import GetStartedPanel from "@/components/GetStartedPanel";
+import CompletenessRing from "@/components/CompletenessRing";
+import { planCompleteness, budgetCompleteness } from "@/lib/au/completeness";
 import NewScenarioModal from "@/components/NewScenarioModal";
 import ConfidenceHero, { type PlanChip } from "@/components/ConfidenceHero";
 import { useHeavyMetrics } from "@/components/useHeavyMetrics";
@@ -2561,6 +2563,30 @@ export default function PlannerApp({
                 className="mt-1.5 w-full rounded-lg border border-line bg-panel-2 px-3 py-2 text-sm font-semibold text-white outline-none focus:border-accent disabled:opacity-60"
               />
               <p className="mt-1 text-[11px] text-muted">Every change is saved to this scenario automatically.</p>
+
+              {/* Completeness donuts → jump straight into the matching tool. */}
+              <div className="mt-4">
+                <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted">How complete is this scenario?</div>
+                <div className="grid grid-cols-2 gap-3">
+                  {[
+                    { label: "Plan details", sub: "Open the plan wizard →", pct: planCompleteness(plan).pct, onClick: () => { setScenarioModalOpen(false); setWizardOpen(true); } },
+                    { label: "Budget", sub: "Open the budget planner →", pct: budgetCompleteness(plan).pct, onClick: () => { setScenarioModalOpen(false); setBudgetOpen(true); } },
+                  ].map((d) => (
+                    <button
+                      key={d.label}
+                      type="button"
+                      onClick={d.onClick}
+                      className="flex flex-col items-center gap-2 rounded-xl border border-line bg-panel-2 px-3 py-3 text-center transition hover:border-accent/50 hover:bg-panel"
+                    >
+                      <CompletenessRing pct={d.pct} size={64} />
+                      <div>
+                        <div className="text-xs font-semibold text-white">{d.label}</div>
+                        <div className="mt-0.5 text-[11px] text-accent">{d.sub}</div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
 
               {/* Switch */}
               {savedPlans.length > 1 && (

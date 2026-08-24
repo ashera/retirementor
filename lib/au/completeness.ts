@@ -57,3 +57,29 @@ export function planCompleteness(plan: RetirementPlan): PlanCompleteness {
   const gap = sections.find((s) => s.core && !s.complete) ?? sections.find((s) => s.optional && !s.complete);
   return { pct, tier, completeCount, total, coreComplete, sections, byKey, gapKey: gap?.key ?? null };
 }
+
+export interface BudgetCompleteness {
+  pct: number;
+  completeCount: number;
+  total: number;
+  sections: CompSection[];
+}
+
+/** How thoroughly the SPENDING side (the budget planner's job) is set up: a headline
+ *  goal, a detailed line-item budget, and later-years phases. Drives the second donut
+ *  in the Manage-scenario modal, alongside planCompleteness. */
+export function budgetCompleteness(plan: RetirementPlan): BudgetCompleteness {
+  const b = plan.budget;
+  const goalSet =
+    plan.retirementAge > 0 && (plan.spendingMode === "stages" ? plan.spendingStages.goGo > 0 : plan.targetSpending > 0);
+  const hasBudget = !!(b?.categories && Object.keys(b.categories).length > 0);
+  const hasPhases = !!b?.applyPhases || plan.spendingMode === "stages";
+  const sections: CompSection[] = [
+    { key: "goal", label: "spending goal", core: true, optional: false, complete: goalSet },
+    { key: "budget", label: "detailed budget", core: false, optional: true, complete: hasBudget },
+    { key: "phases", label: "later-years spending", core: false, optional: true, complete: hasPhases },
+  ];
+  const completeCount = sections.filter((s) => s.complete).length;
+  const total = sections.length;
+  return { pct: Math.round((completeCount / total) * 100), completeCount, total, sections };
+}

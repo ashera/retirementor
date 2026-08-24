@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { planCompleteness } from "../lib/au/completeness";
+import { planCompleteness, budgetCompleteness } from "../lib/au/completeness";
 import { DEFAULT_PLAN, type RetirementPlan } from "../lib/au/types";
 
 const single = (over: Partial<RetirementPlan> = {}): RetirementPlan => ({
@@ -64,5 +64,30 @@ describe("planCompleteness", () => {
     }));
     expect(c.total).toBe(8);
     expect(c.byKey.partner.complete).toBe(true);
+  });
+});
+
+describe("budgetCompleteness", () => {
+  it("a headline goal only → just the goal section (33%)", () => {
+    const c = budgetCompleteness(single({ spendingMode: "flat", targetSpending: 55_000, budget: undefined }));
+    expect(c.total).toBe(3);
+    expect(c.sections.find((s) => s.key === "goal")!.complete).toBe(true);
+    expect(c.sections.find((s) => s.key === "budget")!.complete).toBe(false);
+    expect(c.pct).toBe(33);
+  });
+
+  it("a detailed budget with phases → 100%", () => {
+    const c = budgetCompleteness(
+      single({
+        spendingMode: "stages",
+        spendingStages: { goGo: 60_000, slowGo: 50_000, noGo: 42_000, slowGoAge: 75, noGoAge: 85 },
+        budget: { tenure: "own", lifestyle: "comfortable", categories: { food: 12_000, housing: 8_000 }, applyPhases: true },
+      }),
+    );
+    expect(c.pct).toBe(100);
+  });
+
+  it("no goal set → 0%", () => {
+    expect(budgetCompleteness(single({ spendingMode: "flat", targetSpending: 0, retirementAge: 0, budget: undefined })).pct).toBe(0);
   });
 });
