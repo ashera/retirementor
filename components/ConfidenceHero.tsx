@@ -221,8 +221,6 @@ export default function ConfidenceHero({
     );
   }
 
-  // The "leaving money on the table" nudge — only where there's real headroom.
-  const showNudge = (state === "bulletproof" || state === "safe") && headroom >= 3000;
 
   // Active-scenario name: allow up to 50 characters (wrapping to two lines in the
   // column) before hard-truncating with an ellipsis.
@@ -313,18 +311,6 @@ export default function ConfidenceHero({
               {marker(zonePct[2], ZONE.amber, "Risky zone", `${fmtCompact(safe)}–${fmtCompact(central)}`, "down to 50% likely to last")}
             </div>
           </div>
-
-          {/* The "leaving money on the table" nudge — only where there's real headroom.
-              (The InfoBlast announcement banner lives at the foot of the right column.) */}
-          {showNudge && (
-            <div className="mt-4 flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/[0.08] px-4 py-3">
-              <span aria-hidden className="text-base">💡</span>
-              <p className="text-[13px] leading-snug text-slate-200">
-                At the same 85% chance of your money lasting, your plan models capacity for about{" "}
-                <b className="text-amber-300">{fmtCurrency(headroom)}/yr</b> more than your current goal.
-              </p>
-            </div>
-          )}
 
           <p className="mt-7 text-sm leading-relaxed text-muted">
             Two ways to go further with this plan.{" "}
