@@ -65,6 +65,9 @@ export interface ConfidenceHeroProps {
   // safety-net note under a "running short" verdict. Null when it doesn't apply (e.g. a
   // non-resident not claiming it from abroad).
   agePension?: { annual: number; household: "single" | "couple" } | null;
+  // Read-only shared view: the right column has no scenario/backup/nudge blocks, so it
+  // would be an empty void under the dial. When set, show a "build your own" CTA there.
+  buildOwnHref?: string | null;
 }
 
 export default function ConfidenceHero({
@@ -93,6 +96,7 @@ export default function ConfidenceHero({
   showInfoBlasts,
   confidenceLoading,
   agePension = null,
+  buildOwnHref = null,
 }: ConfidenceHeroProps) {
   const state: ConfidenceState = confidenceState(goalTotal, { failsafe, safe, central });
   const headroom = safe - goalTotal; // + = room to spend more; − = above the safe level
@@ -442,6 +446,28 @@ export default function ConfidenceHero({
           {/* Backoffice-managed rotating announcement banner (main dashboard only) —
               renders nothing when there are no active InfoBlasts. */}
           {showInfoBlasts && <InfoBlastBanner />}
+
+          {/* Shared read-only view: nothing else fills the right column under the dial,
+              so invite the visitor to build their own (fills the void + converts). */}
+          {buildOwnHref && (
+            <div className="border-t border-dashed border-line pt-4">
+              <div className="flex items-center gap-3">
+                <Bert pose="pointer" size={56} className="shrink-0" />
+                <div className="min-w-0">
+                  <div className="text-[13px] font-semibold text-white">Like what you see?</div>
+                  <p className="mt-0.5 text-[11.5px] leading-snug text-muted">
+                    Build your own free retirement projection — no account needed.
+                  </p>
+                </div>
+              </div>
+              <Link
+                href={buildOwnHref}
+                className="mt-3 inline-flex items-center gap-1 rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-ink transition hover:brightness-110"
+              >
+                Build your own <span aria-hidden>→</span>
+              </Link>
+            </div>
+          )}
         </div>
       </div>
 

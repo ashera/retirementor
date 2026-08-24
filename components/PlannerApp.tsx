@@ -1534,6 +1534,7 @@ export default function PlannerApp({
         ioSlot={!user && !shared ? renderIOButtons() : null}
         chips={planChips}
         showInfoBlasts={!shared}
+        buildOwnHref={shared ? "/" : null}
         agePension={
           plan.taxResidency !== "non-resident" || plan.claimAgePensionAbroad
             ? { annual: config.agePension[plan.people.length > 1 ? "couple" : "single"].maxAnnual, household: plan.people.length > 1 ? "couple" : "single" }
