@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { SITE_URL } from "@/lib/site";
 import { breadcrumbLd } from "@/lib/seo";
 import AgedCareCalculator from "@/components/AgedCareCalculator";
+import Bert from "@/components/Bert";
 
 const title = "Aged care cost calculator — Australia (2026)";
 const description =
@@ -46,12 +47,15 @@ export default function AgedCareCalculatorPage() {
         <span className="text-accent">Aged care</span>
       </div>
 
-      <header className="mt-5">
-        <h1 className="text-3xl font-bold text-white sm:text-4xl">Aged care cost calculator</h1>
-        <p className="mt-3 text-lg leading-relaxed text-slate-300">
-          Aged care in Australia is means-tested and the fees can be confusing. Move the sliders to estimate what a care
-          home — or Support at Home — might cost you, using the 2026 Aged Care Act fee structure.
-        </p>
+      <header className="mt-5 flex items-start justify-between gap-5">
+        <div className="min-w-0">
+          <h1 className="text-3xl font-bold text-white sm:text-4xl">Aged care cost calculator</h1>
+          <p className="mt-3 text-lg leading-relaxed text-slate-300">
+            Aged care in Australia is means-tested and the fees can be confusing. Move the sliders to estimate what a care
+            home — or Support at Home — might cost you, using the 2026 Aged Care Act fee structure.
+          </p>
+        </div>
+        <Bert pose="eureka" size={104} className="hidden shrink-0 sm:block" />
       </header>
 
       <div className="mt-8">
