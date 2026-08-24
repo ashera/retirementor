@@ -28,9 +28,10 @@ function useCountUp(target: number, ms = 550) {
 
 /** Circular "how complete is your plan" meter with a dead-centred number that
  *  gently counts up as it changes. `size` in px (header 44, hub 88, chip ~30). */
-export default function CompletenessRing({ pct, size = 44 }: { pct: number; size?: number }) {
+export default function CompletenessRing({ pct, size = 44, showPercent = false }: { pct: number; size?: number; showPercent?: boolean }) {
   const display = useCountUp(pct);
   const big = size >= 80;
+  const showPct = big || showPercent; // big rings always show "%"; others opt in
   const stroke = size >= 80 ? 7 : size >= 40 ? 4 : 3;
   const r = (size - stroke) / 2 - 1;
   const circ = 2 * Math.PI * r;
@@ -46,7 +47,7 @@ export default function CompletenessRing({ pct, size = 44 }: { pct: number; size
       <div className="absolute inset-0 flex items-center justify-center leading-none">
         <span className={`font-bold tabular-nums text-white ${fontClass}`}>
           {display}
-          {big && <span className="align-top text-base font-semibold text-muted">%</span>}
+          {showPct && <span className={big ? "align-top text-base font-semibold text-muted" : "text-[0.7em] font-semibold text-muted"}>%</span>}
         </span>
       </div>
     </div>

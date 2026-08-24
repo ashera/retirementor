@@ -388,6 +388,16 @@ export default function PlannerApp({
   const [nudgeDismissed, setNudgeDismissed] = useState(false);
   const [newScenarioOpen, setNewScenarioOpen] = useState(false);
   const [scenarioModalOpen, setScenarioModalOpen] = useState(false);
+  // When the plan/budget wizard is opened FROM the Manage-scenario modal (its
+  // completeness donuts), reopen that modal once the wizard closes — so the user lands
+  // back where they were rather than on the bare dashboard.
+  const [returnToManage, setReturnToManage] = useState(false);
+  useEffect(() => {
+    if (returnToManage && !wizardOpen && !budgetOpen) {
+      setReturnToManage(false);
+      setScenarioModalOpen(true);
+    }
+  }, [returnToManage, wizardOpen, budgetOpen]);
   const [notesOpen, setNotesOpen] = useState(false);
   // Latest notes per saved scenario, so the modal reflects saves without a full
   // router refresh (which would re-simulate). Keyed by plans-row id.
@@ -2569,8 +2579,8 @@ export default function PlannerApp({
                 <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted">How complete is this scenario?</div>
                 <div className="grid grid-cols-2 gap-3">
                   {[
-                    { label: "Plan details", sub: "Open the plan wizard →", pct: planCompleteness(plan).pct, onClick: () => { setScenarioModalOpen(false); setWizardOpen(true); } },
-                    { label: "Budget", sub: "Open the budget planner →", pct: budgetCompleteness(plan).pct, onClick: () => { setScenarioModalOpen(false); setBudgetOpen(true); } },
+                    { label: "Plan details", sub: "Open the plan wizard →", pct: planCompleteness(plan).pct, onClick: () => { setReturnToManage(true); setScenarioModalOpen(false); setWizardOpen(true); } },
+                    { label: "Budget", sub: "Open the budget planner →", pct: budgetCompleteness(plan).pct, onClick: () => { setReturnToManage(true); setScenarioModalOpen(false); setBudgetOpen(true); } },
                   ].map((d) => (
                     <button
                       key={d.label}
@@ -2578,7 +2588,7 @@ export default function PlannerApp({
                       onClick={d.onClick}
                       className="flex flex-col items-center gap-2 rounded-xl border border-line bg-panel-2 px-3 py-3 text-center transition hover:border-accent/50 hover:bg-panel"
                     >
-                      <CompletenessRing pct={d.pct} size={64} />
+                      <CompletenessRing pct={d.pct} size={64} showPercent />
                       <div>
                         <div className="text-xs font-semibold text-white">{d.label}</div>
                         <div className="mt-0.5 text-[11px] text-accent">{d.sub}</div>
