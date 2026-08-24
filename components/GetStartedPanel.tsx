@@ -1,5 +1,7 @@
 "use client";
 
+import Bert from "@/components/Bert";
+
 /**
  * Shown on the dashboard when we have no plan for the user yet. Deliberately
  * carries NO projection or example figures — the tool only shows results once
@@ -16,9 +18,7 @@ export default function GetStartedPanel({
   return (
     <div className="rounded-2xl border border-line bg-panel px-6 py-8 text-center">
       <div className="mx-auto max-w-xl">
-        <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-accent/10 text-2xl" aria-hidden>
-          🧭
-        </div>
+        <Bert pose="glasses" size={132} priority className="mx-auto mb-1" />
         <h2 className="text-xl font-bold text-white">Let&apos;s get started</h2>
         <p className="mx-auto mt-2 max-w-md text-sm text-muted">
           We don&apos;t have your details yet, so there&apos;s nothing to project. Start with a
