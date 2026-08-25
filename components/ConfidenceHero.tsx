@@ -66,8 +66,10 @@ export interface ConfidenceHeroProps {
   // non-resident not claiming it from abroad).
   agePension?: { annual: number; household: "single" | "couple" } | null;
   // Read-only shared view: the right column has no scenario/backup/nudge blocks, so it
-  // would be an empty void under the dial. When set, show a "build your own" CTA there.
+  // would be an empty void under the dial. When set, show the shared-scenario notice +
+  // a "build your own" CTA there. `sharedName` is the shared scenario's name (if any).
   buildOwnHref?: string | null;
+  sharedName?: string | null;
 }
 
 export default function ConfidenceHero({
@@ -97,6 +99,7 @@ export default function ConfidenceHero({
   confidenceLoading,
   agePension = null,
   buildOwnHref = null,
+  sharedName = null,
 }: ConfidenceHeroProps) {
   const state: ConfidenceState = confidenceState(goalTotal, { failsafe, safe, central });
   const headroom = safe - goalTotal; // + = room to spend more; − = above the safe level
@@ -447,25 +450,28 @@ export default function ConfidenceHero({
               renders nothing when there are no active InfoBlasts. */}
           {showInfoBlasts && <InfoBlastBanner />}
 
-          {/* Shared read-only view: nothing else fills the right column under the dial,
-              so invite the visitor to build their own (fills the void + converts). */}
+          {/* Shared read-only view: fills the otherwise-empty right column with the
+              read-only notice (moved here from the old top banner) + a build-your-own
+              CTA — one info row (Bert + notice) then one full-width button. */}
           {buildOwnHref && (
             <div className="border-t border-dashed border-line pt-4">
-              <div className="flex items-center gap-3">
-                <Bert pose="pointer" size={56} className="shrink-0" />
+              <div className="flex items-start gap-3">
+                <Bert pose="pointer" size={54} className="shrink-0" />
                 <div className="min-w-0">
-                  <div className="text-[13px] font-semibold text-white">Like what you see?</div>
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-accent/80">🔗 Shared scenario</div>
                   <p className="mt-0.5 text-[11.5px] leading-snug text-muted">
-                    Build your own free retirement projection — no account needed.
+                    {sharedName ? <strong className="text-slate-200">“{sharedName}” — </strong> : null}
+                    a read-only preview; changes you make here aren&apos;t saved.
                   </p>
                 </div>
               </div>
               <Link
                 href={buildOwnHref}
-                className="mt-3 inline-flex items-center gap-1 rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-ink transition hover:brightness-110"
+                className="mt-3 flex w-full items-center justify-center gap-1 rounded-lg bg-accent px-3 py-2 text-xs font-semibold text-ink transition hover:brightness-110"
               >
-                Build your own <span aria-hidden>→</span>
+                Build your own free plan <span aria-hidden>→</span>
               </Link>
+              <p className="mt-1 text-center text-[10px] text-muted/70">Free · no account needed</p>
             </div>
           )}
         </div>

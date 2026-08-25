@@ -1340,18 +1340,8 @@ export default function PlannerApp({
         </header>
       )}
 
-      {/* Public share-link view: make it clear this is someone else's scenario and
-          it's read-only (tweaks explore but aren't saved). The "Build your own" CTA
-          now lives in the hero's right column, so it isn't repeated here. */}
-      {shared && (
-        <div className="mt-4 rounded-2xl border border-accent/30 bg-accent/5 px-5 py-3">
-          <p className="text-sm text-slate-200">
-            <span aria-hidden>🔗</span> You&apos;re viewing a{" "}
-            <strong className="text-white">shared scenario{sharedPlan ? ` — “${sharedPlan.name}”` : ""}</strong>.
-            Explore it freely; any changes you make here are just a preview and aren&apos;t saved.
-          </p>
-        </div>
-      )}
+      {/* The shared-scenario read-only notice + "Build your own" CTA now live together
+          in the confidence hero's right column (no separate top banner). */}
 
       {/* The signed-out "saved on this device" nudge now lives inside the
           confidence hero's right column (below the dial), where a signed-out user
@@ -1530,6 +1520,7 @@ export default function PlannerApp({
         chips={planChips}
         showInfoBlasts={!shared}
         buildOwnHref={shared ? "/" : null}
+        sharedName={sharedPlan?.name ?? null}
         agePension={
           plan.taxResidency !== "non-resident" || plan.claimAgePensionAbroad
             ? { annual: config.agePension[plan.people.length > 1 ? "couple" : "single"].maxAnnual, household: plan.people.length > 1 ? "couple" : "single" }
