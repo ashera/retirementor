@@ -359,23 +359,8 @@ export default function GuidedIntro({
             so start with your real salary below. Extra contributions and savings
             outside super come later, on your dashboard.
           </p>
-          {salaryReady ? (
-            <>
-              <div className="mt-3">
-                <RetirementChart result={result} animate height={230} wageInflationPct={plan.inflation + (config.livingStandardsGrowthPct ?? 0)} cpiPct={plan.inflation} ages={ageGapInfo(plan)} />
-              </div>
-              <p className="mt-2 text-center text-sm">
-                Projected super at retirement: <strong className="text-accent">{money(result.superAtRetirement)}</strong> at age {result.retirementAge}
-              </p>
-              <p className="text-center text-xs text-muted">
-                in today&apos;s dollars — comparable to money now, not an inflated future figure
-              </p>
-            </>
-          ) : (
-            <div className="mt-3 rounded-xl border border-dashed border-accent/40 bg-accent/[0.06] px-4 py-6 text-center text-sm text-muted">
-              Enter your {couple ? "incomes" : "income"} below and we&apos;ll project your super forward.
-            </div>
-          )}
+          {/* Inputs first, chart/result BELOW — so entering income doesn't push the
+              slider you're dragging down (a jarring jump on mobile). */}
           <div className="mt-4 grid gap-x-6 gap-y-4 sm:grid-cols-2">
             <Field
               label="Your income (excl. super)"
@@ -393,6 +378,23 @@ export default function GuidedIntro({
             <Field label="Investment return (before fees)" value={invReturn} onChange={(v) => setOReturn(v)} min={1} max={12} step={0.1} suffix="%" hint={`Before fees — super funds usually quote returns after fees. A balanced fund is ~7–9% before fees; we take the ${config.fees.adminInvestmentPct}% fee out (≈ ${+(invReturn - config.fees.adminInvestmentPct).toFixed(2)}% after).`} />
             <Field label="Retire at age" value={retireAge} onChange={(v) => setORetire(Math.round(v))} min={Math.min(maxAge + 1, 55)} max={75} suffix="yrs" />
           </div>
+          {salaryReady ? (
+            <>
+              <div className="mt-4">
+                <RetirementChart result={result} animate height={230} wageInflationPct={plan.inflation + (config.livingStandardsGrowthPct ?? 0)} cpiPct={plan.inflation} ages={ageGapInfo(plan)} />
+              </div>
+              <p className="mt-2 text-center text-sm">
+                Projected super at retirement: <strong className="text-accent">{money(result.superAtRetirement)}</strong> at age {result.retirementAge}
+              </p>
+              <p className="text-center text-xs text-muted">
+                in today&apos;s dollars — comparable to money now, not an inflated future figure
+              </p>
+            </>
+          ) : (
+            <div className="mt-4 rounded-xl border border-dashed border-accent/40 bg-accent/[0.06] px-4 py-6 text-center text-sm text-muted">
+              Enter your {couple ? "incomes" : "income"} above and we&apos;ll project your super forward.
+            </div>
+          )}
           {step === 4 && (
             <Actions
               label="Set my retirement income →"
