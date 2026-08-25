@@ -1561,7 +1561,7 @@ export default function PlannerApp({
               onClick={() => setWizardOpen(true)}
               className="inline-flex items-center gap-1.5 rounded-lg border border-accent/40 bg-accent/10 px-2.5 py-1 text-xs font-semibold text-accent transition hover:bg-accent/20"
             >
-              ✎ Refine scenario
+              ✎ Refine your scenario
               <span aria-hidden>→</span>
             </button>
           }
