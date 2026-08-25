@@ -13,7 +13,8 @@ export default function VisitorActivity() {
 
   // Establish the visitor cookie synchronously (before any tracking server action)
   // so the very first page's events can attach immediately and no duplicate visitor
-  // row is created in the race. trackVisit later upgrades this to an httpOnly cookie.
+  // row is created in the race. trackVisit later re-sets it server-side (same key,
+  // kept JS-visible so this check keeps finding it on return visits — see track.ts).
   useEffect(() => {
     try {
       if (!document.cookie.split("; ").some((c) => c.startsWith("rw_visitor="))) {

@@ -88,13 +88,17 @@ export async function trackVisit(input: TrackInput): Promise<void> {
     if (user) return;
 
     // Ensure a stable visitor key + cookie. If the client already set one (so its
-    // events could attach immediately), adopt that key and (re)set it httpOnly so
-    // it's no longer JS-readable.
+    // events could attach immediately), adopt that key and refresh its expiry.
+    // NOT httpOnly on purpose: it's a random tracking id (not a session token), and
+    // the client reads document.cookie to decide whether to mint one — an httpOnly
+    // cookie is invisible to JS, so the client would think there's none and mint a
+    // NEW key every visit (on browsers like Safari that let JS overwrite it), spawning
+    // a fresh visitor row each time. Keeping it JS-visible makes the key stable.
     let visitorKey = key;
     {
       if (!visitorKey) visitorKey = randomBytes(18).toString("base64url");
       store.set(VISITOR_COOKIE, visitorKey, {
-        httpOnly: true,
+        httpOnly: false,
         sameSite: "lax",
         secure: process.env.NODE_ENV === "production",
         path: "/",
