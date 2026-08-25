@@ -1402,6 +1402,8 @@ export function simulate(
         accessibleSuper: assessedSuper,
         propertyEquity,
         propertyParts,
+        formerHomeAssessed: acFormerHomeAssessed,
+        homeowner: isHomeowner && acFormerHomeAssessed === 0,
         assessableAssets: financialAssets + propertyEquity + acFormerHomeAssessed,
         financialAssets,
         deemedIncome: deemedIncome(financialAssets, plan.household, config),

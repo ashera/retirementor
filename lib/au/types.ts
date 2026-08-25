@@ -493,7 +493,9 @@ export interface PensionBreakdown {
   accessibleSuper: number; // super counted in the assets test
   propertyEquity: number; // combined investment-property net equity (0 if none)
   propertyParts: { name?: string; index: number; equity: number }[]; // per-property net equity (held this year)
-  assessableAssets: number; // sum of the three above
+  formerHomeAssessed: number; // aged care: the kept former home, counted once its 2-year exemption ends (0 otherwise)
+  homeowner: boolean; // effective homeowner status for the means test (false once a former home is assessed → higher free area)
+  assessableAssets: number; // sum of the above
   financialAssets: number; // outsideAssets + accessibleSuper (the deemed base)
   // Assessable income, itemised.
   deemedIncome: number; // income deemed on financialAssets

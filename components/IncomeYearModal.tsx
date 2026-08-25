@@ -212,7 +212,10 @@ export default function IncomeYearModal({
   // for this year (persisted on the row), so the modal matches the figure exactly.
   const pb = row.pension; // null before Age Pension age
   const side = plan.household === "couple" ? config.agePension.couple : config.agePension.single;
-  const freeArea = plan.homeowner ? side.assetsFreeArea.homeowner : side.assetsFreeArea.nonHomeowner;
+  // Effective homeowner status the engine used: once a kept former home is assessed
+  // (2 years into aged care), the person is treated as a non-homeowner (higher free area).
+  const isHomeownerNow = pb?.homeowner ?? plan.homeowner;
+  const freeArea = isHomeownerNow ? side.assetsFreeArea.homeowner : side.assetsFreeArea.nonHomeowner;
   const assetsTaper = config.agePension.assetsTaperPerDollar;
   const incomeTaper = config.agePension.incomeTaperPerDollar;
   const cutoff = freeArea + side.maxAnnual / assetsTaper;
@@ -630,10 +633,13 @@ export default function IncomeYearModal({
                         {pb.propertyParts.map((part) => (
                           <DLine key={part.index} label={`${propLabel(part)} (net equity)`} value={part.equity} />
                         ))}
+                        {pb.formerHomeAssessed > 0 && (
+                          <DLine label="Former home — now counted (2 yrs after entering care)" value={pb.formerHomeAssessed} />
+                        )}
                         <div className="border-t border-line pt-1">
                           <DLine label="= Assessable assets" value={pb.assessableAssets} strong />
                         </div>
-                        <DLine label={`− Free area (${plan.homeowner ? "homeowner" : "non-homeowner"})`} value={freeArea} />
+                        <DLine label={`− Free area (${isHomeownerNow ? "homeowner" : "non-homeowner"})`} value={freeArea} />
                         <div className="border-t border-line pt-1">
                           <DLine label="= Amount over the free area" value={excessAssets} strong />
                         </div>
