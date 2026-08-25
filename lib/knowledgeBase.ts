@@ -338,7 +338,78 @@ export const KB_ARTICLES: KbArticle[] = [
       { href: "/scenario/aged-care-keep-home", label: "Margaret · keep the home + DAP", note: "The idle-home trap: ~$116k/yr and the plan runs short at 87." },
       { href: "/scenario/aged-care-sell-rad", label: "Margaret · sell to fund a RAD", note: "The RAD route: ~$71k/yr, pension rises, plan lasts past 92, deposit refundable." },
     ],
-    related: ["aged-care-in-australia", "aged-care-costs", "means-testing"],
+    related: ["aged-care-illiquidity-trap", "aged-care-in-australia", "aged-care-costs", "means-testing"],
+  },
+  {
+    slug: "aged-care-illiquidity-trap",
+    title: "The aged-care illiquidity trap: house-rich, cash-poor, and no pension",
+    category: "Aged care",
+    summary:
+      "Keeping the family home during residential care can leave you with wealth you can't spend — savings drained by fees while a home you can't touch counts against the Age Pension, cutting the safety net exactly when you need it.",
+    keywords: ["aged care illiquidity trap", "house rich cash poor", "former home age pension", "aged care home assets test", "keep home aged care", "aged care no pension", "aged care cash flow", "home equity aged care", "unlock home equity retirement"],
+    sections: [
+      {
+        body: [
+          { p: "Residential aged care can create a cruel bind: you end up **asset-rich but cash-poor**. Care fees drain your liquid savings, while the family home — often your largest asset — sits **frozen**: you can't spend it, and after a while it starts counting against your Age Pension. The result is running out of spendable money while hundreds of thousands of dollars are locked in the house." },
+        ],
+      },
+      {
+        heading: "Two forces pulling the wrong way",
+        body: [
+          { list: [
+            "**Fees drain your cash.** Residential care can run past $100,000/yr once you add the [daily fee, means-tested fee and accommodation](/learn/aged-care-costs). Keep the home and pay the room as a daily charge (DAP) and that comes straight out of super and savings — the liquid pool empties fast.",
+            "**The home eventually counts.** A kept former home is [exempt from the Age Pension assets test for 2 years](/learn/aged-care-funding) after you enter care. After that it's assessed at market value (and you're treated as a non-homeowner) — often enough to taper the pension to nothing.",
+          ] },
+          { p: "So just as your savings run low, the safety net you'd expect — the Age Pension — can disappear, because the assets test counts a home you can't actually spend." },
+        ],
+      },
+      {
+        heading: "In numbers: Margaret keeps her home",
+        body: [
+          { p: "Margaret retired at 67 with $500k super, $150k outside super and an $800k home. At 85 she enters residential care and keeps the home, paying the room as a DAP. The planner models what happens next:" },
+          { table: {
+            headers: ["Age", "Liquid savings", "Home (assets test)", "Age Pension"],
+            rows: [
+              ["86", "~$201k", "exempt — still within 2 yrs", "$31,223 · full"],
+              ["87", "~$102k", "~$1.19M · now counted", "$0"],
+              ["88", "$0", "~$1.21M · counted", "$0"],
+            ],
+            caption: "Illustrative figures from the planner's model. The home keeps growing in real terms, so by the time it's assessed it's well over $1M.",
+          } },
+          { p: "By 88 her super and savings are **gone**, the Age Pension is **nil** — yet the **~$1.2M of home equity** she can't reach is exactly what's holding the pension at zero. That's the trap." },
+        ],
+      },
+      {
+        heading: "Why the pension doesn't rescue her",
+        body: [
+          { p: "The Age Pension is [means-tested on assets and income](/learn/means-testing). Once the 2-year exemption ends, the home is an assessable asset at its full, grown value. Even as a non-homeowner (with the higher free area), a $1M+ home sits far above the cut-off, so the assets test zeroes the pension — no matter how little cash is left to live on." },
+        ],
+      },
+      {
+        heading: "What changes the picture",
+        body: [
+          { p: "None of these is 'the right answer' — the best choice is personal (family, a possible return home, provider-refund risk). But each unlocks the frozen equity in a different way:" },
+          { list: [
+            "**Sell to fund a RAD.** Selling the home to pay a Refundable Accommodation Deposit turns it into an asset that's refundable to your estate and exempt from the assets test — so the pension can rise and the plan lasts longer. See the [RAD vs DAP comparison](/learn/aged-care-funding).",
+            "**Rent the former home.** The rent helps pay the fees (though it's assessable income, and after 2 years the home still counts).",
+            "**A couple.** If your partner still lives there the home stays exempt (a 'protected person'), and you're assessed as an illness-separated couple — usually a higher combined pension.",
+            "**Home Equity Access Scheme.** The government scheme (and private reverse mortgages) can turn home equity into an income stream without selling — a way to draw on the frozen asset.",
+          ] },
+        ],
+      },
+      {
+        body: [
+          { note: "Illustrative figures from the planner's model (a 2026 vintage of indexed rates) — general information, not advice. Aged-care and home decisions are complex and personal; get advice from a specialist and check the government's My Aged Care and Services Australia." },
+        ],
+      },
+    ],
+    examples: [
+      { href: "/scenario/aged-care-keep-home", label: "Margaret · keep the home (the trap)", note: "Savings run short at 87 while ~$1.2M sits idle in the home and the pension is nil." },
+      { href: "/scenario/aged-care-sell-rad", label: "Margaret · sell to fund a RAD", note: "Selling unlocks the equity: pension rises, plan lasts past 92, deposit refundable." },
+      { href: "/learn/aged-care-calculator", label: "Aged care cost calculator", note: "Try keep-vs-sell and DAP-vs-RAD and watch the cost move." },
+    ],
+    related: ["aged-care-funding", "aged-care-costs", "aged-care-in-australia", "means-testing"],
+    published: "2026-08-25",
   },
 
   // ─────────────────────────── How the model works ───────────────────────────
