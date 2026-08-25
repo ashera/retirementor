@@ -1,9 +1,11 @@
-import Image from "next/image";
-
 // Bert — the RetireWiz cartoon guide. A small set of poses lives in /public/bert.
 // He only ever GUIDES and EXPLAINS, never recommends — so he can't muddy the
 // "general information, not advice" framing. Decorative by default (alt=""), lazy
 // by default; pass a real alt when he carries meaning.
+//
+// Uses a plain <img> (not next/image) so the pose loads as a direct static file —
+// the /_next/image optimizer route fails to load in the iOS home-screen standalone
+// web app, whereas static /public files (like the logo) work everywhere.
 
 const POSES = {
   pointer: { w: 247, h: 257 }, // teaching / onboarding
@@ -34,13 +36,15 @@ export default function Bert({
   const { w, h } = POSES[pose];
   const width = Math.round(size * (w / h));
   return (
-    <Image
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
       src={`/bert/${pose}.png`}
       width={width}
       height={size}
       alt={alt}
       aria-hidden={alt === "" ? true : undefined}
-      priority={priority}
+      loading={priority ? "eager" : "lazy"}
+      decoding="async"
       draggable={false}
       className={`pointer-events-none select-none ${className}`}
     />
