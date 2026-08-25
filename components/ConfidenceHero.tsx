@@ -265,7 +265,7 @@ export default function ConfidenceHero({
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                   <path className="opacity-90" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V0C5.4 0 0 5.4 0 12h4z" />
                 </svg>
-                <span className="text-lg font-semibold">Bert&apos;s assessing your plan…</span>
+                <span className="text-lg font-semibold">Bert is running the numbers…</span>
               </div>
               <p className="mt-2 max-w-[38ch] text-sm text-muted">
                 Working out the most you could safely spend and how likely your money is to last.
