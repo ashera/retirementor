@@ -422,6 +422,20 @@ export default function PlannerApp({
       track("Shared scenario viewed");
       return;
     }
+    // "Build your own free plan" from a shared view lands here as /?fresh=1 — the
+    // visitor wants to start clean, so wipe any local working copy first (then the
+    // restore below finds nothing and shows the empty Get-started state). A signed-in
+    // user's saved scenarios live on the server and are untouched.
+    try {
+      if (new URLSearchParams(window.location.search).get("fresh") === "1") {
+        [STORAGE_KEY, WORKING_TS_KEY, BASELINE_KEY, BASELINE_NAME_KEY, SAVED_ID_KEY, PLAN_OWNER_KEY, "au-retirement-compare"].forEach((k) =>
+          localStorage.removeItem(k),
+        );
+        window.history.replaceState(null, "", "/"); // don't re-wipe on refresh
+      }
+    } catch {
+      /* ignore */
+    }
     // Decide which working plan to restore. Priority: the newer of the local
     // working copy vs. the signed-in user's ACTIVE scenario (so work follows them
     // across devices / survives cleared storage). The active scenario is where all
@@ -1519,7 +1533,7 @@ export default function PlannerApp({
         ioSlot={!user && !shared ? renderIOButtons() : null}
         chips={planChips}
         showInfoBlasts={!shared}
-        buildOwnHref={shared ? "/" : null}
+        buildOwnHref={shared ? "/?fresh=1" : null}
         sharedName={sharedPlan?.name ?? null}
         agePension={
           plan.taxResidency !== "non-resident" || plan.claimAgePensionAbroad
