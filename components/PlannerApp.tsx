@@ -1340,21 +1340,16 @@ export default function PlannerApp({
         </header>
       )}
 
-      {/* Public share-link view: make it clear this is someone else's scenario,
-          it's read-only (tweaks explore but aren't saved), and offer a way in. */}
+      {/* Public share-link view: make it clear this is someone else's scenario and
+          it's read-only (tweaks explore but aren't saved). The "Build your own" CTA
+          now lives in the hero's right column, so it isn't repeated here. */}
       {shared && (
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-accent/30 bg-accent/5 px-5 py-3">
+        <div className="mt-4 rounded-2xl border border-accent/30 bg-accent/5 px-5 py-3">
           <p className="text-sm text-slate-200">
             <span aria-hidden>🔗</span> You&apos;re viewing a{" "}
             <strong className="text-white">shared scenario{sharedPlan ? ` — “${sharedPlan.name}”` : ""}</strong>.
             Explore it freely; any changes you make here are just a preview and aren&apos;t saved.
           </p>
-          <Link
-            href="/"
-            className="shrink-0 rounded-lg bg-accent px-3 py-1.5 text-sm font-semibold text-ink transition hover:bg-accent-soft"
-          >
-            Build your own →
-          </Link>
         </div>
       )}
 
