@@ -1534,6 +1534,26 @@ export default function PlannerApp({
           Before that we show the Get-started panel — never fabricated numbers. */}
       {configured ? (
         <>
+      {/* Scenario summary — the plan's key inputs at a glance, sitting above the
+          headline hero so the reader sees WHAT is being modelled before the verdict. */}
+      <div className="mb-4 flex flex-wrap items-center gap-x-6 gap-y-2 rounded-2xl border border-line bg-panel px-6 py-4">
+        {summary.map((s) => (
+          <div key={s.label} className="flex items-baseline gap-1.5">
+            <span className="text-xs uppercase tracking-wide text-muted">
+              {s.label}
+            </span>
+            <span className="text-sm font-semibold tabular-nums text-white">
+              {s.value}
+            </span>
+          </div>
+        ))}
+        <button
+          onClick={() => setWizardOpen(true)}
+          className="ml-auto text-sm font-medium text-accent hover:underline"
+        >
+          Edit
+        </button>
+      </div>
       {/* Confidence hero — the page's headline answer: can you afford your goal,
           and how much could you safely spend? Folds in the active-scenario identity
           (name + Manage → modal below). */}
@@ -2163,26 +2183,6 @@ export default function PlannerApp({
         )}
       </div>
       {/* end likelihood */}
-
-      {/* Assumptions summary */}
-      <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 rounded-2xl border border-line bg-panel px-6 py-4">
-        {summary.map((s) => (
-          <div key={s.label} className="flex items-baseline gap-1.5">
-            <span className="text-xs uppercase tracking-wide text-muted">
-              {s.label}
-            </span>
-            <span className="text-sm font-semibold tabular-nums text-white">
-              {s.value}
-            </span>
-          </div>
-        ))}
-        <button
-          onClick={() => setWizardOpen(true)}
-          className="ml-auto text-sm font-medium text-accent hover:underline"
-        >
-          Edit
-        </button>
-      </div>
 
       {/* Narrative */}
       <div className="mt-6 rounded-2xl border border-line bg-panel p-6 text-sm text-slate-300">
