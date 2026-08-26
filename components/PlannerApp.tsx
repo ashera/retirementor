@@ -43,11 +43,8 @@ import { whatWillItTake } from "@/lib/au/goalseek";
 import { maxSpendForConfidence, withSpend, appliedStrategies } from "@/lib/au/strategies";
 import { composeScenario, toActiveScenario, EMPTY_LAYER, type StrategyLayer } from "@/lib/au/scenario";
 import { initialWithdrawal, withdrawalBand } from "@/lib/au/withdrawal";
-import TrimSpendingModal from "@/components/TrimSpendingModal";
-import BoostSpendingModal from "@/components/BoostSpendingModal";
 import ProbabilityYearModal from "@/components/ProbabilityYearModal";
 import { retirementGoal } from "@/lib/au/goal";
-import { essentialsFloor } from "@/lib/au/lifestages";
 import { logout } from "@/app/actions/auth";
 import {
   deletePlan,
@@ -236,34 +233,6 @@ function ShareControl({
   );
 }
 
-function Lever({
-  label,
-  value,
-  delta,
-  note,
-  tone = "text-muted",
-  pending = false,
-}: {
-  label: string;
-  value: string;
-  delta?: string;
-  note?: string;
-  tone?: string;
-  pending?: boolean;
-}) {
-  return (
-    <div className="rounded-xl border border-line bg-panel-2 p-4">
-      <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted">
-        {label}
-        {pending && <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent" aria-label="updating" />}
-      </div>
-      <div className={`mt-1 text-xl font-bold tabular-nums text-white ${pending ? "opacity-60" : ""}`}>{value}</div>
-      {note && <div className="mt-0.5 text-[11px] text-muted">{note}</div>}
-      {delta && <div className={`mt-0.5 text-xs ${tone}`}>{delta}</div>}
-    </div>
-  );
-}
-
 export default function PlannerApp({
   user,
   country = null,
@@ -359,8 +328,6 @@ export default function PlannerApp({
   const [wizardSeed, setWizardSeed] = useState<RetirementPlan | null>(null);
   const [budgetOpen, setBudgetOpen] = useState(false);
   const [lifestageOpen, setLifestageOpen] = useState(false);
-  const [trimOpen, setTrimOpen] = useState(false);
-  const [boostOpen, setBoostOpen] = useState(false);
   const [selectedAge, setSelectedAge] = useState<number | null>(null);
   // The main balance chart toggles between "balance" (super + outside) and
   // "networth" (also folds in home equity + investment property), like What-If.
@@ -711,7 +678,6 @@ export default function PlannerApp({
     return () => clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tierKey, ready, configured]);
-  const maxSpend = mcMaxSpend ?? gs.maxSpend; // prudent once settled, central meanwhile
   // SAFE WITHDRAWAL RATE marker — a FIXED benchmark, computed on STEADY (flat real)
   // spending like the classic 4% rule, so it's a stable property of the portfolio and
   // doesn't wobble as the budget's level or shape (the "spending smile") changes. It's
@@ -750,20 +716,6 @@ export default function PlannerApp({
     // Deliberately keyed on the non-spending plan, so budget tweaks don't recompute it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [flatKey, config, ready, configured]);
-  // Trim vs boost is decided against the SAME prudent (85% MC) bar the spend
-  // lever shows, so the card never contradicts itself (e.g. "trim to $X" while a
-  // "spend more" button sits below). Over the bar → offer a trim; under it → a boost.
-  const prudentDelta = maxSpend != null ? maxSpend - gs.currentSpend : null;
-  const overspending = prudentDelta != null && prudentDelta <= -1000;
-  const spendHeadroom = prudentDelta != null && prudentDelta >= 1000;
-  // The essentials floor (needs — housing, food, health…). When the prudent max is
-  // below it, even cutting ALL discretionary can't reach the confidence bar, so a
-  // "trim spending" suggestion would be trimming into needs — not a real option.
-  const essentials = useMemo(() => essentialsFloor(deferredPlan, config).value, [deferredPlan, config]);
-  const cantTrim = overspending && maxSpend != null && maxSpend < essentials - 100;
-  // Spend sits right at the prudent max — neither over nor under. Wait for the MC
-  // max to settle so it doesn't flicker to/from the trim/boost states.
-  const budgetBalanced = prudentDelta != null && !overspending && !spendHeadroom && !mcMaxPending;
 
   const tweaked = useMemo(
     // Compare the composed plans without their bookmarks — a freshly-loaded scenario
@@ -2076,9 +2028,10 @@ export default function PlannerApp({
                 if (e.age == null) {
                   return (
                     <p className="mt-2.5 text-sm text-amber-300">
-                      ⌁ Even retiring at 75 wouldn&apos;t clear {e.targetPct}% at this spend — see{" "}
-                      <a href="#what-will-it-take" className="underline underline-offset-2 hover:text-amber-200">
-                        what will it take
+                      ⌁ Even retiring at 75 wouldn&apos;t clear {e.targetPct}% at this spend — spend
+                      less or save more, or{" "}
+                      <a href={whatIfHref} className="underline underline-offset-2 hover:text-amber-200">
+                        explore your options
                       </a>
                       .
                     </p>
@@ -2210,180 +2163,6 @@ export default function PlannerApp({
         )}
       </div>
       {/* end likelihood */}
-
-      {/* What will it take? (goal-seek) — hidden: its content now conflicts with the
-          redesigned confidence hero card. Kept in-tree (guarded, not deleted) so the
-          goal-seek computations stay referenced and it can be restored if wanted. */}
-      {(false as boolean) && (
-      <div id="what-will-it-take" className="mt-4 scroll-mt-6 rounded-2xl border border-line bg-panel p-6">
-        <h2 className="font-semibold text-white">What will it take?</h2>
-        <p className="mb-4 mt-1 text-sm text-slate-300">
-          {cantTrim
-            ? `Trimming alone can't get ${fmtCurrency(goal.total)}/yr to ${Math.round(MC_CONFIDENCE_TARGET * 100)}% likely to last to age ${plan.lifeExpectancy} — even cutting all discretionary falls short of your essentials. Save more or retire later:`
-            : overspending
-            ? `To keep ${fmtCurrency(goal.total)}/yr about ${Math.round(MC_CONFIDENCE_TARGET * 100)}% likely to last to age ${plan.lifeExpectancy}, ease any one of these:`
-            : gs.lasts
-              ? `Your plan funds ${fmtCurrency(goal.total)}/yr to age ${plan.lifeExpectancy} on the central projection — here's the headroom on each lever.`
-              : `To fund ${fmtCurrency(goal.total)}/yr all the way to age ${plan.lifeExpectancy}, do any one of these:`}
-        </p>
-        <div className="grid gap-3 sm:grid-cols-3">
-          {(() => {
-            const spendDelta = maxSpend != null ? maxSpend - gs.currentSpend : null;
-            const retireDelta =
-              gs.retireAge != null ? gs.retireAge - gs.currentRetireAge : null;
-            const targetPct = Math.round(MC_CONFIDENCE_TARGET * 100);
-            return (
-              <>
-                <Lever
-                  label={
-                    cantTrim
-                      ? "Trim spending"
-                      : budgetBalanced
-                        ? "Budget balanced"
-                        : spendDelta != null && spendDelta < 0
-                          ? "Trim spending to"
-                          : "Spend up to"
-                  }
-                  value={
-                    cantTrim
-                      ? "not enough"
-                      : maxSpend != null
-                        ? `${fmtCurrency(maxSpend + goal.loanCost)}/yr`
-                        : "—"
-                  }
-                  note={
-                    cantTrim || maxSpend == null
-                      ? undefined
-                      : `${goal.loanCost > 0 ? `${fmtCurrency(maxSpend)} living + ${fmtCurrency(goal.loanCost)} loan · ` : ""}${targetPct}% likely to last`
-                  }
-                  delta={
-                    cantTrim
-                      ? `Essentials alone (${fmtCurrency(essentials + goal.loanCost)}/yr) already miss ${targetPct}% — trimming can't fix it`
-                      : budgetBalanced
-                        ? "A great match for what your plan can afford"
-                        : spendDelta == null
-                          ? "even a low spend is risky"
-                          : spendDelta >= 0
-                            ? `${fmtCurrency(spendDelta)} of headroom`
-                            : `${fmtCurrency(-spendDelta)} less than now`
-                  }
-                  tone={
-                    !cantTrim && (budgetBalanced || (spendDelta != null && spendDelta >= 0))
-                      ? "text-emerald-400"
-                      : "text-amber-400"
-                  }
-                  pending={mcMaxPending}
-                />
-                <Lever
-                  label={gs.extraSavings ? "Save an extra" : "Extra saving"}
-                  value={
-                    gs.extraSavings == null
-                      ? "not enough"
-                      : gs.extraSavings === 0
-                        ? "none needed"
-                        : `${fmtCurrency(gs.extraSavings)}/yr`
-                  }
-                  delta={
-                    gs.extraSavings == null
-                      ? "saving alone won't fix it"
-                      : gs.extraSavings === 0
-                        ? gs.lasts
-                          ? "you're covered"
-                          : ""
-                        : `on top of ${fmtCurrency(gs.currentSavings)}/yr`
-                  }
-                  tone={gs.extraSavings ? "text-amber-400" : "text-emerald-400"}
-                />
-                <Lever
-                  label={retireDelta && retireDelta > 0 ? "Retire at" : "Retire as early as"}
-                  value={gs.retireAge != null ? `age ${gs.retireAge}` : "—"}
-                  delta={
-                    retireDelta == null
-                      ? ""
-                      : retireDelta > 0
-                        ? `${retireDelta} yr${retireDelta === 1 ? "" : "s"} later`
-                        : retireDelta < 0
-                          ? `${-retireDelta} yr${retireDelta === -1 ? "" : "s"} sooner than your plan`
-                          : "as planned"
-                  }
-                  tone={retireDelta && retireDelta > 0 ? "text-amber-400" : "text-emerald-400"}
-                />
-              </>
-            );
-          })()}
-        </div>
-        <p className="mt-3 text-xs text-muted">
-          Spend is the most you can spend at a {Math.round(MC_CONFIDENCE_TARGET * 100)}% chance of lasting (allowing
-          for market ups and downs); saving and retirement are on the central average-return projection. Each lever on
-          its own — combine them, or check the likelihood above.
-        </p>
-        {overspending && !cantTrim && (
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
-            <p className="text-sm text-slate-300">
-              Want the app to do it for you? Trim discretionary spending — keeping
-              your essentials — to stay about {Math.round(MC_CONFIDENCE_TARGET * 100)}% likely to last to age {plan.lifeExpectancy}.
-            </p>
-            <button
-              onClick={() => setTrimOpen(true)}
-              className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-ink transition hover:brightness-110"
-            >
-              ✂️ Help me trim spending
-            </button>
-          </div>
-        )}
-        {spendHeadroom && (
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
-            <p className="text-sm text-slate-300">
-              The model shows headroom: discretionary spending (essentials kept) could
-              rise while the plan stays about {Math.round(MC_CONFIDENCE_TARGET * 100)}%
-              likely to last to age {plan.lifeExpectancy}. Whether to spend it is your
-              choice — this is general information, not advice.
-            </p>
-            <button
-              onClick={() => setBoostOpen(true)}
-              className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-ink transition hover:brightness-110"
-            >
-              📈 Model spending more
-            </button>
-          </div>
-        )}
-        {budgetBalanced && (
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
-            <p className="text-sm text-slate-300">
-              <span className="font-semibold text-accent">Around the mark.</span> Your spending sits near the top
-              of what the model projects at about the {Math.round(MC_CONFIDENCE_TARGET * 100)}% likelihood — nothing
-              flagged to trim, and little modelled headroom to add. General information, not advice.
-            </p>
-            <span className="text-2xl" aria-hidden>🎯</span>
-          </div>
-        )}
-      </div>
-      )}
-
-      <TrimSpendingModal
-        open={trimOpen}
-        onClose={() => setTrimOpen(false)}
-        onApply={(patch) => {
-          quickAdjust(patch);
-          setNotice("Spending trimmed (essentials kept) to make your money last to life expectancy.");
-        }}
-        plan={plan}
-        config={config}
-        result={result}
-      />
-
-      <BoostSpendingModal
-        open={boostOpen}
-        onClose={() => setBoostOpen(false)}
-        onApply={(patch) => {
-          quickAdjust(patch);
-          track("Spending boosted");
-          setNotice("Spending raised (essentials kept) to the most your plan can afford.");
-        }}
-        plan={plan}
-        config={config}
-        result={result}
-      />
 
       {/* Assumptions summary */}
       <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 rounded-2xl border border-line bg-panel px-6 py-4">
