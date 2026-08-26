@@ -9,6 +9,10 @@ interface FieldProps {
   min: number;
   max: number;
   step?: number;
+  // Whole-number-only (ages): committed values are rounded to integers and the mobile
+  // keypad drops the decimal point. Prevents fractional ages, which offset the whole
+  // projection off integer years (e.g. a 50.8 current age → rows at 50.8, 51.8, …).
+  integer?: boolean;
   prefix?: string;
   suffix?: string;
   hint?: string;
@@ -25,13 +29,17 @@ export default function Field({
   min,
   max,
   step = 1,
+  integer = false,
   prefix,
   suffix,
   hint,
   locked = false,
   lockNote,
 }: FieldProps) {
-  const clamp = (n: number) => Math.min(max, Math.max(min, n));
+  const clamp = (n: number) => {
+    const r = integer ? Math.round(n) : n;
+    return Math.min(max, Math.max(min, r));
+  };
 
   // The text box holds the RAW text while the user is typing, so a partial entry
   // (e.g. "4" on the way to "45") is never clamped up to `min` mid-keystroke — the
@@ -57,7 +65,8 @@ export default function Field({
             value={text}
             min={min}
             max={max}
-            step={step}
+            step={integer ? 1 : step}
+            inputMode={integer ? "numeric" : undefined}
             disabled={locked}
             onFocus={() => setFocused(true)}
             onChange={(e) => {

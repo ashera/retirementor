@@ -1894,6 +1894,7 @@ function StrategyCardRow({
                 min={effMin + off}
                 max={effMax + off}
                 step={pm.step}
+                integer={pm.suffix === "yrs"}
                 prefix={pm.prefix}
                 suffix={pm.suffix}
                 hint={hint}

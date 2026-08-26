@@ -297,8 +297,8 @@ export default function GuidedIntro({
               </div>
             </div>
 
-            <Field label={couple ? "Your age" : "How old are you?"} value={age1} onChange={(v) => setAge1(Math.round(v))} min={18} max={75} suffix="yrs" />
-            {couple && <Field label="Partner's age" value={age2} onChange={(v) => setAge2(Math.round(v))} min={18} max={75} suffix="yrs" />}
+            <Field label={couple ? "Your age" : "How old are you?"} value={age1} onChange={(v) => setAge1(Math.round(v))} min={18} max={75} integer suffix="yrs" />
+            {couple && <Field label="Partner's age" value={age2} onChange={(v) => setAge2(Math.round(v))} min={18} max={75} integer suffix="yrs" />}
 
             {couple && (
               <div>
@@ -376,7 +376,7 @@ export default function GuidedIntro({
               <Field label="Partner's income (excl. super)" value={sal2} onChange={setSal2} min={0} max={400_000} step={5_000} prefix="$" />
             )}
             <Field label="Investment return (before fees)" value={invReturn} onChange={(v) => setOReturn(v)} min={1} max={12} step={0.1} suffix="%" hint={`Before fees — super funds usually quote returns after fees. A balanced fund is ~7–9% before fees; we take the ${config.fees.adminInvestmentPct}% fee out (≈ ${+(invReturn - config.fees.adminInvestmentPct).toFixed(2)}% after).`} />
-            <Field label="Retire at age" value={retireAge} onChange={(v) => setORetire(Math.round(v))} min={Math.min(maxAge + 1, 55)} max={75} suffix="yrs" />
+            <Field label="Retire at age" value={retireAge} onChange={(v) => setORetire(Math.round(v))} min={Math.min(maxAge + 1, 55)} max={75} integer suffix="yrs" />
           </div>
           {salaryReady ? (
             <>

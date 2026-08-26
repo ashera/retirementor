@@ -375,6 +375,7 @@ export default function PlanWizard({
           onChange={setPerson(i, "currentAge")}
           min={18}
           max={75}
+          integer
           suffix="yrs"
         />
         <div>
@@ -756,6 +757,7 @@ export default function PlanWizard({
             onChange={(v) => patch({ retirementAge: v })}
             min={40}
             max={75}
+            integer
             suffix="yrs"
             hint={
               draft.retirementAge < 60
@@ -770,6 +772,7 @@ export default function PlanWizard({
               onChange={(v) => setPerson(1, "retirementAge")(v)}
               min={40}
               max={75}
+              integer
               suffix="yrs"
               hint="Partners can retire at different ages — whoever keeps working still earns, contributes, and helps cover spending."
             />
@@ -889,6 +892,7 @@ export default function PlanWizard({
           onChange={(v) => patch({ lifeExpectancy: v })}
           min={75}
           max={105}
+          integer
           suffix="yrs"
         />
         </div>

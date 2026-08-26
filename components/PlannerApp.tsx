@@ -1777,6 +1777,7 @@ export default function PlannerApp({
                 onChange={(v) => quickAdjust({ retirementAge: v })}
                 min={40}
                 max={75}
+                integer
                 suffix="yrs"
                 locked={retireOverridden}
                 lockNote={lockNote("Retire later")}
@@ -1832,6 +1833,7 @@ export default function PlannerApp({
               onChange={(v) => quickAdjust({ lifeExpectancy: v })}
               min={75}
               max={105}
+              integer
               suffix="yrs"
             />
           </div>
