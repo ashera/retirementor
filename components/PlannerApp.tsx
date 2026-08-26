@@ -2170,7 +2170,10 @@ export default function PlannerApp({
       </div>
       {/* end likelihood */}
 
-      {/* What will it take? (goal-seek) */}
+      {/* What will it take? (goal-seek) — hidden: its content now conflicts with the
+          redesigned confidence hero card. Kept in-tree (guarded, not deleted) so the
+          goal-seek computations stay referenced and it can be restored if wanted. */}
+      {(false as boolean) && (
       <div id="what-will-it-take" className="mt-4 scroll-mt-6 rounded-2xl border border-line bg-panel p-6">
         <h2 className="font-semibold text-white">What will it take?</h2>
         <p className="mb-4 mt-1 text-sm text-slate-300">
@@ -2314,6 +2317,7 @@ export default function PlannerApp({
           </div>
         )}
       </div>
+      )}
 
       <TrimSpendingModal
         open={trimOpen}
