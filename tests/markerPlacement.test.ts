@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { placeMarkers } from "../components/markerPlacement";
+import { placeMarkers, clusterPins, type PinItem } from "../components/markerPlacement";
 
 describe("placeMarkers (label lane solver)", () => {
   it("puts well-separated labels on a single row", () => {
@@ -44,5 +44,36 @@ describe("placeMarkers (label lane solver)", () => {
     const rowOf = (r: typeof a, k: string) => r.placed.find((p) => p.key === k)!.row;
     expect(rowOf(a, "1")).toBe(rowOf(b, "1"));
     expect(rowOf(a, "2")).toBe(rowOf(b, "2"));
+  });
+});
+
+describe("clusterPins (axis pin clustering)", () => {
+  const pin = (key: string, age: number): PinItem => ({ key, age, icon: "•", label: key, color: "#000" });
+
+  it("gives every cluster a finite pixel x", () => {
+    const xOf = (age: number) => age * 10; // simple linear age→pixel
+    const clusters = clusterPins([pin("a", 60), pin("b", 75)], xOf, 20);
+    expect(clusters).toHaveLength(2);
+    expect(clusters.every((c) => Number.isFinite(c.x))).toBe(true);
+  });
+
+  it("merges pins whose pixels fall within minPx", () => {
+    const xOf = (age: number) => age * 10;
+    const clusters = clusterPins([pin("a", 60), pin("b", 61)], xOf, 20); // 10px apart < 20
+    expect(clusters).toHaveLength(1);
+    expect(clusters[0].members).toHaveLength(2);
+  });
+
+  // Regression: a categorical axis over fractional row ages (50.8, 51.8, …) returns
+  // undefined for an integer pin age like 60. Such pins must be dropped, never emitted
+  // with an undefined/NaN x (which crashed the chart via c.x.toFixed).
+  it("skips pins whose age has no pixel on the axis (never yields a non-finite x)", () => {
+    const rowAges = new Set([50.8, 51.8, 52.8, 60.8, 74.8, 75.8]);
+    const scale = (age: number) => (rowAges.has(age) ? age * 10 : undefined);
+    const xOf = (age: number) => scale(age) as number; // mimics the old direct-scale path
+    const clusters = clusterPins([pin("in", 60.8), pin("off", 60)], xOf, 20);
+    expect(clusters).toHaveLength(1);
+    expect(clusters[0].members.map((m) => m.key)).toEqual(["in"]);
+    expect(clusters.every((c) => Number.isFinite(c.x))).toBe(true);
   });
 });

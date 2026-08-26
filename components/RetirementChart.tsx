@@ -45,8 +45,11 @@ function markerLabel(text: string, fill: string, topOffset: number) {
 // with no in-plot text (detail lives in the year tooltip + a native <title>). Rendered
 // via Recharts <Customized> so it can read the live age→pixel scale and cluster any
 // chips that would overlap. `cp` is Recharts' internal layout (xAxisMap + plot offset).
+type CategoryScale = ((v: number | string) => number | undefined) & {
+  domain?: () => Array<number | string>;
+};
 function renderPinLayer(cp: {
-  xAxisMap?: Record<string, { scale?: (v: number) => number }>;
+  xAxisMap?: Record<string, { scale?: CategoryScale }>;
   offset?: { top: number; left: number; width: number; height: number };
 }, pins: PinItem[]) {
   const xMap = cp.xAxisMap;
@@ -54,8 +57,21 @@ function renderPinLayer(cp: {
   if (!xMap || !off) return <g />;
   const axis = xMap[Object.keys(xMap)[0]];
   const scale = axis?.scale;
-  if (!scale) return <g />;
-  const xOf = (age: number) => scale(age) as number;
+  if (typeof scale !== "function") return <g />;
+  // The x-axis is CATEGORICAL over the row ages, which are fractional whenever the
+  // person's current age is (e.g. 50.8, 51.8, 52.8…). Pins carry integer ages (a life
+  // event or strategy at "age 60"), so scale(60) is undefined → pins would land at NaN.
+  // Build a linear age→pixel map from the category extent instead: the endpoints are
+  // exact row ages (so scale resolves them), and rows are evenly spaced by one year, so
+  // linear interpolation is exact for any age in between.
+  const dom = typeof scale.domain === "function" ? scale.domain() : [];
+  if (dom.length < 2) return <g />;
+  const aMin = Number(dom[0]);
+  const aMax = Number(dom[dom.length - 1]);
+  const pMin = scale(dom[0]) as number;
+  const pMax = scale(dom[dom.length - 1]) as number;
+  if (!Number.isFinite(pMin) || !Number.isFinite(pMax) || !(aMax > aMin)) return <g />;
+  const xOf = (age: number) => pMin + ((age - aMin) / (aMax - aMin)) * (pMax - pMin);
   const yBase = off.top + off.height - 9; // just above the x-axis, inside the plot
   const clusters = clusterPins(pins, xOf, 20);
   return (

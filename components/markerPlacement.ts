@@ -59,6 +59,7 @@ export function clusterPins(pins: PinItem[], xOf: (age: number) => number, minPx
   const clusters: PinCluster[] = [];
   for (const p of sorted) {
     const px = xOf(p.age);
+    if (!Number.isFinite(px)) continue; // age with no pixel (off the axis' domain) → skip
     const last = clusters[clusters.length - 1];
     const lastPx = last ? xOf(last.members[last.members.length - 1].age) : -Infinity;
     if (last && px - lastPx < minPx) last.members.push(p);
