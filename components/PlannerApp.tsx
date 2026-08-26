@@ -595,6 +595,14 @@ export default function PlannerApp({
     }
   }, [ready, user, configured, plan]);
 
+  // Status confirmations auto-dismiss so they never linger and eat vertical space
+  // (they render as a floating toast, but clear themselves regardless).
+  useEffect(() => {
+    if (!notice) return;
+    const t = setTimeout(() => setNotice(null), 5000);
+    return () => clearTimeout(t);
+  }, [notice]);
+
   const result = useMemo(() => simulate(deferredPlan, config), [deferredPlan, config]);
   // Shared, referentially-stable age-axis info for every chart (recomputed only when the
   // deferred plan settles — so it never churns the memoised chart elements mid-drag).
@@ -1394,8 +1402,22 @@ export default function PlannerApp({
       <Disclosures config={config} />
       <div className="mb-6" />
 
-      {/* Status confirmations (loaded / saved / applied) — shown to everyone. */}
-      {notice && <p className="mb-4 text-xs text-accent">{notice}</p>}
+      {/* Status confirmations (loaded / saved / applied) — shown to everyone as a
+          floating, auto-dismissing toast so they never take up layout space. */}
+      {notice && (
+        <div className="pointer-events-none fixed inset-x-0 bottom-5 z-50 flex justify-center px-4">
+          <div className="pointer-events-auto flex items-center gap-3 rounded-full border border-line bg-panel-2/95 px-4 py-2 text-xs text-accent shadow-xl backdrop-blur">
+            <span>{notice}</span>
+            <button
+              onClick={() => setNotice(null)}
+              className="text-muted transition hover:text-white"
+              aria-label="Dismiss"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Scenario bar — signed-in users only, shown ONLY in the pre-build empty
           state so you can switch/create before there's a plan. Once configured, the
