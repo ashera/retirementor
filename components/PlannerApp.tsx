@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import StatCard from "@/components/StatCard";
@@ -305,6 +305,13 @@ export default function PlannerApp({
   const [base, setBase] = useState<RetirementPlan>(DEFAULT_PLAN);
   const [strategies, setStrategies] = useState<StrategyLayer>(EMPTY_LAYER);
   const plan = useMemo(() => composeScenario(base, strategies, config), [base, strategies, config]);
+  // Keep the quick-adjust sliders responsive: the input controls read the LIVE `plan`
+  // (so the thumb + typed value move instantly), while the expensive derived work — the
+  // chart simulation, the goal-seek, the essentials floor — reads this DEFERRED plan.
+  // React serves the cheap slider updates at high priority and coalesces the heavy
+  // recompute to the latest value once dragging pauses, instead of running the full
+  // simulate + whatWillItTake on every intermediate pixel of a drag.
+  const deferredPlan = useDeferredValue(plan);
   // The persist/save form of the active scenario: the composed plan plus a bookmark
   // carrying the strategy layer + base, so a reload / save restores the strategies.
   // Strategy-free plans store plain (no bookmark) — smaller and back-compatible.
@@ -621,7 +628,10 @@ export default function PlannerApp({
     }
   }, [ready, user, configured, plan]);
 
-  const result = useMemo(() => simulate(plan, config), [plan, config]);
+  const result = useMemo(() => simulate(deferredPlan, config), [deferredPlan, config]);
+  // Shared, referentially-stable age-axis info for every chart (recomputed only when the
+  // deferred plan settles — so it never churns the memoised chart elements mid-drag).
+  const deferredAges = useMemo(() => ageGapInfo(deferredPlan), [deferredPlan]);
   // The active scenario's strategy layer, for the chips (all baked into the numbers).
   const applied = useMemo(() => appliedStrategies(storable, config), [storable, config]);
   // Committed life events on this plan — surfaced as chips too, so a known event
@@ -659,7 +669,7 @@ export default function PlannerApp({
   const successPct = mc ? Math.round(mc.successRate * 100) : null;
   const successTone: "accent" | "amber" | "red" =
     !mc ? "amber" : mc.successRate >= 0.85 ? "accent" : mc.successRate >= 0.6 ? "amber" : "red";
-  const gs = useMemo(() => whatWillItTake(plan, config), [plan, config]);
+  const gs = useMemo(() => whatWillItTake(deferredPlan, config), [deferredPlan, config]);
 
   // Prudent max spend: the most you can spend while Monte Carlo success still
   // clears the shared 85% bar (matching the What-If safe spend and the boost
@@ -749,7 +759,7 @@ export default function PlannerApp({
   // The essentials floor (needs — housing, food, health…). When the prudent max is
   // below it, even cutting ALL discretionary can't reach the confidence bar, so a
   // "trim spending" suggestion would be trimming into needs — not a real option.
-  const essentials = useMemo(() => essentialsFloor(plan, config).value, [plan, config]);
+  const essentials = useMemo(() => essentialsFloor(deferredPlan, config).value, [deferredPlan, config]);
   const cantTrim = overspending && maxSpend != null && maxSpend < essentials - 100;
   // Spend sits right at the prudent max — neither over nor under. Wait for the MC
   // max to settle so it doesn't flicker to/from the trim/boost states.
@@ -1200,19 +1210,86 @@ export default function PlannerApp({
         ? "between the ASFA ‘modest’ and ‘comfortable’ standards"
         : "below the ASFA ‘modest’ standard";
 
-  // Bands live on the OLDEST-person age axis: the go-go phase starts at household
-  // retirement (first to retire), and no-go runs to the axis end (the younger
-  // partner's life expectancy). The slow/no-go boundaries are already oldest-age
-  // (spendingForAge keys off the oldest's age).
-  const bandRetireStart = oldestCurrentAge(plan) + householdRetirementOffset(plan);
-  const bandAxisEnd = oldestCurrentAge(plan) + householdHorizon(plan);
-  const stageBands = isStaged
-    ? [
-        { x1: bandRetireStart, x2: stages.slowGoAge, label: "Go-go Years", fill: "#34d399" },
-        { x1: stages.slowGoAge, x2: stages.noGoAge, label: "Slow-go Years", fill: "#f59e0b" },
-        { x1: stages.noGoAge, x2: bandAxisEnd, label: "No-go Years", fill: "#a78bfa" },
-      ].filter((b) => b.x2 > b.x1)
-    : undefined;
+  // The balance chart is the heaviest child in this tree (Recharts), so memoise the
+  // WHOLE element on the DEFERRED plan. While the quick-adjust sliders move, the
+  // high-priority render reuses this same element reference — React skips the chart's
+  // Recharts reconcile entirely — and the chart only re-renders once the deferred plan
+  // settles. Bands live on the OLDEST-person age axis: the go-go phase starts at
+  // household retirement (first to retire), and no-go runs to the axis end (the younger
+  // partner's life expectancy).
+  const balanceChartEl = useMemo(() => {
+    const dpStaged = deferredPlan.spendingMode === "stages";
+    const dpStages = deferredPlan.spendingStages;
+    const retireStart = oldestCurrentAge(deferredPlan) + householdRetirementOffset(deferredPlan);
+    const axisEnd = oldestCurrentAge(deferredPlan) + householdHorizon(deferredPlan);
+    const bands = dpStaged
+      ? [
+          { x1: retireStart, x2: dpStages.slowGoAge, label: "Go-go Years", fill: "#34d399" },
+          { x1: dpStages.slowGoAge, x2: dpStages.noGoAge, label: "Slow-go Years", fill: "#f59e0b" },
+          { x1: dpStages.noGoAge, x2: axisEnd, label: "No-go Years", fill: "#a78bfa" },
+        ].filter((b) => b.x2 > b.x1)
+      : undefined;
+    return (
+      <RetirementChart
+        result={result}
+        bands={bands}
+        showHome={balanceView === "networth"}
+        baseline={baselineResult}
+        baselineLabel={baselineLabel}
+        onSelectYear={(age) => {
+          track("Year breakdown opened", { chart: "balance" });
+          setSelectedAge(age);
+        }}
+        selectedAge={selectedAge}
+        wageInflationPct={deferredPlan.inflation + (config.livingStandardsGrowthPct ?? 0)}
+        cpiPct={deferredPlan.inflation}
+        ages={deferredAges}
+        lifeEvents={lifeEvents}
+        agedCare={deferredPlan.agedCare?.enabled ? { entryAge: deferredPlan.agedCare.entryAge, durationYears: deferredPlan.agedCare.durationYears } : null}
+        plan={deferredPlan}
+      />
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [result, deferredPlan, deferredAges, balanceView, baselineResult, baselineLabel, selectedAge, lifeEvents, config]);
+
+  // The income + tax + fan charts are the other heavy Recharts children — memoise their
+  // elements on the same deferred inputs so the high-priority slider render skips them
+  // too (they only re-render once the deferred plan settles).
+  const incomeChartEl = useMemo(() => (
+    <IncomeChart
+      result={result}
+      minDrawdownBands={config.minDrawdownBands}
+      onSelectYear={(age) => {
+        track("Year breakdown opened", { chart: "income" });
+        setIncomeAge(age);
+      }}
+      ages={deferredAges}
+    />
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  ), [result, deferredAges, config]);
+  const taxChartEl = useMemo(() => (
+    <TaxChart
+      result={result}
+      onSelectYear={(age) => {
+        track("Year breakdown opened", { chart: "tax" });
+        setTaxAge(age);
+      }}
+      ages={deferredAges}
+    />
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  ), [result, deferredAges]);
+  const fanChartEl = useMemo(() => (
+    mc ? (
+      <FanChart
+        fan={mc.fan}
+        retirementAge={result.retirementAge}
+        agePensionAge={result.agePensionAge}
+        onSelectAge={setFanAge}
+        ages={deferredAges}
+      />
+    ) : null
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  ), [mc, result, deferredAges]);
 
   const spendPhrase = isStaged
     ? `staged spending — go-go ${fmtCurrency(stages.goGo)}, slow-go ${fmtCurrency(stages.slowGo)} from ${stages.slowGoAge}, no-go ${fmtCurrency(stages.noGo)} from ${stages.noGoAge} (go-go is ${benchmark})`
@@ -1703,24 +1780,7 @@ export default function PlannerApp({
           )}
           {tweaked && <LegendDot color="#94a3b8" label={baselineLabel} />}
         </div>
-        <RetirementChart
-          result={result}
-          bands={stageBands}
-          showHome={balanceView === "networth"}
-          baseline={baselineResult}
-          baselineLabel={baselineLabel}
-          onSelectYear={(age) => {
-            track("Year breakdown opened", { chart: "balance" });
-            setSelectedAge(age);
-          }}
-          selectedAge={selectedAge}
-          wageInflationPct={plan.inflation + (config.livingStandardsGrowthPct ?? 0)}
-          cpiPct={plan.inflation}
-          ages={ageGapInfo(plan)}
-          lifeEvents={lifeEvents}
-          agedCare={plan.agedCare?.enabled ? { entryAge: plan.agedCare.entryAge, durationYears: plan.agedCare.durationYears } : null}
-          plan={plan}
-        />
+        {balanceChartEl}
         <p className="mt-2 text-center text-xs text-muted">
           Tip: click any year for a full breakdown of income, tax and spending.
         </p>
@@ -1898,15 +1958,7 @@ export default function PlannerApp({
             {hasInvestmentProperty(plan) && <LegendDot color="#fb923c" label="Net rent" />}
           </div>
         </div>
-        <IncomeChart
-          result={result}
-          minDrawdownBands={config.minDrawdownBands}
-          onSelectYear={(age) => {
-            track("Year breakdown opened", { chart: "income" });
-            setIncomeAge(age);
-          }}
-          ages={ageGapInfo(plan)}
-        />
+        {incomeChartEl}
         <p className="mt-2 text-center text-xs text-muted">
           Dotted lines mark where super&apos;s <strong>minimum drawdown</strong> rate steps up (5% → 6% → 7%…) — the law
           makes you draw a bigger slice of super at those ages, which can shift the super-vs-savings mix and cause the
@@ -1928,14 +1980,7 @@ export default function PlannerApp({
               <LegendDot color="#38bdf8" label="Capital gains" />
             </div>
           </div>
-          <TaxChart
-            result={result}
-            onSelectYear={(age) => {
-              track("Year breakdown opened", { chart: "tax" });
-              setTaxAge(age);
-            }}
-            ages={ageGapInfo(plan)}
-          />
+          {taxChartEl}
           <p className="mt-2 text-center text-xs text-muted">
             Every tax the projection charges, by type. Super pension drawdowns and the Age Pension are tax-free, so tax
             usually falls sharply at retirement. Income tax is after the low-income (LITO) and seniors (SAPTO) offsets.
@@ -2110,13 +2155,7 @@ export default function PlannerApp({
 
         {mc && (
         <>
-        <FanChart
-          fan={mc.fan}
-          retirementAge={result.retirementAge}
-          agePensionAge={result.agePensionAge}
-          onSelectAge={setFanAge}
-          ages={ageGapInfo(plan)}
-        />
+        {fanChartEl}
         <p className="mt-1 text-center text-xs text-muted">
           Click a year to see the range of possible outcomes — and why they spread.
         </p>
