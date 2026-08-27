@@ -487,6 +487,11 @@ function SetupStep({
       : tenure === "mortgage"
         ? `Own with a ${fmtCurrency(mortgage.balance)} mortgage · home ${fmtCurrency(home.value)}`
         : `Own outright · home ${fmtCurrency(home.value)}`;
+  // A carried home loan is a real annual expense that gets ADDED to the budget you
+  // build here (it's part of the income goal). Cleared-at-retirement loans have no
+  // ongoing cost, so only "carry" contributes.
+  const loanYr =
+    tenure === "mortgage" && mortgage.strategy === "carry" ? mortgageAnnualCost(mortgage) : 0;
   return (
     <div className="space-y-6">
       <p className="text-sm text-muted">
@@ -505,9 +510,31 @@ function SetupStep({
         <p className="mt-1.5 text-xs text-muted">
           {tenure === "rent"
             ? "Renters carry a bigger housing cost — we use ASFA’s renter figures."
-            : "ASFA covers rates, insurance and upkeep; any loan is added on top."}{" "}
+            : "ASFA covers rates, insurance and upkeep; any loan repayment is added on top."}{" "}
           Change it in the <span className="text-slate-300">“Your home”</span> step of your plan.
         </p>
+        {loanYr > 0 && (
+          <div className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2.5">
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-amber-300">
+                Home loan — added to your goal
+              </div>
+              <div className="mt-0.5 text-xs text-muted">
+                Sits on top of the essentials + discretionary budget you build here
+                {mortgage.type === "principal_interest" && mortgage.payoffAge
+                  ? `, until age ${mortgage.payoffAge}`
+                  : " — interest-only, for life"}
+                .
+              </div>
+            </div>
+            <div className="shrink-0 text-right">
+              <div className="text-xl font-bold tabular-nums text-amber-300">
+                ＋{fmtCurrency(loanYr)}
+                <span className="ml-0.5 text-xs font-medium text-amber-300/80">/yr</span>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       <div>
