@@ -41,9 +41,16 @@ export default async function AssetsPage({ params }: { params: Promise<{ id: str
     const t = row.age - oldestCur;
     const properties = invProps.map((pr) => {
       const sold = pr.strategy === "sell" && row.age >= pr.sellAtAge;
-      return sold ? { value: 0, loan: 0 } : { value: propertyValueAt(pr, t), loan: pr.loanBalance / inflPow(t) };
+      return sold
+        ? { value: 0, loan: 0, offset: 0 }
+        : { value: propertyValueAt(pr, t), loan: pr.loanBalance / inflPow(t), offset: Math.max(0, pr.loanOffset ?? 0) / inflPow(t) };
     });
     const b = row.breakdown;
+    // Split the year's total offsetHeld back into home vs each property: the per-property
+    // amounts are the held offsets above (0 once sold), and the home offset is whatever
+    // remains — so home + properties always reconciles with offsetHeld (and net worth).
+    const propOffsetTotal = properties.reduce((s, pp) => s + pp.offset, 0);
+    const homeOffset = Math.max(0, (b.offsetHeld ?? 0) - propOffsetTotal);
     const inc = retirementYearIncome(row);
     // Per-person split of the attributable income (take-home is per person; net rent
     // and Age Pension split equally; income streams follow their owner; part-time work
@@ -71,7 +78,7 @@ export default async function AssetsPage({ params }: { params: Promise<{ id: str
       age: row.age,
       superTotal: row.totalSuper,
       savings: row.outside,
-      offset: b.offsetHeld ?? 0,
+      homeOffset,
       homeValue: row.homeValue,
       homeEquity: row.homeEquity,
       propertyEquity: row.propertyEquity,

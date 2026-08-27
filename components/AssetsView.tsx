@@ -11,7 +11,7 @@ export interface AgePoint {
   age: number; // oldest member's age this year
   superTotal: number;
   savings: number; // outside-super
-  offset: number; // offset-account cash held against the home/property loans (deemed asset)
+  homeOffset: number; // offset cash held against the HOME loan (deemed asset)
   homeValue: number;
   homeEquity: number; // homeValue less any mortgage
   propertyEquity: number; // combined investment-property net equity
@@ -19,7 +19,7 @@ export interface AgePoint {
   working: boolean; // accumulation phase (still earning)
   homeToOutside: number; // freed home-downsize equity routed to outside this year
   propToOutside: number; // property-sale proceeds routed to outside this year
-  properties: { value: number; loan: number }[]; // per investment property, at this age (sold → 0/0)
+  properties: { value: number; loan: number; offset: number }[]; // per investment property, at this age (sold → 0/0); offset = its offset-account cash
   // Cash flow this year (today's dollars). Income sources reconcile with spending in a
   // funded retirement year; in working years living costs aren't itemised.
   retired: boolean;
@@ -124,20 +124,20 @@ export default function AssetsView({ name, plan, points }: { name: string; plan:
       icon: ic("outside"),
     });
   }
-  if (p.offset > 0.5) {
-    assets.push({
-      label: "Offset account",
-      value: p.offset,
-      sub: "cash offsetting your loan — saves interest instead of earning a return; still an assessed (deemed) asset",
-      icon: ic("outside"),
-    });
-  }
   if (p.homeValue > 0) {
     assets.push({
       label: "Home",
       value: p.homeValue,
       sub: homeLoan > 0 ? `net equity ${fmtCurrency(p.homeEquity)} after the home loan` : "owned outright — exempt from the assets test",
       icon: ic("household"),
+    });
+  }
+  if (p.homeOffset > 0.5) {
+    assets.push({
+      label: "Home-loan offset",
+      value: p.homeOffset,
+      sub: "cash offsetting your home loan — saves interest (tax-free) instead of a return; still an assessed asset",
+      icon: ic("outside"),
     });
   }
   // Each investment property shown at its gross market value (its loan is a separate
@@ -149,6 +149,14 @@ export default function AssetsView({ name, plan, points }: { name: string; plan:
         value: pp.value,
         sub: `${props[n].grossYield}% gross yield${pp.loan > 0 ? " · loan shown in liabilities" : ""}`,
         icon: ic("property"),
+      });
+    }
+    if (pp.offset > 0.5) {
+      assets.push({
+        label: `${propName(n)} offset`,
+        value: pp.offset,
+        sub: "cash offsetting this property's loan — cuts the (deductible) interest; still an assessed asset",
+        icon: ic("outside"),
       });
     }
   });
