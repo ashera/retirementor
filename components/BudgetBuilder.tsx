@@ -349,6 +349,7 @@ export default function BudgetBuilder({ plan, config, onApply, onProgress, onClo
               home={home}
               mortgage={mortgage}
               lifestyle={lifestyle}
+              categories={categories}
               applyPreset={applyPreset}
               config={config}
             />
@@ -470,6 +471,7 @@ function SetupStep({
   home,
   mortgage,
   lifestyle,
+  categories,
   applyPreset,
   config,
 }: {
@@ -478,6 +480,7 @@ function SetupStep({
   home: HomeDetail;
   mortgage: MortgageDetail;
   lifestyle: BudgetLifestyle;
+  categories: Record<string, number>;
   applyPreset: (ls: BudgetLifestyle) => void;
   config: EngineConfig;
 }) {
@@ -492,6 +495,47 @@ function SetupStep({
   // ongoing cost, so only "carry" contributes.
   const loanYr =
     tenure === "mortgage" && mortgage.strategy === "carry" ? mortgageAnnualCost(mortgage) : 0;
+  // Once the live budget no longer matches the preset it was seeded from, the picker
+  // would silently overwrite the user's work AND the highlighted preset would be a lie.
+  // So we treat that as "customised" and switch the picker for a read-only benchmark
+  // comparison (with a deliberate "start over" escape hatch).
+  const homeownerFlag = tenure !== "rent";
+  const total = budgetTotal(categories);
+  const presetTotal = (ls: BudgetLifestyle) =>
+    budgetTotal(presetCategories(config, household, homeownerFlag, ls));
+  const startingCats = presetCategories(config, household, homeownerFlag, lifestyle);
+  const customised = [...new Set([...Object.keys(categories), ...Object.keys(startingCats)])].some(
+    (k) => Math.round(categories[k] ?? 0) !== Math.round(startingCats[k] ?? 0),
+  );
+  const [showReset, setShowReset] = useState(false);
+  const presetButtons = () =>
+    LIFESTYLES.map((l) => {
+      const t = presetTotal(l.key);
+      const active = lifestyle === l.key && !customised;
+      return (
+        <button
+          key={l.key}
+          onClick={() => {
+            applyPreset(l.key);
+            setShowReset(false);
+          }}
+          className={`flex w-full items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left transition ${
+            active
+              ? "border-slate-300 bg-white/5 ring-1 ring-slate-300/40"
+              : "border-line bg-panel-2 hover:border-slate-400/50"
+          }`}
+        >
+          <div>
+            <div className="font-semibold text-white">{l.label}</div>
+            <div className="text-xs text-muted">{l.blurb}</div>
+          </div>
+          <div className="text-right">
+            <div className="text-sm font-bold tabular-nums text-white">{fmtCurrency(t)}</div>
+            <div className="text-[11px] text-muted">per year</div>
+          </div>
+        </button>
+      );
+    });
   return (
     <div className="space-y-6">
       <p className="text-sm text-muted">
@@ -537,42 +581,64 @@ function SetupStep({
         )}
       </div>
 
-      <div>
-        <div className="mb-2 text-sm font-semibold text-slate-200">
-          Pick a starting point
+      {!customised ? (
+        // First-time setup: pick an ASFA starting point.
+        <div>
+          <div className="mb-2 text-sm font-semibold text-slate-200">Pick a starting point</div>
+          <div className="space-y-2.5">{presetButtons()}</div>
         </div>
-        <div className="space-y-2.5">
-          {LIFESTYLES.map((l) => {
-            const preset = presetCategories(config, household, tenure !== "rent", l.key);
-            const t = budgetTotal(preset);
-            const active = lifestyle === l.key;
-            return (
-              <button
-                key={l.key}
-                onClick={() => applyPreset(l.key)}
-                className={`flex w-full items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left transition ${
-                  active
-                    ? "border-slate-300 bg-white/5 ring-1 ring-slate-300/40"
-                    : "border-line bg-panel-2 hover:border-slate-400/50"
-                }`}
-              >
-                <div>
-                  <div className="font-semibold text-white">
-                    {l.label}
+      ) : (
+        // Already refined: the presets are no longer the budget, so show them as a
+        // read-only benchmark instead of an overwrite-on-click picker.
+        <div>
+          <div className="mb-2 text-sm font-semibold text-slate-200">How your budget compares</div>
+          <div className="rounded-xl border border-line bg-panel-2 px-4 py-3">
+            <div className="flex items-center justify-between gap-3">
+              <div className="text-sm font-semibold text-white">Your budget</div>
+              <div className="text-sm font-bold tabular-nums text-white">
+                {fmtCurrency(total)}
+                <span className="ml-0.5 text-[11px] font-medium text-muted">/yr</span>
+              </div>
+            </div>
+            <div className="mt-2.5 space-y-1.5 border-t border-line pt-2.5">
+              {LIFESTYLES.map((l) => {
+                const pt = presetTotal(l.key);
+                const d = total - pt;
+                const near = Math.abs(d) <= 500;
+                return (
+                  <div key={l.key} className="flex items-baseline justify-between gap-3 text-xs">
+                    <span className="text-muted">
+                      {l.label} <span className="tabular-nums text-slate-500">· {fmtCurrency(pt)}</span>
+                    </span>
+                    <span className={`tabular-nums ${near ? "text-emerald-300" : "text-slate-300"}`}>
+                      {near
+                        ? "≈ matches"
+                        : d > 0
+                          ? `${fmtCurrency(d)} above`
+                          : `${fmtCurrency(-d)} below`}
+                    </span>
                   </div>
-                  <div className="text-xs text-muted">{l.blurb}</div>
-                </div>
-                <div className="text-right">
-                  <div className="text-sm font-bold tabular-nums text-white">
-                    {fmtCurrency(t)}
-                  </div>
-                  <div className="text-[11px] text-muted">per year</div>
-                </div>
-              </button>
-            );
-          })}
+                );
+              })}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowReset((v) => !v)}
+            className="mt-2.5 text-xs font-medium text-muted transition hover:text-slate-300"
+          >
+            ↺ Start over from a preset
+          </button>
+          {showReset && (
+            <div className="mt-2 space-y-2.5">
+              <p className="text-[11px] text-amber-300/80">
+                Picking one replaces your customised budget.
+              </p>
+              {presetButtons()}
+            </div>
+          )}
         </div>
-      </div>
+      )}
     </div>
   );
 }
