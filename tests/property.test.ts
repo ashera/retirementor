@@ -2,7 +2,8 @@ import { describe, it, expect } from "vitest";
 import { simulate } from "../lib/au/simulate";
 import { DEFAULT_CONFIG as cfg } from "../lib/au/config";
 import { DEFAULT_PLAN, type PropertyDetail, type RetirementPlan } from "../lib/au/types";
-import { capitalGainsTax, netRentCash, propertyValueAt } from "../lib/au/property";
+import { capitalGainsTax, netRentCash, propertyValueAt, loanInterest } from "../lib/au/property";
+import { rowNetWorth } from "../lib/au/networth";
 import { incomeTax } from "../lib/au/tax";
 
 const base = (over: Partial<RetirementPlan> = {}): RetirementPlan => ({
@@ -223,5 +224,36 @@ describe("Multiple investment properties", () => {
     const array = simulate(base({ people: super0, investmentProperties: [prop()] }), cfg);
     expect(rowAt(array, 67).propertyEquity).toBe(rowAt(legacy, 67).propertyEquity);
     expect(pensionAt(array, 67)).toBeCloseTo(pensionAt(legacy, 67), 5);
+  });
+});
+
+describe("Offset account on an investment-property loan", () => {
+  it("reduces the deductible interest (levied on loan − offset)", () => {
+    expect(loanInterest(prop({ loanBalance: 200_000, loanRate: 6 }))).toBe(12_000);
+    expect(loanInterest(prop({ loanBalance: 200_000, loanRate: 6, loanOffset: 100_000 }))).toBe(6_000);
+    expect(loanInterest(prop({ loanBalance: 200_000, loanRate: 6, loanOffset: 250_000 }))).toBe(0); // capped at the balance
+  });
+
+  it("lifts net rent (less interest) but leaves assessed equity unchanged", () => {
+    const r = simulate(base({ investmentProperty: prop({ loanOffset: 100_000 }) }), cfg);
+    const row = rowAt(r, 67);
+    // Gross 20k × (1−25%) = 15k, less (200k−100k) × 6% = 6k interest → 9k net rent (was 3k).
+    expect(row.rentIncome).toBeCloseTo(9_000, 0);
+    expect(row.propertyEquity).toBe(300_000); // offset doesn't shelter the property's equity
+  });
+
+  it("holds the offset cash as net worth + a deemed asset", () => {
+    const withOff = simulate(base({ investmentProperty: prop({ loanOffset: 100_000 }) }), cfg);
+    const noOff = simulate(base({ investmentProperty: prop() }), cfg);
+    expect(rowAt(withOff, 67).breakdown.offsetHeld).toBeCloseTo(100_000, 0);
+    // +$100k liquid asset → net worth up ~$100k, and a lower pension (more deemed assets).
+    expect(rowNetWorth(rowAt(withOff, 67)) - rowNetWorth(rowAt(noOff, 67))).toBeCloseTo(100_000, -2);
+    expect(pensionAt(withOff, 67)).toBeLessThan(pensionAt(noOff, 67));
+  });
+
+  it("frees the offset into savings when the property is sold", () => {
+    const r = simulate(base({ investmentProperty: prop({ loanOffset: 80_000, strategy: "sell", sellAtAge: 75 }) }), cfg);
+    expect(rowAt(r, 70).breakdown.offsetHeld).toBeGreaterThan(60_000); // held while owned
+    expect(rowAt(r, 78).breakdown.offsetHeld ?? 0).toBe(0); // freed once sold
   });
 });

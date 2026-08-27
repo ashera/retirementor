@@ -121,6 +121,13 @@ export interface PropertyDetail {
   costRatio: number; // percent of gross rent lost to expenses + vacancy
   loanBalance: number; // loan secured against this property (interest-only)
   loanRate: number; // loan interest rate, percent
+  // Optional offset account against this loan: cash that reduces the interest charged
+  // (levied on `loanBalance − loanOffset`) instead of earning a market return. On an
+  // investment loan the interest is DEDUCTIBLE, so offsetting it also gives up that
+  // deduction — the net benefit is loanRate × (1 − marginal tax); this falls out of the
+  // engine automatically since it taxes net rent. The offset cash is a liquid, deemed
+  // asset (net worth + Age Pension), freed into savings when the property is sold.
+  loanOffset?: number;
   purchasePrice: number; // cost base for CGT (today's-dollar approximation)
   strategy: "hold" | "sell"; // hold for income, or sell at an age
   sellAtAge: number; // oldest person's age at sale (when strategy === "sell")

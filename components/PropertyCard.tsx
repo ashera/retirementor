@@ -4,7 +4,7 @@ import { useState } from "react";
 import Field from "@/components/Field";
 import InlineExplainer from "@/components/InlineExplainer";
 import { fmtCurrency } from "@/lib/au/format";
-import { incomeTestRent, netEquity, netRentCash } from "@/lib/au/property";
+import { incomeTestRent, netEquity, netRentCash, loanInterest } from "@/lib/au/property";
 import type { PropertyDetail } from "@/lib/au/types";
 
 // One editable investment property in the wizard. Shows the essentials up front
@@ -136,6 +136,16 @@ export default function PropertyCard({
           hint="Only a loan against THIS property reduces its assessed value (interest-only)."
         />
         <Field
+          label="Offset account"
+          value={Math.min(p.loanOffset ?? 0, p.loanBalance)}
+          onChange={(v) => onChange({ loanOffset: v })}
+          min={0}
+          max={p.loanBalance}
+          step={5_000}
+          prefix="$"
+          hint="Cash offsetting this loan cuts the interest charged. It's DEDUCTIBLE interest, so you also give up the tax break on it — the net saving is roughly your loan rate less your marginal tax rate. Still counts as your savings for net worth and the Age Pension."
+        />
+        <Field
           label="Gross rental yield"
           value={p.grossYield}
           onChange={(v) => onChange({ grossYield: v })}
@@ -212,8 +222,12 @@ export default function PropertyCard({
               <span className="tabular-nums">−{fmtCurrency(Math.round((p.value * p.grossYield * p.costRatio) / 10000))}</span>
             </div>
             <div className="flex justify-between gap-4">
-              <span>− Loan interest ({p.loanRate}% of {fmtCurrency(p.loanBalance)})</span>
-              <span className="tabular-nums">−{fmtCurrency(Math.round((p.loanBalance * p.loanRate) / 100))}</span>
+              <span>
+                − Loan interest ({p.loanRate}% of{" "}
+                {fmtCurrency(Math.max(0, p.loanBalance - (p.loanOffset ?? 0)))}
+                {(p.loanOffset ?? 0) > 0 ? " after offset" : ""})
+              </span>
+              <span className="tabular-nums">−{fmtCurrency(Math.round(loanInterest(p)))}</span>
             </div>
             <div className="flex justify-between gap-4 border-t border-line pt-1 font-semibold text-white">
               <span>Net rent</span>

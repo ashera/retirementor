@@ -22,9 +22,12 @@ export function netOperatingIncome(p: PropertyDetail, value: number): number {
   return grossRent(p, value) * (1 - p.costRatio / 100);
 }
 
-/** Annual interest on the secured loan (interest-only). */
+/** Annual interest on the secured loan (interest-only). An offset account against the
+ *  loan reduces the interest charged (levied on `loanBalance − loanOffset`). Because the
+ *  engine taxes net rent, feeding the reduced interest through here makes the lost
+ *  negative-gearing deduction fall out automatically. */
 export function loanInterest(p: PropertyDetail): number {
-  return p.loanBalance * (p.loanRate / 100);
+  return Math.max(0, p.loanBalance - (p.loanOffset ?? 0)) * (p.loanRate / 100);
 }
 
 /** Net cash the property throws off each year — can be negative if geared. */

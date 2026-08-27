@@ -692,6 +692,7 @@ export function simulate(
         const loanReal = prop.loanBalance / Math.pow(1 + plan.inflation / 100, t); // nominal IO loan → today's $
         const proceeds = value - loanReal - cgtPaid;
         addCpiRealOutside(proceeds, t); // CPI-real sale proceeds → basis-corrected before the boundary
+        addCpiRealOutside(Math.max(0, prop.loanOffset ?? 0) / Math.pow(1 + plan.inflation / 100, t), t); // offset cash freed on sale
         // Report the proceeds on the same (wage-real) basis as this accumulation-year
         // pool so the net-worth bridge reconciles; the boundary rebase restores CPI-real.
         accumPropertyProceeds += proceeds / boundaryRebase;
@@ -709,7 +710,10 @@ export function simulate(
       // income, or a negative cash drain for a geared property) — surfaced on the
       // income chart alongside take-home pay. Like salary take-home it's disposable
       // income, not auto-saved, so it doesn't itself move the balance.
-      const accumRentCash = properties.reduce((s, prop, pi) => s + (sold[pi] ? 0 : netRentCash({ ...prop, loanBalance: prop.loanBalance / accumPropDeflator }, propertyValueAt(prop, t))), 0);
+      const accumRentCash = properties.reduce((s, prop, pi) => s + (sold[pi] ? 0 : netRentCash({ ...prop, loanBalance: prop.loanBalance / accumPropDeflator, loanOffset: (prop.loanOffset ?? 0) / accumPropDeflator }, propertyValueAt(prop, t))), 0);
+      // Offset cash held against unsold property loans (today's dollars) — added to net
+      // worth + the means test via offsetHeld, like the home-loan offset.
+      const accumPropertyOffsetHeld = properties.reduce((s, prop, pi) => s + (sold[pi] ? 0 : Math.max(0, prop.loanOffset ?? 0) / accumPropDeflator), 0);
       // Income tax on that rent, marginal, stacked on each owner's taxable salary and
       // split equally across the household. A rental LOSS reduces income tax — this is
       // negative gearing (the working-years benefit). NEGATIVE rentTax = a tax saving.
@@ -878,7 +882,7 @@ export function simulate(
           rentCost: 0,
           mortgageCost: 0,
           mortgageCleared: 0,
-          offsetHeld: offsetHeldReal,
+          offsetHeld: offsetHeldReal + accumPropertyOffsetHeld,
           lumpSum: 0,
           recontribution: 0,
           propertyProceeds: accumPropertyProceeds,
@@ -1258,13 +1262,19 @@ export function simulate(
     let propertyCgt = 0; // combined CGT paid on sales this year
     const propertySales: PropertySaleDetail[] = []; // per-sale CGT working (for the tax modal)
     const propertyParts: { name?: string; index: number; equity: number }[] = [];
+    // Offset cash held against unsold property loans this year (today's dollars) — a
+    // liquid, deemed asset added to net worth + the means test (via offsetHeld below),
+    // freed into savings when the property sells.
+    let propertyOffsetHeldReal = 0;
     properties.forEach((prop, pi) => {
       if (sold[pi]) return;
       const value = propertyValueAt(prop, t);
       // The secured loan is a nominal balance; the value is in today's dollars, so
       // deflate the loan to the same basis (mirrors the home loanBalReal) or its real
       // burden would never erode — over-stating the debt against net equity + net rent.
-      const propReal = { ...prop, loanBalance: prop.loanBalance / Math.pow(1 + plan.inflation / 100, t) };
+      const deflator = Math.pow(1 + plan.inflation / 100, t);
+      const propOffsetReal = Math.max(0, prop.loanOffset ?? 0) / deflator;
+      const propReal = { ...prop, loanBalance: prop.loanBalance / deflator, loanOffset: propOffsetReal };
       if (prop.strategy === "sell" && oldest >= prop.sellAtAge) {
         // The Age Pension exemption from the 30% minimum uses the PRIOR year's
         // receipt (this year's pension is worked out after the sale, below).
@@ -1282,13 +1292,16 @@ export function simulate(
         propertyProceeds += proceeds;
         propertyCgt += cgtPaid;
         if (cgtPaid > 0.5) propertySales.push(propertySaleDetail(prop, value, cgtRules, plan.people.length, prop.name?.trim() || `Property ${pi + 1}`));
-        outside += proceeds;
+        // The offset cash is freed into savings alongside the sale proceeds (the loan
+        // it offset is discharged from those proceeds).
+        outside += proceeds + propOffsetReal;
         sold[pi] = true;
       } else {
         const eq = netEquity(propReal, value);
         rentCash += netRentCash(propReal, value);
         propertyEquity += eq;
         propertyParts.push({ name: prop.name, index: pi, equity: eq });
+        propertyOffsetHeldReal += propOffsetReal;
       }
     });
     // Income test assesses net rental income at the household level, so gains and
@@ -1408,9 +1421,10 @@ export function simulate(
       // can leave it negative, but unsecured debt isn't deductible from assessable
       // assets (the property's own loan is already netted via propertyEquity), so a
       // shortfall shouldn't understate assets and inflate the pension. Offset-account
-      // cash is an assessed, deemed financial asset — offsetting a loan against the
-      // exempt home doesn't shelter it (once freed it's already inside `outside`).
-      const financialAssets = Math.max(0, outside) + assessedSuper + offsetHeldReal;
+      // cash (home loan + any investment-property loans) is an assessed, deemed
+      // financial asset — offsetting a loan doesn't shelter it; once freed it's already
+      // inside `outside`.
+      const financialAssets = Math.max(0, outside) + assessedSuper + offsetHeldReal + propertyOffsetHeldReal;
       // A couple with one partner in permanent RESIDENTIAL care is "illness-separated":
       // assessed as a couple (combined means, couple thresholds) but each paid the
       // higher single rate → usually a higher combined pension.
@@ -1841,7 +1855,7 @@ export function simulate(
         rentCost: rentExpense,
         mortgageCost,
         mortgageCleared: mortgageClearedNow,
-        offsetHeld: offsetHeldReal,
+        offsetHeld: offsetHeldReal + propertyOffsetHeldReal,
         lumpSum: lumpSumNow,
         recontribution: recontributionNow,
         eventIncome: eventIncomeNow,
