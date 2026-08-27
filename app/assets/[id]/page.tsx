@@ -71,6 +71,7 @@ export default async function AssetsPage({ params }: { params: Promise<{ id: str
       age: row.age,
       superTotal: row.totalSuper,
       savings: row.outside,
+      offset: b.offsetHeld ?? 0,
       homeValue: row.homeValue,
       homeEquity: row.homeEquity,
       propertyEquity: row.propertyEquity,

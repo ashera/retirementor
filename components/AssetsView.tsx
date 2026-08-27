@@ -11,6 +11,7 @@ export interface AgePoint {
   age: number; // oldest member's age this year
   superTotal: number;
   savings: number; // outside-super
+  offset: number; // offset-account cash held against the home/property loans (deemed asset)
   homeValue: number;
   homeEquity: number; // homeValue less any mortgage
   propertyEquity: number; // combined investment-property net equity
@@ -120,6 +121,14 @@ export default function AssetsView({ name, plan, points }: { name: string; plan:
       label: "Savings (outside super)",
       value: p.savings,
       sub: sources.length ? `incl. ${sources.join(" · ")}` : undefined,
+      icon: ic("outside"),
+    });
+  }
+  if (p.offset > 0.5) {
+    assets.push({
+      label: "Offset account",
+      value: p.offset,
+      sub: "cash offsetting your loan — saves interest instead of earning a return; still an assessed (deemed) asset",
       icon: ic("outside"),
     });
   }
