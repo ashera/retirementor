@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { simulate } from "../lib/au/simulate";
 import { DEFAULT_CONFIG as cfg } from "../lib/au/config";
 import { DEFAULT_PLAN, type MortgageDetail, type RetirementPlan } from "../lib/au/types";
-import { suggestPayoffAge } from "../lib/au/mortgage";
+import { suggestPayoffAge, mortgageAnnualCost, outstandingBalance } from "../lib/au/mortgage";
 
 const base = (over: Partial<RetirementPlan> = {}): RetirementPlan => ({
   ...DEFAULT_PLAN,
@@ -86,5 +86,76 @@ describe("Mortgage in retirement", () => {
   it("suggests a payoff age from balance, rate and repayment", () => {
     expect(suggestPayoffAge(150_000, 6, 18_000, 60)).toBe(72); // ~11.6 yrs to amortise
     expect(suggestPayoffAge(200_000, 6, 11_000, 60)).toBeNull(); // repayment ≤ interest
+  });
+});
+
+describe("Offset account (pure loan maths)", () => {
+  it("interest-only: offset lowers the annual interest at the loan rate", () => {
+    expect(mortgageAnnualCost(ioLoan)).toBe(12_000); // 200k × 6%
+    expect(mortgageAnnualCost({ ...ioLoan, offset: 50_000 })).toBe(9_000); // (200k − 50k) × 6%
+    expect(mortgageAnnualCost({ ...ioLoan, offset: 250_000 })).toBe(0); // offset ≥ balance → no interest
+  });
+
+  it("P&I: the repayment is unchanged but the loan amortises faster", () => {
+    expect(mortgageAnnualCost({ ...piLoan, offset: 60_000 })).toBe(18_000); // still the fixed repayment
+    for (const n of [1, 3, 5, 8]) {
+      const noOffset = outstandingBalance(piLoan, n);
+      const withOffset = outstandingBalance({ ...piLoan, offset: 60_000 }, n);
+      expect(withOffset).toBeLessThan(noOffset); // more of each repayment hits principal
+    }
+  });
+
+  it("P&I: a full offset clears the loan in balance ÷ repayment years", () => {
+    // offset ≥ balance → interest always 0 → balance falls by the repayment each year.
+    const m = { ...piLoan, balance: 90_000, annualRepayment: 18_000, offset: 90_000 };
+    expect(outstandingBalance(m, 4)).toBeCloseTo(18_000, 0); // 90k − 4×18k
+    expect(outstandingBalance(m, 5)).toBe(0); // cleared
+  });
+
+  it("no offset leaves the amortisation byte-identical (closed form)", () => {
+    for (const n of [0, 2, 6, 11, 20]) {
+      expect(outstandingBalance({ ...piLoan, offset: 0 }, n)).toBe(outstandingBalance(piLoan, n));
+      expect(outstandingBalance({ ...piLoan, offset: undefined }, n)).toBe(outstandingBalance(piLoan, n));
+    }
+  });
+});
+
+describe("Offset account (in the projection)", () => {
+  it("interest-only: the offset cuts the annual loan cost (tax-free saving)", () => {
+    const r = simulate(base({ outsideSuper: 0, mortgage: { ...ioLoan, offset: 50_000 } }), cfg);
+    expect(spendAt(r, 60)).toBe(59_000); // 50k spend + (200k − 50k) × 6% = 50k + 9k (was 62k)
+  });
+
+  it("counts the offset cash as liquid net worth while the loan runs", () => {
+    const r = simulate(base({ outsideSuper: 0, mortgage: { ...ioLoan, offset: 50_000 } }), cfg);
+    const row60 = r.rows.find((x) => x.age === 60)!;
+    expect(row60.breakdown.offsetHeld).toBe(50_000); // today's dollars at t=0
+    expect(row60.total).toBeGreaterThan(740_000); // 700k super + ~50k offset (outside = 0)
+  });
+
+  it("assesses the offset for the Age Pension (a deemed financial asset)", () => {
+    const atPension = { people: base().people.map((p) => ({ ...p, currentAge: 67 })), retirementAge: 67 };
+    const noOff = simulate(base({ ...atPension, outsideSuper: 0, mortgage: ioLoan }), cfg);
+    const withOff = simulate(base({ ...atPension, outsideSuper: 0, mortgage: { ...ioLoan, offset: 120_000 } }), cfg);
+    const pen = (r: ReturnType<typeof simulate>) => r.rows.find((x) => x.age === 67)!.agePension;
+    expect(pen(withOff)).toBeLessThan(pen(noOff)); // the extra $120k offset asset trims the pension
+  });
+
+  it("clear-at-retirement uses the offset first, so super covers only the shortfall", () => {
+    const atPension = { people: base().people.map((p) => ({ ...p, currentAge: 67 })), retirementAge: 67 };
+    const clearedLump = (offset?: number) => {
+      const r = simulate(base({ ...atPension, mortgage: { ...piLoan, strategy: "clear_at_retirement", offset } }), cfg);
+      return r.rows.find((x) => x.age === 67)!.breakdown.mortgageCleared;
+    };
+    expect(clearedLump(60_000)).toBeLessThan(clearedLump(undefined)); // offset covers part → less super drawn
+  });
+
+  it("frees the offset into the outside pool once a P&I loan pays off", () => {
+    const r = simulate(base({ outsideSuper: 0, targetSpending: 20_000, mortgage: { ...piLoan, offset: 40_000, strategy: "carry" } }), cfg);
+    const active = r.rows.find((x) => x.age === 62)!;
+    expect(active.breakdown.offsetHeld).toBeGreaterThan(30_000); // held while the loan runs
+    const paid = r.rows.find((x) => x.age >= 68 && x.breakdown.mortgageCost === 0)!;
+    expect(paid.breakdown.offsetHeld ?? 0).toBe(0); // freed once the loan clears
+    expect(paid.outside).toBeGreaterThan(20_000); // the freed cash landed in the outside pool
   });
 });

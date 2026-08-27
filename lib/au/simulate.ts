@@ -259,6 +259,12 @@ export function simulate(
   // "clear at retirement" lump sum has been paid off from super.
   const mortgage = plan.mortgage;
   let mortgageCleared = false;
+  // Offset account held against the home loan (nominal, today's-dollars frame like the
+  // loan). It reduces the interest charged (handled in mortgage.ts) and is a liquid,
+  // assessed asset that earns no market return while the loan runs; once the loan
+  // clears it's freed into the outside pool. `offsetFreed` flips true at that point.
+  const offsetNominal = Math.max(0, mortgage?.offset ?? 0);
+  let offsetFreed = false;
 
   // Investment properties. `sold[i]` flips true once that property's "sell at age"
   // event has released its net proceeds into the outside-super pool.
@@ -566,6 +572,24 @@ export function simulate(
       mortgage && !mortgageCleared && isHomeowner && mortgageActiveAtAge(mortgage, oldest, t) ? loanBalReal : 0;
     const homeEquityThisYear = Math.max(0, homeValueThisYear - outstandingLoan);
 
+    // Offset account: today's-dollars value of the offset cash this year. While the loan
+    // runs it's held as a liquid, assessed (deemed) asset that earns no market return
+    // (`offsetHeldReal`, added to net worth + the means test below). The first year the
+    // loan is no longer active, the cash is freed into the outside pool so it starts
+    // earning a return and becomes spendable. `clear_at_retirement` consumes it instead
+    // (it helps pay the loan off — see that block), setting offsetFreed without freeing.
+    const offsetReal = offsetNominal / Math.pow(1 + plan.inflation / 100, t);
+    let offsetHeldReal = 0;
+    if (offsetNominal > 0 && !offsetFreed) {
+      const loanActive = !mortgageCleared && isHomeowner && mortgageActiveAtAge(mortgage!, oldest, t);
+      if (loanActive) {
+        offsetHeldReal = offsetReal;
+      } else {
+        outside += offsetReal;
+        offsetFreed = true;
+      }
+    }
+
     // Balances at the START of this year (on the birthday) — this is what each
     // data point plots, so the peak lands on the retirement age, not the year before.
     const startSuper = totalSuper();
@@ -854,6 +878,7 @@ export function simulate(
           rentCost: 0,
           mortgageCost: 0,
           mortgageCleared: 0,
+          offsetHeld: offsetHeldReal,
           lumpSum: 0,
           recontribution: 0,
           propertyProceeds: accumPropertyProceeds,
@@ -863,7 +888,7 @@ export function simulate(
           homeProceedsToSuper: 0,
           homeValue: homeValueThisYear,
           homeEquity: homeEquityThisYear,
-          ...deathBenefitFields(outside - drLoan, homeEquityThisYear, 0),
+          ...deathBenefitFields(outside - drLoan + offsetHeldReal, homeEquityThisYear, 0),
         }),
       );
       continue;
@@ -1016,18 +1041,28 @@ export function simulate(
     // assets, so the Age Pension below is recomputed on the reduced balances —
     // the family home stays exempt regardless of any loan against it.
     let mortgageClearedNow = 0;
+    // Any offset cash you're holding pays down part of the loan first (it's already
+    // sitting against it), so super only has to cover the shortfall — preserving more
+    // tax-free super. The offset is consumed here (not freed into the outside pool).
+    const clearNeed = Math.max(0, loanBalReal - offsetReal);
     if (
       mortgage &&
       mortgage.strategy === "clear_at_retirement" &&
       !mortgageCleared &&
-      accessibleSuper >= loanBalReal
+      accessibleSuper >= clearNeed
     ) {
       // Pay off the loan's TODAY'S-DOLLARS value (the same deflated basis the carry
       // repayment uses) — not the raw nominal balance, which would over-draw super.
-      drawSuper(accessibleIdx, loanBalReal);
-      accessibleSuper -= loanBalReal;
+      if (clearNeed > 0) {
+        drawSuper(accessibleIdx, clearNeed);
+        accessibleSuper -= clearNeed;
+      }
       mortgageCleared = true;
-      mortgageClearedNow = loanBalReal;
+      mortgageClearedNow = clearNeed; // the super lump actually drawn (net of the offset)
+      if (offsetNominal > 0) {
+        offsetFreed = true; // offset spent clearing the loan → don't also free it to outside
+        offsetHeldReal = 0;
+      }
     }
 
     // One-off lump sum withdrawn from super at a chosen age. Only accessible super
@@ -1372,8 +1407,10 @@ export function simulate(
       // Floor the outside pool at 0 for the means test: an underwater property sale
       // can leave it negative, but unsecured debt isn't deductible from assessable
       // assets (the property's own loan is already netted via propertyEquity), so a
-      // shortfall shouldn't understate assets and inflate the pension.
-      const financialAssets = Math.max(0, outside) + assessedSuper;
+      // shortfall shouldn't understate assets and inflate the pension. Offset-account
+      // cash is an assessed, deemed financial asset — offsetting a loan against the
+      // exempt home doesn't shelter it (once freed it's already inside `outside`).
+      const financialAssets = Math.max(0, outside) + assessedSuper + offsetHeldReal;
       // A couple with one partner in permanent RESIDENTIAL care is "illness-separated":
       // assessed as a couple (combined means, couple thresholds) but each paid the
       // higher single rate → usually a higher combined pension.
@@ -1804,6 +1841,7 @@ export function simulate(
         rentCost: rentExpense,
         mortgageCost,
         mortgageCleared: mortgageClearedNow,
+        offsetHeld: offsetHeldReal,
         lumpSum: lumpSumNow,
         recontribution: recontributionNow,
         eventIncome: eventIncomeNow,
@@ -1827,7 +1865,7 @@ export function simulate(
         homeProceedsToSuper: homeToSuperThisYear,
         homeValue: homeValueThisYear,
         homeEquity: homeEquityThisYear,
-        ...deathBenefitFields(outside - drLoan, homeEquityThisYear, radHeld),
+        ...deathBenefitFields(outside - drLoan + offsetHeldReal, homeEquityThisYear, radHeld),
         onBreak: workOnBreak, // a still-working partner on a gap year → charts shade it
       }),
     );
@@ -1890,7 +1928,10 @@ function row(
     age,
     totalSuper,
     outside,
-    total: totalSuper + outside,
+    // Net financial worth includes offset-account cash held against the loan (a liquid
+    // asset that just isn't earning a market return); once the loan clears it's inside
+    // `outside`, so the breakdown carries it only while held (avoids double counting).
+    total: totalSuper + outside + (breakdown.offsetHeld ?? 0),
     agePension: agePensionAmt,
     pension: breakdown.pension,
     salaryIncome: breakdown.salaryIncome,

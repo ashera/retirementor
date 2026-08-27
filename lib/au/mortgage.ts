@@ -10,7 +10,11 @@ import type { MortgageDetail } from "./types";
  * interest on the outstanding balance.
  */
 export function mortgageAnnualCost(m: MortgageDetail): number {
-  if (m.type === "interest_only") return Math.max(0, m.balance * (m.interestRate / 100));
+  // An offset account reduces the interest charged (levied on `balance − offset`).
+  // For interest-only that directly lowers the annual cash cost; for P&I the fixed
+  // repayment is unchanged (the saving diverts to principal — see outstandingBalance).
+  const offset = Math.max(0, m.offset ?? 0);
+  if (m.type === "interest_only") return Math.max(0, (m.balance - offset)) * (m.interestRate / 100);
   return Math.max(0, m.annualRepayment);
 }
 
@@ -42,6 +46,22 @@ export function outstandingBalance(m: MortgageDetail, yearsElapsed: number): num
   const n = Math.max(0, yearsElapsed);
   const M = Math.max(0, m.annualRepayment);
   const r = m.interestRate / 100;
+  const offset = Math.max(0, m.offset ?? 0);
+  // With an offset, interest is charged on (balance − offset), so more of each fixed
+  // repayment goes to principal and the loan amortises faster. Step it year by year so
+  // the offset is capped at the balance (extra offset once B < offset doesn't
+  // over-credit). The offset cash is NOT consumed here — it only diverts the interest
+  // saving to principal. (yearsElapsed is the integer year index in the engine.)
+  if (offset > 0 && M > 0) {
+    let B = Math.max(0, m.balance);
+    const years = Math.floor(n);
+    for (let i = 0; i < years; i++) {
+      const interest = Math.max(0, B - offset) * r;
+      B = Math.max(0, B + interest - M);
+      if (B <= 0) return 0;
+    }
+    return B;
+  }
   if (M <= 0) return Math.max(0, m.balance);
   if (r <= 0) return Math.max(0, m.balance - M * n);
   const grown = Math.pow(1 + r, n);

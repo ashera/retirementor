@@ -81,6 +81,14 @@ export interface MortgageDetail {
   annualRepayment: number; // P&I fixed repayment, today's-nominal dollars
   payoffAge: number | null; // P&I: oldest person's age at payoff; interest-only: null
   strategy: MortgageStrategy;
+  // Optional offset account: cash held against the loan that reduces the interest
+  // charged (interest is levied on `balance − offset`), rather than earning a market
+  // return. Tax-free saving at the loan rate (PPOR interest isn't deductible). The
+  // offset cash stays a liquid, assessed (deemed) asset — it's preserved while the
+  // loan runs and freed into the outside pool when the loan clears. Interest-only:
+  // lowers the annual interest; P&I: same repayment → more to principal → clears
+  // sooner. Nominal (today's-dollars) figure, held constant in the loan's frame.
+  offset?: number;
 }
 
 // The principal home (PPOR), modelled as an asset for the household's net-worth
@@ -596,6 +604,7 @@ export interface YearBreakdown {
   rentCost: number; // rent paid this year after selling up (0 otherwise)
   mortgageCost: number;
   mortgageCleared: number; // one-off super lump sum used to clear the home loan
+  offsetHeld?: number; // offset-account cash held against the loan this year (today's $) — a liquid, assessed asset that isn't earning a market return; freed into the outside pool when the loan clears
   superTaxDraw?: number; // super drawn to settle outside-tax when the outside pool was emptied
   lumpSum: number; // one-off tax-free lump sum withdrawn from super this year (spent)
   recontribution: number; // after-tax amount moved from savings into super this year (non-concessional)

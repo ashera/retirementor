@@ -208,6 +208,23 @@ export default function HomeEditor({
                 suffix="%"
               />
 
+              <Field
+                label="Offset account"
+                value={Math.min(mortgage.offset ?? 0, mortgage.balance)}
+                onChange={(v) => onMortgage({ offset: v })}
+                min={0}
+                max={mortgage.balance}
+                step={5_000}
+                prefix="$"
+                hint={
+                  (mortgage.offset ?? 0) > 0
+                    ? `Cash offsetting the loan — saves ${fmtCurrency(
+                        Math.round(Math.min(mortgage.offset ?? 0, mortgage.balance) * (mortgage.interestRate / 100)),
+                      )}/yr in interest (tax-free, at your loan rate) instead of earning a market return. Still counts as your savings for net worth and the Age Pension.`
+                    : "Money in an offset account reduces the interest charged — a tax-free saving at your loan rate — rather than earning an investment return. Leave at $0 if you don’t have one."
+                }
+              />
+
               {isPI ? (
                 <>
                   <Field
