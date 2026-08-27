@@ -69,6 +69,23 @@ export function outstandingBalance(m: MortgageDetail, yearsElapsed: number): num
 }
 
 /**
+ * The age a P&I loan is paid off, derived from the SAME year-by-year amortisation the
+ * engine uses to decide when the loan clears (offset-aware — an offset diverts each
+ * repayment's interest saving to principal, so the loan clears sooner). Returns null
+ * for an interest-only loan, or a P&I loan whose repayment can't out-run the interest
+ * (it never meaningfully amortises → "runs for life"). This keeps the displayed payoff
+ * age and the "until age X" labels honest against what the projection really does.
+ */
+export function mortgagePayoffAge(m: MortgageDetail, oldestAgeNow: number): number | null {
+  if (m.type !== "principal_interest") return null;
+  if (m.balance <= 0.5) return Math.round(oldestAgeNow);
+  for (let n = 1; n <= 100; n++) {
+    if (outstandingBalance(m, n) <= 0.5) return Math.round(oldestAgeNow + n);
+  }
+  return null; // still not cleared after 100 years → effectively never amortises
+}
+
+/**
  * Suggested payoff age for a P&I loan, from the standard amortisation formula:
  *   n = -ln(1 - i·B/M) / ln(1+i)   (monthly i, repayment M, balance B)
  * Returns null when the repayment doesn't even cover the interest (never

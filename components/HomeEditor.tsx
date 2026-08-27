@@ -2,7 +2,7 @@
 
 import Field from "@/components/Field";
 import { fmtCurrency } from "@/lib/au/format";
-import { mortgageAnnualCost, suggestPayoffAge } from "@/lib/au/mortgage";
+import { mortgageAnnualCost, suggestPayoffAge, mortgagePayoffAge } from "@/lib/au/mortgage";
 import type { HomeDetail, HomeTenure, MortgageDetail } from "@/lib/au/types";
 
 // The family home editor — tenure (optional), the home as an exempt asset (value +
@@ -106,7 +106,13 @@ export default function HomeEditor({
   const isPI = mortgage.type === "principal_interest";
   const cost = mortgageAnnualCost(mortgage);
   const equity = Math.max(0, home.value - (tenure === "mortgage" ? mortgage.balance : 0));
-  const suggested = suggestPayoffAge(mortgage.balance, mortgage.interestRate, mortgage.annualRepayment, oldestAtRetire);
+  // The payoff age is DERIVED from the loan (balance × rate × repayment × offset) — the
+  // engine clears the loan off the real amortised balance, not a stored age — so compute
+  // it here and re-derive + store it on every loan edit (patchMortgage), keeping the
+  // display and every "until age X" label honest against what the projection does.
+  const computedPayoff = mortgagePayoffAge(mortgage, oldestAtRetire);
+  const patchMortgage = (patch: Partial<MortgageDetail>) =>
+    onMortgage({ ...patch, payoffAge: mortgagePayoffAge({ ...mortgage, ...patch }, oldestAtRetire) });
 
   return (
     <div className="space-y-4">
@@ -184,13 +190,13 @@ export default function HomeEditor({
                   { value: "principal_interest", label: "Principal & interest" },
                   { value: "interest_only", label: "Interest-only" },
                 ]}
-                onChange={(v) => onMortgage({ type: v as MortgageDetail["type"] })}
+                onChange={(v) => patchMortgage({ type: v as MortgageDetail["type"] })}
               />
 
               <Field
                 label="Balance owing"
                 value={mortgage.balance}
-                onChange={(v) => onMortgage({ balance: v })}
+                onChange={(v) => patchMortgage({ balance: v })}
                 min={0}
                 max={1_000_000}
                 step={5_000}
@@ -201,7 +207,7 @@ export default function HomeEditor({
               <Field
                 label="Interest rate"
                 value={mortgage.interestRate}
-                onChange={(v) => onMortgage({ interestRate: v })}
+                onChange={(v) => patchMortgage({ interestRate: v })}
                 min={1}
                 max={12}
                 step={0.1}
@@ -211,7 +217,7 @@ export default function HomeEditor({
               <Field
                 label="Offset account"
                 value={Math.min(mortgage.offset ?? 0, mortgage.balance)}
-                onChange={(v) => onMortgage({ offset: v })}
+                onChange={(v) => patchMortgage({ offset: v })}
                 min={0}
                 max={mortgage.balance}
                 step={5_000}
@@ -230,7 +236,7 @@ export default function HomeEditor({
                   <Field
                     label="Repayments"
                     value={mortgage.annualRepayment}
-                    onChange={(v) => onMortgage({ annualRepayment: v })}
+                    onChange={(v) => patchMortgage({ annualRepayment: v })}
                     min={0}
                     max={120_000}
                     step={600}
@@ -238,31 +244,29 @@ export default function HomeEditor({
                     suffix="/yr"
                     hint={`about ${fmtCurrency(Math.round(mortgage.annualRepayment / 12))} a month`}
                   />
-                  <div>
-                    <Field
-                      label="Paid off by age"
-                      value={mortgage.payoffAge ?? suggested ?? oldestAtRetire + 10}
-                      onChange={(v) => onMortgage({ payoffAge: v })}
-                      min={oldestAtRetire}
-                      max={lifeExpectancy}
-                      step={1}
-                      suffix="yrs"
-                    />
-                    {suggested != null && suggested !== mortgage.payoffAge && (
-                      <button
-                        type="button"
-                        onClick={() => onMortgage({ payoffAge: suggested })}
-                        className="mt-1 text-xs text-accent underline-offset-2 hover:underline"
-                      >
-                        Work it out from balance & rate → age {suggested}
-                      </button>
-                    )}
-                    {suggested == null && (
-                      <p className="mt-1 text-xs text-amber-300">
-                        These repayments barely cover the interest — the loan hardly shrinks.
-                      </p>
+                  {/* Paid-off age is DERIVED (not a manual entry) — the engine clears the
+                      loan off the real amortised balance, so we compute it from balance,
+                      rate, repayments and any offset, and it updates live as you edit. */}
+                  <div className="flex items-baseline justify-between gap-3">
+                    <span className="text-sm font-medium text-slate-200">Paid off by age</span>
+                    {computedPayoff == null ? (
+                      <span className="text-sm font-semibold text-amber-300">runs for life</span>
+                    ) : (
+                      <span className="text-sm font-bold tabular-nums text-white">
+                        {computedPayoff}
+                        {computedPayoff > lifeExpectancy && (
+                          <span className="ml-1 text-xs font-medium text-muted">(beyond your plan)</span>
+                        )}
+                      </span>
                     )}
                   </div>
+                  <p className="-mt-2 text-xs text-muted">
+                    {computedPayoff == null
+                      ? "These repayments barely cover the interest — the loan hardly shrinks."
+                      : `Worked out from your balance, rate, repayments${
+                          (mortgage.offset ?? 0) > 0 ? " and offset" : ""
+                        } — raise the repayment to clear it sooner.`}
+                  </p>
                 </>
               ) : (
                 <div className="rounded-lg border border-line bg-panel px-3 py-2.5 text-xs text-muted">

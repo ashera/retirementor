@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { simulate } from "../lib/au/simulate";
 import { DEFAULT_CONFIG as cfg } from "../lib/au/config";
 import { DEFAULT_PLAN, type MortgageDetail, type RetirementPlan } from "../lib/au/types";
-import { suggestPayoffAge, mortgageAnnualCost, outstandingBalance } from "../lib/au/mortgage";
+import { suggestPayoffAge, mortgageAnnualCost, outstandingBalance, mortgagePayoffAge } from "../lib/au/mortgage";
 
 const base = (over: Partial<RetirementPlan> = {}): RetirementPlan => ({
   ...DEFAULT_PLAN,
@@ -148,6 +148,16 @@ describe("Offset account (in the projection)", () => {
       return r.rows.find((x) => x.age === 67)!.breakdown.mortgageCleared;
     };
     expect(clearedLump(60_000)).toBeLessThan(clearedLump(undefined)); // offset covers part → less super drawn
+  });
+
+  it("derives the payoff age from the amortisation (matches the engine, offset-aware)", () => {
+    // Same amortisation the engine clears on: piLoan clears at age 72 (see the P&I test).
+    expect(mortgagePayoffAge(piLoan, 60)).toBe(72);
+    // An offset diverts interest to principal → clears sooner.
+    expect(mortgagePayoffAge({ ...piLoan, offset: 60_000 }, 60)!).toBeLessThan(72);
+    // Interest-only never amortises; a repayment that only covers the interest doesn't either.
+    expect(mortgagePayoffAge(ioLoan, 60)).toBeNull();
+    expect(mortgagePayoffAge({ ...piLoan, annualRepayment: 9_000 }, 60)).toBeNull(); // 150k × 6% = 9k
   });
 
   it("frees the offset into the outside pool once a P&I loan pays off", () => {
