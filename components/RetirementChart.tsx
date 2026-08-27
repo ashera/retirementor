@@ -103,6 +103,7 @@ type ChartRow = Partial<YearRow> & {
   propertyNW?: number;
   pensionSuper?: number; // tax-free pension pool (opening); pensionSuper + accumSuper = totalSuper
   accumSuper?: number; // taxed accumulation pool (opening)
+  offset?: number; // offset-account cash held against the loan (a net-worth asset, not spendable while held)
 };
 
 function AssetsTooltip({
@@ -124,18 +125,24 @@ function AssetsTooltip({
   const r = payload[0].payload;
   const home = showHome ? Math.max(0, r.homeEquity ?? 0) : 0;
   const property = showHome ? Math.max(0, r.propertyNW ?? 0) : 0;
+  const offset = showHome ? Math.max(0, r.offset ?? 0) : 0;
   const events = eventsByAge?.get(r.age) ?? [];
   return (
     <div className="rounded-lg border border-line bg-panel px-3 py-2 text-sm shadow-xl">
       <div className="font-semibold text-white">{ages ? dualAgeLabel(ages, r.age) : `Age ${r.age}`}</div>
       {r.total !== undefined && (
         <div className="tabular-nums text-slate-200">
-          {showHome ? "Net worth" : "Total"} {fmtCurrency(r.total + home + property)}
+          {showHome ? "Net worth" : "Total"} {fmtCurrency(r.total + home + property + offset)}
         </div>
       )}
       {showHome && r.homeEquity !== undefined && (
         <div className="tabular-nums text-slate-400">
           Home equity {fmtCurrency(home)}
+        </div>
+      )}
+      {showHome && offset > 0 && (
+        <div className="tabular-nums" style={{ color: "#fbbf24" }}>
+          Offset account {fmtCurrency(offset)}
         </div>
       )}
       {showHome && property > 0 && (
@@ -288,6 +295,8 @@ export default function RetirementChart({
       propertyNW: Math.max(0, (r.propertyEquity ?? 0) + (r.breakdown?.propertyProceeds ?? 0)),
       pensionSuper: isAccum ? 0 : r.breakdown?.pensionSuper ?? 0,
       accumSuper: isAccum ? r.totalSuper ?? 0 : r.breakdown?.accumSuper ?? 0,
+      // Offset cash is already CPI-real (like home equity), so it isn't rescaled by cpiBasis.
+      offset: Math.max(0, r.breakdown?.offsetHeld ?? 0),
     });
   }
   if (baseline) {
@@ -374,7 +383,9 @@ export default function RetirementChart({
   const headroomFrac = markerRows > 0 ? Math.min(0.4, (rowTopPx + markerRows * rowStepPx + 4) / height) : 0;
   const stackTop = (d: ChartRow) => {
     const sup = hasSplit ? (d.accumSuper ?? 0) + (d.pensionSuper ?? 0) : d.totalSuper ?? 0;
-    const extra = showHome ? Math.max(0, d.homeEquity ?? 0) + Math.max(0, d.propertyNW ?? 0) : 0;
+    const extra = showHome
+      ? Math.max(0, d.homeEquity ?? 0) + Math.max(0, d.propertyNW ?? 0) + Math.max(0, d.offset ?? 0)
+      : 0;
     return Math.max(sup + (d.outside ?? 0) + extra, d.baselineTotal ?? 0);
   };
   const dataMax = Math.max(1, ...data.map(stackTop));
@@ -465,6 +476,10 @@ export default function RetirementChart({
             <stop offset="0%" stopColor="#fb923c" stopOpacity={0.4} />
             <stop offset="100%" stopColor="#fb923c" stopOpacity={0.04} />
           </linearGradient>
+          <linearGradient id="offsetFill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#fbbf24" stopOpacity={0.45} />
+            <stop offset="100%" stopColor="#fbbf24" stopOpacity={0.04} />
+          </linearGradient>
         </defs>
         <CartesianGrid strokeDasharray="3 3" stroke="#232c40" vertical={false} />
         <XAxis
@@ -521,6 +536,18 @@ export default function RetirementChart({
             strokeWidth={2}
             fill="url(#propertyFill)"
             name="Investment property"
+            isAnimationActive={animate}
+          />
+        )}
+        {showHome && (
+          <Area
+            type="monotone"
+            dataKey="offset"
+            stackId="1"
+            stroke="#fbbf24"
+            strokeWidth={2}
+            fill="url(#offsetFill)"
+            name="Offset account"
             isAnimationActive={animate}
           />
         )}

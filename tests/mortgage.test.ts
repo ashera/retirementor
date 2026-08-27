@@ -3,6 +3,7 @@ import { simulate } from "../lib/au/simulate";
 import { DEFAULT_CONFIG as cfg } from "../lib/au/config";
 import { DEFAULT_PLAN, type MortgageDetail, type RetirementPlan } from "../lib/au/types";
 import { suggestPayoffAge, mortgageAnnualCost, outstandingBalance, mortgagePayoffAge } from "../lib/au/mortgage";
+import { rowNetWorth } from "../lib/au/networth";
 
 const base = (over: Partial<RetirementPlan> = {}): RetirementPlan => ({
   ...DEFAULT_PLAN,
@@ -126,11 +127,13 @@ describe("Offset account (in the projection)", () => {
     expect(spendAt(r, 60)).toBe(59_000); // 50k spend + (200k − 50k) × 6% = 50k + 9k (was 62k)
   });
 
-  it("counts the offset cash as liquid net worth while the loan runs", () => {
-    const r = simulate(base({ outsideSuper: 0, mortgage: { ...ioLoan, offset: 50_000 } }), cfg);
-    const row60 = r.rows.find((x) => x.age === 60)!;
-    expect(row60.breakdown.offsetHeld).toBe(50_000); // today's dollars at t=0
-    expect(row60.total).toBeGreaterThan(740_000); // 700k super + ~50k offset (outside = 0)
+  it("counts the offset cash as net worth (not the spendable funding pool)", () => {
+    const withOff = simulate(base({ outsideSuper: 0, mortgage: { ...ioLoan, offset: 50_000 } }), cfg);
+    const noOff = simulate(base({ outsideSuper: 0, mortgage: ioLoan }), cfg);
+    const at60 = (r: ReturnType<typeof simulate>) => r.rows.find((x) => x.age === 60)!;
+    expect(at60(withOff).breakdown.offsetHeld).toBe(50_000); // today's dollars at t=0
+    expect(at60(withOff).total).toBe(at60(noOff).total); // funding pool (super + outside) unchanged
+    expect(rowNetWorth(at60(withOff)) - rowNetWorth(at60(noOff))).toBe(50_000); // net worth = +offset exactly
   });
 
   it("assesses the offset for the Age Pension (a deemed financial asset)", () => {

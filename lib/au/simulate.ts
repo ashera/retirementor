@@ -1928,10 +1928,10 @@ function row(
     age,
     totalSuper,
     outside,
-    // Net financial worth includes offset-account cash held against the loan (a liquid
-    // asset that just isn't earning a market return); once the loan clears it's inside
-    // `outside`, so the breakdown carries it only while held (avoids double counting).
-    total: totalSuper + outside + (breakdown.offsetHeld ?? 0),
+    // `total` is the spendable funding pool (super + outside). Offset-account cash held
+    // against the loan is NOT spendable while the loan runs, so it lives in NET WORTH
+    // (rowNetWorth) alongside home equity, not here — the breakdown carries offsetHeld.
+    total: totalSuper + outside,
     agePension: agePensionAmt,
     pension: breakdown.pension,
     salaryIncome: breakdown.salaryIncome,

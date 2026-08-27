@@ -1775,6 +1775,9 @@ export default function PlannerApp({
           )}
           <LegendDot color="#38bdf8" label="Outside super" />
           {balanceView === "networth" && <LegendDot color="#64748b" label="Home equity" />}
+          {balanceView === "networth" && (plan.mortgage?.offset ?? 0) > 0 && (
+            <LegendDot color="#fbbf24" label="Offset account" />
+          )}
           {balanceView === "networth" && hasInvestmentProperty(plan) && (
             <LegendDot color="#fb923c" label="Investment property" />
           )}
