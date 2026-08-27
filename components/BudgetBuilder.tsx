@@ -593,11 +593,18 @@ function SetupStep({
         <div>
           <div className="mb-2 text-sm font-semibold text-slate-200">How your budget compares</div>
           <div className="rounded-xl border border-line bg-panel-2 px-4 py-3">
-            <div className="flex items-center justify-between gap-3">
+            <div className="flex items-start justify-between gap-3">
               <div className="text-sm font-semibold text-white">Your budget</div>
-              <div className="text-sm font-bold tabular-nums text-white">
-                {fmtCurrency(total)}
-                <span className="ml-0.5 text-[11px] font-medium text-muted">/yr</span>
+              <div className="text-right">
+                <div className="text-sm font-bold tabular-nums text-white">
+                  {fmtCurrency(total + loanYr)}
+                  <span className="ml-0.5 text-[11px] font-medium text-muted">/yr</span>
+                </div>
+                {loanYr > 0 && (
+                  <div className="text-[11px] tabular-nums text-muted">
+                    {fmtCurrency(total)} living + {fmtCurrency(loanYr)} loan
+                  </div>
+                )}
               </div>
             </div>
             <div className="mt-2.5 space-y-1.5 border-t border-line pt-2.5">
@@ -621,6 +628,11 @@ function SetupStep({
                 );
               })}
             </div>
+            {loanYr > 0 && (
+              <p className="mt-2.5 border-t border-line pt-2 text-[11px] text-muted">
+                ASFA benchmarks cover living costs only — your home loan sits on top.
+              </p>
+            )}
           </div>
           <button
             type="button"
