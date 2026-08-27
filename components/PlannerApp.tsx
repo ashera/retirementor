@@ -603,7 +603,13 @@ export default function PlannerApp({
     return () => clearTimeout(t);
   }, [notice]);
 
-  const result = useMemo(() => simulate(deferredPlan, config), [deferredPlan, config]);
+  // The confidence hero, modals and narrative read the LIVE result, so a scenario LOAD
+  // shows the correct numbers immediately. The charts read a DEFERRED result (below) so a
+  // slider drag still coalesces their heavy Recharts reconcile. (Reading the charts off
+  // the live plan would flash the previous/default scenario in the hero while the deferred
+  // value caught up — the "Bert's running the numbers" spinner never getting a chance.)
+  const result = useMemo(() => simulate(plan, config), [plan, config]);
+  const deferredResult = useMemo(() => simulate(deferredPlan, config), [deferredPlan, config]);
   // Shared, referentially-stable age-axis info for every chart (recomputed only when the
   // deferred plan settles — so it never churns the memoised chart elements mid-drag).
   const deferredAges = useMemo(() => ageGapInfo(deferredPlan), [deferredPlan]);
@@ -644,7 +650,7 @@ export default function PlannerApp({
   const successPct = mc ? Math.round(mc.successRate * 100) : null;
   const successTone: "accent" | "amber" | "red" =
     !mc ? "amber" : mc.successRate >= 0.85 ? "accent" : mc.successRate >= 0.6 ? "amber" : "red";
-  const gs = useMemo(() => whatWillItTake(deferredPlan, config), [deferredPlan, config]);
+  const gs = useMemo(() => whatWillItTake(plan, config), [plan, config]);
 
   // Prudent max spend: the most you can spend while Monte Carlo success still
   // clears the shared 85% bar (matching the What-If safe spend and the boost
@@ -1191,7 +1197,7 @@ export default function PlannerApp({
       : undefined;
     return (
       <RetirementChart
-        result={result}
+        result={deferredResult}
         bands={bands}
         showHome={balanceView === "networth"}
         baseline={baselineResult}
@@ -1210,14 +1216,14 @@ export default function PlannerApp({
       />
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [result, deferredPlan, deferredAges, balanceView, baselineResult, baselineLabel, selectedAge, lifeEvents, config]);
+  }, [deferredResult, deferredPlan, deferredAges, balanceView, baselineResult, baselineLabel, selectedAge, lifeEvents, config]);
 
   // The income + tax + fan charts are the other heavy Recharts children — memoise their
   // elements on the same deferred inputs so the high-priority slider render skips them
   // too (they only re-render once the deferred plan settles).
   const incomeChartEl = useMemo(() => (
     <IncomeChart
-      result={result}
+      result={deferredResult}
       minDrawdownBands={config.minDrawdownBands}
       onSelectYear={(age) => {
         track("Year breakdown opened", { chart: "income" });
@@ -1226,10 +1232,10 @@ export default function PlannerApp({
       ages={deferredAges}
     />
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  ), [result, deferredAges, config]);
+  ), [deferredResult, deferredAges, config]);
   const taxChartEl = useMemo(() => (
     <TaxChart
-      result={result}
+      result={deferredResult}
       onSelectYear={(age) => {
         track("Year breakdown opened", { chart: "tax" });
         setTaxAge(age);
@@ -1237,19 +1243,19 @@ export default function PlannerApp({
       ages={deferredAges}
     />
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  ), [result, deferredAges]);
+  ), [deferredResult, deferredAges]);
   const fanChartEl = useMemo(() => (
     mc ? (
       <FanChart
         fan={mc.fan}
-        retirementAge={result.retirementAge}
-        agePensionAge={result.agePensionAge}
+        retirementAge={deferredResult.retirementAge}
+        agePensionAge={deferredResult.agePensionAge}
         onSelectAge={setFanAge}
         ages={deferredAges}
       />
     ) : null
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  ), [mc, result, deferredAges]);
+  ), [mc, deferredResult, deferredAges]);
 
   const spendPhrase = isStaged
     ? `staged spending — go-go ${fmtCurrency(stages.goGo)}, slow-go ${fmtCurrency(stages.slowGo)} from ${stages.slowGoAge}, no-go ${fmtCurrency(stages.noGo)} from ${stages.noGoAge} (go-go is ${benchmark})`
