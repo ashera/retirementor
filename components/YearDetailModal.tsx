@@ -89,7 +89,8 @@ export default function YearDetailModal({
   const isNetWorth = view === "networth";
   const nwHome = Math.max(0, row.homeEquity ?? 0);
   const nwProp = Math.max(0, (row.propertyEquity ?? 0) + (b.propertyProceeds ?? 0));
-  const nwTotal = rowNetWorth(row); // = flow.opening + nwHome + nwProp
+  const nwOffset = Math.max(0, b.offsetHeld ?? 0); // offset cash held against the loan
+  const nwTotal = rowNetWorth(row); // = flow.opening + nwHome + nwProp + nwOffset
   // Net worth at year end = the next year's start (or held flat on the final row).
   // The home/property change is whatever isn't explained by the savings drivers.
   const nwClosing = nextRow ? rowNetWorth(nextRow) : nwTotal;
@@ -378,16 +379,18 @@ export default function YearDetailModal({
             {isNetWorth ? (
               <p className="mt-2 border-t border-line pt-2 text-[11px] leading-snug text-muted">
                 Net worth is your <span className="text-slate-300">savings</span> (super + outside) plus
-                home &amp; property equity. The spending and funding below break down the savings part.
+                home &amp; property equity{nwOffset > 0 ? ` and offset cash (${fmtCurrency(nwOffset)})` : ""}.
+                The spending and funding below break down the savings part.
               </p>
             ) : (
-              (nwHome > 0 || nwProp > 0) && (
+              (nwHome > 0 || nwProp > 0 || nwOffset > 0) && (
                 <p className="mt-2 border-t border-line pt-2 text-[11px] leading-snug text-muted">
                   This tracks your <span className="text-slate-300">savings</span> (super + outside). Your
                   net worth also counts home equity ({fmtCurrency(nwHome)})
-                  {nwProp > 0 ? ` and investment property (${fmtCurrency(nwProp)})` : ""} — about{" "}
+                  {nwProp > 0 ? `, investment property (${fmtCurrency(nwProp)})` : ""}
+                  {nwOffset > 0 ? `${nwProp > 0 ? "" : ","} offset cash (${fmtCurrency(nwOffset)})` : ""} — about{" "}
                   <span className="text-slate-300">{fmtCurrency(nwTotal)}</span> all up at the start of this
-                  year. Those move with property prices, so they sit outside this money flow.
+                  year. Those sit outside this money flow.
                 </p>
               )
             )}

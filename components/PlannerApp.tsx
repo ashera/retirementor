@@ -2335,6 +2335,8 @@ export default function PlannerApp({
             <YearDetailModal
               row={row}
               plan={plan}
+              nextRow={result.rows.find((r) => r.age === selectedAge + 1)}
+              view={balanceView === "networth" ? "networth" : "savings"}
               onClose={() => setSelectedAge(null)}
               onPrev={() => setSelectedAge((a) => (a != null ? Math.max(min, a - 1) : a))}
               onNext={() => setSelectedAge((a) => (a != null ? Math.min(max, a + 1) : a))}
