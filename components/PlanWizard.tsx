@@ -477,7 +477,15 @@ export default function PlanWizard({
         {contribMode === "no" && (
           <p className="text-xs text-muted">Just the employer Super Guarantee, then — you can change this anytime.</p>
         )}
-        {contribMode === "yes" && draft.people.map((person, i) => (
+        {contribMode === "yes" && draft.people.map((person, i) => {
+          // The concessional cap covers the employer SG + any salary sacrifice, so the
+          // room to sacrifice is the cap less the SG (salary × SG rate). Anything above
+          // that is wasted — the engine caps total concessional at the cap — so we bound
+          // the field at the room and tell the user how much they've still got.
+          const sg = Math.max(0, person.salary * config.sgRate);
+          const room = Math.max(0, config.concessionalCap - sg);
+          const remaining = Math.max(0, room - person.voluntaryConcessional);
+          return (
           <div key={i} className="space-y-4">
             {isCouple && (
               <div className="text-xs font-semibold uppercase tracking-wide text-accent">
@@ -490,10 +498,14 @@ export default function PlanWizard({
                 value={person.voluntaryConcessional}
                 onChange={setPerson(i, "voluntaryConcessional")}
                 min={0}
-                max={config.concessionalCap}
+                max={room}
                 step={500}
                 prefix="$"
-                hint={`Concessional cap is ${fmtCurrency(config.concessionalCap)}/yr incl. the SG.`}
+                hint={
+                  room <= 0
+                    ? `Your employer SG (~${fmtCurrency(sg)}/yr) already reaches the ${fmtCurrency(config.concessionalCap)} concessional cap — no room to salary-sacrifice without going over.`
+                    : `Concessional cap ${fmtCurrency(config.concessionalCap)}/yr incl. your ~${fmtCurrency(sg)}/yr employer SG — ${fmtCurrency(remaining)} more you can add before the cap.`
+                }
               />
               <Field
                 label="After-tax contributions"
@@ -506,7 +518,8 @@ export default function PlanWizard({
               />
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
     ),
   };
