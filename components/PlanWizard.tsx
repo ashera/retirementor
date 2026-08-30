@@ -479,9 +479,11 @@ export default function PlanWizard({
         )}
         {contribMode === "yes" && draft.people.map((person, i) => {
           // The concessional cap covers the employer SG + any salary sacrifice, so the
-          // room to sacrifice is the cap less the SG (salary × SG rate). Anything above
-          // that is wasted — the engine caps total concessional at the cap — so we bound
-          // the field at the room and tell the user how much they've still got.
+          // room to sacrifice before hitting the cap is the cap less the SG (salary × SG
+          // rate). We surface that headroom but let the slider run to the full cap so the
+          // user can freely dial it up to max their cap (the engine caps the modelled
+          // concessional at the annual cap, so sliding past the room just holds total at
+          // the cap — it never over-contributes).
           const sg = Math.max(0, person.salary * config.sgRate);
           const room = Math.max(0, config.concessionalCap - sg);
           const remaining = Math.max(0, room - person.voluntaryConcessional);
@@ -498,13 +500,15 @@ export default function PlanWizard({
                 value={person.voluntaryConcessional}
                 onChange={setPerson(i, "voluntaryConcessional")}
                 min={0}
-                max={room}
+                max={config.concessionalCap}
                 step={500}
                 prefix="$"
                 hint={
                   room <= 0
-                    ? `Your employer SG (~${fmtCurrency(sg)}/yr) already reaches the ${fmtCurrency(config.concessionalCap)} concessional cap — no room to salary-sacrifice without going over.`
-                    : `Concessional cap ${fmtCurrency(config.concessionalCap)}/yr incl. your ~${fmtCurrency(sg)}/yr employer SG — ${fmtCurrency(remaining)} more you can add before the cap.`
+                    ? `Your employer SG (~${fmtCurrency(sg)}/yr) already reaches the ${fmtCurrency(config.concessionalCap)} concessional cap.`
+                    : remaining > 0
+                      ? `Concessional cap ${fmtCurrency(config.concessionalCap)}/yr incl. your ~${fmtCurrency(sg)}/yr employer SG — ${fmtCurrency(remaining)} more before you hit the cap.`
+                      : `✓ You've maxed the ${fmtCurrency(config.concessionalCap)} concessional cap (SG ${fmtCurrency(sg)} + ${fmtCurrency(room)} sacrifice). Anything above just holds at the cap — it isn't over-contributed.`
                 }
               />
               <Field
