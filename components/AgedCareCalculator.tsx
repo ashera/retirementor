@@ -172,15 +172,37 @@ export default function AgedCareCalculator() {
                     <input type="range" min={0} max={100} step={5} value={radSharePct} onChange={(e) => setRadSharePct(Number(e.target.value))} aria-label="Lump-sum share" className="mt-1 w-full accent-emerald-500" />
                   </div>
                 )}
+                <div className="mt-3 space-y-1.5 rounded-lg border border-line bg-panel-2 px-3 py-2.5 text-[11px] leading-snug text-muted">
+                  <p>
+                    <span className="font-semibold text-slate-200">RAD — Refundable Accommodation Deposit (lump sum).</span> A
+                    one-off deposit for your room, like an interest-free loan to the provider. It&apos;s refunded when you
+                    leave (less any agreed deductions) and is <span className="text-slate-200">exempt from the pension assets
+                    test</span> — but it ties up a large amount of capital.
+                  </p>
+                  <p>
+                    <span className="font-semibold text-slate-200">DAP — Daily Accommodation Payment.</span> Pay for the room
+                    as an ongoing daily charge instead — the unpaid room price × the {(AC.mpir * 100).toFixed(2)}% government
+                    rate (the MPIR). You <span className="text-slate-200">keep your capital</span> (so it stays assessable
+                    for the pension), but the DAP is a non-refundable cost for as long as you&apos;re in care.
+                  </p>
+                  <p>
+                    <span className="font-semibold text-slate-200">A mix</span> pays part as a RAD and charges the rest as a
+                    (smaller) DAP — a common middle ground.
+                  </p>
+                </div>
               </div>
 
-              {accom !== "dap" && (
-                <MoneySlider
-                  label="Room price"
-                  value={room} min={0} max={1_500_000} step={10_000} onChange={setRoom}
-                  hint={`The advertised room price. The national average is about ${fmtCurrency(AC.radNationalAvg)}.`}
-                />
-              )}
+              {/* The room price drives every option — the RAD lump, the daily DAP
+                  (unpaid room × MPIR), or the mix — so it always needs to be set. */}
+              <MoneySlider
+                label="Room price"
+                value={room} min={0} max={1_500_000} step={10_000} onChange={setRoom}
+                hint={
+                  accom === "dap"
+                    ? `The advertised room price — the daily payment (DAP) is this × the ${(AC.mpir * 100).toFixed(2)}% MPIR. National average about ${fmtCurrency(AC.radNationalAvg)}.`
+                    : `The advertised room price. The national average is about ${fmtCurrency(AC.radNationalAvg)}.`
+                }
+              />
 
               <div>
                 <div className="flex items-baseline justify-between">
