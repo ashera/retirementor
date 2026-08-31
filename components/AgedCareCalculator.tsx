@@ -80,6 +80,10 @@ export default function AgedCareCalculator() {
   const [room, setRoom] = useState(AC.radNationalAvg);
   const [radSharePct, setRadSharePct] = useState(50);
   const [years, setYears] = useState(3);
+  // RAD-vs-DAP comparison inputs.
+  const [investReturn, setInvestReturn] = useState(6); // expected pre-tax investment return, %
+  const [marginalTax, setMarginalTax] = useState(0); // marginal tax rate on earnings, %
+  const [partPension, setPartPension] = useState(false); // on an assets-tested part Age Pension?
 
   const residential = careType === "residential";
 
@@ -110,6 +114,21 @@ export default function AgedCareCalculator() {
   const retention = residential ? radRetention(radLump, years, AC) : 0;
   const refund = residential ? radRefund(radLump, years, AC) : 0;
   const totalOverStay = annualFees * years + retention;
+
+  // ── RAD vs DAP: what return is the RAD lump effectively earning? ──────────
+  // Paying $1 of RAD avoids $1 × MPIR of DAP each year — a tax-free, risk-free
+  // "return" of the MPIR. Net of the retention it loses, plus any Age Pension the
+  // exempt RAD preserves (assets-test taper = $3/fortnight per $1,000 ≈ 7.8%/yr).
+  const rate = (x: number) => `${(x * 100).toFixed(1)}%`;
+  const pensionTaperPa = 0.078; // Age Pension assets-test taper, annualised
+  // Retention is 2%/yr for up to 5 years; annualise it over the actual stay.
+  const retentionDragPa = (AC.radRetentionPctPerYear * Math.min(years, AC.radRetentionMaxYears)) / Math.max(1, years);
+  const radEffReturn = AC.mpir - retentionDragPa + (partPension ? pensionTaperPa : 0); // tax-free
+  const taxFrac = marginalTax / 100;
+  const investAfterTax = (investReturn / 100) * (1 - taxFrac);
+  const breakEvenPreTax = radEffReturn / Math.max(0.0001, 1 - taxFrac); // pre-tax return needed to match the RAD
+  const annualInvestAdvantage = room * (investAfterTax - radEffReturn); // >0 → investing + DAP wins
+  const radBetter = annualInvestAdvantage < 0;
 
   return (
     <div className="grid gap-6 lg:grid-cols-2">
@@ -410,6 +429,69 @@ export default function AgedCareCalculator() {
             </div>
           )}
         </div>
+
+        {/* ── RAD vs DAP: effective return on the lump sum ─────────── */}
+        {residential && room > 0 && (
+          <div className="rounded-2xl border border-line bg-panel p-5">
+            <div className="text-xs font-semibold uppercase tracking-wide text-accent">RAD vs DAP — is the lump sum better invested?</div>
+            <p className="mt-1 text-[11px] leading-snug text-muted">
+              Paying the room as a refundable lump sum (RAD) avoids the daily payment (DAP), so it effectively earns you
+              the MPIR — tax-free and risk-free. Compare that with keeping the {fmtCurrency(room)} invested and paying the DAP from the returns.
+            </p>
+
+            {/* Effective RAD return headline */}
+            <div className="mt-3 rounded-xl border border-accent/30 bg-accent/[0.06] p-3">
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="text-xs font-medium text-muted">The RAD effectively returns</span>
+                <span className="text-2xl font-bold tabular-nums text-white">{rate(radEffReturn)}</span>
+              </div>
+              <p className="mt-1 text-[11px] leading-snug text-muted">
+                MPIR {rate(AC.mpir)} − retention {rate(retentionDragPa)}{partPension ? <> + pension {rate(pensionTaperPa)}</> : null} — tax-free &amp; risk-free.
+                To beat it by investing you&apos;d need a pre-tax return above <span className="font-semibold text-slate-200">{rate(breakEvenPreTax)}</span>.
+              </p>
+            </div>
+
+            {/* Inputs */}
+            <div className="mt-3 space-y-3">
+              <div>
+                <div className="flex items-baseline justify-between">
+                  <label className="text-sm font-medium text-slate-200">Expected investment return (pre-tax)</label>
+                  <span className="text-sm font-bold tabular-nums text-white">{investReturn}%</span>
+                </div>
+                <input type="range" min={0} max={12} step={0.5} value={investReturn} onChange={(e) => setInvestReturn(Number(e.target.value))} aria-label="Expected investment return" className="mt-2 w-full accent-emerald-500" />
+              </div>
+              <div>
+                <div className="flex items-baseline justify-between">
+                  <label className="text-sm font-medium text-slate-200">Your tax rate on earnings</label>
+                  <span className="text-sm font-bold tabular-nums text-white">{marginalTax}%</span>
+                </div>
+                <input type="range" min={0} max={47} step={1} value={marginalTax} onChange={(e) => setMarginalTax(Number(e.target.value))} aria-label="Marginal tax rate on earnings" className="mt-2 w-full accent-emerald-500" />
+                <p className="mt-1 text-[11px] text-muted">Many retirees pay little or no tax — super pension-phase earnings are tax-free and low incomes are covered by SAPTO. Leave at 0% if unsure.</p>
+              </div>
+              <label className="flex cursor-pointer items-start gap-2 text-[11px] leading-snug text-muted">
+                <input type="checkbox" checked={partPension} onChange={(e) => setPartPension(e.target.checked)} className="mt-0.5 accent-emerald-500" />
+                <span>I receive an assets-tested part Age Pension — the exempt RAD preserves about {rate(pensionTaperPa)}/yr of pension the invested money would cost me.</span>
+              </label>
+            </div>
+
+            {/* Verdict */}
+            <div className={`mt-3 rounded-xl border p-3 ${radBetter ? "border-emerald-500/30 bg-emerald-500/[0.06]" : "border-amber-500/30 bg-amber-500/[0.06]"}`}>
+              <div className="text-sm font-semibold text-white">
+                {radBetter ? "Paying the RAD comes out ahead" : "Investing + paying the DAP comes out ahead"}
+              </div>
+              <p className="mt-1 text-[11px] leading-snug text-muted">
+                At a {investReturn}% return{marginalTax > 0 ? ` and ${marginalTax}% tax` : ", tax-free"}, your money earns {rate(investAfterTax)} after tax
+                vs the RAD&apos;s {rate(radEffReturn)}. {radBetter ? "Paying the RAD" : "Investing"} leaves you about{" "}
+                <span className="font-semibold text-slate-200">{fmtCurrency(Math.round(Math.abs(annualInvestAdvantage)))}/yr</span> better off on the {fmtCurrency(room)} room.
+              </p>
+            </div>
+
+            <p className="mt-2 text-[11px] leading-snug text-muted/75">
+              A simplified comparison of the accommodation choice only. It ignores investment risk (the RAD is government-guaranteed) and any
+              pension effect beyond the assets-test taper. General information, not advice.
+            </p>
+          </div>
+        )}
 
         <p className="text-[11px] leading-relaxed text-muted">
           General information only, a 2026-vintage estimate in today&apos;s dollars — not personal financial advice. Clinical
