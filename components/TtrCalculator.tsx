@@ -121,34 +121,31 @@ export default function TtrCalculator() {
   }, [salary, superBalance, capRoom, drawLimit]);
 
   const sweetS = Math.round(sweet.S / 100) * 100;
-  // Start the explore slider at $0 so the cap meter opens with the full room showing and
-  // counts down as you drag sacrifice up; the sweet-spot card offers a one-tap snap.
-  const [sacrifice, setSacrifice] = useState(0);
-  const S = clamp(sacrifice, 0, Math.max(0, Math.round(capRoom)));
+  // The slider defaults to — and tracks — the sweet spot, so Step 3 opens on the
+  // recommended amount. `custom` holds a manual override; null means "follow the sweet
+  // spot" (so it also updates as the Step 1 inputs change, until the user drags).
+  const [custom, setCustom] = useState<number | null>(null);
+  const capRoomRounded = Math.max(0, Math.round(capRoom));
+  const S = clamp(custom ?? sweetS, 0, capRoomRounded);
+  const atSweet = Math.abs(S - sweetS) < 50;
 
-  // Concessional-cap meter: the cap is filled by the employer SG plus your salary
-  // sacrifice; "remaining" counts down to zero as the sacrifice slider rises.
+  // Concessional-cap meter: SG + salary sacrifice fill the cap; "remaining" counts down.
   const capRemaining = Math.max(0, CAP - sg - S);
   const sgPct = clamp((sg / CAP) * 100, 0, 100);
   const sacPct = clamp((S / CAP) * 100, 0, 100);
 
-  // Take-home shortfall at the explore slider — drives the Step 2 hint. Take-home is fully
-  // replaced up to the sweet spot; past it the 10% drawdown limit leaves a gap.
-  const drawCapped = Math.min(drawNeeded(S), drawLimit);
-  const takeHomeGap = Math.max(0, currentTakeHome - (takeHomeOf(salary - S) + drawCapped));
+  // Outcome AT THE CURRENT SLIDER — Step 3 populates live from this. Take-home is fully
+  // replaced up to the sweet spot; past it the 10% drawdown limit leaves a shortfall.
+  const draw = Math.min(drawNeeded(S), drawLimit);
+  const takeHomeNow = takeHomeOf(salary - S) + draw;
+  const takeHomeGap = Math.max(0, currentTakeHome - takeHomeNow);
+  const saving = savingAt(S);
+  const intoSuper = S * (1 - CONTRIB_TAX) - d293Marginal(S);
+  const netToSuper = intoSuper - draw;
   const marginalPct = Math.round(((taxPlusMedicare(salary) - taxPlusMedicare(salary - 1000)) / 1000) * 100);
   const years = Math.max(0, retireAge - age);
-  const cumulative = savingAt(sweetS) * years;
+  const cumulative = saving * years;
   const eligible = age >= PRES_AGE;
-
-  // The breakdown shown on the sweet-spot card is computed at the sweet spot itself (not
-  // the explore slider), so it always shows the recommended outcome. By construction the
-  // sweet spot keeps take-home whole (its draw stays within the 10% limit).
-  const sweetDraw = Math.min(drawNeeded(sweetS), drawLimit);
-  const sweetSaving = savingAt(sweetS);
-  const sweetIntoSuper = sweetS * (1 - CONTRIB_TAX) - d293Marginal(sweetS);
-  const sweetNetSuper = sweetIntoSuper - sweetDraw;
-  const sweetTakeHome = takeHomeOf(salary - sweetS) + sweetDraw;
 
   return (
     <div className="grid gap-6 lg:grid-cols-2">
@@ -201,42 +198,55 @@ export default function TtrCalculator() {
           {/* $100 step so the slider can land exactly on the sweet spot (cap − SG is always
               a multiple of $100), instead of stopping $100 short on a coarser step. */}
           <div className="mt-4">
-            <Field label="Salary sacrifice" value={S} min={0} max={Math.max(100, Math.round(capRoom))} step={100} onChange={setSacrifice} prefix="$"
-              hint={
-                takeHomeGap > 0
-                  ? `Past the sweet spot: the 10% TTR limit can't replace all the take-home, so you'd be ${fmtCurrency(Math.round(takeHomeGap))}/yr worse off.`
-                  : "At this level the tax-free TTR pension fully replaces the take-home you sacrifice."
-              } />
+            <Field label="Salary sacrifice" value={S} min={0} max={Math.max(100, capRoomRounded)} step={100} onChange={setCustom} prefix="$" />
+            {atSweet ? (
+              <p className="mt-1.5 text-[11px] leading-snug text-accent">
+                ✓ We&apos;ve set this to your <span className="font-semibold">sweet spot</span> — the most you can sacrifice
+                without cutting your take-home. Drag it to explore other amounts.
+              </p>
+            ) : (
+              <p className="mt-1.5 text-[11px] leading-snug text-muted">
+                {takeHomeGap > 0
+                  ? `Past the sweet spot — the 10% TTR limit can't replace all the take-home, so you'd be ${fmtCurrency(Math.round(takeHomeGap))}/yr worse off. `
+                  : "The tax-free TTR pension fully replaces the take-home you sacrifice. "}
+                <button type="button" onClick={() => setCustom(null)} className="font-medium text-accent hover:underline">
+                  Reset to your sweet spot ({fmtCurrency(sweetS)})
+                </button>.
+              </p>
+            )}
           </div>
         </div>
 
         {/* ── Step 3 · your sweet spot ─────────────────────────── */}
         <div className="rounded-2xl border border-accent/30 bg-accent/[0.06] p-5">
-          <div className="text-xs font-semibold uppercase tracking-wide text-accent">Step 3 · Your TTR sweet spot</div>
-          <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-            <span className="text-3xl font-bold tabular-nums text-white">{fmtCurrency(sweetS)}</span>
+          <div className="text-xs font-semibold uppercase tracking-wide text-accent">Step 3 · Your outcome</div>
+          <div className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+            <span className="text-3xl font-bold tabular-nums text-white">{fmtCurrency(S)}</span>
             <span className="text-sm text-muted">salary sacrifice / year</span>
+            {atSweet && (
+              <span className="rounded-full bg-accent/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-accent">✓ Sweet spot</span>
+            )}
           </div>
           <div className="mt-1 text-sm text-slate-300">
-            Saves <span className="font-semibold tabular-nums text-accent">{fmtCurrency(Math.round(sweetSaving))}/yr</span> in
-            tax for the <span className="text-white">same take-home</span> — about{" "}
+            Saves <span className="font-semibold tabular-nums text-accent">{fmtCurrency(Math.round(saving))}/yr</span> in tax
+            {takeHomeGap > 0.5 ? " (but your take-home drops — see below)" : <> for the <span className="text-white">same take-home</span></>} — about{" "}
             <span className="font-semibold tabular-nums text-white">{fmtCurrency(Math.round(cumulative))}</span> over {years} year{years === 1 ? "" : "s"} to {retireAge}.
           </div>
-          {sweetS !== S && (
+          {!atSweet && (
             <button
               type="button"
-              onClick={() => setSacrifice(sweetS)}
+              onClick={() => setCustom(null)}
               className="mt-3 rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-ink transition hover:brightness-110"
             >
-              Set the slider to the sweet spot →
+              Back to your sweet spot ({fmtCurrency(sweetS)}) →
             </button>
           )}
           <div className="mt-4 border-t border-accent/20 pt-1">
-            <Row label="Tax saved (extra to super)" sub={`${marginalPct}% marginal − ${Math.round(CONTRIB_TAX * 100)}% contributions tax${d293Marginal(sweetS) > 0.5 ? " − Div 293" : ""}`} value={`${fmtCurrency(Math.round(sweetSaving))}/yr`} tone="text-accent" />
-            <Row label="Take-home pay" sub="unchanged — the whole point" value={`${fmtCurrency(Math.round(sweetTakeHome))}/yr`} />
-            <Row label="TTR pension drawn (tax-free)" sub={`within the 10% limit (${fmtCurrency(Math.round(drawLimit))}/yr)`} value={`${fmtCurrency(Math.round(sweetDraw))}/yr`} />
-            <Row label="Into super after 15% tax" value={`${fmtCurrency(Math.round(sweetIntoSuper))}/yr`} />
-            <Row label="Net added to super" sub="contribution in − pension drawn out" value={`${fmtCurrency(Math.round(sweetNetSuper))}/yr`} />
+            <Row label="Tax saved (extra to super)" sub={`${marginalPct}% marginal − ${Math.round(CONTRIB_TAX * 100)}% contributions tax${d293Marginal(S) > 0.5 ? " − Div 293" : ""}`} value={`${fmtCurrency(Math.round(saving))}/yr`} tone="text-accent" />
+            <Row label="Take-home pay" sub={takeHomeGap > 0.5 ? "reduced — TTR drawdown maxed out" : "unchanged — the whole point"} value={`${fmtCurrency(Math.round(takeHomeNow))}/yr`} tone={takeHomeGap > 0.5 ? "text-amber-400" : "text-slate-100"} />
+            <Row label="TTR pension drawn (tax-free)" sub={`limit ${fmtCurrency(Math.round(drawLimit))}/yr (10% of super)`} value={`${fmtCurrency(Math.round(draw))}/yr`} />
+            <Row label="Into super after 15% tax" value={`${fmtCurrency(Math.round(intoSuper))}/yr`} />
+            <Row label="Net added to super" sub="contribution in − pension drawn out" value={`${fmtCurrency(Math.round(netToSuper))}/yr`} tone={netToSuper >= 0 ? "text-slate-100" : "text-amber-400"} />
           </div>
         </div>
 
