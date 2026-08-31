@@ -24,13 +24,15 @@ const takeHomeOf = (salary: number) =>
 const taxPlusMedicare = (salary: number) => residentIncomeTax(Math.max(0, salary)) + medicareLevy(Math.max(0, salary));
 /** Income tax + Medicare saved by sacrificing S (earning S less). */
 const taxDropOf = (salary: number, S: number) => taxPlusMedicare(salary) - taxPlusMedicare(salary - S);
-/** Division 293: an extra 15% on concessional contributions once income-for-surcharge
- *  (salary + SG + sacrifice) tops the threshold, on the lesser of the contributions or
- *  the amount over the threshold. */
+/** Division 293: an extra 15% on concessional contributions when combined income tops
+ *  the $250k threshold. Combined income = income-for-surcharge (taxable, i.e. salary − S)
+ *  + low-tax contributions (SG + S) = salary + SG — the sacrifice cancels, so it's driven
+ *  by salary + SG, not the sacrifice. The extra tax hits the lesser of the concessional
+ *  contributions or the amount over the threshold. */
 const div293Of = (salary: number, sg: number, S: number) => {
-  const surchargeIncome = salary + sg + S;
-  const taxedContrib = Math.max(0, Math.min(sg + S, surchargeIncome - D293_THRESHOLD));
-  return D293_RATE * taxedContrib;
+  const combined = salary + sg;
+  if (combined <= D293_THRESHOLD) return 0;
+  return D293_RATE * Math.max(0, Math.min(sg + S, combined - D293_THRESHOLD));
 };
 
 function Field({ label, value, min, max, step, onChange, prefix, suffix, hint }: {
@@ -81,25 +83,40 @@ export default function TtrCalculator() {
   // The take-home the pension must replace at sacrifice S (what earning S less costs you
   // after tax), and the net wealth the swap adds (the tax saved) at S.
   const drawNeeded = (S: number) => Math.max(0, S - taxDropOf(salary, S));
-  const savingAt = (S: number) => taxDropOf(salary, S) - CONTRIB_TAX * S - div293Of(salary, sg, S);
+  // The extra Div 293 the SACRIFICE causes (its baseline on the SG applies either way, so
+  // it isn't part of the strategy's saving).
+  const d293Marginal = (S: number) => div293Of(salary, sg, S) - div293Of(salary, sg, 0);
+  const savingAt = (S: number) => taxDropOf(salary, S) - CONTRIB_TAX * S - d293Marginal(S);
 
-  // Sweet spot: the largest sacrifice that (a) stays within the cap, (b) can be replaced
-  // within the 10% drawdown limit, (c) doesn't exceed salary. Saving rises with S (every
-  // dollar above the tax-free threshold beats the 15% contributions tax), so the optimum
-  // is the largest feasible S — found by binary search when the drawdown limit binds.
+  // Sweet spot: the sacrifice that maximises the tax saving, bounded by the cap, the 10%
+  // TTR drawdown, and salary. The saving per dollar is (marginal + Medicare − 15%): it's
+  // positive while taxable income stays above the tax-free threshold, then turns NEGATIVE
+  // once sacrifice pushes income below it (you'd pay 15% on income that was already
+  // tax-free). So for most incomes the optimum is the cap, but for low incomes it peaks
+  // short of it — scan for the actual peak, then apply the drawdown limit.
   const sweet = useMemo(() => {
     const ceiling = Math.min(capRoom, salary);
     if (ceiling <= 0) return { S: 0, bind: "none" as const };
-    if (drawNeeded(ceiling) <= drawLimit) {
-      return { S: ceiling, bind: (capRoom <= salary ? "cap" : "salary") as "cap" | "salary" };
+    // Unconstrained peak of the saving over [0, ceiling].
+    let peakS = 0, peakVal = 0; // S = 0 (saving 0) is the floor — never sacrifice at a loss
+    for (let s = 100; s <= ceiling; s += 100) {
+      const v = savingAt(s);
+      if (v > peakVal) { peakVal = v; peakS = s; }
     }
-    let lo = 0, hi = ceiling;
-    for (let k = 0; k < 50; k++) {
-      const mid = (lo + hi) / 2;
-      if (drawNeeded(mid) > drawLimit) hi = mid;
-      else lo = mid;
+    // Most the 10% TTR pension can replace (drawNeeded rises monotonically with S).
+    let drawMax = ceiling;
+    if (drawNeeded(ceiling) > drawLimit) {
+      let lo = 0, hi = ceiling;
+      for (let k = 0; k < 50; k++) {
+        const mid = (lo + hi) / 2;
+        if (drawNeeded(mid) > drawLimit) hi = mid;
+        else lo = mid;
+      }
+      drawMax = lo;
     }
-    return { S: lo, bind: "drawdown" as const };
+    const S = Math.min(peakS, drawMax);
+    const bind = drawMax < peakS ? "drawdown" : peakS >= ceiling - 50 ? "cap" : "income";
+    return { S, bind: bind as "cap" | "drawdown" | "income" };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [salary, superBalance, capRoom, drawLimit]);
 
@@ -129,7 +146,7 @@ export default function TtrCalculator() {
   // sweet spot keeps take-home whole (its draw stays within the 10% limit).
   const sweetDraw = Math.min(drawNeeded(sweetS), drawLimit);
   const sweetSaving = savingAt(sweetS);
-  const sweetIntoSuper = sweetS * (1 - CONTRIB_TAX) - div293Of(salary, sg, sweetS);
+  const sweetIntoSuper = sweetS * (1 - CONTRIB_TAX) - d293Marginal(sweetS);
   const sweetNetSuper = sweetIntoSuper - sweetDraw;
   const sweetTakeHome = takeHomeOf(salary - sweetS) + sweetDraw;
 
@@ -215,7 +232,7 @@ export default function TtrCalculator() {
             </button>
           )}
           <div className="mt-4 border-t border-accent/20 pt-1">
-            <Row label="Tax saved (extra to super)" sub={`${marginalPct}% marginal − ${Math.round(CONTRIB_TAX * 100)}% contributions tax${div293Of(salary, sg, sweetS) > 0 ? " − Div 293" : ""}`} value={`${fmtCurrency(Math.round(sweetSaving))}/yr`} tone="text-accent" />
+            <Row label="Tax saved (extra to super)" sub={`${marginalPct}% marginal − ${Math.round(CONTRIB_TAX * 100)}% contributions tax${d293Marginal(sweetS) > 0.5 ? " − Div 293" : ""}`} value={`${fmtCurrency(Math.round(sweetSaving))}/yr`} tone="text-accent" />
             <Row label="Take-home pay" sub="unchanged — the whole point" value={`${fmtCurrency(Math.round(sweetTakeHome))}/yr`} />
             <Row label="TTR pension drawn (tax-free)" sub={`within the 10% limit (${fmtCurrency(Math.round(drawLimit))}/yr)`} value={`${fmtCurrency(Math.round(sweetDraw))}/yr`} />
             <Row label="Into super after 15% tax" value={`${fmtCurrency(Math.round(sweetIntoSuper))}/yr`} />
