@@ -243,12 +243,45 @@ export default function AgedCareCalculator() {
           {/* Means-test workings */}
           <div className="mt-4 rounded-xl border border-line bg-panel-2 p-3">
             <div className="text-xs font-medium text-muted">How the means test works out your fees</div>
-            <dl className="mt-2 grid grid-cols-2 gap-x-3 text-[11px] leading-snug">
-              <dt className="text-muted">Assessable assets</dt>
-              <dd className="text-right tabular-nums text-slate-200">{fmtCurrency(Math.round(assessable))}</dd>
-              <dt className="text-muted">Assessable income</dt>
-              <dd className="text-right tabular-nums text-slate-200">{fmtCurrency(Math.round(income))}/yr</dd>
-            </dl>
+            {homeInTest > 0 || radLump > 0 ? (
+              // Itemise how the assessable-assets figure is built when the home and/or a
+              // RAD lump adjust it.
+              <dl className="mt-2 text-[11px] leading-snug">
+                <div className="flex justify-between gap-3">
+                  <dt className="text-muted">Savings, super &amp; investments</dt>
+                  <dd className="tabular-nums text-slate-300">{fmtCurrency(Math.round(assets))}</dd>
+                </div>
+                {homeInTest > 0 && (
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-muted">
+                      + Former home {homeAction === "keep" ? `(capped at ${fmtCurrency(AC.homeValueCapMeansTest)})` : "(sold — full value)"}
+                    </dt>
+                    <dd className="tabular-nums text-slate-300">{fmtCurrency(Math.round(homeInTest))}</dd>
+                  </div>
+                )}
+                {radLump > 0 && (
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-muted">− RAD lump sum (exempt)</dt>
+                    <dd className="tabular-nums text-slate-300">−{fmtCurrency(Math.round(radLump))}</dd>
+                  </div>
+                )}
+                <div className="mt-1 flex justify-between gap-3 border-t border-line pt-1">
+                  <dt className="font-semibold text-slate-200">= Assessable assets</dt>
+                  <dd className="font-semibold tabular-nums text-slate-100">{fmtCurrency(Math.round(assessable))}</dd>
+                </div>
+                <div className="mt-0.5 flex justify-between gap-3">
+                  <dt className="text-muted">Assessable income</dt>
+                  <dd className="tabular-nums text-slate-300">{fmtCurrency(Math.round(income))}/yr</dd>
+                </div>
+              </dl>
+            ) : (
+              <dl className="mt-2 grid grid-cols-2 gap-x-3 text-[11px] leading-snug">
+                <dt className="text-muted">Assessable assets</dt>
+                <dd className="text-right tabular-nums text-slate-200">{fmtCurrency(Math.round(assessable))}</dd>
+                <dt className="text-muted">Assessable income</dt>
+                <dd className="text-right tabular-nums text-slate-200">{fmtCurrency(Math.round(income))}/yr</dd>
+              </dl>
+            )}
 
             {residential ? (
               <>
