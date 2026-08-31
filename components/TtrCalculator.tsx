@@ -104,8 +104,16 @@ export default function TtrCalculator() {
   }, [salary, superBalance, capRoom, drawLimit]);
 
   const sweetS = Math.round(sweet.S / 100) * 100;
-  const [sacrifice, setSacrifice] = useState(() => Math.round(sweet.S / 100) * 100);
+  // Start the explore slider at $0 so the cap meter opens with the full room showing and
+  // counts down as you drag sacrifice up; the sweet-spot card offers a one-tap snap.
+  const [sacrifice, setSacrifice] = useState(0);
   const S = clamp(sacrifice, 0, Math.max(0, Math.round(capRoom)));
+
+  // Concessional-cap meter: the cap is filled by the employer SG plus your salary
+  // sacrifice; "remaining" counts down to zero as the sacrifice slider rises.
+  const capRemaining = Math.max(0, CAP - sg - S);
+  const sgPct = clamp((sg / CAP) * 100, 0, 100);
+  const sacPct = clamp((S / CAP) * 100, 0, 100);
 
   // Outcome at the chosen sacrifice.
   const draw = drawNeeded(S);
@@ -180,6 +188,24 @@ export default function TtrCalculator() {
 
         {/* Explore */}
         <div className="rounded-2xl border border-line bg-panel p-5">
+          {/* Concessional-cap meter — remaining room counts down as you slide sacrifice up */}
+          <div className="mb-4">
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="text-sm font-medium text-slate-200">Concessional cap remaining</span>
+              <span className={`text-sm font-bold tabular-nums ${capRemaining <= 0.5 ? "text-amber-400" : "text-white"}`}>
+                {fmtCurrency(Math.round(capRemaining))}
+              </span>
+            </div>
+            <div className="mt-2 flex h-2.5 w-full overflow-hidden rounded-full bg-panel-2">
+              <div className="h-full bg-slate-500" style={{ width: `${sgPct}%` }} />
+              <div className="h-full bg-accent transition-[width] duration-150" style={{ width: `${sacPct}%` }} />
+            </div>
+            <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-muted">
+              <span className="flex items-center gap-1"><span aria-hidden className="inline-block h-2 w-2 rounded-full bg-slate-500" /> Employer SG {fmtCurrency(Math.round(sg))}</span>
+              <span className="flex items-center gap-1"><span aria-hidden className="inline-block h-2 w-2 rounded-full bg-accent" /> Salary sacrifice {fmtCurrency(Math.round(S))}</span>
+              <span className="ml-auto">of {fmtCurrency(CAP)} cap</span>
+            </div>
+          </div>
           <Field label="Explore: salary sacrifice" value={S} min={0} max={Math.max(500, Math.round(capRoom))} step={500} onChange={setSacrifice} prefix="$"
             hint={
               takeHomeGap > 0
