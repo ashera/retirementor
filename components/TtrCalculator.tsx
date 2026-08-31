@@ -206,7 +206,9 @@ export default function TtrCalculator() {
               <span className="ml-auto">of {fmtCurrency(CAP)} cap</span>
             </div>
           </div>
-          <Field label="Explore: salary sacrifice" value={S} min={0} max={Math.max(500, Math.round(capRoom))} step={500} onChange={setSacrifice} prefix="$"
+          {/* $100 step so the slider can land exactly on the sweet spot (cap − SG is always
+              a multiple of $100), instead of stopping $100 short on a coarser step. */}
+          <Field label="Explore: salary sacrifice" value={S} min={0} max={Math.max(100, Math.round(capRoom))} step={100} onChange={setSacrifice} prefix="$"
             hint={
               takeHomeGap > 0
                 ? `Past the sweet spot: the 10% TTR limit can't replace all the take-home, so you're ${fmtCurrency(Math.round(takeHomeGap))}/yr worse off.`
