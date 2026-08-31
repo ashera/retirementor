@@ -331,6 +331,30 @@ export default function AgedCareCalculator() {
                       : "At or above the supplement, so you pay the market room price (as a RAD, DAP, or a mix)."}
                   </p>
                 </div>
+
+                {/* Plain-English explainer for the three constants in the taper formulas. */}
+                <details className="mt-2 border-t border-line pt-2">
+                  <summary className="cursor-pointer text-[11px] font-medium text-muted hover:text-slate-200">
+                    What are {pct(AC.meansAssetTaper)}, {fmtCurrency(AC.hscAssetThreshold)} and {fmtCurrency(AC.ncccAssetThreshold)}?
+                  </summary>
+                  <dl className="mt-1.5 space-y-1.5 text-[11px] leading-snug text-muted">
+                    <div>
+                      <dt className="inline font-semibold text-slate-200">{pct(AC.meansAssetTaper)} — the asset taper.</dt>{" "}
+                      <dd className="inline">Each year you contribute {pct(AC.meansAssetTaper)} of your assessable assets above a threshold (income above its own threshold is added at {pct(AC.meansIncomeTaper)}).</dd>
+                    </div>
+                    <div>
+                      <dt className="inline font-semibold text-slate-200">{fmtCurrency(AC.hscAssetThreshold)} — the hotelling threshold.</dt>{" "}
+                      <dd className="inline">Below this you pay nothing towards the hotelling contribution (the everyday-services charge).</dd>
+                    </div>
+                    <div>
+                      <dt className="inline font-semibold text-slate-200">{fmtCurrency(AC.ncccAssetThreshold)} — the care threshold.</dt>{" "}
+                      <dd className="inline">The higher bar for the care contribution (NCCC) — you only start contributing towards your personal care once your assets pass it.</dd>
+                    </div>
+                  </dl>
+                  <p className="mt-1.5 text-[11px] leading-snug text-muted/75">
+                    Government figures (1 Jul 2026 vintage), indexed periodically. The daily amount is the annual contribution ÷ 364.
+                  </p>
+                </details>
               </>
             ) : (
               <p className="mt-2 border-t border-line pt-2 text-[11px] leading-snug text-muted">
