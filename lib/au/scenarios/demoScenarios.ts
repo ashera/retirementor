@@ -385,9 +385,9 @@ export const DEMO_SCENARIOS: DemoScenario[] = [
     slug: "aged-care-keep-home",
     title: "Aged care · keep the home + DAP",
     blurb:
-      "Margaret, a single homeowner (retired at 67 on $500k super + $150k outside + an $800k home, $52k/yr), needs 3 years of residential care from 85 — keeping her home and paying the accommodation as a Daily Accommodation Payment. Modelled cost ~$116k/yr, and her liquid savings run short at 87 while $800k of home equity sits idle. Illustrative general information, not advice.",
+      "Margaret, a single homeowner (retired at 67 on $500k super + $150k outside + an $800k home, $52k/yr), needs 3 years of residential care from 85 — keeping her home and paying the accommodation as a Daily Accommodation Payment. Modelled cost ~$120k/yr, and her liquid savings run short in her late 80s while $800k of home equity sits idle. Illustrative general information, not advice.",
     context:
-      "Aged-care case study (leg 1 of the structural-depth build) linked from the /learn aged-care articles. Same person as aged-care-sell-rad — only the FUNDING choice differs. Residential fees (2026 vintage): basic daily fee ~$23.9k + means-tested hotelling ~$8.1k + NCCC ~$39.2k + DAP on a ~$570k room at the 7.96% MPIR ~$45.4k ≈ $116.5k/yr. With the home kept but not paying accommodation, its $800k equity is illiquid, so the ~$650k of super+savings is exhausted by age 87. Shows the aged-care illiquidity trap. Not advice — the right choice is personal; see My Aged Care / a specialist.",
+      "Aged-care case study (leg 1 of the structural-depth build) linked from the /learn aged-care articles. Same person as aged-care-sell-rad — only the FUNDING choice differs. Residential fees (1 Jul 2026 vintage): basic daily fee ~$24.4k + means-tested hotelling ~$8.1k + NCCC ~$39.2k + DAP on a ~$570k room at the 8.43% MPIR ~$48.0k ≈ $119.7k/yr. With the home kept but not paying accommodation, its $800k equity is illiquid, so the ~$650k of super+savings is exhausted in her late 80s. Shows the aged-care illiquidity trap. Not advice — the right choice is personal; see My Aged Care / a specialist.",
     threadUrl: "",
     sortOrder: 100,
     data: agedCareKeepHome,

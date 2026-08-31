@@ -249,7 +249,7 @@ export default function AgedCareEditor({
                     </div>
                     <p className="mt-1 text-[11px] text-muted/70">
                       {(draft.accommodation ?? "dap") === "dap"
-                        ? "Paid daily (DAP): room price × MPIR ≈ 7.96%/yr."
+                        ? "Paid daily (DAP): room price × MPIR ≈ 8.43%/yr."
                         : (draft.accommodation ?? "dap") === "rad"
                           ? "Paid as a refundable lump sum (RAD) — no daily charge."
                           : "Split: a lump-sum RAD plus a daily (DAP) charge on the rest."}

@@ -6,7 +6,7 @@ import type { EngineConfig } from "@/lib/au/config";
 import type { RetirementPlan, YearBreakdown } from "@/lib/au/types";
 
 const clamp01 = (x: number) => (x < 0 ? 0 : x > 1 ? 1 : x);
-// Show real precision without trailing zeros: 0.0796 → "7.96%", 0.33 → "33%".
+// Show real precision without trailing zeros: 0.0843 → "8.43%", 0.33 → "33%".
 const pct = (x: number) => `${(x * 100).toFixed(2).replace(/\.?0+$/, "")}%`;
 
 const CARE_LABEL = { residential: "Residential", home: "At home" } as const;

@@ -313,23 +313,26 @@ export const DEFAULT_CONFIG: EngineConfig = {
     },
   },
 
-  // Aged care — 2026 vintage (post-1 Nov 2025 Aged Care Act). Indexed figures;
+  // Aged care — 1 Jul 2026 vintage (post-1 Nov 2025 Aged Care Act). Indexed figures;
   // re-verify at build (Dept. of Health/Ageing schedules + adviser tech refs).
   agedCare: {
     vintage: "2026",
-    basicDailyFee: 65.55,
+    basicDailyFee: 66.80, // from 1 Jul 2026 (85% of the single Age Pension); indexes 20 Mar / 20 Sep
     hotellingMaxDaily: 22.15,
     ncccMaxDaily: 107.32,
     ncccLifetimeCap: 137_917,
     ncccMaxYears: 4,
-    mpir: 0.0796, // Apr–Jun 2026 Maximum Permissible Interest Rate
+    mpir: 0.0843, // 8.43% — Maximum Permissible Interest Rate from 1 Jul 2026 (indexes quarterly)
     radNationalAvg: 570_000,
     radRetentionPctPerYear: 0.02,
     radRetentionMaxYears: 5,
-    homeValueCapMeansTest: 214_884, // 20 Mar 2026
+    homeValueCapMeansTest: 214_884, // 1 Jul 2026 former-home assessment cap
     formerHomeRentYieldNet: 0.03, // ~3% net rent on a kept, rented former home
     residentialLivingRetainedPct: 0.3, // keep ~30% of normal living spend for personal items/health; the fees cover the rest
     // Statutory means test — 1 Nov 2025 Aged Care Act (figures per health.gov.au).
+    // NOTE: the HSC/NCCC asset & income thresholds below are yet to be reconfirmed against
+    // the primary 1 Jul 2026 schedule (secondary sources conflict on the ~$502k NCCC figure);
+    // the taper rates, caps and accommodation figures are 1 Jul 2026 confirmed.
     meansAssetTaper: 0.078, // 7.8% p.a. of assets over the threshold
     meansIncomeTaper: 0.50, // 50% of income over the threshold
     hscAssetThreshold: 238_000,
@@ -338,7 +341,7 @@ export const DEFAULT_CONFIG: EngineConfig = {
     ncccIncomeThreshold: 131_279,
     maxAccommodationSupplement: 72.30, // per day (new/refurbished facilities, from 1 Jul 2026)
     accomAssetFreeArea: 64_500,
-    accomIncomeFreeArea: 35_313,
+    accomIncomeFreeArea: 35_521, // single income free area, 1 Jul 2026 ($35,521.20)
     accomAssetTaper: 0.175, // 17.5% p.a. — the only band reached before the DAC caps at the supplement
     accomIncomeTaper: 0.50,
     entryProbability: 0.33, // ~1 in 3 enter permanent residential care

@@ -176,7 +176,7 @@ export const KB_ARTICLES: KbArticle[] = [
             table: {
               headers: ["Fee", "What it is", "Amount (2026 vintage)"],
               rows: [
-                ["Basic daily fee", "Flat — everyone pays; 85% of the single Age Pension", "~$65.55/day (~$23,900/yr)"],
+                ["Basic daily fee", "Flat — everyone pays; 85% of the single Age Pension", "~$66.80/day (~$24,400/yr)"],
                 ["Hotelling", "**Means-tested** — meals, cleaning, laundry, heating (no cap)", "up to ~$22.15/day (~$8,100/yr)"],
                 ["Care contribution (NCCC)", "**Means-tested**, **capped** at $137,917 or 4 years", "up to ~$107.32/day (~$39,200/yr)"],
                 ["Accommodation", "Your room — paid as a RAD, a DAP, or a mix", "~$570k RAD, or ~$45k/yr DAP"],
@@ -231,7 +231,7 @@ export const KB_ARTICLES: KbArticle[] = [
         heading: "Residential care: four fees",
         body: [
           { list: [
-            "**Basic daily fee** — a flat everyday-living charge everyone pays, set at 85% of the single Age Pension (about **$65.55/day, ~$23,900/yr**). Not means-tested.",
+            "**Basic daily fee** — a flat everyday-living charge everyone pays, set at 85% of the single Age Pension (about **$66.80/day, ~$24,400/yr**). Not means-tested.",
             "**Hotelling contribution** — a means-tested charge for 'hotel' services (meals, cleaning, laundry, heating), up to about **$22.15/day (~$8,100/yr)**. No cap.",
             "**Non-Clinical Care Contribution (NCCC)** — a means-tested charge toward non-clinical personal care (bathing, dressing, mobility), up to about **$107.32/day (~$39,200/yr)** — but **capped**: it stops at **$137,917 over your lifetime, or after 4 years**, whichever comes first.",
             "**Accommodation** — what you pay for the room, as a **RAD** or a **DAP** (see [Paying for aged care](/learn/aged-care-funding)).",
@@ -245,7 +245,7 @@ export const KB_ARTICLES: KbArticle[] = [
           { list: [
             "**RAD — Refundable Accommodation Deposit**: a lump sum you pay for your room. It's **refundable** to you or your estate when you leave (less a small retained amount), and it's **exempt from the Age Pension assets test**.",
             "**DAP — Daily Accommodation Payment**: paying for the room as a daily charge instead of a lump sum — effectively interest on the unpaid room price at the MPIR.",
-            "**MPIR — Maximum Permissible Interest Rate**: the government rate that converts a room price into a DAP (currently about **7.96%**). A $570,000 room works out to roughly **$45,000/yr** as a DAP.",
+            "**MPIR — Maximum Permissible Interest Rate**: the government rate that converts a room price into a DAP (currently about **8.43%**). A $570,000 room works out to roughly **$48,000/yr** as a DAP.",
             "**NCCC / hotelling**: the two means-tested care and living charges above.",
           ] },
         ],
@@ -291,16 +291,16 @@ export const KB_ARTICLES: KbArticle[] = [
             table: {
               headers: ["", "RAD — lump sum", "DAP — daily"],
               rows: [
-                ["What you pay", "The room price upfront (e.g. ~$570k)", "Interest on the room price at the MPIR (~7.96%)"],
+                ["What you pay", "The room price upfront (e.g. ~$570k)", "Interest on the room price at the MPIR (~8.43%)"],
                 ["Refundable?", "**Yes** — to you or your estate, less a small retained share", "**No** — an ongoing cost that never comes back"],
                 ["Age Pension assets test", "**Exempt** — paying it can **lift** your pension", "The money stays assessable"],
                 ["Cash tied up", "A large lump sum", "Nothing large tied up"],
-                ["Typical cost", "Retention ~2%/yr, capped at 10%", "~$45k/yr on a $570k room"],
+                ["Typical cost", "Retention ~2%/yr, capped at 10%", "~$48k/yr on a $570k room"],
               ],
               caption: "Many people pay a combination of the two. Figures are a 2026 vintage.",
             },
           },
-          { formula: "DAP per year = unpaid room price × MPIR   (e.g. $570,000 × 7.96% ≈ $45,000)" },
+          { formula: "DAP per year = unpaid room price × MPIR   (e.g. $570,000 × 8.43% ≈ $48,000)" },
         ],
       },
       {
