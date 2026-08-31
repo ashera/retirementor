@@ -347,9 +347,15 @@ export default function AgedCareCalculator() {
           <div className="mt-2">
             {residential ? (
               <>
-                <FeeRow label="Basic daily fee" formula="flat — everyone pays this" value={resid.basic} />
-                <FeeRow label="Hotelling (meals, cleaning, laundry)" formula="means-tested, no cap" value={resid.hotelling} />
-                <FeeRow label="Care contribution (NCCC)" formula={`means-tested, capped at ${fmtCurrency(AC.ncccLifetimeCap)} / ${AC.ncccMaxYears} yrs`} value={resid.nccc} />
+                <FeeRow label="Basic daily fee" formula={`${fmtDay(AC.basicDailyFee)} × 365 — flat, everyone pays this`} value={resid.basic} />
+                <FeeRow label="Hotelling (meals, cleaning, laundry)" formula={`${fmtDay(w.hsc.daily)}${w.hsc.capped ? " (max)" : ""} × 365`} value={resid.hotelling} />
+                <FeeRow
+                  label="Care contribution (NCCC)"
+                  formula={w.nccc.applied
+                    ? `${fmtDay(w.nccc.daily)}${w.nccc.capped ? " (max)" : ""} × 365 — capped at ${fmtCurrency(AC.ncccLifetimeCap)} / ${AC.ncccMaxYears} yrs`
+                    : `$0 — not yet paying the full hotelling contribution`}
+                  value={resid.nccc}
+                />
                 {resid.dap > 0 && (
                   lowMeans
                     ? <FeeRow label="Accommodation contribution (DAC)" formula={`means-tested, government subsidises the rest`} value={resid.dap} />
