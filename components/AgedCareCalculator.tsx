@@ -4,10 +4,9 @@ import { useState } from "react";
 import Link from "next/link";
 import { fmtCurrency } from "@/lib/au/format";
 import { DEFAULT_CONFIG } from "@/lib/au/config";
-import { meansScore, residentialAnnualCost, homeCareAnnualCost, radRetention, radRefund } from "@/lib/au/agedCare";
+import { residentialAnnualCost, homeCareAnnualCost, radRetention, radRefund } from "@/lib/au/agedCare";
 
 const AC = DEFAULT_CONFIG.agedCare;
-const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
 
 type CareType = "residential" | "home";
 type Accom = "rad" | "dap" | "mix";
@@ -98,11 +97,15 @@ export default function AgedCareCalculator() {
     : 0; // in home care you still live at home — the residence is exempt
   const assessable = Math.max(0, assets + homeInTest - radLump);
   const means = { assets: assessable, income };
-  const score = meansScore(means, AC);
 
-  const resid = residentialAnnualCost({ means, radUnpaid }, AC);
+  const resid = residentialAnnualCost({ means, radUnpaid, applyLowMeans: true }, AC);
+  const w = resid.workings; // HSC / NCCC / accommodation means-test workings
+  const lowMeans = resid.lowMeans;
   const homeAnnual = homeCareAnnualCost(means, AC);
   const annualFees = residential ? resid.total : homeAnnual;
+
+  const fmtDay = (x: number) => `$${x.toFixed(2)}/day`;
+  const pct = (x: number) => `${(x * 100).toFixed(x * 100 % 1 === 0 ? 0 : 1)}%`;
 
   const retention = residential ? radRetention(radLump, years, AC) : 0;
   const refund = residential ? radRefund(radLump, years, AC) : 0;
@@ -237,19 +240,71 @@ export default function AgedCareCalculator() {
             {residential && retention > 0 && <span className="text-muted"> (incl. the deposit retention)</span>}.
           </div>
 
-          {/* Means score */}
+          {/* Means-test workings */}
           <div className="mt-4 rounded-xl border border-line bg-panel-2 p-3">
-            <div className="flex items-baseline justify-between">
-              <span className="text-xs font-medium text-muted">Your means-tested share</span>
-              <span className="text-sm font-bold tabular-nums text-white">{Math.round(score * 100)}%</span>
-            </div>
-            <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-panel">
-              <div className="h-full rounded-full bg-accent" style={{ width: `${clamp(score * 100, 0, 100)}%` }} />
-            </div>
-            <p className="mt-2 text-[11px] leading-snug text-muted">
-              You&apos;d pay {score >= 0.999 ? "the maximum" : `${Math.round(score * 100)}% of the maximum`} means-tested fees.
-              Below {fmtCurrency(AC.careAssetFreeArea)} in assessable assets you pay none; at/above {fmtCurrency(AC.careAssetFullArea)} you pay the most.
-            </p>
+            <div className="text-xs font-medium text-muted">How the means test works out your fees</div>
+            <dl className="mt-2 grid grid-cols-2 gap-x-3 text-[11px] leading-snug">
+              <dt className="text-muted">Assessable assets</dt>
+              <dd className="text-right tabular-nums text-slate-200">{fmtCurrency(Math.round(assessable))}</dd>
+              <dt className="text-muted">Assessable income</dt>
+              <dd className="text-right tabular-nums text-slate-200">{fmtCurrency(Math.round(income))}/yr</dd>
+            </dl>
+
+            {residential ? (
+              <>
+                {/* Hotelling contribution (HSC) */}
+                <div className="mt-2 border-t border-line pt-2">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="text-[11px] font-semibold text-slate-200">Hotelling contribution</span>
+                    <span className="text-[11px] font-bold tabular-nums text-white">{fmtDay(w.hsc.daily)}{w.hsc.capped ? " (max)" : ""}</span>
+                  </div>
+                  <p className="mt-0.5 text-[11px] leading-snug text-muted">
+                    {pct(AC.meansAssetTaper)} × (assets − {fmtCurrency(AC.hscAssetThreshold)}) = {fmtCurrency(Math.round(w.hsc.assetPart))}/yr
+                    {w.hsc.incomePart > 0 && <> + {pct(AC.meansIncomeTaper)} × (income − {fmtCurrency(AC.hscIncomeThreshold)}) = {fmtCurrency(Math.round(w.hsc.incomePart))}/yr</>}
+                    , ÷ 364 = {fmtDay(w.hsc.dailyUncapped)}
+                    {w.hsc.capped ? `, capped at ${fmtDay(AC.hotellingMaxDaily)}` : ""}.
+                  </p>
+                </div>
+
+                {/* Care contribution (NCCC) */}
+                <div className="mt-2 border-t border-line pt-2">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="text-[11px] font-semibold text-slate-200">Care contribution (NCCC)</span>
+                    <span className="text-[11px] font-bold tabular-nums text-white">{w.nccc.applied ? `${fmtDay(w.nccc.daily)}${w.nccc.capped ? " (max)" : ""}` : "$0.00/day"}</span>
+                  </div>
+                  <p className="mt-0.5 text-[11px] leading-snug text-muted">
+                    {w.nccc.applied ? (
+                      <>
+                        {pct(AC.meansAssetTaper)} × (assets − {fmtCurrency(AC.ncccAssetThreshold)})
+                        {w.nccc.incomePart > 0 && <> + {pct(AC.meansIncomeTaper)} × (income − {fmtCurrency(AC.ncccIncomeThreshold)})</>}
+                        , ÷ 364{w.nccc.capped ? `, capped at ${fmtDay(AC.ncccMaxDaily)}` : ""}. Stops at {fmtCurrency(AC.ncccLifetimeCap)} lifetime or {AC.ncccMaxYears} years.
+                      </>
+                    ) : (
+                      <>Not payable until you&apos;re paying the full hotelling contribution ({fmtDay(AC.hotellingMaxDaily)}).</>
+                    )}
+                  </p>
+                </div>
+
+                {/* Accommodation */}
+                <div className="mt-2 border-t border-line pt-2">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="text-[11px] font-semibold text-slate-200">Accommodation</span>
+                    <span className="text-[11px] font-bold tabular-nums text-white">{lowMeans ? `${fmtDay(w.accom.dac)} (subsidised)` : "market price"}</span>
+                  </div>
+                  <p className="mt-0.5 text-[11px] leading-snug text-muted">
+                    Your means-tested amount is {fmtDay(w.accom.mtaDaily)} vs the {fmtDay(AC.maxAccommodationSupplement)} supplement.{" "}
+                    {lowMeans
+                      ? "Below the supplement, so the government subsidises your room — you pay the lower means-tested contribution, not the advertised RAD/DAP."
+                      : "At or above the supplement, so you pay the market room price (as a RAD, DAP, or a mix)."}
+                  </p>
+                </div>
+              </>
+            ) : (
+              <p className="mt-2 border-t border-line pt-2 text-[11px] leading-snug text-muted">
+                Your Support-at-Home contribution scales with your means — from nothing as a full pensioner up to the
+                point where you&apos;d pay the full hotelling contribution ({fmtDay(AC.hotellingMaxDaily)}). Clinical care is free.
+              </p>
+            )}
           </div>
         </div>
 
@@ -262,7 +317,11 @@ export default function AgedCareCalculator() {
                 <FeeRow label="Basic daily fee" formula="flat — everyone pays this" value={resid.basic} />
                 <FeeRow label="Hotelling (meals, cleaning, laundry)" formula="means-tested, no cap" value={resid.hotelling} />
                 <FeeRow label="Care contribution (NCCC)" formula={`means-tested, capped at ${fmtCurrency(AC.ncccLifetimeCap)} / ${AC.ncccMaxYears} yrs`} value={resid.nccc} />
-                {radUnpaid > 0 && <FeeRow label="Daily room payment (DAP)" formula={`${fmtCurrency(Math.round(radUnpaid))} unpaid × ${(AC.mpir * 100).toFixed(2)}% MPIR`} value={resid.dap} />}
+                {resid.dap > 0 && (
+                  lowMeans
+                    ? <FeeRow label="Accommodation contribution (DAC)" formula={`means-tested, government subsidises the rest`} value={resid.dap} />
+                    : <FeeRow label="Daily room payment (DAP)" formula={`${fmtCurrency(Math.round(radUnpaid))} unpaid × ${(AC.mpir * 100).toFixed(2)}% MPIR`} value={resid.dap} />
+                )}
               </>
             ) : (
               <>

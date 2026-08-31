@@ -94,17 +94,33 @@ function pensionCheckpoint(
 function agedCareCheckpoint(b: YearBreakdown, careAge: number, roomPrice: number, config: EngineConfig): CheckpointResult {
   const AC = config.agedCare;
   const assets = Math.max(0, b.openingOutside) + b.openingSuper + Math.min(b.homeValue, AC.homeValueCapMeansTest);
-  const score = Math.min(1, Math.max(0, (assets - AC.careAssetFreeArea) / (AC.careAssetFullArea - AC.careAssetFreeArea)));
+  const income = 0; // engine folds assessable income into the care means test at v2
+  const DAYS = 364; // statutory divisor turning an annual means-tested amount into a daily rate
+
+  // Statutory means test (1 Nov 2025 Aged Care Act): each contribution = an asset taper +
+  // an income taper, ÷ 364 to a daily amount, capped at the daily max. Re-derived here from
+  // config rates, NOT via the aged-care module.
+  const hscUncapped =
+    (AC.meansAssetTaper * Math.max(0, assets - AC.hscAssetThreshold) +
+      AC.meansIncomeTaper * Math.max(0, income - AC.hscIncomeThreshold)) / DAYS;
+  const hscDaily = Math.min(AC.hotellingMaxDaily, hscUncapped);
+  const hscCapped = hscUncapped >= AC.hotellingMaxDaily;
+  // NCCC is only assessed once the full Hotelling contribution is being paid.
+  const ncccUncapped =
+    (AC.meansAssetTaper * Math.max(0, assets - AC.ncccAssetThreshold) +
+      AC.meansIncomeTaper * Math.max(0, income - AC.ncccIncomeThreshold)) / DAYS;
+  const ncccDaily = hscCapped ? Math.min(AC.ncccMaxDaily, ncccUncapped) : 0;
+
   const basic = AC.basicDailyFee * 365;
-  const hotelling = AC.hotellingMaxDaily * score * 365;
-  const nccc = AC.ncccMaxDaily * score * 365;
+  const hotelling = hscDaily * 365;
+  const nccc = ncccDaily * 365;
   const dap = roomPrice * AC.mpir;
   const expected = basic + hotelling + nccc + dap;
   const workings =
-    `Means score = clamp((assets ${m(Math.round(assets))} − ${m(AC.careAssetFreeArea)}) ÷ (${m(AC.careAssetFullArea)} − ${m(AC.careAssetFreeArea)}), 0–1) = ${score.toFixed(2)}. ` +
+    `Assessable assets ${m(Math.round(assets))}. ` +
+    `Hotelling = min($${AC.hotellingMaxDaily.toFixed(2)}, ${(AC.meansAssetTaper * 100).toFixed(1)}%×(assets − ${m(AC.hscAssetThreshold)}) ÷ 364) = $${hscDaily.toFixed(2)}/day × 365 = ${m(Math.round(hotelling))}. ` +
+    `NCCC ${hscCapped ? `= min($${AC.ncccMaxDaily.toFixed(2)}, ${(AC.meansAssetTaper * 100).toFixed(1)}%×(assets − ${m(AC.ncccAssetThreshold)}) ÷ 364) = $${ncccDaily.toFixed(2)}/day × 365 = ${m(Math.round(nccc))}` : `= $0 (hotelling not yet maxed)`}. ` +
     `Basic $${AC.basicDailyFee.toFixed(2)}/day × 365 = ${m(Math.round(basic))} (flat) + ` +
-    `Hotelling $${AC.hotellingMaxDaily.toFixed(2)}/day × ${score.toFixed(2)} × 365 = ${m(Math.round(hotelling))} + ` +
-    `NCCC $${AC.ncccMaxDaily.toFixed(2)}/day × ${score.toFixed(2)} × 365 = ${m(Math.round(nccc))} + ` +
     `DAP room ${m(roomPrice)} × MPIR ${(AC.mpir * 100).toFixed(2)}% = ${m(Math.round(dap))}. Total = ${m(Math.round(expected))}.`;
   return moneyCheck(
     "Aged-care cost, first care year",

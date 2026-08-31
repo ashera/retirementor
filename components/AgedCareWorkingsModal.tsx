@@ -41,11 +41,11 @@ const TERMS: { term: string; def: string }[] = [
   { term: "RAD", def: "Refundable Accommodation Deposit — a lump sum for your room. Refundable to your estate, and exempt from the Age Pension assets test." },
   { term: "DAP", def: "Daily Accommodation Payment — paying for the room daily instead, as interest on the room price at the MPIR." },
   { term: "MPIR", def: "Maximum Permissible Interest Rate — the government rate that turns a room price into a DAP." },
-  { term: "Means score", def: "A 0–1 measure of how much you contribute, from your assessable assets and income. 1 = the maximum means-tested charges (this version uses assets; income is added later)." },
+  { term: "Means test", def: "The statutory test that sets your means-tested charges: each is an asset taper (a % p.a. of assets over a threshold) plus an income taper (a % of income over a threshold), divided by 364 to a daily amount and capped. This version uses assets; income is added later." },
 ];
 
 // Full "how the cost is worked out" explainer for the aged-care card — the means
-// score, the per-line fee arithmetic (with this scenario's real numbers), any
+// test, the per-line fee arithmetic (with this scenario's real numbers), any
 // probabilistic weighting, and a glossary. General information, not advice.
 export default function AgedCareWorkingsModal({
   plan, breakdown, config, careAge, onClose, onEdit,
@@ -61,12 +61,27 @@ export default function AgedCareWorkingsModal({
   const AC = config.agedCare;
   const residential = ac.careType === "residential";
 
-  // Reconstruct the v1 means indicator exactly as the engine did.
+  // Reconstruct the engine's means indicator: opening assessable position (income folded
+  // in at v2), then the statutory taper for each contribution.
   const superOpen = Math.max(0, breakdown.openingSuper);
   const outsideOpen = Math.max(0, breakdown.openingOutside);
   const cappedHome = Math.min(Math.max(0, breakdown.homeValue), AC.homeValueCapMeansTest);
   const assets = superOpen + outsideOpen + cappedHome;
-  const score = clamp01((assets - AC.careAssetFreeArea) / Math.max(1, AC.careAssetFullArea - AC.careAssetFreeArea));
+  const careIncome = 0; // engine folds assessable income into the care means test at v2
+  const MEANS_DAYS = 364; // statutory divisor turning an annual means-tested amount into a daily rate
+  // Hotelling Supplement Contribution: asset taper + income taper, ÷ 364, capped at the daily max.
+  const hscUncapped =
+    (AC.meansAssetTaper * Math.max(0, assets - AC.hscAssetThreshold) +
+      AC.meansIncomeTaper * Math.max(0, careIncome - AC.hscIncomeThreshold)) / MEANS_DAYS;
+  const hscDaily = Math.min(AC.hotellingMaxDaily, hscUncapped);
+  const hscCapped = hscUncapped >= AC.hotellingMaxDaily;
+  // NCCC only once the full Hotelling contribution is being paid; same taper shape, its own thresholds.
+  const ncccUncapped =
+    (AC.meansAssetTaper * Math.max(0, assets - AC.ncccAssetThreshold) +
+      AC.meansIncomeTaper * Math.max(0, careIncome - AC.ncccIncomeThreshold)) / MEANS_DAYS;
+  const ncccDaily = hscCapped ? Math.min(AC.ncccMaxDaily, ncccUncapped) : 0;
+  // Home-care out-of-pocket scales with how far up the Hotelling taper the person is.
+  const homeFactor = clamp01(hscDaily / Math.max(0.0001, AC.hotellingMaxDaily));
 
   const full = breakdown.agedCareFull ?? breakdown.agedCareTotal ?? 0;
 
@@ -132,10 +147,10 @@ export default function AgedCareWorkingsModal({
         <div className="mt-4 grid gap-4 md:grid-cols-2 md:gap-x-5 md:[&>div]:mt-0">
         {/* Step 1 — the means test */}
         <div className="mt-0">
-          <div className="text-[11px] font-semibold uppercase tracking-wide text-accent">1 · Your means score</div>
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-accent">1 · Your means test</div>
           <p className="mt-1 text-xs text-muted">
-            The means-tested charges scale with your assessable position. This version uses assets (income is added in a
-            later version).
+            The means-tested charges are an asset taper plus an income taper, ÷ 364 to a daily amount and capped. This
+            version uses assets (income is added in a later version).
           </p>
           <div className="mt-2 rounded-xl border border-line bg-panel-2 p-3">
             <Row label="Super (opening)" formula="assessed from Age-Pension age" value={fmtCurrency(Math.round(superOpen))} />
@@ -145,10 +160,17 @@ export default function AgedCareWorkingsModal({
             )}
             <Row label="Assessable assets" formula="sum of the above" value={fmtCurrency(Math.round(assets))} />
             <Row
-              label="Means score"
-              formula={`(assets − ${fmtCurrency(AC.careAssetFreeArea)}) ÷ (${fmtCurrency(AC.careAssetFullArea)} − ${fmtCurrency(AC.careAssetFreeArea)}), capped 0–1`}
-              note={`${fmtCurrency(AC.careAssetFreeArea)} and ${fmtCurrency(AC.careAssetFullArea)} are the government aged-care asset thresholds: below the first you pay nothing means-tested, at/above the second you pay the maximum. A score of ${score.toFixed(2)} means ${score >= 0.999 ? "the maximum" : `${Math.round(score * 100)}% of the maximum`} charges.`}
-              value={score.toFixed(2)}
+              label="Hotelling contribution"
+              formula={`${pct(AC.meansAssetTaper)} × (assets − ${fmtCurrency(AC.hscAssetThreshold)}) ÷ 364${hscCapped ? `, capped at $${AC.hotellingMaxDaily.toFixed(2)}/day` : ""}`}
+              note={`${fmtCurrency(AC.hscAssetThreshold)} is the asset threshold: below it you pay nothing towards hotelling. ${hscCapped ? `Your taper reaches the $${AC.hotellingMaxDaily.toFixed(2)}/day maximum.` : `You're below the $${AC.hotellingMaxDaily.toFixed(2)}/day maximum.`}`}
+              value={`$${hscDaily.toFixed(2)}/day`}
+            />
+            <Row
+              label="Care contribution (NCCC)"
+              formula={hscCapped ? `${pct(AC.meansAssetTaper)} × (assets − ${fmtCurrency(AC.ncccAssetThreshold)}) ÷ 364${ncccUncapped >= AC.ncccMaxDaily ? `, capped at $${AC.ncccMaxDaily.toFixed(2)}/day` : ""}` : "not payable until hotelling is maxed"}
+              note={hscCapped ? `Only assessed once you pay the full hotelling contribution. Capped at ${fmtCurrency(AC.ncccLifetimeCap)} over ${AC.ncccMaxYears} years.` : `You're not yet paying the full $${AC.hotellingMaxDaily.toFixed(2)}/day hotelling contribution, so no NCCC applies.`}
+              value={`$${ncccDaily.toFixed(2)}/day`}
+              muted={!hscCapped}
             />
           </div>
 
@@ -179,14 +201,14 @@ export default function AgedCareWorkingsModal({
                 />
                 <Row
                   label="Hotelling"
-                  formula={`$${AC.hotellingMaxDaily.toFixed(2)}/day × ${score.toFixed(2)} × 365`}
-                  note={`$${AC.hotellingMaxDaily.toFixed(2)} is the government maximum daily hotelling charge (meals, cleaning, laundry, heating); you pay it in proportion to your means score (${score.toFixed(2)}). No cap.`}
+                  formula={`$${hscDaily.toFixed(2)}/day × 365`}
+                  note={`Your means-tested hotelling contribution (meals, cleaning, laundry, heating) — the asset taper worked out above, capped at $${AC.hotellingMaxDaily.toFixed(2)}/day. No lifetime cap.`}
                   value={fmtCurrency(Math.round(breakdown.agedCareHotelling ?? 0))}
                 />
                 <Row
                   label="Care (NCCC)"
-                  formula={`$${AC.ncccMaxDaily.toFixed(2)}/day × ${score.toFixed(2)} × 365`}
-                  note={`$${AC.ncccMaxDaily.toFixed(2)} is the government maximum daily non-clinical care charge, scaled by your means score and capped at ${fmtCurrency(AC.ncccLifetimeCap)} over ${AC.ncccMaxYears} years. Clinical care (nursing, medical) is free.`}
+                  formula={hscCapped ? `$${ncccDaily.toFixed(2)}/day × 365` : "$0 — hotelling not yet maxed"}
+                  note={`Your means-tested non-clinical care contribution, capped at $${AC.ncccMaxDaily.toFixed(2)}/day and ${fmtCurrency(AC.ncccLifetimeCap)} over ${AC.ncccMaxYears} years. Only assessed once you pay the full hotelling contribution. Clinical care (nursing, medical) is free.`}
                   value={fmtCurrency(Math.round(breakdown.agedCareNCCC ?? 0))}
                 />
                 {(breakdown.agedCareDAP ?? 0) > 0 ? (
@@ -219,8 +241,8 @@ export default function AgedCareWorkingsModal({
             ) : (
               <Row
                 label="Support at Home contribution"
-                formula={`≈ ${fmtCurrency(AC.homeCareAnnualEstimate)}/yr (rough placeholder) × ${score.toFixed(2)} means score`}
-                note={`Home care isn't modelled in detail yet — ${fmtCurrency(AC.homeCareAnnualEstimate)}/yr is a rough placeholder for a self-funded retiree's out-of-pocket, scaled by your means score (${score.toFixed(2)}). The real Support at Home cost varies widely by your assessed care level and service mix; clinical care is government-funded.`}
+                formula={`≈ ${fmtCurrency(AC.homeCareAnnualEstimate)}/yr (rough placeholder) × ${homeFactor.toFixed(2)} means factor`}
+                note={`Home care isn't modelled in detail yet — ${fmtCurrency(AC.homeCareAnnualEstimate)}/yr is a rough placeholder for a self-funded retiree's out-of-pocket, scaled by how far up the hotelling taper you are (${homeFactor.toFixed(2)}). The real Support at Home cost varies widely by your assessed care level and service mix; clinical care is government-funded.`}
                 value={fmtCurrency(Math.round(full))}
               />
             )}
@@ -358,7 +380,7 @@ export default function AgedCareWorkingsModal({
         <div className="mt-4">
           <div className="text-[11px] font-semibold uppercase tracking-wide text-accent">Terminology</div>
           <dl className="mt-2 space-y-1.5 md:grid md:grid-cols-2 md:gap-2 md:space-y-0">
-            {TERMS.filter((t) => residential || ["Means score", "NCCC"].includes(t.term) || t.term === "Basic daily fee").map((t) => (
+            {TERMS.filter((t) => residential || ["Means test", "NCCC"].includes(t.term) || t.term === "Basic daily fee").map((t) => (
               <div key={t.term} className="rounded-lg border border-line bg-panel-2 px-3 py-2">
                 <dt className="text-xs font-semibold text-slate-200">{t.term}</dt>
                 <dd className="text-[11px] leading-relaxed text-muted">{t.def}</dd>

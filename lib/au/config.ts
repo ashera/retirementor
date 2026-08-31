@@ -181,13 +181,23 @@ export interface AgedCareConfig {
   homeValueCapMeansTest: number; // former home assessed up to this cap for aged-care means testing
   formerHomeRentYieldNet: number; // net rental yield (fraction of value) if a kept former home is rented out
   residentialLivingRetainedPct: number; // fraction of normal living spend still paid personally in residential care (the rest — housing, meals, utilities — is covered by the fees)
-  // v1 means-score inputs: score = max(assetScore, incomeScore), each a clamped
-  // linear ramp between its free area and full-contribution point. Self-funded
-  // retirees land near 1 (max contributions); low-asset/low-income pensioners near 0.
-  careAssetFreeArea: number; // assets at/below → 0 asset score
-  careAssetFullArea: number; // assets at/above → asset score 1 (max hotelling/NCCC)
-  careIncomeFreeArea: number; // annual income at/below → 0 income score
-  careIncomeFullArea: number; // annual income at/above → income score 1
+  // Statutory means test (1 Nov 2025 Aged Care Act). Each care contribution is the SUM of
+  // an asset taper (rate × assets over a threshold) and an income taper (rate × income
+  // over a threshold), converted to a daily amount and capped.
+  meansAssetTaper: number; // p.a. rate on assets over the threshold (HSC & NCCC), e.g. 0.078
+  meansIncomeTaper: number; // rate on income over the threshold (HSC & NCCC), e.g. 0.50
+  hscAssetThreshold: number; // Hotelling Supplement Contribution asset threshold
+  hscIncomeThreshold: number; // HSC income threshold
+  ncccAssetThreshold: number; // Non-Clinical Care Contribution asset threshold (higher — only wealthier residents)
+  ncccIncomeThreshold: number; // NCCC income threshold
+  // Accommodation means test: a low-means resident (means-tested amount below the max
+  // supplement) has the government pay the accommodation supplement and pays only a
+  // Daily Accommodation Contribution = min(means-tested amount, max supplement).
+  maxAccommodationSupplement: number; // max accommodation supplement per day
+  accomAssetFreeArea: number; // asset free area for the accommodation means-tested amount
+  accomIncomeFreeArea: number; // income free area for the accommodation means-tested amount
+  accomAssetTaper: number; // p.a. rate on assets over the free area (first band; the DAC caps at the supplement before higher bands bite)
+  accomIncomeTaper: number; // rate on income over the free area
   // Planning base rates for the probabilistic framing (verify vs AIHW GEN data).
   entryProbability: number; // lifetime chance of entering permanent residential care
   medianEntryAge: number;
@@ -319,11 +329,18 @@ export const DEFAULT_CONFIG: EngineConfig = {
     homeValueCapMeansTest: 214_884, // 20 Mar 2026
     formerHomeRentYieldNet: 0.03, // ~3% net rent on a kept, rented former home
     residentialLivingRetainedPct: 0.3, // keep ~30% of normal living spend for personal items/health; the fees cover the rest
-    // v1 means-score ramps (transparent approximation of the statutory test).
-    careAssetFreeArea: 61_500, // ~ the aged-care asset free area
-    careAssetFullArea: 290_453, // assets at/above → max hotelling
-    careIncomeFreeArea: 33_508, // single income free area (legacy MTF)
-    careIncomeFullArea: 100_000,
+    // Statutory means test — 1 Nov 2025 Aged Care Act (figures per health.gov.au).
+    meansAssetTaper: 0.078, // 7.8% p.a. of assets over the threshold
+    meansIncomeTaper: 0.50, // 50% of income over the threshold
+    hscAssetThreshold: 238_000,
+    hscIncomeThreshold: 95_400,
+    ncccAssetThreshold: 501_981,
+    ncccIncomeThreshold: 131_279,
+    maxAccommodationSupplement: 72.30, // per day (new/refurbished facilities, from 1 Jul 2026)
+    accomAssetFreeArea: 64_500,
+    accomIncomeFreeArea: 35_313,
+    accomAssetTaper: 0.175, // 17.5% p.a. — the only band reached before the DAC caps at the supplement
+    accomIncomeTaper: 0.50,
     entryProbability: 0.33, // ~1 in 3 enter permanent residential care
     medianEntryAge: 85,
     medianDurationYears: 2.6,
