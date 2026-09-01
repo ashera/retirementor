@@ -122,6 +122,7 @@ export default function AgePensionCalculator() {
   return (
     <div className="grid gap-6 lg:grid-cols-2">
       {/* ── Inputs ─────────────────────────────────────────────── */}
+      <div className="space-y-4">
       <div className="rounded-2xl border border-line bg-panel p-5">
         <h3 className="text-sm font-bold uppercase tracking-wide text-accent">Your situation</h3>
 
@@ -185,18 +186,31 @@ export default function AgePensionCalculator() {
             </p>
           </div>
 
-          <details className="text-sm">
-            <summary className="cursor-pointer text-muted hover:text-slate-200">Advanced: other income</summary>
-            <div className="mt-3">
-              <MoneySlider
-                label="Other income (per year)"
-                value={otherIncome} min={0} max={100_000} step={1_000}
-                onChange={setOtherIncome}
-                hint="Income NOT from investments — e.g. wages, rent, or a defined-benefit/overseas pension. Your investments are counted via deeming below, so leave this at 0 if all your money is invested."
-              />
-            </div>
-          </details>
+          <MoneySlider
+            label="Other income (per year)"
+            value={otherIncome} min={0} max={100_000} step={1_000}
+            onChange={setOtherIncome}
+            hint="Income NOT from investments — e.g. wages, rent, or a defined-benefit/overseas pension. Your investments are counted via deeming below, so leave this at 0 if all your money is invested."
+          />
         </div>
+      </div>
+
+      {/* Age Pension in context — facts to frame the estimate above */}
+      <div className="rounded-2xl border border-line bg-panel-2/50 p-5">
+        <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-accent">
+          <span aria-hidden>🏛️</span> Age Pension in context
+        </div>
+        <ul className="mt-3 space-y-2.5 text-[13px] leading-relaxed text-muted">
+          <li>
+            The maximum rate (including supplements) is <span className="text-slate-200">{money(AP.single.maxAnnual)}/yr</span> for a single
+            and <span className="text-slate-200">{money(AP.couple.maxAnnual)}/yr</span> for a couple combined.
+          </li>
+          <li>About <span className="text-slate-200">2 in 3</span> Australians of Age Pension age (67+) receive a full or part pension — and roughly <span className="text-slate-200">60%</span> of those get the maximum rate.</li>
+          <li>Your investments are <span className="text-slate-200">deemed</span> to earn {(DEEM.lowerRate * 100).toFixed(2)}%–{(DEEM.upperRate * 100).toFixed(2)}% — the test ignores what they actually return.</li>
+          <li>The family <span className="text-slate-200">home is exempt</span> from the assets test, whatever it&apos;s worth.</li>
+          <li>Rates and thresholds are <span className="text-slate-200">indexed twice a year</span> (20 March &amp; 20 September) to keep pace with prices and wages.</li>
+        </ul>
+      </div>
       </div>
 
       {/* ── Results ────────────────────────────────────────────── */}
