@@ -208,13 +208,17 @@ export default function AgePensionCalculator() {
 
           {/* Step 1 — deemed income */}
           <div className="mt-3 rounded-xl border border-line bg-panel-2 p-3">
-            <div className="text-[11px] font-semibold uppercase tracking-wide text-muted">1 · Deemed income</div>
-            <div className="mt-1.5">
-              <Row label={`Lower rate on the first ${money(deemThreshold)}`} formula={`${money(Math.min(assets, deemThreshold))} × ${(DEEM.lowerRate * 100).toFixed(2)}%`} value={`${money(deemLower)}/yr`} />
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-muted">1 · Your income for the test</div>
+            <p className="mt-1 text-[11px] leading-snug text-muted">
+              The income test doesn&apos;t use what your investments actually earn — it <span className="text-slate-300">&ldquo;deems&rdquo;</span> your {money(assets)} of assets to
+              earn a set rate. That deemed figure is your income here{otherIncome > 0 ? ", plus the other income you entered" : ", even though you entered no other income"}.
+            </p>
+            <div className="mt-2">
+              <Row label={`First ${money(deemThreshold)} of your assets`} formula={`${money(Math.min(assets, deemThreshold))} deemed at ${(DEEM.lowerRate * 100).toFixed(2)}%`} value={`${money(deemLower)}/yr`} />
               {assets > deemThreshold && (
-                <Row label="Upper rate on the rest" formula={`${money(assets - deemThreshold)} × ${(DEEM.upperRate * 100).toFixed(2)}%`} value={`${money(deemUpper)}/yr`} />
+                <Row label="Your remaining assets" formula={`${money(assets - deemThreshold)} deemed at ${(DEEM.upperRate * 100).toFixed(2)}%`} value={`${money(deemUpper)}/yr`} />
               )}
-              {otherIncome > 0 && <Row label="Plus other income" formula="not from investments" value={`${money(otherIncome)}/yr`} />}
+              {otherIncome > 0 && <Row label="Plus your other income" formula="wages, rent, DB/overseas pension — not deemed" value={`${money(otherIncome)}/yr`} />}
               <div className="mt-1 border-t border-line pt-1">
                 <Row label="Total assessable income" value={`${money(totalIncome)}/yr`} strong />
               </div>
@@ -228,7 +232,7 @@ export default function AgePensionCalculator() {
               <div className="text-[11px] font-bold tabular-nums text-white">{money(result.incomeTestAnnual)}/yr</div>
             </div>
             <p className="mt-1 text-[11px] leading-snug text-muted">
-              Income over the {money(cfg.incomeFreeAreaAnnual)} free area is {money(incomeOver)}. Reduce the max by 50c per $1:
+              Your {money(totalIncome)} assessable income (from step 1) is {money(incomeOver)} over the {money(cfg.incomeFreeAreaAnnual)} free area. Reduce the max by 50c per $1:
               {" "}{money(maxAnnual)} − ({money(incomeOver)} × 50%) = <span className="font-semibold text-slate-200">{money(result.incomeTestAnnual)}</span>.
             </p>
           </div>
