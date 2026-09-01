@@ -827,6 +827,22 @@ export default function PlannerApp({
   const quickAdjust = (patch: Partial<RetirementPlan>) =>
     setBase((prev) => ({ ...prev, ...patch }));
 
+  // The budget builder writes the spending goal into `base`. But an active
+  // "adjust-spending" What-If lever pins the COMPOSED spend (strategies win), so a
+  // freshly-applied budget would be shadowed and the dashboard would keep showing the
+  // old number. Keep that lever in step with the new goal so the budget takes effect.
+  // (Other spend-group levers — downsize, sell-property — don't set targetSpending, so
+  // they don't need this.)
+  const syncSpendingStrategyToGoal = (goal: number | undefined) => {
+    if (goal == null || !Number.isFinite(goal)) return;
+    setStrategies((prev) => {
+      if (!prev.active.includes("adjust-spending")) return prev;
+      const cur = prev.values["adjust-spending"];
+      if (cur && cur.spend === goal) return prev; // already aligned
+      return { ...prev, values: { ...prev.values, "adjust-spending": { ...(cur ?? {}), spend: goal } } };
+    });
+  };
+
   // Apply the "earliest retirement" age to EVERYONE (so a couple both retire at it,
   // matching the both-retire basis the figure is computed on) — person 0 via
   // retirementAge, each partner via their own override.
@@ -854,6 +870,7 @@ export default function PlannerApp({
 
   const handleBudgetApply = (update: Partial<RetirementPlan>) => {
     quickAdjust(update);
+    syncSpendingStrategyToGoal(update.targetSpending);
     setBudgetOpen(false);
     setNotice("Budget applied — this is now your income goal.");
     if (!user) {
@@ -2300,7 +2317,7 @@ export default function PlannerApp({
           plan={plan}
           config={config}
           onApply={handleBudgetApply}
-          onProgress={(update) => quickAdjust(update)}
+          onProgress={(update) => { quickAdjust(update); syncSpendingStrategyToGoal(update.targetSpending); }}
           onClose={() => setBudgetOpen(false)}
         />
       )}
