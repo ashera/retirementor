@@ -154,12 +154,36 @@ export default function AgePensionCalculator() {
             </p>
           </div>
 
-          <MoneySlider
-            label="Assessable assets (excluding your home)"
-            value={assets} min={0} max={1_400_000} step={5_000}
-            onChange={setAssets}
-            hint="Super, shares, bank accounts, managed funds, your car and home contents — valued at market/sale value."
-          />
+          <div>
+            <div className="flex items-baseline justify-between gap-2">
+              <label htmlFor="ap-assets" className="text-sm font-medium text-slate-200">Assessable assets (excluding your home)</label>
+              <div className="flex items-baseline text-sm font-bold text-white">
+                <span className="text-muted">$</span>
+                <input
+                  id="ap-assets"
+                  type="text"
+                  inputMode="numeric"
+                  value={assets.toLocaleString("en-AU")}
+                  onChange={(e) => {
+                    const n = Number(e.target.value.replace(/[^\d]/g, ""));
+                    if (!Number.isNaN(n)) setAssets(Math.min(n, 100_000_000));
+                  }}
+                  aria-label="Assessable assets (excluding your home)"
+                  className="w-28 bg-transparent text-right tabular-nums text-white outline-none focus:border-b focus:border-accent"
+                />
+              </div>
+            </div>
+            <input
+              type="range" min={0} max={3_000_000} step={5_000}
+              value={Math.min(assets, 3_000_000)}
+              onChange={(e) => setAssets(Number(e.target.value))}
+              aria-label="Assessable assets slider"
+              className="mt-2 w-full accent-emerald-500"
+            />
+            <p className="mt-1 text-[11px] leading-snug text-muted">
+              Super, shares, bank accounts, managed funds, your car and home contents — valued at market/sale value. Type any amount; the slider covers up to $3m.
+            </p>
+          </div>
 
           <details className="text-sm">
             <summary className="cursor-pointer text-muted hover:text-slate-200">Advanced: other income</summary>
