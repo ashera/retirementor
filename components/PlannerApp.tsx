@@ -300,11 +300,26 @@ export default function PlannerApp({
           },
     [plan, strategies, base],
   );
+
+  // Show the hero's "Bert is running the numbers" spinner for a guaranteed minimum on a
+  // full load / scenario switch — even when the deterministic metrics cache resolves the
+  // numbers instantly (so the load still reads as deliberate). Bumped only from `splitInto`
+  // (initial load + every scenario adoption), never from a slider drag (`quickAdjust`).
+  const HERO_WARMUP_MS = 550;
+  const [warmSeq, setWarmSeq] = useState(0);
+  const [heroWarming, setHeroWarming] = useState(true);
+  useEffect(() => {
+    setHeroWarming(true);
+    const t = setTimeout(() => setHeroWarming(false), HERO_WARMUP_MS);
+    return () => clearTimeout(t);
+  }, [warmSeq]);
+
   // Adopt a composed plan as the active scenario (splits it into base + strategy layer).
   const splitInto = (composed: RetirementPlan) => {
     const sc = toActiveScenario(composed);
     setBase(sc.base);
     setStrategies(sc.strategies);
+    setWarmSeq((n) => n + 1); // restart the hero "running the numbers" spinner floor
   };
   // Baseline = the last committed plan (wizard / saved / load). Quick-adjust tweaks
   // update the active scenario only, so the chart can show a "vs saved" ghost line.
@@ -1616,7 +1631,7 @@ export default function PlannerApp({
         lastsToLE={result.lastsToLifeExpectancy}
         depletedAge={result.depletedAge}
         pending={mcMaxPending}
-        loading={successPct == null || safeLiving == null || failsafeLiving == null}
+        loading={heroWarming || successPct == null || safeLiving == null || failsafeLiving == null}
         whatIfHref={whatIfHref}
         stressHref={stressHref}
         scenarioName={shared ? null : activeName}
