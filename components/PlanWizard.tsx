@@ -5,6 +5,7 @@ import Field from "@/components/Field";
 import HomeEditor, { DEFAULT_HOME, defaultMortgage } from "@/components/HomeEditor";
 import CompletenessRing from "@/components/CompletenessRing";
 import BudgetBuilder from "@/components/BudgetBuilder";
+import BudgetQuest from "@/components/BudgetQuest";
 import PropertyCard from "@/components/PropertyCard";
 import IncomeStreamsEditor from "@/components/IncomeStreamsEditor";
 import { simulate } from "@/lib/au/simulate";
@@ -162,6 +163,14 @@ export default function PlanWizard({
   const [step, setStep] = useState(0);
   const [view, setView] = useState<"summary" | "step">("summary");
   const [budgetOpen, setBudgetOpen] = useState(false); // budget builder, nested over the wizard
+  const [budgetPlayMode, setBudgetPlayMode] = useState(false); // Budget Quest opt-in play mode
+  useEffect(() => {
+    try { setBudgetPlayMode(localStorage.getItem("rw:budget-play") === "1"); } catch { /* ignore */ }
+  }, []);
+  const setBudgetPlay = (on: boolean) => {
+    setBudgetPlayMode(on);
+    try { localStorage.setItem("rw:budget-play", on ? "1" : "0"); } catch { /* ignore */ }
+  };
 
   // Explicit "have you told us?" state for the optional sections that otherwise
   // default to $0 (so we can't tell "none" from "not answered yet"). Seeded from
@@ -1435,7 +1444,19 @@ export default function PlanWizard({
 
       {/* Budget builder, nested over the wizard — applies back to the draft and
           returns here on close, so spending stays in one place. */}
-      {budgetOpen && (
+      {budgetOpen && (budgetPlayMode ? (
+        <BudgetQuest
+          plan={draft}
+          config={config}
+          onApply={(update) => {
+            setDraft((prev) => ({ ...prev, ...update }));
+            setBudgetOpen(false);
+          }}
+          onProgress={(update) => setDraft((prev) => ({ ...prev, ...update }))}
+          onClose={() => setBudgetOpen(false)}
+          onSwitchToClassic={() => setBudgetPlay(false)}
+        />
+      ) : (
         <BudgetBuilder
           plan={draft}
           config={config}
@@ -1445,8 +1466,9 @@ export default function PlanWizard({
           }}
           onProgress={(update) => setDraft((prev) => ({ ...prev, ...update }))}
           onClose={() => setBudgetOpen(false)}
+          onSwitchToPlay={() => setBudgetPlay(true)}
         />
-      )}
+      ))}
     </div>
   );
 }

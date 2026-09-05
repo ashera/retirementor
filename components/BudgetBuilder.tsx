@@ -37,6 +37,7 @@ interface BudgetBuilderProps {
   onApply: (update: Partial<RetirementPlan>) => void;
   onProgress?: (update: Partial<RetirementPlan>) => void; // continuous save — apply without closing
   onClose: () => void;
+  onSwitchToPlay?: () => void; // switch to the Budget Quest play mode (opt-in)
 }
 
 const LIFESTYLES: { key: BudgetLifestyle; label: string; blurb: string }[] = [
@@ -65,7 +66,7 @@ function useDebounced<T>(value: T, ms: number): T {
   return debounced;
 }
 
-export default function BudgetBuilder({ plan, config, onApply, onProgress, onClose }: BudgetBuilderProps) {
+export default function BudgetBuilder({ plan, config, onApply, onProgress, onClose, onSwitchToPlay }: BudgetBuilderProps) {
   const household = plan.household;
   const oldestAtRetire =
     Math.max(...plan.people.map((p) => p.currentAge)) +
@@ -243,13 +244,24 @@ export default function BudgetBuilder({ plan, config, onApply, onProgress, onClo
               What will retirement cost you?
             </h2>
           </div>
-          <button
-            onClick={onClose}
-            aria-label="Close"
-            className="rounded-lg p-1.5 text-muted transition hover:bg-panel-2 hover:text-white"
-          >
-            ✕
-          </button>
+          <div className="flex items-center gap-3">
+            {onSwitchToPlay && (
+              <button
+                onClick={onSwitchToPlay}
+                className="rounded-lg border border-accent/40 bg-accent/10 px-2.5 py-1.5 text-[11px] font-semibold text-accent transition hover:bg-accent/20"
+                title="Try Budget Quest — the same budget as a game"
+              >
+                🎮 Play mode
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              aria-label="Close"
+              className="rounded-lg p-1.5 text-muted transition hover:bg-panel-2 hover:text-white"
+            >
+              ✕
+            </button>
+          </div>
         </div>
 
         {/* Progress dots */}

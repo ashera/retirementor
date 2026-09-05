@@ -17,6 +17,7 @@ import MonteCarloMark from "@/components/MonteCarloMark";
 import ReturnSeriesModal from "@/components/ReturnSeriesModal";
 import PlanWizard from "@/components/PlanWizard";
 import BudgetBuilder from "@/components/BudgetBuilder";
+import BudgetQuest from "@/components/BudgetQuest";
 import ScenarioNotesModal from "@/components/ScenarioNotesModal";
 import Field from "@/components/Field";
 import Logo from "@/components/Logo";
@@ -343,6 +344,16 @@ export default function PlannerApp({
   // so nothing is re-typed (null → the blank starter, for a cold "enter details").
   const [wizardSeed, setWizardSeed] = useState<RetirementPlan | null>(null);
   const [budgetOpen, setBudgetOpen] = useState(false);
+  // Budget Quest: opt-in gamified "play mode" that sits alongside the classic builder,
+  // remembered per browser. Both skins drive the same handleBudgetApply / onProgress path.
+  const [budgetPlayMode, setBudgetPlayMode] = useState(false);
+  useEffect(() => {
+    try { setBudgetPlayMode(localStorage.getItem("rw:budget-play") === "1"); } catch { /* ignore */ }
+  }, []);
+  const setBudgetPlay = (on: boolean) => {
+    setBudgetPlayMode(on);
+    try { localStorage.setItem("rw:budget-play", on ? "1" : "0"); } catch { /* ignore */ }
+  };
   const [lifestageOpen, setLifestageOpen] = useState(false);
   const [selectedAge, setSelectedAge] = useState<number | null>(null);
   // The main balance chart toggles between "balance" (super + outside) and
@@ -2327,15 +2338,25 @@ export default function PlannerApp({
         />
       )}
 
-      {budgetOpen && (
+      {budgetOpen && (budgetPlayMode ? (
+        <BudgetQuest
+          plan={plan}
+          config={config}
+          onApply={handleBudgetApply}
+          onProgress={(update) => { quickAdjust(update); syncSpendingStrategyToGoal(update.targetSpending); }}
+          onClose={() => setBudgetOpen(false)}
+          onSwitchToClassic={() => setBudgetPlay(false)}
+        />
+      ) : (
         <BudgetBuilder
           plan={plan}
           config={config}
           onApply={handleBudgetApply}
           onProgress={(update) => { quickAdjust(update); syncSpendingStrategyToGoal(update.targetSpending); }}
           onClose={() => setBudgetOpen(false)}
+          onSwitchToPlay={() => setBudgetPlay(true)}
         />
-      )}
+      ))}
 
       {notesOpen && activePlan && (
         <ScenarioNotesModal
