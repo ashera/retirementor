@@ -28,6 +28,7 @@ import { DEFAULT_HOME, defaultMortgage } from "@/components/HomeEditor";
 import BudgetCategoryIcon, { CATEGORY_COLOR } from "@/components/BudgetCategoryIcon";
 import TrimSpendingModal from "@/components/TrimSpendingModal";
 import BoostSpendingModal from "@/components/BoostSpendingModal";
+import CategoryQuiz from "@/components/CategoryQuiz";
 import { boostSpending } from "@/lib/au/goalseek";
 
 
@@ -98,6 +99,8 @@ export default function BudgetBuilder({ plan, config, onApply, onProgress, onClo
   // dial the whole budget without opening individual line items.
   const [editingTotal, setEditingTotal] = useState(false);
   const [totalText, setTotalText] = useState("");
+  // Per-category "work it out" quiz — which category's quiz is open (null = none).
+  const [quizKey, setQuizKey] = useState<string | null>(null);
   // Snapshot of the category mix taken when total-editing starts, so every
   // keystroke scales from the ORIGINAL mix (not the already-scaled interim, which
   // would collapse the shares to zero as you type the first digits).
@@ -232,6 +235,16 @@ export default function BudgetBuilder({ plan, config, onApply, onProgress, onClo
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+      {quizKey && (
+        <CategoryQuiz
+          categoryKey={quizKey}
+          categoryLabel={BUDGET_CATEGORY_META.find((c) => c.key === quizKey)?.label ?? "Category"}
+          household={household}
+          config={config}
+          onApply={(t) => { setCat(quizKey, t); setQuizKey(null); }}
+          onClose={() => setQuizKey(null)}
+        />
+      )}
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
       <div className="relative z-10 flex h-[760px] max-h-[92vh] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-line bg-panel shadow-2xl">
         {/* Header */}
@@ -380,6 +393,7 @@ export default function BudgetBuilder({ plan, config, onApply, onProgress, onClo
                 open={open}
                 toggleOpen={toggleOpen}
                 setCat={setCat}
+                onQuiz={setQuizKey}
               />
               <CategoryGroup
                 title="Lifestyle & discretionary"
@@ -392,6 +406,7 @@ export default function BudgetBuilder({ plan, config, onApply, onProgress, onClo
                 open={open}
                 toggleOpen={toggleOpen}
                 setCat={setCat}
+                onQuiz={setQuizKey}
               />
               <button
                 onClick={() => applyPreset(lifestyle)}
@@ -681,6 +696,7 @@ function CategoryGroup({
   open,
   toggleOpen,
   setCat,
+  onQuiz,
 }: {
   title: string;
   caption: string;
@@ -692,6 +708,7 @@ function CategoryGroup({
   open: Set<string>;
   toggleOpen: (k: string) => void;
   setCat: (k: string, v: number) => void;
+  onQuiz: (k: string) => void;
 }) {
   const subtotal = metas.reduce((s, m) => s + (categories[m.key] || 0), 0);
   return (
@@ -720,6 +737,7 @@ function CategoryGroup({
             expanded={open.has(m.key)}
             onToggle={() => toggleOpen(m.key)}
             onChange={(v) => setCat(m.key, v)}
+            onQuiz={() => onQuiz(m.key)}
           />
         ))}
       </div>
@@ -736,6 +754,7 @@ function CategoryCard({
   expanded,
   onToggle,
   onChange,
+  onQuiz,
 }: {
   meta: BudgetCategoryMeta;
   value: number;
@@ -745,6 +764,7 @@ function CategoryCard({
   expanded: boolean;
   onToggle: () => void;
   onChange: (annual: number) => void;
+  onQuiz: () => void;
 }) {
   const cfgCat = config.asfa.breakdown.categories.find((c) => c.key === meta.key);
   const comfortable = cfgCat?.comfortable[household] ?? 5_000;
@@ -805,7 +825,7 @@ function CategoryCard({
 
       {expanded && (
         <div className="border-t border-line px-3 pb-3 pt-3">
-          <div className="mb-3 flex flex-wrap gap-1.5">
+          <div className="mb-3 flex flex-wrap items-center gap-1.5">
             {meta.items.map((it) => (
               <span
                 key={it}
@@ -815,6 +835,12 @@ function CategoryCard({
               </span>
             ))}
           </div>
+          <button
+            onClick={onQuiz}
+            className="mb-3 inline-flex items-center gap-1.5 rounded-lg border border-accent/40 bg-accent/10 px-2.5 py-1.5 text-[11px] font-semibold text-accent transition hover:bg-accent/20"
+          >
+            🎲 Not sure? Work it out
+          </button>
 
           {meta.input === "stepper" ? (
             <div className="flex items-center justify-between gap-3">

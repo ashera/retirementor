@@ -6,6 +6,7 @@ import { BUDGET_CATEGORY_META, presetCategories } from "@/lib/au/budget";
 import type { EngineConfig } from "@/lib/au/config";
 import type { RetirementPlan } from "@/lib/au/types";
 import { useBudgetModel } from "@/components/useBudgetModel";
+import CategoryQuiz from "@/components/CategoryQuiz";
 import Bert, { type BertPose } from "@/components/Bert";
 
 interface BudgetQuestProps {
@@ -35,8 +36,11 @@ export default function BudgetQuest({
   const m = useBudgetModel(plan, config);
   const {
     categories, setCat, total, split, tierInfo, lastsToLE, depletedAge,
-    confidence, headroom, verdict, badges, bert, budgetUpdate,
+    confidence, headroom, verdict, badges, bert, budgetUpdate, household,
   } = m;
+
+  // Per-category "work it out" quiz — which category's quiz is open (null = none).
+  const [quizKey, setQuizKey] = useState<string | null>(null);
 
   // Slider ceilings from the Comfortable preset (a stable reference, so the max never
   // chases the current value).
@@ -91,7 +95,14 @@ export default function BudgetQuest({
       <div className="flex items-center gap-3 py-1.5">
         <div className="w-28 shrink-0">
           <div className="text-[13px] leading-tight text-slate-200">{meta.label}</div>
-          <div className="text-[10px] uppercase tracking-wide text-muted">{meta.essential ? "essential" : "lifestyle"}</div>
+          <button
+            type="button"
+            onClick={() => setQuizKey(meta.key)}
+            className="text-[10px] font-medium text-accent transition hover:underline"
+            title={`Not sure? Answer a few questions to work out your ${meta.label.toLowerCase()} budget`}
+          >
+            🎲 work it out
+          </button>
         </div>
         <input
           type="range" min={0} max={max} step={meta.essential ? 250 : 500} value={Math.min(val, max)}
@@ -194,10 +205,22 @@ export default function BudgetQuest({
     </div>
   );
 
+  const quizEl = quizKey ? (
+    <CategoryQuiz
+      categoryKey={quizKey}
+      categoryLabel={BUDGET_CATEGORY_META.find((c) => c.key === quizKey)?.label ?? "Category"}
+      household={household}
+      config={config}
+      onApply={(t) => { setCat(quizKey, t); setQuizKey(null); }}
+      onClose={() => setQuizKey(null)}
+    />
+  ) : null;
+
   // ── Inline (standalone /budget) ────────────────────────────────────────────
   if (variant === "inline") {
     return (
       <div className="rounded-2xl border border-line bg-panel p-5">
+        {quizEl}
         <div className="flex items-center justify-between gap-3">
           <h3 className="text-sm font-bold uppercase tracking-wide text-accent">Your retirement lifestyle</h3>
           {onSwitchToClassic && (
@@ -219,6 +242,7 @@ export default function BudgetQuest({
   // ── Modal (embedded play mode) ─────────────────────────────────────────────
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+      {quizEl}
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
       <div className="relative z-10 flex h-[760px] max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-line bg-panel shadow-2xl">
         <div className="flex items-center justify-between border-b border-line px-6 py-4">
