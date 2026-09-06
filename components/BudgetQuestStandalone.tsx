@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useDeferredValue, useMemo, useState } from "react";
 import { fmtCurrency } from "@/lib/au/format";
 import { DEFAULT_CONFIG } from "@/lib/au/config";
 import { questPlanFromInputs } from "@/lib/au/budgetQuest";
@@ -30,13 +30,20 @@ export default function BudgetQuestStandalone() {
   const [superBalance, setSuperBalance] = useState(500_000);
   const [retirementAge, setRetirementAge] = useState(67);
 
+  // Drive the heavy engine (simulate + Monte Carlo + sustainable-spend) off DEFERRED
+  // inputs: the slider thumb tracks the live value instantly, while the projection
+  // recomputes at lower priority and catches up when the drag settles.
+  const dHousehold = useDeferredValue(household);
+  const dSuper = useDeferredValue(superBalance);
+  const dAge = useDeferredValue(retirementAge);
   const plan = useMemo<RetirementPlan>(
-    () => questPlanFromInputs({ household, superBalance, retirementAge }),
-    [household, superBalance, retirementAge],
+    () => questPlanFromInputs({ household: dHousehold, superBalance: dSuper, retirementAge: dAge }),
+    [dHousehold, dSuper, dAge],
   );
 
   const handoff = (update: Partial<RetirementPlan>) => {
-    const full: RetirementPlan = { ...plan, ...update };
+    // Rebuild from the LIVE inputs so the hand-off reflects the latest slider positions.
+    const full: RetirementPlan = { ...questPlanFromInputs({ household, superBalance, retirementAge }), ...update };
     try {
       localStorage.setItem("au-retirement-plan", JSON.stringify(full));
       localStorage.setItem("au-retirement-baseline", JSON.stringify(full));
@@ -61,14 +68,13 @@ export default function BudgetQuestStandalone() {
             </div>
           </div>
           <div>
-            <label htmlFor="bq-super" className="text-sm font-medium text-slate-200">Super at retirement</label>
-            <div className="mt-2 flex items-baseline gap-1 text-lg font-bold text-white">
-              <span className="text-muted">$</span>
-              <input id="bq-super" type="text" inputMode="numeric" value={superBalance.toLocaleString("en-AU")}
-                onChange={(e) => { const n = Number(e.target.value.replace(/[^\d]/g, "")); if (!Number.isNaN(n)) setSuperBalance(Math.min(n, 20_000_000)); }}
-                aria-label="Super at retirement"
-                className="w-32 bg-transparent tabular-nums text-white outline-none focus:border-b focus:border-accent" />
+            <div className="flex items-baseline justify-between">
+              <label htmlFor="bq-super" className="text-sm font-medium text-slate-200">Super at retirement</label>
+              <span className="text-sm font-bold tabular-nums text-white">{fmtCurrency(superBalance)}</span>
             </div>
+            <input id="bq-super" type="range" min={50_000} max={4_000_000} step={25_000} value={superBalance}
+              onChange={(e) => setSuperBalance(Number(e.target.value))}
+              aria-label="Super at retirement" className="mt-2 w-full accent-emerald-500" />
           </div>
           <div>
             <div className="flex items-baseline justify-between">
