@@ -837,7 +837,7 @@ export default function PlannerApp({
     const leverSpend = strategies.values["adjust-spending"]?.spend;
     const baseSpend = base.spendingMode === "stages" ? base.spendingStages.goGo : base.targetSpending;
     if (leverSpend == null || !(baseSpend > leverSpend + 500)) return null;
-    return `Heads up: an active “Adjust spending” What-If is holding your spend to ${fmtCurrency(leverSpend)}/yr — your budget would otherwise be ${fmtCurrency(baseSpend)}/yr. Change it on the What-If board.`;
+    return `Heads up: an active “Adjust spending” What-If is holding your spend to ${fmtCurrency(leverSpend)}/yr (your built budget is ${fmtCurrency(baseSpend)}/yr). Committing a budget here will turn that What-If off and make this your goal.`;
   })();
 
   // Leaving the first-run guide. Completing adopts the entered plan and shows the
@@ -864,20 +864,19 @@ export default function PlannerApp({
   const quickAdjust = (patch: Partial<RetirementPlan>) =>
     setBase((prev) => ({ ...prev, ...patch }));
 
-  // The budget builder writes the spending goal into `base`. But an active
-  // "adjust-spending" What-If lever pins the COMPOSED spend (strategies win), so a
-  // freshly-applied budget would be shadowed and the dashboard would keep showing the
-  // old number. Keep that lever in step with the new goal so the budget takes effect.
-  // (Other spend-group levers — downsize, sell-property — don't set targetSpending, so
-  // they don't need this.)
-  const syncSpendingStrategyToGoal = (goal: number | undefined) => {
-    if (goal == null || !Number.isFinite(goal)) return;
-    setStrategies((prev) => {
-      if (!prev.active.includes("adjust-spending")) return prev;
-      const cur = prev.values["adjust-spending"];
-      if (cur && cur.spend === goal) return prev; // already aligned
-      return { ...prev, values: { ...prev.values, "adjust-spending": { ...(cur ?? {}), spend: goal } } };
-    });
+  // The budget is the single source of truth for spend. The "Adjust spending" What-If
+  // lever is an EXPLORATION on the What-If board; the moment a real budget is committed
+  // here it yields — we clear the lever entirely (rather than syncing it to parity, which
+  // just re-arms the divergence). This makes the two mutually exclusive: you can explore
+  // with the slider, but committing a budget always wins. Returns whether a lever was
+  // cleared, so the caller can note it.
+  const clearSpendLever = (): boolean => {
+    if (!strategies.active.includes("adjust-spending")) return false;
+    setStrategies((prev) => ({
+      active: prev.active.filter((a) => a !== "adjust-spending"),
+      values: Object.fromEntries(Object.entries(prev.values).filter(([k]) => k !== "adjust-spending")),
+    }));
+    return true;
   };
 
   // Apply the "earliest retirement" age to EVERYONE (so a couple both retire at it,
@@ -906,10 +905,13 @@ export default function PlannerApp({
   };
 
   const handleBudgetApply = (update: Partial<RetirementPlan>) => {
+    const hadLever = strategies.active.includes("adjust-spending");
     quickAdjust(update);
-    syncSpendingStrategyToGoal(update.targetSpending);
+    clearSpendLever();
     setBudgetOpen(false);
-    setNotice("Budget applied — this is now your income goal.");
+    setNotice(hadLever
+      ? "Budget applied — your Adjust-spending What-If was turned off, so this is now your goal."
+      : "Budget applied — this is now your income goal.");
     if (!user) {
       const goal = update.targetSpending ?? plan.targetSpending;
       void trackVisit({ event: "budget", value: Number.isFinite(goal) ? goal : undefined, webdriver: navigator.webdriver === true });
@@ -2354,7 +2356,7 @@ export default function PlannerApp({
           plan={plan}
           config={config}
           onApply={handleBudgetApply}
-          onProgress={(update) => { quickAdjust(update); syncSpendingStrategyToGoal(update.targetSpending); }}
+          onProgress={(update) => { quickAdjust(update); clearSpendLever(); }}
           onClose={() => setBudgetOpen(false)}
           onSwitchToClassic={() => setBudgetPlay(false)}
           spendLeverNote={spendLeverNote}
@@ -2364,7 +2366,7 @@ export default function PlannerApp({
           plan={plan}
           config={config}
           onApply={handleBudgetApply}
-          onProgress={(update) => { quickAdjust(update); syncSpendingStrategyToGoal(update.targetSpending); }}
+          onProgress={(update) => { quickAdjust(update); clearSpendLever(); }}
           onClose={() => setBudgetOpen(false)}
           onSwitchToPlay={() => setBudgetPlay(true)}
           spendLeverNote={spendLeverNote}
