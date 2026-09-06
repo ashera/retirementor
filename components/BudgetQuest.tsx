@@ -136,9 +136,9 @@ export default function BudgetQuest({
         <span aria-hidden>⚙️</span><span>{spendLeverNote}</span>
       </div>
     )}
-    <div className="grid gap-5 md:grid-cols-[1fr_260px]">
+    <div className="grid gap-5 md:grid-cols-[minmax(0,1fr)_260px]">
       {/* Left: Bert + tier + categories */}
-      <div>
+      <div className="min-w-0">
         {/* Bert host */}
         <div className="flex items-start gap-3 rounded-2xl border border-line bg-panel-2/60 p-3">
           <Bert pose={POSE_FOR(verdict.status, tierInfo.tier === "premium")} size={56} className="shrink-0" />
@@ -185,7 +185,7 @@ export default function BudgetQuest({
       </div>
 
       {/* Right: sustainability + badges */}
-      <div>
+      <div className="min-w-0">
         <div className="rounded-2xl border border-line bg-panel-2 p-4 text-center">
           <div className="text-[11px] font-semibold uppercase tracking-wide text-muted">Will it last?</div>
           <svg className="mx-auto mt-2 h-32 w-32" viewBox="0 0 120 120" role="img" aria-label={`Lasts to age ${lastsAge}, ${confPct}% confidence`}>
