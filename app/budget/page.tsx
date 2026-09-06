@@ -49,7 +49,7 @@ export default function BudgetPage() {
       <header className="mt-5 flex items-start justify-between gap-5">
         <div className="min-w-0">
           <h1 className="text-3xl font-bold text-white sm:text-4xl">
-            Budget Quiz <span aria-hidden>🎮</span>
+            Budget Quiz <span aria-hidden>📝</span>
           </h1>
           <p className="mt-3 text-lg leading-relaxed text-slate-300">
             Design the retirement you want — travel, dining, the lot — and watch, live, whether your money can carry it.
