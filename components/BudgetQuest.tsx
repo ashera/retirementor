@@ -21,6 +21,7 @@ interface BudgetQuestProps {
   onSwitchToClassic?: () => void; // embedded: hand back to the form builder
   ctaLabel?: string; // inline: primary action label
   onCta?: (update: Partial<RetirementPlan>) => void; // inline: hand off to the planner
+  spendLeverNote?: string | null; // note when an Adjust-spending What-If is capping the budget
 }
 
 const STATUS_TONE = {
@@ -33,7 +34,7 @@ const POSE_FOR = (status: "good" | "warn" | "bad", premium: boolean): BertPose =
   status === "bad" ? "pointer" : status === "warn" ? "glasses" : premium ? "violin" : "eureka";
 
 export default function BudgetQuest({
-  plan, config, variant = "modal", onApply, onProgress, onClose, onSwitchToClassic, ctaLabel, onCta,
+  plan, config, variant = "modal", onApply, onProgress, onClose, onSwitchToClassic, ctaLabel, onCta, spendLeverNote,
 }: BudgetQuestProps) {
   const m = useBudgetModel(plan, config);
   const {
@@ -129,6 +130,12 @@ export default function BudgetQuest({
   };
 
   const hud = (
+    <div>
+    {spendLeverNote && (
+      <div className="mb-4 flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/[0.08] px-3 py-2.5 text-[12px] leading-snug text-amber-200">
+        <span aria-hidden>⚙️</span><span>{spendLeverNote}</span>
+      </div>
+    )}
     <div className="grid gap-5 md:grid-cols-[1fr_260px]">
       {/* Left: Bert + tier + categories */}
       <div>
@@ -218,6 +225,7 @@ export default function BudgetQuest({
           </p>
         )}
       </div>
+    </div>
     </div>
   );
 

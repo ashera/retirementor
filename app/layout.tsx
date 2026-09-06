@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import Analytics from "@/components/Analytics";
+import VersionWatcher from "@/components/VersionWatcher";
 import FeedbackButton from "@/components/FeedbackButton";
 import FooterNav from "@/components/FooterNav";
 import Link from "next/link";
@@ -86,6 +87,7 @@ export default function RootLayout({
           </p>
         </footer>
         <FeedbackButton />
+        <VersionWatcher />
         <Analytics />
       </body>
     </html>

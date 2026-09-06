@@ -829,6 +829,17 @@ export default function PlannerApp({
     resetScenarioDerived();
   };
 
+  // If an "Adjust spending" What-If is holding spend below the built budget, the budget
+  // editors show the reduced (composed) figure — surface a note so that reduction isn't a
+  // silent mystery (the classic "why does my budget say less than I set?" confusion).
+  const spendLeverNote = (() => {
+    if (!strategies.active.includes("adjust-spending")) return null;
+    const leverSpend = strategies.values["adjust-spending"]?.spend;
+    const baseSpend = base.spendingMode === "stages" ? base.spendingStages.goGo : base.targetSpending;
+    if (leverSpend == null || !(baseSpend > leverSpend + 500)) return null;
+    return `Heads up: an active “Adjust spending” What-If is holding your spend to ${fmtCurrency(leverSpend)}/yr — your budget would otherwise be ${fmtCurrency(baseSpend)}/yr. Change it on the What-If board.`;
+  })();
+
   // Leaving the first-run guide. Completing adopts the entered plan and shows the
   // dashboard; opting out ("Enter my details myself") continues into the manual
   // wizard, carrying over whatever they entered so far (rather than the empty
@@ -2346,6 +2357,7 @@ export default function PlannerApp({
           onProgress={(update) => { quickAdjust(update); syncSpendingStrategyToGoal(update.targetSpending); }}
           onClose={() => setBudgetOpen(false)}
           onSwitchToClassic={() => setBudgetPlay(false)}
+          spendLeverNote={spendLeverNote}
         />
       ) : (
         <BudgetBuilder
@@ -2355,6 +2367,7 @@ export default function PlannerApp({
           onProgress={(update) => { quickAdjust(update); syncSpendingStrategyToGoal(update.targetSpending); }}
           onClose={() => setBudgetOpen(false)}
           onSwitchToPlay={() => setBudgetPlay(true)}
+          spendLeverNote={spendLeverNote}
         />
       ))}
 

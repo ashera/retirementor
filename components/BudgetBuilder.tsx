@@ -39,6 +39,7 @@ interface BudgetBuilderProps {
   onProgress?: (update: Partial<RetirementPlan>) => void; // continuous save — apply without closing
   onClose: () => void;
   onSwitchToPlay?: () => void; // switch to the Budget Quiz play mode (opt-in)
+  spendLeverNote?: string | null; // note when an Adjust-spending What-If is capping the budget
 }
 
 const LIFESTYLES: { key: BudgetLifestyle; label: string; blurb: string }[] = [
@@ -67,7 +68,7 @@ function useDebounced<T>(value: T, ms: number): T {
   return debounced;
 }
 
-export default function BudgetBuilder({ plan, config, onApply, onProgress, onClose, onSwitchToPlay }: BudgetBuilderProps) {
+export default function BudgetBuilder({ plan, config, onApply, onProgress, onClose, onSwitchToPlay, spendLeverNote }: BudgetBuilderProps) {
   const household = plan.household;
   const oldestAtRetire =
     Math.max(...plan.people.map((p) => p.currentAge)) +
@@ -292,6 +293,12 @@ export default function BudgetBuilder({ plan, config, onApply, onProgress, onClo
             />
           ))}
         </div>
+
+        {spendLeverNote && (
+          <div className="mx-6 mt-4 flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/[0.08] px-3 py-2.5 text-[12px] leading-snug text-amber-200">
+            <span aria-hidden>⚙️</span><span>{spendLeverNote}</span>
+          </div>
+        )}
 
         {/* Live total bar — visible on every step after Setup */}
         {currentKey !== "setup" && (
