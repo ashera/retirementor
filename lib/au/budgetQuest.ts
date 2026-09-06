@@ -31,8 +31,12 @@ const TIER_LABEL: Record<QuestTier, string> = {
  * premium preset, which uplifts discretionary spend).
  */
 export function budgetTier(total: number, household: Household, config: EngineConfig): TierInfo {
-  const modest = config.asfa.modest[household];
-  const comfortable = config.asfa.comfortable[household];
+  // Use the SUM of the per-category ASFA figures (not the headline totals) so the overall
+  // tier lines up with the per-category zones — a budget where every category sits at
+  // "comfortable" then reads "Comfortable" overall, rather than landing ~0.4% short.
+  const cats = config.asfa.breakdown.categories;
+  const modest = cats.reduce((s, c) => s + c.modest[household], 0);
+  const comfortable = cats.reduce((s, c) => s + c.comfortable[household], 0);
   const premium = Math.round((comfortable * 1.25) / 500) * 500;
   let tier: QuestTier;
   let index: number;

@@ -8,6 +8,7 @@ import type { EngineConfig } from "@/lib/au/config";
 import type { RetirementPlan } from "@/lib/au/types";
 import { useBudgetModel } from "@/components/useBudgetModel";
 import CategoryQuiz from "@/components/CategoryQuiz";
+import BudgetCategoryIcon from "@/components/BudgetCategoryIcon";
 import Bert, { type BertPose } from "@/components/Bert";
 
 interface BudgetQuestProps {
@@ -98,14 +99,12 @@ export default function BudgetQuest({
       <button
         type="button"
         onClick={() => setQuizKey(meta.key)}
-        className="group flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left transition hover:bg-panel-2/70"
+        className="group flex w-full items-center gap-3 rounded-xl border border-line bg-panel px-3 py-2.5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-accent/60 hover:bg-panel-2 hover:shadow-lg focus-visible:border-accent focus-visible:outline-none"
         title={`Answer a few questions to work out your ${meta.label.toLowerCase()} budget`}
       >
+        <BudgetCategoryIcon categoryKey={meta.key} size={20} />
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <span className="truncate text-[13px] font-medium text-slate-100">{meta.label}</span>
-            <span className="whitespace-nowrap text-[10px] font-medium text-accent opacity-60 transition group-hover:opacity-100">🎲 work it out</span>
-          </div>
+          <div className="truncate text-[13px] font-semibold text-slate-100">{meta.label}</div>
           <div className="mt-1.5 flex items-center gap-2">
             <span className="flex gap-0.5" aria-hidden>
               {[0, 1, 2].map((i) => (
@@ -119,7 +118,12 @@ export default function BudgetQuest({
           <div className="text-[13px] font-semibold tabular-nums text-white">{fmtCurrency(val)}</div>
           <div className="text-[9px] uppercase tracking-wide text-muted">per year</div>
         </div>
-        <span aria-hidden className="text-muted transition group-hover:translate-x-0.5 group-hover:text-accent">›</span>
+        <span
+          aria-hidden
+          className="grid h-7 w-7 shrink-0 place-items-center rounded-full border border-accent/40 bg-accent/10 text-sm font-bold text-accent transition group-hover:bg-accent group-hover:text-ink"
+        >
+          ›
+        </span>
       </button>
     );
   };
@@ -167,9 +171,9 @@ export default function BudgetQuest({
             <span aria-hidden>🎲</span> Tap a category to answer a few questions and set your number
           </div>
           <div className="text-[11px] font-semibold uppercase tracking-wide text-muted">Essentials · your floor · {fmtCurrency(split.essential)}/yr</div>
-          <div className="mt-1">{essentials.map((c) => <CatRow key={c.key} meta={c} />)}</div>
-          <div className="mt-3 border-t border-line pt-3 text-[11px] font-semibold uppercase tracking-wide text-amber-300/80">Lifestyle · where it flexes · {fmtCurrency(split.discretionary)}/yr</div>
-          <div className="mt-1">{discretionary.map((c) => <CatRow key={c.key} meta={c} />)}</div>
+          <div className="mt-2 space-y-2">{essentials.map((c) => <CatRow key={c.key} meta={c} />)}</div>
+          <div className="mt-4 border-t border-line pt-3 text-[11px] font-semibold uppercase tracking-wide text-amber-300/80">Lifestyle · where it flexes · {fmtCurrency(split.discretionary)}/yr</div>
+          <div className="mt-2 space-y-2">{discretionary.map((c) => <CatRow key={c.key} meta={c} />)}</div>
         </div>
       </div>
 
