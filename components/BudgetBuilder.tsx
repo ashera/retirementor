@@ -265,7 +265,7 @@ export default function BudgetBuilder({ plan, config, onApply, onProgress, onClo
                 className="rounded-lg border border-accent/40 bg-accent/10 px-2.5 py-1.5 text-[11px] font-semibold text-accent transition hover:bg-accent/20"
                 title="Try Budget Quiz — the same budget as a game"
               >
-                🎮 Play mode
+                🎮 Quiz mode
               </button>
             )}
             <button
