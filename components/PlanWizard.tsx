@@ -163,7 +163,7 @@ export default function PlanWizard({
   const [step, setStep] = useState(0);
   const [view, setView] = useState<"summary" | "step">("summary");
   const [budgetOpen, setBudgetOpen] = useState(false); // budget builder, nested over the wizard
-  const [budgetPlayMode, setBudgetPlayMode] = useState(false); // Budget Quest opt-in play mode
+  const [budgetPlayMode, setBudgetPlayMode] = useState(false); // Budget Quiz opt-in play mode
   useEffect(() => {
     try { setBudgetPlayMode(localStorage.getItem("rw:budget-play") === "1"); } catch { /* ignore */ }
   }, []);

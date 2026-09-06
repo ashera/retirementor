@@ -23,7 +23,7 @@ function Segmented<T extends string>({ value, options, onChange }: {
 }
 
 // The standalone /budget experience: a few quick inputs make the "will it last?"
-// constraint real, then Budget Quest plays inline. The CTA seeds the planner's
+// constraint real, then Budget Quiz plays inline. The CTA seeds the planner's
 // localStorage so "See it in your full plan" opens the same budget in the full app.
 export default function BudgetQuestStandalone() {
   const [household, setHousehold] = useState<Household>("single");

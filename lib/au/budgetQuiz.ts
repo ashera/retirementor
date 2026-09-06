@@ -1,4 +1,4 @@
-// Budget Quest — per-category "work it out" quizzes. Instead of guessing an annual $
+// Budget Quiz — per-category "work it out" quizzes. Instead of guessing an annual $
 // for a category, the user answers a short SERIES of plain-language multiple-choice
 // questions (built from the category's sub-items) and the answers SUM to the figure.
 // Amounts are authored per SINGLE household, then scaled for couples by that category's

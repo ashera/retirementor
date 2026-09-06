@@ -1,4 +1,4 @@
-// Budget Quest — the pure game logic that sits over the existing budget mechanics
+// Budget Quiz — the pure game logic that sits over the existing budget mechanics
 // (lib/au/budget.ts + the projection engine). No React, no engine changes: it just
 // scores a budget into a lifestyle TIER, a sustainability VERDICT, milestone BADGES
 // and a line of guidance from Bert. Kept pure so it's unit-testable and shared by the

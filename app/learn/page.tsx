@@ -54,7 +54,7 @@ export default function LearnIndex() {
           <span aria-hidden className="text-3xl">🎮</span>
           <span className="min-w-0 flex-1">
             <span className="flex items-center gap-2">
-              <span className="font-semibold text-white">Budget Quest</span>
+              <span className="font-semibold text-white">Budget Quiz</span>
               <span className="rounded-full bg-accent/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-accent">Game</span>
             </span>
             <span className="mt-0.5 block text-sm text-muted">Design the retirement lifestyle you want and watch, live, whether your money can carry it.</span>

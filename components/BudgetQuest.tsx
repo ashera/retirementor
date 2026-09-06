@@ -264,7 +264,7 @@ export default function BudgetQuest({
         <div className="flex items-center justify-between border-b border-line px-6 py-4">
           <div>
             <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-accent">
-              <span aria-hidden>🎮</span> Budget Quest
+              <span aria-hidden>🎮</span> Budget Quiz
             </div>
             <h2 className="mt-0.5 text-lg font-bold text-white">Design the retirement you want</h2>
           </div>

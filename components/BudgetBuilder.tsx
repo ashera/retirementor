@@ -38,7 +38,7 @@ interface BudgetBuilderProps {
   onApply: (update: Partial<RetirementPlan>) => void;
   onProgress?: (update: Partial<RetirementPlan>) => void; // continuous save — apply without closing
   onClose: () => void;
-  onSwitchToPlay?: () => void; // switch to the Budget Quest play mode (opt-in)
+  onSwitchToPlay?: () => void; // switch to the Budget Quiz play mode (opt-in)
 }
 
 const LIFESTYLES: { key: BudgetLifestyle; label: string; blurb: string }[] = [
@@ -262,7 +262,7 @@ export default function BudgetBuilder({ plan, config, onApply, onProgress, onClo
               <button
                 onClick={onSwitchToPlay}
                 className="rounded-lg border border-accent/40 bg-accent/10 px-2.5 py-1.5 text-[11px] font-semibold text-accent transition hover:bg-accent/20"
-                title="Try Budget Quest — the same budget as a game"
+                title="Try Budget Quiz — the same budget as a game"
               >
                 🎮 Play mode
               </button>

@@ -5,7 +5,7 @@ import { breadcrumbLd } from "@/lib/seo";
 import BudgetQuestStandalone from "@/components/BudgetQuestStandalone";
 import Bert from "@/components/Bert";
 
-const title = "Budget Quest — retirement budget game (Australia)";
+const title = "Budget Quiz — retirement budget game (Australia)";
 const description =
   "Design the retirement lifestyle you want and watch whether your money can carry it. A free, Bert-guided retirement-budget game using the ASFA Retirement Standard and a real projection — no sign-up.";
 
@@ -20,7 +20,7 @@ const jsonLd = [
   {
     "@context": "https://schema.org",
     "@type": "WebApplication",
-    name: "Budget Quest — retirement budget game",
+    name: "Budget Quiz — retirement budget game",
     applicationCategory: "FinanceApplication",
     operatingSystem: "Web",
     url: `${SITE_URL}/budget`,
@@ -31,7 +31,7 @@ const jsonLd = [
   },
   breadcrumbLd([
     { name: "Home", path: "/" },
-    { name: "Budget Quest", path: "/budget" },
+    { name: "Budget Quiz", path: "/budget" },
   ]),
 ];
 
@@ -43,13 +43,13 @@ export default function BudgetPage() {
       <div className="flex flex-wrap items-center gap-2 text-sm text-muted">
         <Link href="/" className="font-medium hover:text-white">← RetireWiz</Link>
         <span aria-hidden>·</span>
-        <span className="text-accent">Budget Quest</span>
+        <span className="text-accent">Budget Quiz</span>
       </div>
 
       <header className="mt-5 flex items-start justify-between gap-5">
         <div className="min-w-0">
           <h1 className="text-3xl font-bold text-white sm:text-4xl">
-            Budget Quest <span aria-hidden>🎮</span>
+            Budget Quiz <span aria-hidden>🎮</span>
           </h1>
           <p className="mt-3 text-lg leading-relaxed text-slate-300">
             Design the retirement you want — travel, dining, the lot — and watch, live, whether your money can carry it.

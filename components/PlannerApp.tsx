@@ -344,7 +344,7 @@ export default function PlannerApp({
   // so nothing is re-typed (null → the blank starter, for a cold "enter details").
   const [wizardSeed, setWizardSeed] = useState<RetirementPlan | null>(null);
   const [budgetOpen, setBudgetOpen] = useState(false);
-  // Budget Quest: opt-in gamified "play mode" that sits alongside the classic builder,
+  // Budget Quiz: opt-in gamified "play mode" that sits alongside the classic builder,
   // remembered per browser. Both skins drive the same handleBudgetApply / onProgress path.
   const [budgetPlayMode, setBudgetPlayMode] = useState(false);
   useEffect(() => {
