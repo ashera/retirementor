@@ -43,6 +43,32 @@ export function budgetTier(total: number, household: Household, config: EngineCo
   return { tier, index, label: TIER_LABEL[tier], thresholds: { modest, comfortable, premium } };
 }
 
+export type CategoryZone = "basic" | "comfortable" | "premium";
+export interface CategoryZoneInfo {
+  zone: CategoryZone;
+  index: number; // 0..2, lights up a 3-segment per-category dial
+  label: string;
+}
+const ZONE_LABEL: Record<CategoryZone, string> = { basic: "Basic", comfortable: "Comfortable", premium: "Premium" };
+
+/**
+ * Which lifestyle zone a single category's spend sits in, against that category's own
+ * ASFA modest/comfortable figures. Basic below the modest↔comfortable midpoint,
+ * Comfortable up to a "premium" step (comfortable × 1.25), Premium above.
+ */
+export function categoryZone(categoryKey: string, value: number, household: Household, config: EngineConfig): CategoryZoneInfo {
+  const c = config.asfa.breakdown.categories.find((x) => x.key === categoryKey);
+  if (!c) return { zone: "comfortable", index: 1, label: ZONE_LABEL.comfortable };
+  const mid = (c.modest[household] + c.comfortable[household]) / 2;
+  const premium = c.comfortable[household] * 1.25;
+  let zone: CategoryZone;
+  let index: number;
+  if (value >= premium) { zone = "premium"; index = 2; }
+  else if (value >= mid) { zone = "comfortable"; index = 1; }
+  else { zone = "basic"; index = 0; }
+  return { zone, index, label: ZONE_LABEL[zone] };
+}
+
 export type SustainStatus = "good" | "warn" | "bad";
 
 export interface SustainVerdict {

@@ -3,6 +3,7 @@ import { DEFAULT_CONFIG } from "../lib/au/config";
 import { budgetTotal } from "../lib/au/budget";
 import {
   budgetTier,
+  categoryZone,
   sustainabilityVerdict,
   computeBadges,
   bertLine,
@@ -33,6 +34,27 @@ describe("budget quest — lifestyle tier", () => {
 
   it("uses higher couple thresholds than single", () => {
     expect(budgetTier(cfg.asfa.comfortable.single + 1_000, "couple", cfg).tier).not.toBe("comfortable");
+  });
+});
+
+describe("budget quest — per-category zone dial", () => {
+  const catAsfa = (key: string, tier: "modest" | "comfortable") =>
+    cfg.asfa.breakdown.categories.find((c) => c.key === key)![tier].single;
+
+  it("classifies a category against its own ASFA modest/comfortable", () => {
+    // food: modest 6,100, comfortable 7,880
+    expect(categoryZone("food", catAsfa("food", "modest"), "single", cfg).zone).toBe("basic");
+    expect(categoryZone("food", catAsfa("food", "comfortable"), "single", cfg).zone).toBe("comfortable");
+    expect(categoryZone("food", catAsfa("food", "comfortable") * 1.4, "single", cfg).zone).toBe("premium");
+  });
+
+  it("indexes 0..2 for the three-segment dial, monotonic in spend", () => {
+    const a = categoryZone("travel", 0, "single", cfg).index;
+    const b = categoryZone("travel", catAsfa("travel", "comfortable"), "single", cfg).index;
+    const c = categoryZone("travel", catAsfa("travel", "comfortable") * 2, "single", cfg).index;
+    expect(a).toBe(0);
+    expect(b).toBeGreaterThanOrEqual(1);
+    expect(c).toBe(2);
   });
 });
 

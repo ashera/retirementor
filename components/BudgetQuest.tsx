@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { fmtCurrency } from "@/lib/au/format";
-import { BUDGET_CATEGORY_META, presetCategories } from "@/lib/au/budget";
+import { BUDGET_CATEGORY_META } from "@/lib/au/budget";
+import { categoryZone, type CategoryZone } from "@/lib/au/budgetQuest";
 import type { EngineConfig } from "@/lib/au/config";
 import type { RetirementPlan } from "@/lib/au/types";
 import { useBudgetModel } from "@/components/useBudgetModel";
@@ -41,12 +42,6 @@ export default function BudgetQuest({
 
   // Per-category "work it out" quiz — which category's quiz is open (null = none).
   const [quizKey, setQuizKey] = useState<string | null>(null);
-
-  // Slider ceilings from the Comfortable preset (a stable reference, so the max never
-  // chases the current value).
-  const comfy = presetCategories(config, plan.household, plan.homeowner, "comfortable");
-  const catMax = (key: string) =>
-    Math.max(Math.ceil(((comfy[key] ?? 5_000) * 2.5) / 1_000) * 1_000, categories[key] ?? 0, 12_000);
 
   const tone = STATUS_TONE[verdict.status];
   const lastsAge = lastsToLE ? `${plan.lifeExpectancy}+` : depletedAge ?? "—";
@@ -88,30 +83,44 @@ export default function BudgetQuest({
   const essentials = BUDGET_CATEGORY_META.filter((c) => c.essential);
   const discretionary = BUDGET_CATEGORY_META.filter((c) => !c.essential);
 
+  // Each category is a tappable card: a basic/comfortable/premium zone dial + its figure,
+  // and tapping it opens that category's quiz. No sliders — the quiz is the way you play.
+  const ZONE_TONE: Record<CategoryZone, { seg: string; text: string }> = {
+    basic: { seg: "bg-sky-400/80", text: "text-sky-300" },
+    comfortable: { seg: "bg-accent", text: "text-accent" },
+    premium: { seg: "bg-amber-400", text: "text-amber-300" },
+  };
   const CatRow = ({ meta }: { meta: (typeof BUDGET_CATEGORY_META)[number] }) => {
     const val = categories[meta.key] ?? 0;
-    const max = catMax(meta.key);
+    const z = categoryZone(meta.key, val, household, config);
+    const zt = ZONE_TONE[z.zone];
     return (
-      <div className="flex items-center gap-3 py-1.5">
-        <div className="w-28 shrink-0">
-          <div className="text-[13px] leading-tight text-slate-200">{meta.label}</div>
-          <button
-            type="button"
-            onClick={() => setQuizKey(meta.key)}
-            className="text-[10px] font-medium text-accent transition hover:underline"
-            title={`Not sure? Answer a few questions to work out your ${meta.label.toLowerCase()} budget`}
-          >
-            🎲 work it out
-          </button>
+      <button
+        type="button"
+        onClick={() => setQuizKey(meta.key)}
+        className="group flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left transition hover:bg-panel-2/70"
+        title={`Answer a few questions to work out your ${meta.label.toLowerCase()} budget`}
+      >
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="truncate text-[13px] font-medium text-slate-100">{meta.label}</span>
+            <span className="whitespace-nowrap text-[10px] font-medium text-accent opacity-60 transition group-hover:opacity-100">🎲 work it out</span>
+          </div>
+          <div className="mt-1.5 flex items-center gap-2">
+            <span className="flex gap-0.5" aria-hidden>
+              {[0, 1, 2].map((i) => (
+                <span key={i} className={`h-1.5 w-5 rounded-full ${i <= z.index ? zt.seg : "border border-line bg-panel-2"}`} />
+              ))}
+            </span>
+            <span className={`text-[10px] font-semibold uppercase tracking-wide ${zt.text}`}>{z.label}</span>
+          </div>
         </div>
-        <input
-          type="range" min={0} max={max} step={meta.essential ? 250 : 500} value={Math.min(val, max)}
-          onChange={(e) => setCat(meta.key, Number(e.target.value))}
-          aria-label={`${meta.label} per year`}
-          className={`h-1.5 flex-1 ${meta.essential ? "accent-emerald-500" : "accent-amber-400"}`}
-        />
-        <div className="w-16 shrink-0 text-right text-[12px] tabular-nums text-muted">{fmtCurrency(val)}</div>
-      </div>
+        <div className="shrink-0 text-right">
+          <div className="text-[13px] font-semibold tabular-nums text-white">{fmtCurrency(val)}</div>
+          <div className="text-[9px] uppercase tracking-wide text-muted">per year</div>
+        </div>
+        <span aria-hidden className="text-muted transition group-hover:translate-x-0.5 group-hover:text-accent">›</span>
+      </button>
     );
   };
 
@@ -152,8 +161,11 @@ export default function BudgetQuest({
           </div>
         </div>
 
-        {/* Category allocation */}
+        {/* Category allocation — every category is a tappable quiz */}
         <div className="mt-4 rounded-2xl border border-line bg-panel-2/40 p-3">
+          <div className="mb-2 flex items-center gap-1.5 rounded-lg bg-accent/10 px-2.5 py-1.5 text-[11px] font-medium text-accent">
+            <span aria-hidden>🎲</span> Tap a category to answer a few questions and set your number
+          </div>
           <div className="text-[11px] font-semibold uppercase tracking-wide text-muted">Essentials · your floor · {fmtCurrency(split.essential)}/yr</div>
           <div className="mt-1">{essentials.map((c) => <CatRow key={c.key} meta={c} />)}</div>
           <div className="mt-3 border-t border-line pt-3 text-[11px] font-semibold uppercase tracking-wide text-amber-300/80">Lifestyle · where it flexes · {fmtCurrency(split.discretionary)}/yr</div>
