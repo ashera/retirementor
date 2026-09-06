@@ -770,11 +770,11 @@ export default function PlanWizard({
     title: "Your retirement goal",
     subtitle: "",
     body: (
-      <div className="space-y-6">
+      <div className="space-y-3">
         <WizardHeaderCard
           page="goal"
           eyebrow="Your retirement goal"
-          blurb="When you'll stop working and how much you'll spend each year — the target the whole plan is built to reach."
+          blurb="When you'll retire, and the yearly spending the whole plan aims for."
         />
         <div className="grid grid-cols-1 items-start gap-x-5 gap-y-5 sm:grid-cols-2">
           <Field
@@ -800,15 +800,25 @@ export default function PlanWizard({
               max={75}
               integer
               suffix="yrs"
-              hint="Partners can retire at different ages — whoever keeps working still earns, contributes, and helps cover spending."
+              hint="Partners can retire at different ages — the one still working keeps earning."
             />
           )}
         </div>
 
         {/* Spending is set exclusively in the budget builder — one source of
-            truth, so the wizard and budget can never disagree. */}
-        <div className="rounded-xl border border-line bg-panel-2 p-4">
-          <div className="text-xs font-semibold uppercase tracking-wide text-muted">Retirement spending</div>
+            truth, so the wizard and budget can never disagree. The editor button is
+            folded into this card's header to save vertical space (no scroll). */}
+        <div className="rounded-xl border border-line bg-panel-2 p-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="text-xs font-semibold uppercase tracking-wide text-muted">Retirement spending</div>
+            <button
+              type="button"
+              onClick={() => setBudgetOpen(true)}
+              className="shrink-0 rounded-lg border border-accent/40 bg-accent/10 px-2.5 py-1 text-xs font-semibold text-accent transition hover:bg-accent/20"
+            >
+              {draft.budget ? "Edit budget →" : "Set spending →"}
+            </button>
+          </div>
           <div className="mt-1 text-lg font-bold text-white">
             {!Number.isFinite(previewSpend)
               ? "Not set yet"
@@ -820,23 +830,10 @@ export default function PlanWizard({
           {draft.spendingMode === "stages" && (
             <div className="mt-0.5 text-xs text-muted">
               Living costs ease {fmtCurrency(draft.spendingStages.goGo)} → {fmtCurrency(draft.spendingStages.slowGo)} → {fmtCurrency(draft.spendingStages.noGo)} as you age
-              {goalMortgage > 0 ? "; the home loan sits on top" : ""}
-            </div>
-          )}
-          {goalMortgage > 0 && (
-            <div className="mt-1 text-[11px] leading-snug text-muted">
-              Your {fmtCurrency(Math.round(goalMortgage))}/yr home loan is a fixed dollar payment, so its
-              real cost eases over the years — the year-by-year projection shows it a little lower.
+              {goalMortgage > 0 ? `; the ${fmtCurrency(Math.round(goalMortgage))}/yr home loan sits on top (its real cost eases over time)` : ""}
             </div>
           )}
         </div>
-        <button
-          type="button"
-          onClick={() => setBudgetOpen(true)}
-          className="w-full rounded-lg border border-accent/40 bg-accent/10 px-4 py-2.5 text-sm font-semibold text-accent transition hover:bg-accent/20"
-        >
-          {draft.budget ? "Edit your spending budget →" : "Set your retirement spending →"}
-        </button>
       </div>
     ),
   };
