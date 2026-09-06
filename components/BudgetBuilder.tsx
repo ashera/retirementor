@@ -93,7 +93,15 @@ export default function BudgetBuilder({ plan, config, onApply, onProgress, onClo
       presetCategories(config, household, plan.homeowner, plan.budget?.lifestyle ?? "comfortable"),
   );
   const [applyPhases, setApplyPhases] = useState(plan.budget?.applyPhases ?? true);
+  // Monthly/yearly display — shared with the Budget Quiz via localStorage so the choice
+  // sticks across both skins.
   const [monthly, setMonthly] = useState(true);
+  useEffect(() => {
+    try { const v = localStorage.getItem("rw:budget-monthly"); if (v != null) setMonthly(v === "1"); } catch { /* ignore */ }
+  }, []);
+  useEffect(() => {
+    try { localStorage.setItem("rw:budget-monthly", monthly ? "1" : "0"); } catch { /* ignore */ }
+  }, [monthly]);
   const [open, setOpen] = useState<Set<string>>(new Set());
   // Directly-editable total: type a figure and every category scales by the same
   // factor, so the essentials/discretionary mix (the pie) stays put — lets people

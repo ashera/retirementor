@@ -13,7 +13,8 @@ interface CategoryQuizProps {
   categoryLabel: string;
   household: Household;
   config?: EngineConfig;
-  onApply: (total: number) => void;
+  monthly?: boolean; // show amounts per month rather than per year
+  onApply: (total: number) => void; // always the ANNUAL total
   onClose: () => void;
 }
 
@@ -21,12 +22,14 @@ interface CategoryQuizProps {
 // (from the category's sub-items) with next / back / done, a running tally, and a result
 // that drops straight into the budget. Rendered as an overlay so it works from either
 // budget skin.
-export default function CategoryQuiz({ categoryKey, categoryLabel, household, config = DEFAULT_CONFIG, onApply, onClose }: CategoryQuizProps) {
+export default function CategoryQuiz({ categoryKey, categoryLabel, household, config = DEFAULT_CONFIG, monthly = false, onApply, onClose }: CategoryQuizProps) {
   const questions = useMemo(() => quizFor(categoryKey, household, config), [categoryKey, household, config]);
   const [i, setI] = useState(0);
   const [answers, setAnswers] = useState<(number | null)[]>(() => questions.map(() => null));
 
   const total = answers.reduce<number>((s, a, idx) => s + (a == null ? 0 : questions[idx].opts[a].amt), 0);
+  const per = monthly ? "/mo" : "/yr";
+  const amt = (annual: number) => fmtCurrency(monthly ? Math.round(annual / 12) : Math.round(annual));
   const done = i >= questions.length;
   const Q = done ? null : questions[i];
 
@@ -52,7 +55,7 @@ export default function CategoryQuiz({ categoryKey, categoryLabel, household, co
               <div key={k} className={`h-1.5 w-6 rounded-full ${k === i ? "bg-accent" : answers[k] != null || done ? "bg-accent/50" : "bg-panel-2 border border-line"}`} />
             ))}
           </div>
-          <div className="text-[11px] tabular-nums text-muted">{done ? "all done ✓" : <>so far <span className="font-bold text-accent">{fmtCurrency(total)}</span>/yr</>}</div>
+          <div className="text-[11px] tabular-nums text-muted">{done ? "all done ✓" : <>so far <span className="font-bold text-accent">{amt(total)}</span>{per}</>}</div>
         </div>
 
         {/* Body */}
@@ -80,7 +83,7 @@ export default function CategoryQuiz({ categoryKey, categoryLabel, household, co
                     {o.sub && <span className="mt-0.5 block text-[11px] text-muted">{o.sub}</span>}
                   </span>
                   <span className={`shrink-0 text-[12px] tabular-nums ${answers[i] === k ? "font-bold text-accent" : "text-muted"}`}>
-                    {o.amt === 0 ? "$0" : `+${fmtCurrency(o.amt)}`}
+                    {o.amt === 0 ? "$0" : `+${amt(o.amt)}${per}`}
                   </span>
                 </button>
               ))}
@@ -90,14 +93,16 @@ export default function CategoryQuiz({ categoryKey, categoryLabel, household, co
           <div className="px-5 py-6 text-center">
             <div className="text-[11px] font-semibold uppercase tracking-wide text-muted">Your {categoryLabel.toLowerCase()} budget</div>
             <div className="mt-1 text-4xl font-extrabold tracking-tight text-accent tabular-nums">
-              {fmtCurrency(total)}<span className="text-base font-medium text-muted">/yr</span>
+              {amt(total)}<span className="text-base font-medium text-muted">{per}</span>
             </div>
-            <div className="mt-1 text-[12px] text-muted">about <span className="font-semibold text-slate-200">{fmtCurrency(Math.round(total / 52))}</span> a week</div>
+            <div className="mt-1 text-[12px] text-muted">
+              about <span className="font-semibold text-slate-200">{monthly ? fmtCurrency(total) : fmtCurrency(Math.round(total / 12))}</span> a {monthly ? "year" : "month"}
+            </div>
             <dl className="mx-auto mt-4 max-w-xs text-left text-[12px]">
               {questions.map((q, idx) => (
                 <div key={q.key} className="flex justify-between border-b border-dashed border-line py-1.5 last:border-0">
                   <dt className="text-muted">{q.key}</dt>
-                  <dd className="tabular-nums text-slate-200">{fmtCurrency(answers[idx] == null ? 0 : q.opts[answers[idx]!].amt)}</dd>
+                  <dd className="tabular-nums text-slate-200">{amt(answers[idx] == null ? 0 : q.opts[answers[idx]!].amt)}</dd>
                 </div>
               ))}
             </dl>
@@ -114,7 +119,7 @@ export default function CategoryQuiz({ categoryKey, categoryLabel, household, co
           </button>
           {done ? (
             <button onClick={() => onApply(total)} className="rounded-lg bg-accent px-5 py-2 text-sm font-semibold text-ink transition hover:bg-accent-soft">
-              Use {fmtCurrency(total)}/yr →
+              Use {amt(total)}{per} →
             </button>
           ) : (
             <button

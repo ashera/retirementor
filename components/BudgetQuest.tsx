@@ -45,6 +45,18 @@ export default function BudgetQuest({
   // Per-category "work it out" quiz — which category's quiz is open (null = none).
   const [quizKey, setQuizKey] = useState<string | null>(null);
 
+  // Show figures monthly or yearly — shared with the classic builder via localStorage so
+  // the choice sticks across both skins. Defaults to monthly (matches the classic builder).
+  const [monthly, setMonthly] = useState(true);
+  useEffect(() => {
+    try { const v = localStorage.getItem("rw:budget-monthly"); if (v != null) setMonthly(v === "1"); } catch { /* ignore */ }
+  }, []);
+  useEffect(() => {
+    try { localStorage.setItem("rw:budget-monthly", monthly ? "1" : "0"); } catch { /* ignore */ }
+  }, [monthly]);
+  const per = monthly ? "/mo" : "/yr";
+  const amt = (annual: number) => fmtCurrency(monthly ? Math.round(annual / 12) : Math.round(annual));
+
   const tone = STATUS_TONE[verdict.status];
   const lastsAge = lastsToLE ? `${plan.lifeExpectancy}+` : depletedAge ?? "—";
   const confPct = Math.round(confidence * 100);
@@ -116,8 +128,8 @@ export default function BudgetQuest({
           </div>
         </div>
         <div className="shrink-0 text-right">
-          <div className="text-[13px] font-semibold tabular-nums text-white">{fmtCurrency(val)}</div>
-          <div className="text-[9px] uppercase tracking-wide text-muted">per year</div>
+          <div className="text-[13px] font-semibold tabular-nums text-white">{amt(val)}</div>
+          <div className="text-[9px] uppercase tracking-wide text-muted">{monthly ? "per month" : "per year"}</div>
         </div>
         <span
           aria-hidden
@@ -155,7 +167,7 @@ export default function BudgetQuest({
               {tierInfo.label}
               {tierInfo.tier === "premium" && <span className="ml-1 text-amber-300">◆</span>}
             </span>
-            <span className="text-sm font-semibold tabular-nums text-slate-300">{fmtCurrency(total)}/yr</span>
+            <span className="text-sm font-semibold tabular-nums text-slate-300">{amt(total)}{per}</span>
           </div>
           <div className="mt-2 flex gap-1" aria-hidden>
             {[0, 1, 2, 3].map((i) => (
@@ -174,12 +186,21 @@ export default function BudgetQuest({
 
         {/* Category allocation — every category is a tappable quiz */}
         <div className="mt-4 rounded-2xl border border-line bg-panel-2/40 p-3">
-          <div className="mb-2 flex items-center gap-1.5 rounded-lg bg-accent/10 px-2.5 py-1.5 text-[11px] font-medium text-accent">
-            <span aria-hidden>🎲</span> Tap a category to answer a few questions and set your number
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5 rounded-lg bg-accent/10 px-2.5 py-1.5 text-[11px] font-medium text-accent">
+              <span aria-hidden>🎲</span> Tap a category to set your number
+            </div>
+            <button
+              type="button"
+              onClick={() => setMonthly((v) => !v)}
+              className="shrink-0 rounded-lg border border-line px-2.5 py-1.5 text-[11px] font-medium text-muted transition hover:text-white"
+            >
+              Show {monthly ? "yearly" : "monthly"}
+            </button>
           </div>
-          <div className="text-[11px] font-semibold uppercase tracking-wide text-muted">Essentials · your floor · {fmtCurrency(split.essential)}/yr</div>
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-muted">Essentials · your floor · {amt(split.essential)}{per}</div>
           <div className="mt-2 space-y-2">{essentials.map((c) => <CatRow key={c.key} meta={c} />)}</div>
-          <div className="mt-4 border-t border-line pt-3 text-[11px] font-semibold uppercase tracking-wide text-amber-300/80">Lifestyle · where it flexes · {fmtCurrency(split.discretionary)}/yr</div>
+          <div className="mt-4 border-t border-line pt-3 text-[11px] font-semibold uppercase tracking-wide text-amber-300/80">Lifestyle · where it flexes · {amt(split.discretionary)}{per}</div>
           <div className="mt-2 space-y-2">{discretionary.map((c) => <CatRow key={c.key} meta={c} />)}</div>
         </div>
       </div>
@@ -221,7 +242,7 @@ export default function BudgetQuest({
 
         {headroom > 1_000 && verdict.status === "good" && (
           <p className="mt-3 text-[12px] leading-snug text-muted">
-            You could add about <span className="font-semibold text-amber-300">{fmtCurrency(Math.round(headroom / 500) * 500)}</span>/yr and still be safe.
+            You could add about <span className="font-semibold text-amber-300">{amt(Math.round(headroom / 500) * 500)}</span>{per} and still be safe.
           </p>
         )}
       </div>
@@ -235,6 +256,7 @@ export default function BudgetQuest({
       categoryLabel={BUDGET_CATEGORY_META.find((c) => c.key === quizKey)?.label ?? "Category"}
       household={household}
       config={config}
+      monthly={monthly}
       onApply={(t) => { setCat(quizKey, t); setQuizKey(null); }}
       onClose={() => setQuizKey(null)}
     />
