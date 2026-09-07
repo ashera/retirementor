@@ -270,10 +270,14 @@ export default function BudgetBuilder({ plan, config, onApply, onProgress, onClo
             {onSwitchToPlay && (
               <button
                 onClick={onSwitchToPlay}
-                className="rounded-lg border border-accent/40 bg-accent/10 px-2.5 py-1.5 text-[11px] font-semibold text-accent transition hover:bg-accent/20"
-                title="Try Budget Quiz — the same budget as a game"
+                className="relative inline-flex items-center gap-1.5 rounded-full bg-amber-400 px-3.5 py-2 text-xs font-bold text-ink shadow-md shadow-amber-500/25 transition hover:brightness-110"
+                title="Try Budget Quiz — set each number by answering a few quick questions"
               >
-                📝 Quiz mode
+                <span aria-hidden>📝</span> Try Quiz mode
+                <span aria-hidden className="absolute -right-1 -top-1 flex h-2.5 w-2.5">
+                  <span className="absolute inline-flex h-full w-full rounded-full bg-amber-300 opacity-75 motion-safe:animate-ping" />
+                  <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-amber-300" />
+                </span>
               </button>
             )}
             <button
