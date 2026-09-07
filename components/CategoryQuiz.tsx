@@ -26,14 +26,22 @@ export default function CategoryQuiz({ categoryKey, categoryLabel, household, co
   const questions = useMemo(() => quizFor(categoryKey, household, config), [categoryKey, household, config]);
   const [i, setI] = useState(0);
   const [answers, setAnswers] = useState<(number | null)[]>(() => questions.map(() => null));
+  // Per-question fine-tuning nudge (annual $), applied on the summary screen.
+  const [adjust, setAdjust] = useState<number[]>(() => questions.map(() => 0));
 
-  const total = answers.reduce<number>((s, a, idx) => s + (a == null ? 0 : questions[idx].opts[a].amt), 0);
   const per = monthly ? "/mo" : "/yr";
   const amt = (annual: number) => fmtCurrency(monthly ? Math.round(annual / 12) : Math.round(annual));
+  // A ± tap moves the displayed number by $10 (so $120/yr when viewing monthly).
+  const stepAnnual = monthly ? 120 : 10;
+  const baseAmt = (idx: number) => (answers[idx] == null ? 0 : questions[idx].opts[answers[idx]!].amt);
+  const lineAmt = (idx: number) => Math.max(0, baseAmt(idx) + adjust[idx]);
+  const total = questions.reduce<number>((s, _q, idx) => s + lineAmt(idx), 0);
   const done = i >= questions.length;
   const Q = done ? null : questions[i];
 
   const choose = (k: number) => setAnswers((prev) => prev.map((a, idx) => (idx === i ? k : a)));
+  const bump = (idx: number, dir: 1 | -1) =>
+    setAdjust((prev) => prev.map((a, k) => (k === idx ? Math.max(-baseAmt(idx), a + dir * stepAnnual) : a)));
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" role="dialog" aria-modal="true">
@@ -98,11 +106,31 @@ export default function CategoryQuiz({ categoryKey, categoryLabel, household, co
             <div className="mt-1 text-[12px] text-muted">
               about <span className="font-semibold text-slate-200">{monthly ? fmtCurrency(total) : fmtCurrency(Math.round(total / 12))}</span> a {monthly ? "year" : "month"}
             </div>
-            <dl className="mx-auto mt-4 max-w-xs text-left text-[12px]">
+            <p className="mx-auto mt-4 max-w-xs text-[11px] text-muted">Fine-tune any line with <span className="font-semibold text-slate-300">−</span> / <span className="font-semibold text-slate-300">+</span> ($10{per} a tap).</p>
+            <dl className="mx-auto mt-2 max-w-xs text-left text-[12px]">
               {questions.map((q, idx) => (
-                <div key={q.key} className="flex justify-between border-b border-dashed border-line py-1.5 last:border-0">
-                  <dt className="text-muted">{q.key}</dt>
-                  <dd className="tabular-nums text-slate-200">{amt(answers[idx] == null ? 0 : q.opts[answers[idx]!].amt)}</dd>
+                <div key={q.key} className="flex items-center justify-between gap-2 border-b border-dashed border-line py-1.5 last:border-0">
+                  <dt className="min-w-0 flex-1 truncate text-muted">{q.key}</dt>
+                  <dd className="flex shrink-0 items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => bump(idx, -1)}
+                      disabled={lineAmt(idx) <= 0}
+                      aria-label={`Decrease ${q.key}`}
+                      className="grid h-6 w-6 place-items-center rounded-full border border-line text-sm font-bold text-muted transition hover:border-accent hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
+                    >
+                      −
+                    </button>
+                    <span className="w-14 text-right tabular-nums text-slate-100">{amt(lineAmt(idx))}</span>
+                    <button
+                      type="button"
+                      onClick={() => bump(idx, 1)}
+                      aria-label={`Increase ${q.key}`}
+                      className="grid h-6 w-6 place-items-center rounded-full border border-line text-sm font-bold text-muted transition hover:border-accent hover:text-white"
+                    >
+                      +
+                    </button>
+                  </dd>
                 </div>
               ))}
             </dl>
