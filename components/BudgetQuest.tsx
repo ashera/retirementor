@@ -118,18 +118,17 @@ export default function BudgetQuest({
         <BudgetCategoryIcon categoryKey={meta.key} size={20} />
         <div className="min-w-0 flex-1">
           <div className="truncate text-[13px] font-semibold text-slate-100">{meta.label}</div>
-          <div className="mt-1 flex items-center gap-2">
-            <span className="flex gap-0.5" aria-hidden>
+          <div className="mt-1 flex min-w-0 items-center gap-1.5">
+            <span className="flex shrink-0 gap-0.5" aria-hidden>
               {[0, 1, 2].map((i) => (
-                <span key={i} className={`h-1.5 w-5 rounded-full ${i <= z.index ? zt.seg : "border border-line bg-panel-2"}`} />
+                <span key={i} className={`h-1.5 w-4 rounded-full ${i <= z.index ? zt.seg : "border border-line bg-panel-2"}`} />
               ))}
             </span>
-            <span className={`text-[10px] font-semibold uppercase tracking-wide ${zt.text}`}>{z.label}</span>
+            <span className={`truncate text-[10px] font-semibold uppercase tracking-wide ${zt.text}`}>{z.label}</span>
           </div>
         </div>
-        <div className="shrink-0 text-right">
-          <div className="text-[13px] font-semibold tabular-nums text-white">{amt(val)}</div>
-          <div className="text-[9px] uppercase tracking-wide text-muted">{monthly ? "per month" : "per year"}</div>
+        <div className="shrink-0 text-right text-[13px] font-semibold tabular-nums text-white">
+          {amt(val)}<span className="ml-0.5 text-[9px] font-medium text-muted">{monthly ? "/mo" : "/yr"}</span>
         </div>
         <span
           aria-hidden
