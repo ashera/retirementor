@@ -344,16 +344,11 @@ export default function PlannerApp({
   // so nothing is re-typed (null → the blank starter, for a cold "enter details").
   const [wizardSeed, setWizardSeed] = useState<RetirementPlan | null>(null);
   const [budgetOpen, setBudgetOpen] = useState(false);
-  // Budget Quiz: opt-in gamified "play mode" that sits alongside the classic builder,
-  // remembered per browser. Both skins drive the same handleBudgetApply / onProgress path.
+  // Budget Quiz: opt-in gamified "play mode" that sits alongside the classic builder.
+  // The classic builder is always the default; the quiz is a per-session opt-in (not
+  // remembered across reloads). Both skins drive the same handleBudgetApply / onProgress path.
   const [budgetPlayMode, setBudgetPlayMode] = useState(false);
-  useEffect(() => {
-    try { setBudgetPlayMode(localStorage.getItem("rw:budget-play") === "1"); } catch { /* ignore */ }
-  }, []);
-  const setBudgetPlay = (on: boolean) => {
-    setBudgetPlayMode(on);
-    try { localStorage.setItem("rw:budget-play", on ? "1" : "0"); } catch { /* ignore */ }
-  };
+  const setBudgetPlay = (on: boolean) => setBudgetPlayMode(on);
   const [lifestageOpen, setLifestageOpen] = useState(false);
   const [selectedAge, setSelectedAge] = useState<number | null>(null);
   // The main balance chart toggles between "balance" (super + outside) and

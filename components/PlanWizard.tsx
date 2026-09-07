@@ -163,14 +163,9 @@ export default function PlanWizard({
   const [step, setStep] = useState(0);
   const [view, setView] = useState<"summary" | "step">("summary");
   const [budgetOpen, setBudgetOpen] = useState(false); // budget builder, nested over the wizard
-  const [budgetPlayMode, setBudgetPlayMode] = useState(false); // Budget Quiz opt-in play mode
-  useEffect(() => {
-    try { setBudgetPlayMode(localStorage.getItem("rw:budget-play") === "1"); } catch { /* ignore */ }
-  }, []);
-  const setBudgetPlay = (on: boolean) => {
-    setBudgetPlayMode(on);
-    try { localStorage.setItem("rw:budget-play", on ? "1" : "0"); } catch { /* ignore */ }
-  };
+  // Classic builder is always the default; the Budget Quiz is a per-session opt-in.
+  const [budgetPlayMode, setBudgetPlayMode] = useState(false);
+  const setBudgetPlay = (on: boolean) => setBudgetPlayMode(on);
 
   // Explicit "have you told us?" state for the optional sections that otherwise
   // default to $0 (so we can't tell "none" from "not answered yet"). Seeded from
