@@ -78,6 +78,21 @@ describe("buildTimeline — structure & invariants", () => {
     expect(tl.headline).toContain("lasts to 90");
   });
 
+  it("narrates downsizing the family home", () => {
+    const plan: RetirementPlan = {
+      ...GOOD,
+      homeowner: true,
+      home: { value: 1_200_000, growthReal: 2, downsize: { atAge: 70, newValue: 700_000, toSuper: 300_000 } },
+    };
+    const { tl } = story(plan, 98);
+    const dz = tl.beats.find((b) => b.kind === "downsize");
+    expect(dz, "a downsize beat should exist").toBeTruthy();
+    expect(dz!.age).toBe(70);
+    expect(dz!.title.toLowerCase()).toContain("downsize");
+    expect(dz!.fact.length).toBeGreaterThan(0);
+    expect(dz!.vignette, "downsizing carries emotional colour on a healthy plan").toBeTruthy();
+  });
+
   it("stays honest when the plan runs short — no beats past the shortfall, no vignettes", () => {
     const { result, tl } = story(SHORT, 20);
     expect(result.lastsToLifeExpectancy).toBe(false);

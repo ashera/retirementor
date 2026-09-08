@@ -85,6 +85,13 @@ const VIG = {
   mortgage: [
     "The keys are wholly yours now. No repayment to make room for — every dollar goes further.",
   ],
+  downsize: [
+    "A home full of memories becomes a lighter, simpler place to be — bittersweet, and quietly freeing.",
+    "Less house to look after, more life to enjoy — and the equity you built quietly goes to work for the years ahead.",
+  ],
+  sellRent: [
+    "Handing over the keys is a big step — but it trades bricks and upkeep for freedom and flexibility.",
+  ],
   pension: [
     "A steady government top-up arrives, taking some of the weight off your own savings.",
   ],
@@ -325,6 +332,52 @@ export function buildTimeline(
     }
   });
 
+  // ── The family home: downsizing, or selling up to rent (a big, emotional move) ─
+  let homeMoveAge: number | null = null;
+  const homeMoveRow = result.rows.find((r) => (r.breakdown.homeProceeds ?? 0) > 0) ?? null;
+  if (plan.home?.downsize) {
+    const dz = plan.home.downsize;
+    const r = rowAt(dz.atAge) ?? homeMoveRow;
+    const freed = r?.breakdown.homeProceeds ?? 0;
+    const toSuper = r?.breakdown.homeProceedsToSuper ?? 0;
+    const age = r ? r.age : dz.atAge;
+    homeMoveAge = age;
+    add({
+      id: "downsize",
+      order: 6,
+      age,
+      icon: "🏡",
+      kind: "downsize",
+      title: "You downsize the family home",
+      fact:
+        freed > 0
+          ? `Moving to a ${$(dz.newValue)} home frees about ${$(freed)}${toSuper > 0 ? `, with ${$(toSuper)} going into super as a downsizer contribution` : ""}.`
+          : `You move to a smaller ${$(dz.newValue)} home, freeing up equity for the years ahead.`,
+      bert: { pose: "bicycle", line: "“A big move — and a real lift to the plan. The house was always more than an asset.”" },
+      vignette: vig(VIG.downsize),
+    });
+  } else if (plan.home?.sellAndRent) {
+    const sr = plan.home.sellAndRent;
+    const r = rowAt(sr.atAge) ?? homeMoveRow;
+    const freed = r?.breakdown.homeProceeds ?? 0;
+    const age = r ? r.age : sr.atAge;
+    homeMoveAge = age;
+    add({
+      id: "sell-and-rent",
+      order: 6,
+      age,
+      icon: "🧳",
+      kind: "sell-and-rent",
+      title: "You sell up and rent",
+      fact:
+        freed > 0
+          ? `Selling the home releases about ${$(freed)} into your savings; from here you rent, at about ${$(sr.rentPerYear)}/yr.`
+          : `You sell the home and rent from here, at about ${$(sr.rentPerYear)}/yr.`,
+      bert: { pose: "glasses", line: "“Turning the home into flexibility and cash — a different kind of security.”" },
+      vignette: vig(VIG.sellRent),
+    });
+  }
+
   // ── Mortgage cleared (with-super lump, or a P&I payoff) ─────────────────────
   let clearAge: number | null = null;
   let clearLump = 0;
@@ -345,6 +398,8 @@ export function buildTimeline(
       }
       prev = c;
     }
+    // A P&I loan repaid as part of a home move isn't its own beat — the move covers it.
+    if (clearAge != null && clearAge === homeMoveAge) clearAge = null;
   }
   if (clearAge != null && clearAge > oldest) {
     add({
