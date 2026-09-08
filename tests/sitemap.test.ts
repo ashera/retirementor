@@ -22,6 +22,7 @@ const EXCLUDED = new Set<string>([
   "/wizard-preview", // internal preview page
   "/stress-test", // per-user tool route (reads your local plan) — noindex
   "/what-if", // per-user tool route — noindex
+  "/timeline", // per-user tool route (reads your local plan) — noindex
 ]);
 
 /** Every route that has a page.tsx, excluding /admin and dynamic ([param]) segments. */

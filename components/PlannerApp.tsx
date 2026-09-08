@@ -263,6 +263,9 @@ export default function PlannerApp({
   // the viewer's own plan; signed-in/normal visitors go to the regular sandbox.
   const whatIfHref = sharedPlan ? `${sharedPlan.basePath}/what-if` : "/what-if";
   const stressHref = sharedPlan ? `${sharedPlan.basePath}/stress-test` : "/stress-test";
+  // The retirement-timeline story reads the viewer's own stored plan; the shared
+  // read-only variant is a later phase, so only expose it in the normal view.
+  const timelineHref = sharedPlan ? undefined : "/timeline";
   const router = useRouter();
   // Config arrives as a server prop, so every server re-render (e.g. after a save
   // that revalidates "/") hands us a NEW object with the same VALUE. Left raw, that
@@ -1653,6 +1656,7 @@ export default function PlannerApp({
         loading={heroWarming || successPct == null || safeLiving == null || failsafeLiving == null}
         whatIfHref={whatIfHref}
         stressHref={stressHref}
+        timelineHref={timelineHref}
         scenarioName={shared ? null : activeName}
         hasNotes={!!(((activePlan && (notesOverride[activePlan.id] ?? activePlan.notes)) || "") as string).trim()}
         onManage={user && !shared ? () => setScenarioModalOpen(true) : null}

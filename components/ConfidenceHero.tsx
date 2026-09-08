@@ -48,6 +48,7 @@ export interface ConfidenceHeroProps {
   loading: boolean; // first load — no real safe/failsafe tier yet, so show a skeleton not fallbacks
   whatIfHref: string;
   stressHref: string;
+  timelineHref?: string;
   // Folded-in scenario identity (see PlannerApp's Manage modal).
   scenarioName: string | null;
   hasNotes: boolean;
@@ -87,6 +88,7 @@ export default function ConfidenceHero({
   loading,
   whatIfHref,
   stressHref,
+  timelineHref,
   scenarioName,
   hasNotes,
   onManage,
@@ -320,7 +322,7 @@ export default function ConfidenceHero({
           </div>
 
           <p className="mt-7 text-sm leading-relaxed text-muted">
-            Two ways to go further with this plan.{" "}
+            A few ways to go further with this plan.{" "}
             <b className="font-semibold text-slate-200">What-If</b> lets you try strategies — downsizing, retiring earlier,
             recontributing to super — and see the effect on your income and how long your money lasts.{" "}
             <b className="font-semibold text-slate-200">Pressure testing</b> replays your plan through real market history —
@@ -340,6 +342,14 @@ export default function ConfidenceHero({
             >
               Pressure test it with History <span aria-hidden className="text-accent">→</span>
             </Link>
+            {timelineHref && (
+              <Link
+                href={timelineHref}
+                className="rounded-xl border border-accent/40 bg-accent/10 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:border-accent/70 hover:bg-accent/20"
+              >
+                See your retirement story <span aria-hidden className="text-accent">→</span>
+              </Link>
+            )}
           </div>
           </>
           )}
