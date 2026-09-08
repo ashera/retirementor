@@ -35,6 +35,7 @@ import {
   type StrategyGoal,
 } from "@/lib/au/strategies";
 import { toActiveScenario, fromActiveScenario } from "@/lib/au/scenario";
+import { bestSellYear, type SellYearResult } from "@/lib/au/sellTiming";
 import RetirementChart from "@/components/RetirementChart";
 import { ageGapInfo } from "@/components/ageAxis";
 import Bert from "@/components/Bert";
@@ -787,6 +788,11 @@ export default function WhatIfView({
           }
         : undefined,
     deathTaxRatePct: config.superDeathBenefit.taxedElementRatePct + config.superDeathBenefit.medicareLevyPct,
+    // "Find the best year to sell" — scans sell ages for the one leaving the most
+    // wealth, on top of the other active levers. Only investment-property cards.
+    sellSolver: card.id.startsWith("sell-prop-")
+      ? () => bestSellYear(baseline, { active: [...active], values }, config, card.id)
+      : undefined,
   });
 
   // Heading back to the planner: flush the active scenario to BOTH the working plan
@@ -1643,11 +1649,14 @@ function StrategyCardRow({
   guardrails,
   sustainable,
   deathTaxRatePct,
+  sellSolver,
 }: {
   card: StrategyCard;
   on: boolean;
   delta: Marginal;
   deathTaxRatePct: number;
+  sellSolver?: () => SellYearResult | null; // sell-property cards only
+
   // The 85% "Extra you could spend" figure — computed on demand (null for cards where
   // it isn't meaningful, e.g. Adjust spending). `stale` = inputs changed since it ran.
   income: IncomeCalc;
@@ -1692,6 +1701,7 @@ function StrategyCardRow({
     onSetSafe: () => void;
   };
 }) {
+  const [sellFit, setSellFit] = useState<SellYearResult | null>(null);
   // Guardrails figures are computed on LIVING spend (what flexes); add the fixed
   // home loan so the card shows TOTAL spend, consistent with the "Your spending"
   // bar (the loan is never trimmed — it behaves like an essential).
@@ -1901,6 +1911,40 @@ function StrategyCardRow({
               />
             );
           })}
+          {/* Solver: find the sell age that leaves the most wealth. */}
+          {sellSolver && (
+            <div className="space-y-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const r = sellSolver();
+                  setSellFit(r);
+                  if (r) onParam("age", r.bestAge);
+                }}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-accent/50 bg-accent/10 px-3 py-2 text-sm font-semibold text-accent transition hover:bg-accent/20"
+              >
+                <span aria-hidden>✨</span> Find the best year to sell
+              </button>
+              {sellFit && (
+                <div className="rounded-lg border border-line bg-panel-2 px-3 py-2.5 text-xs leading-relaxed text-slate-300">
+                  Selling at <span className="font-semibold text-white">age {sellFit.bestAge}</span> leaves the most —
+                  about <span className="font-semibold text-accent tabular-nums">{fmtCompact(sellFit.bestNetWorth)}</span> at {life}.
+                  {sellFit.currentNetWorth != null && sellFit.gainVsCurrent > 500 && (
+                    <> That&apos;s <span className="font-semibold text-accent tabular-nums">+{fmtCompact(sellFit.gainVsCurrent)}</span> vs your current age&nbsp;{sellFit.currentAge}.</>
+                  )}
+                  {sellFit.currentNetWorth != null && sellFit.gainVsCurrent <= 500 && sellFit.currentAge === sellFit.bestAge && (
+                    <> Your current year is already the best.</>
+                  )}
+                  {!sellFit.sellBeatsHold && (
+                    <span className="mt-1 block text-amber-300/90">
+                      Heads-up: holding it for life leaves more again (~{fmtCompact(sellFit.holdNetWorth)}) — selling isn&apos;t the wealth-max move for this plan.
+                    </span>
+                  )}
+                  <span className="mt-1 block text-[11px] text-muted">Maximises net worth at {life}, weighing growth &amp; rent kept against CGT and the means test.</span>
+                </div>
+              )}
+            </div>
+          )}
           {/* Live take-home hit while working (only shows when the lever moves it). */}
           {baseTakeHome > 0 && Math.round(delta.takeHomeNow) !== Math.round(baseTakeHome) && (
             <div className="flex items-center justify-between gap-3 rounded-lg border border-line bg-panel-2 px-3 py-2 text-xs">
