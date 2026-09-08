@@ -2325,6 +2325,7 @@ export default function PlannerApp({
           initial={configured ? base : (wizardSeed ?? BLANK_STARTER)}
           configured={configured}
           config={config}
+          strategies={strategies}
           onComplete={handleComplete}
           onProgress={(d) => {
             // Continuous save: mirror the wizard's progress into the live plan so it's

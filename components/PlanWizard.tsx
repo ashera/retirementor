@@ -13,7 +13,8 @@ import { runMonteCarlo, MC_CONFIDENCE_MC, MC_CONFIDENCE_TARGET } from "@/lib/au/
 import type { EngineConfig } from "@/lib/au/config";
 import { fmtCompact, fmtCurrency } from "@/lib/au/format";
 import { planCompleteness } from "@/lib/au/completeness";
-import { essentialsFloor } from "@/lib/au/strategies";
+import { essentialsFloor, appliedStrategies } from "@/lib/au/strategies";
+import { fromActiveScenario, type StrategyLayer } from "@/lib/au/scenario";
 import { mortgageAnnualCost } from "@/lib/au/mortgage";
 import InfoTip from "@/components/InfoTip";
 import { WizardHeaderCard } from "@/components/WizardArt";
@@ -56,6 +57,12 @@ interface PlanWizardProps {
   /** Called on every "Next" so the host can save progress as the user advances. */
   onProgress?: (plan: RetirementPlan) => void;
   onClose: () => void;
+  /**
+   * The active What-If strategy layer, if any. The wizard edits the BASE plan facts,
+   * so its preview excludes these boosts; we surface the composed (dashboard) figure
+   * as a reconciling note so the two surfaces don't silently disagree.
+   */
+  strategies?: StrategyLayer;
 }
 
 type OptMode = "no" | "yes";
@@ -158,6 +165,7 @@ export default function PlanWizard({
   onComplete,
   onProgress,
   onClose,
+  strategies,
 }: PlanWizardProps) {
   const [draft, setDraft] = useState<RetirementPlan>(initial);
   const [step, setStep] = useState(0);
@@ -303,6 +311,25 @@ export default function PlanWizard({
   );
   const successPct = previewMc ? Math.round(previewMc.successRate * 100) : 0;
   const passesBar = previewMc ? previewMc.successRate >= MC_CONFIDENCE_TARGET : false;
+
+  // The wizard edits BASE plan facts; the dashboard shows the BASE + active What-If
+  // layer (composed). When boosts are active, compose them onto the live draft so we
+  // can show the dashboard figure + delta as a reconciling note (keeps it live as the
+  // user edits, and stops the two surfaces silently disagreeing — e.g. salary-sacrifice
+  // adding ~$118k to super at retirement).
+  const composedPreview = useMemo(() => {
+    if (!previewReady || !strategies || strategies.active.length === 0) return null;
+    // fromActiveScenario re-composes the layer onto the draft AND re-attaches the
+    // whatIf bookmark, so appliedStrategies can name bookmark-only levers (e.g.
+    // salary-sacrifice) — composeScenario alone strips the bookmark.
+    const composed = fromActiveScenario({ base: draft, strategies, name: null, savedId: null, dirty: false }, config);
+    return {
+      superAtRetirement: simulate(composed, config).superAtRetirement,
+      labels: appliedStrategies(composed, config).map((s) => s.label),
+    };
+  }, [previewReady, strategies, draft, config]);
+  const superBoost = composedPreview ? composedPreview.superAtRetirement - preview.superAtRetirement : 0;
+  const showBoostNote = !!composedPreview && Math.abs(superBoost) >= 500 && composedPreview.labels.length > 0;
 
   // ── Family home (its own wizard step) ──────────────────────────────────────
   // Edits the same plan fields the budget reads (homeowner / home / mortgage). Tenure
@@ -1380,27 +1407,37 @@ export default function PlanWizard({
 
         {/* Live preview */}
         {previewReady ? (
-          <div className="mx-6 mb-2 flex items-center justify-between rounded-xl border border-line bg-panel-2 px-4 py-3">
-            <div>
-              <div className="text-xs text-muted">Super at retirement <span className="text-muted/70">(today&apos;s $)</span></div>
-              <div className="text-base font-bold tabular-nums text-white">
-                {fmtCurrency(preview.superAtRetirement)}
+          <div className="mx-6 mb-2 rounded-xl border border-line bg-panel-2 px-4 py-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-xs text-muted">Super at retirement <span className="text-muted/70">(today&apos;s $)</span></div>
+                <div className="text-base font-bold tabular-nums text-white">
+                  {fmtCurrency(preview.superAtRetirement)}
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-xs text-muted">Chance it lasts to {draft.lifeExpectancy}</div>
+                <div
+                  className={`text-base font-bold tabular-nums ${
+                    successPct >= Math.round(MC_CONFIDENCE_TARGET * 100)
+                      ? "text-accent"
+                      : successPct >= 60
+                        ? "text-amber-400"
+                        : "text-red-400"
+                  }`}
+                >
+                  {successPct}%{passesBar ? " ✓" : ""}
+                </div>
               </div>
             </div>
-            <div className="text-right">
-              <div className="text-xs text-muted">Chance it lasts to {draft.lifeExpectancy}</div>
-              <div
-                className={`text-base font-bold tabular-nums ${
-                  successPct >= Math.round(MC_CONFIDENCE_TARGET * 100)
-                    ? "text-accent"
-                    : successPct >= 60
-                      ? "text-amber-400"
-                      : "text-red-400"
-                }`}
-              >
-                {successPct}%{passesBar ? " ✓" : ""}
+            {showBoostNote && (
+              <div className="mt-2 border-t border-line pt-2 text-[11px] leading-snug text-amber-300/90">
+                <span aria-hidden>⚙️</span> This is your <span className="font-semibold">base plan</span> — before What-If boosts.
+                With {composedPreview!.labels.join(", ")} applied, the dashboard shows{" "}
+                <span className="font-semibold text-amber-200">{fmtCurrency(composedPreview!.superAtRetirement)}</span>{" "}
+                ({superBoost >= 0 ? "+" : "−"}{fmtCurrency(Math.abs(superBoost))}).
               </div>
-            </div>
+            )}
           </div>
         ) : (
           <div className="mx-6 mb-2 rounded-xl border border-line bg-panel-2 px-4 py-3 text-center text-xs text-muted">
