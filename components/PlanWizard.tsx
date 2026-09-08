@@ -36,6 +36,32 @@ import {
   type SuperMode,
 } from "@/lib/au/types";
 
+// Natural-prose names for What-If strategies, so the wizard's reconciling note reads
+// as a sentence ("with your boost applied (extra salary sacrifice)…") rather than
+// dropping in the imperative board labels ("Salary-sacrifice more"). Keyed by id;
+// falls back to the lower-cased label for anything not listed.
+const STRATEGY_PHRASE: Record<string, string> = {
+  "salary-sacrifice": "extra salary sacrifice",
+  "retire-later": "retiring later",
+  "adjust-spending": "your adjusted spending",
+  downsize: "downsizing your home",
+  "sell-and-rent": "selling up and renting",
+  "clear-mortgage": "clearing the mortgage with super",
+  "keep-accumulation": "keeping super in accumulation",
+  recontribute: "recontributing savings to super",
+  "lump-sum": "taking a lump sum",
+  ttr: "a transition-to-retirement strategy",
+  "debt-recycle": "debt recycling",
+  "part-time-work": "part-time work in early retirement",
+  guardrails: "flexible spending",
+};
+const strategyPhrase = (id: string, label: string): string => {
+  if (STRATEGY_PHRASE[id]) return STRATEGY_PHRASE[id];
+  if (id.startsWith("gap-years")) return "gap years off work";
+  if (id.startsWith("sell-prop")) return "selling an investment property";
+  return label.charAt(0).toLowerCase() + label.slice(1);
+};
+
 const DEFAULT_PROPERTY: PropertyDetail = {
   value: 600_000,
   growthReal: 2,
@@ -325,11 +351,11 @@ export default function PlanWizard({
     const composed = fromActiveScenario({ base: draft, strategies, name: null, savedId: null, dirty: false }, config);
     return {
       superAtRetirement: simulate(composed, config).superAtRetirement,
-      labels: appliedStrategies(composed, config).map((s) => s.label),
+      phrases: appliedStrategies(composed, config).map((s) => strategyPhrase(s.id, s.label)),
     };
   }, [previewReady, strategies, draft, config]);
   const superBoost = composedPreview ? composedPreview.superAtRetirement - preview.superAtRetirement : 0;
-  const showBoostNote = !!composedPreview && Math.abs(superBoost) >= 500 && composedPreview.labels.length > 0;
+  const showBoostNote = !!composedPreview && Math.abs(superBoost) >= 500 && composedPreview.phrases.length > 0;
 
   // ── Family home (its own wizard step) ──────────────────────────────────────
   // Edits the same plan fields the budget reads (homeowner / home / mortgage). Tenure
@@ -1433,7 +1459,11 @@ export default function PlanWizard({
             {showBoostNote && (
               <div className="mt-2 border-t border-line pt-2 text-[11px] leading-snug text-amber-300/90">
                 <span aria-hidden>⚙️</span> This is your <span className="font-semibold">base plan</span> — before What-If boosts.
-                With {composedPreview!.labels.join(", ")} applied, the dashboard shows{" "}
+                On the dashboard, with{" "}
+                {composedPreview!.phrases.length > 1
+                  ? `these boosts (${composedPreview!.phrases.join(", ")})`
+                  : composedPreview!.phrases[0]}
+                , super at retirement is{" "}
                 <span className="font-semibold text-amber-200">{fmtCurrency(composedPreview!.superAtRetirement)}</span>{" "}
                 ({superBoost >= 0 ? "+" : "−"}{fmtCurrency(Math.abs(superBoost))}).
               </div>
