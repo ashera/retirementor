@@ -17,6 +17,7 @@ import ReportStressChart from "@/components/ReportStressChart";
 import ReportExplainers from "@/components/ReportExplainers";
 import { lifestageBreakdown } from "@/lib/au/lifestages";
 import { BUDGET_CATEGORY_META } from "@/lib/au/budget";
+import { buildTimeline, phaseLabel, type TimelinePhase } from "@/lib/au/timeline";
 
 const money = (n: number) => fmtCurrency(Math.round(n));
 
@@ -122,6 +123,17 @@ export default function ReportView({
       ].filter((b) => b.x2 > b.x1)
     : undefined;
   const ls = lifestageBreakdown(plan, config);
+
+  // "Your retirement, year by year" — the plain-language story of the plan, built
+  // from the same milestones the timeline page uses (facts + illustrative colour;
+  // Bert's quips are left to the interactive page — a printed report stays sober).
+  const timeline = buildTimeline(plan, result, config, { mcPct: mc.successRate * 100 });
+  const storyChapters: { phase: TimelinePhase; beats: typeof timeline.beats }[] = [];
+  for (const beat of timeline.beats) {
+    const last = storyChapters[storyChapters.length - 1];
+    if (last && last.phase === beat.phase) last.beats.push(beat);
+    else storyChapters.push({ phase: beat.phase, beats: [beat] });
+  }
 
   // Per-category budget breakdown for the report, below the spending table.
   // When the user has built a budget we show their own category amounts;
@@ -297,6 +309,48 @@ export default function ReportView({
             <RetirementChart result={result} bands={bands} animate={false} height={200} wageInflationPct={wageInfl} cpiPct={plan.inflation} ages={ageGapInfo(plan)} lifeEvents={plan.lifeEvents} agedCare={plan.agedCare?.enabled ? { entryAge: plan.agedCare.entryAge, durationYears: plan.agedCare.durationYears } : null} plan={plan} />
           </div>
         </Section>
+
+        {/* ───────── Your retirement, year by year (the narrative) ───────── */}
+        {timeline.beats.length > 0 && (
+          <div className="break-before-page">
+            <Section title="Your retirement, year by year" allowBreak>
+              <Lead>
+                A plain-language walk through the projection above — the milestones in the order they arrive. The
+                amber notes are illustrative colour to bring the years to life; every figure is drawn from the plan.
+              </Lead>
+              <div className="space-y-4">
+                {storyChapters.map((ch, ci) => {
+                  const label = phaseLabel(ch.phase, staged);
+                  return (
+                    <div key={ci} className="break-inside-avoid">
+                      {label && (
+                        <div className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-teal-700">{label}</div>
+                      )}
+                      <div className="space-y-2.5">
+                        {ch.beats.map((b) => (
+                          <div key={b.id} className="break-inside-avoid border-l-2 border-slate-200 pl-3">
+                            <div className="text-[10px] font-semibold tabular-nums text-teal-700">
+                              {b.yearLabel ?? b.year}
+                              <span className="ml-1 font-normal text-slate-400">· age {b.age}</span>
+                            </div>
+                            <div className="text-sm font-bold text-slate-800">{b.title}</div>
+                            <div className="text-xs leading-relaxed text-slate-600">{b.fact}</div>
+                            {b.vignette && (
+                              <div className="mt-1 text-xs italic leading-relaxed text-amber-700">{b.vignette}</div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="mt-3 text-[10px] leading-snug text-slate-500">
+                An illustrative story built from this plan&apos;s projection — not a guarantee. Figures are in today&apos;s dollars.
+              </p>
+            </Section>
+          </div>
+        )}
 
         {/* ───────── PAGE 2: Income sources · Lifestages ───────── */}
         <div className="break-before-page">
