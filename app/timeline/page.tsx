@@ -12,5 +12,5 @@ export default async function TimelinePage() {
     user ? listPlans() : Promise.resolve([]),
     getActiveConfig(),
   ]);
-  return <TimelineView config={config} savedPlans={savedPlans} />;
+  return <TimelineView config={config} savedPlans={savedPlans} signedIn={!!user} />;
 }

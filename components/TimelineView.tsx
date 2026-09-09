@@ -12,6 +12,7 @@ import { buildTimeline, phaseLabel, type TimelinePhase } from "@/lib/au/timeline
 import { track } from "@/lib/analytics";
 import Bert from "@/components/Bert";
 import YearDetailModal from "@/components/YearDetailModal";
+import ShareControl from "@/components/ShareControl";
 
 const PLAN_KEY = "au-retirement-plan";
 const SAVED_ID_KEY = "au-retirement-saved-id";
@@ -27,15 +28,19 @@ export default function TimelineView({
   config,
   savedPlans,
   sharedPlan = null,
+  signedIn = false,
 }: {
   config: EngineConfig;
   savedPlans: SavedPlan[];
   sharedPlan?: { plan: RetirementPlan; name: string; basePath: string } | null;
+  signedIn?: boolean;
 }) {
   const shared = !!sharedPlan;
   const [plan, setPlan] = useState<RetirementPlan | null>(null);
   const [savedName, setSavedName] = useState<string | null>(null);
+  const [savedId, setSavedId] = useState<string | null>(null);
   const [openAge, setOpenAge] = useState<number | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
     if (sharedPlan) {
@@ -48,6 +53,7 @@ export default function TimelineView({
       const raw = localStorage.getItem(PLAN_KEY);
       if (raw) setPlan({ ...DEFAULT_PLAN, ...JSON.parse(raw) });
       const id = localStorage.getItem(SAVED_ID_KEY);
+      setSavedId(id);
       if (id) setSavedName(savedPlans.find((s) => s.id === id)?.name ?? null);
     } catch {
       /* no stored plan → empty state */
@@ -55,6 +61,18 @@ export default function TimelineView({
     track("Timeline viewed");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Auto-dismiss the "link copied" toast.
+  useEffect(() => {
+    if (!notice) return;
+    const t = setTimeout(() => setNotice(null), 4000);
+    return () => clearTimeout(t);
+  }, [notice]);
+
+  // The public share link attaches to the SAVED scenario; only offer it to a
+  // signed-in owner whose timeline is a saved plan (not a guest or a shared view).
+  const shareToken = savedId ? savedPlans.find((s) => s.id === savedId)?.share_token ?? null : null;
+  const canShare = !shared && signedIn && !!savedId;
 
   const built =
     !!plan &&
@@ -120,9 +138,22 @@ export default function TimelineView({
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
         <Link href={homeHref} className="font-medium text-muted hover:text-white">← {shared ? "Back" : "RetireWiz"}</Link>
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/[0.08] px-3 py-1 text-[11px] font-semibold text-amber-300">
-          ◆ Illustrative story · not a guarantee
-        </span>
+        <div className="flex flex-wrap items-center gap-2">
+          {canShare && (
+            <ShareControl
+              id={savedId!}
+              initialToken={shareToken}
+              onNotice={setNotice}
+              linkPath="/timeline"
+              shareLabel="🔗 Share this story"
+              copyLabel="🔗 Copy story link"
+              copiedNotice="Timeline link copied — anyone with it can view your retirement story (read-only)."
+            />
+          )}
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/[0.08] px-3 py-1 text-[11px] font-semibold text-amber-300">
+            ◆ Illustrative story · not a guarantee
+          </span>
+        </div>
       </div>
 
       <header className="mt-6">
@@ -251,6 +282,14 @@ export default function TimelineView({
           canPrev={openAge != null && openAge > minAge}
           canNext={openAge != null && openAge < maxAge}
         />
+      )}
+
+      {notice && (
+        <div className="fixed inset-x-0 bottom-6 z-50 flex justify-center px-4" role="status" aria-live="polite">
+          <div className="max-w-md rounded-xl border border-accent/40 bg-panel px-4 py-2.5 text-sm text-slate-100 shadow-lg">
+            {notice}
+          </div>
+        </div>
       )}
     </main>
   );

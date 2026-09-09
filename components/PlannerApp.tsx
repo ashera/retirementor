@@ -54,10 +54,9 @@ import {
   createScenario,
   setActivePlan,
   getOrCreateActiveScenario,
-  createShareLink,
-  revokeShareLink,
   type SavedPlan,
 } from "@/app/actions/plans";
+import ShareControl from "@/components/ShareControl";
 import { simulate } from "@/lib/au/simulate";
 import type { EngineConfig } from "@/lib/au/config";
 import { fmtCurrency } from "@/lib/au/format";
@@ -145,93 +144,6 @@ function LegendDot({ color, label }: { color: string; label: string }) {
       />
       {label}
     </span>
-  );
-}
-
-/** Per-scenario share control: mints (or reuses) a public read-only link, copies
- *  it to the clipboard, and lets the owner revoke it. Lives in the saved-scenarios
- *  chip beside the Report/Delete actions. */
-function ShareControl({
-  id,
-  initialToken,
-  onNotice,
-}: {
-  id: string;
-  initialToken: string | null;
-  onNotice: (msg: string) => void;
-}) {
-  const [token, setToken] = useState<string | null>(initialToken);
-  const [busy, setBusy] = useState(false);
-
-  const linkFor = (t: string) =>
-    `${typeof window !== "undefined" ? window.location.origin : ""}/s/${t}`;
-
-  const copy = async (url: string) => {
-    try {
-      await navigator.clipboard.writeText(url);
-      onNotice("Share link copied — anyone with it can view this scenario (read-only).");
-    } catch {
-      onNotice(`Share link: ${url}`); // clipboard blocked — show it so they can copy manually
-    }
-  };
-
-  const share = async () => {
-    if (busy) return;
-    if (token) return void copy(linkFor(token));
-    setBusy(true);
-    try {
-      const res = await createShareLink(id);
-      if (res.token) {
-        setToken(res.token);
-        await copy(linkFor(res.token));
-      } else {
-        onNotice(res.error ?? "Couldn't create a share link.");
-      }
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const revoke = async () => {
-    if (busy) return;
-    setBusy(true);
-    try {
-      await revokeShareLink(id);
-      setToken(null);
-      onNotice("Share link revoked — the public link no longer works.");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return token ? (
-    <div className="inline-flex items-center overflow-hidden rounded-lg border border-line bg-panel-2 text-sm">
-      <button
-        onClick={share}
-        disabled={busy}
-        title="Copy the public read-only link"
-        className="px-3 py-1.5 font-medium text-accent transition hover:bg-accent/10 disabled:opacity-60"
-      >
-        🔗 Copy link
-      </button>
-      <button
-        onClick={revoke}
-        disabled={busy}
-        title="Disable the public link"
-        className="border-l border-line px-2 py-1.5 text-muted transition hover:text-red-400 disabled:opacity-60"
-      >
-        unshare
-      </button>
-    </div>
-  ) : (
-    <button
-      onClick={share}
-      disabled={busy}
-      title="Create a public read-only link to send someone"
-      className="rounded-lg border border-line bg-panel-2 px-3 py-1.5 text-sm font-medium text-slate-200 transition hover:border-accent/50 hover:text-white disabled:opacity-60"
-    >
-      🔗 Share
-    </button>
   );
 }
 
