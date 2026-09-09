@@ -7,7 +7,7 @@
 import type { RetirementPlan, SimResult } from "./types";
 import { getCareerBreaks, getInvestmentProperties, personRetirementOffset, startingSuperBalances } from "./types";
 import { fmtCurrency } from "./format";
-import { propertyValueAt, capitalGainsTax, netSaleProceeds } from "./property";
+import { propertyValueAt, netSaleProceeds } from "./property";
 import { budgetSplit, budgetTotal, isEssential, presetCategories } from "./budget";
 import { incomeTax, medicareLevy } from "./tax";
 import { simulate } from "./simulate";
@@ -424,13 +424,13 @@ export function buildStrategyCatalog(
             "peak at a mid-range age, then fall. Slide through a few ages to find the sweet spot.",
         },
       ],
-      // Live tax read-out at the chosen sale age: sale price, CGT and what's left.
+      // Live read-out at the chosen sale age: the net that lands in savings (after
+      // CGT and clearing the loan — the blurb already says as much, so keep it to the
+      // one number that matters).
       note: (v) => {
         const value = propertyValueAt(pr, Math.max(0, v.age - oldest));
-        const cgt = capitalGainsTax(pr, value, cgtRules);
-        const loan = pr.loanBalance ?? 0;
         const net = netSaleProceeds(pr, value, cgtRules);
-        return `At age ${v.age}: sells for ~${fmtCurrency(value)}${loan ? `, less the ${fmtCurrency(loan)} loan` : ""}, less ~${fmtCurrency(cgt)} CGT → ~${fmtCurrency(net)} into savings.`;
+        return `At age ${v.age}, about ${fmtCurrency(net)} lands in your savings.`;
       },
       apply: (p, v) => {
         const arr = getInvestmentProperties(p).map((q, qi) =>

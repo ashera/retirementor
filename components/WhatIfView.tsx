@@ -1813,7 +1813,10 @@ function StrategyCardRow({
             <span className="rounded-full bg-panel-2 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted">
               Stress test
             </span>
-          ) : (
+          ) : !on ? (
+            // A preview of the effect while the lever is OFF. Once it's ON the
+            // ImpactBreakdown below shows the same figures, so we drop the chip to
+            // avoid printing every number twice.
             <DeltaChip
               years={delta.years}
               moneyLeft={delta.moneyLeft}
@@ -1822,7 +1825,7 @@ function StrategyCardRow({
               incomePending={income?.computing ?? false}
               life={life}
             />
-          )}
+          ) : null}
         </div>
       </div>
 
@@ -1933,21 +1936,14 @@ function StrategyCardRow({
                 <span aria-hidden>✨</span> {sellSolving ? "Finding the best year…" : "Find the best year to sell"}
               </button>
               {sellFit && !sellSolving && (
-                <div className="rounded-lg border border-line bg-panel-2 px-3 py-2.5 text-xs leading-relaxed text-slate-300">
-                  Selling at <span className="font-semibold text-white">age {sellFit.bestAge}</span> lets you spend the most —
-                  about <span className="font-semibold text-accent tabular-nums">{fmtCurrency(Math.round(sellFit.bestSpend / 500) * 500)}</span>/yr.
-                  {sellFit.currentSpend != null && sellFit.gainVsCurrent > 500 && (
-                    <> That&apos;s <span className="font-semibold text-accent tabular-nums">+{fmtCurrency(Math.round(sellFit.gainVsCurrent / 500) * 500)}</span>/yr vs your current age&nbsp;{sellFit.currentAge}.</>
-                  )}
-                  {sellFit.currentSpend != null && sellFit.gainVsCurrent <= 500 && sellFit.currentAge === sellFit.bestAge && (
-                    <> Your current year is already the best.</>
-                  )}
+                <div className="rounded-lg border border-line bg-panel-2 px-3 py-2 text-xs leading-relaxed text-slate-300">
+                  <span className="font-semibold text-white">Age {sellFit.bestAge}</span> is the sweet spot — the most spending your plan can sustain
+                  {sellFit.currentSpend != null && sellFit.gainVsCurrent > 500
+                    ? <> (<span className="font-semibold text-accent tabular-nums">+{fmtCurrency(Math.round(sellFit.gainVsCurrent / 500) * 500)}</span>/yr vs age {sellFit.currentAge}).</>
+                    : <>.</>}
                   {!sellFit.sellBeatsHold && (
-                    <span className="mt-1 block text-amber-300/90">
-                      Heads-up: keeping the property lets you spend more (~{fmtCurrency(Math.round(sellFit.holdSpend / 500) * 500)}/yr) — selling doesn&apos;t lift your spending here.
-                    </span>
+                    <span className="mt-1 block text-amber-300/90">Keeping the property sustains more spending — selling doesn&apos;t help here.</span>
                   )}
-                  <span className="mt-1 block text-[11px] text-muted">Maximises the yearly spending your plan can sustain, weighing the property&apos;s growth &amp; rent against the liquidity freed by selling.</span>
                 </div>
               )}
             </div>
