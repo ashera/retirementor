@@ -1702,6 +1702,7 @@ function StrategyCardRow({
   };
 }) {
   const [sellFit, setSellFit] = useState<SellYearResult | null>(null);
+  const [sellSolving, setSellSolving] = useState(false);
   // Guardrails figures are computed on LIVING spend (what flexes); add the fixed
   // home loan so the card shows TOTAL spend, consistent with the "Your spending"
   // bar (the loan is never trimmed — it behaves like an essential).
@@ -1911,36 +1912,42 @@ function StrategyCardRow({
               />
             );
           })}
-          {/* Solver: find the sell age that leaves the most wealth. */}
+          {/* Solver: find the sell age that most lifts sustainable spending. */}
           {sellSolver && (
             <div className="space-y-2">
               <button
                 type="button"
+                disabled={sellSolving}
                 onClick={() => {
-                  const r = sellSolver();
-                  setSellFit(r);
-                  if (r) onParam("age", r.bestAge);
+                  setSellSolving(true);
+                  // Defer so the "Finding…" label paints before the (synchronous) scan.
+                  setTimeout(() => {
+                    const r = sellSolver();
+                    setSellFit(r);
+                    if (r) onParam("age", r.bestAge);
+                    setSellSolving(false);
+                  }, 20);
                 }}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-accent/50 bg-accent/10 px-3 py-2 text-sm font-semibold text-accent transition hover:bg-accent/20"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-accent/50 bg-accent/10 px-3 py-2 text-sm font-semibold text-accent transition hover:bg-accent/20 disabled:opacity-60"
               >
-                <span aria-hidden>✨</span> Find the best year to sell
+                <span aria-hidden>✨</span> {sellSolving ? "Finding the best year…" : "Find the best year to sell"}
               </button>
-              {sellFit && (
+              {sellFit && !sellSolving && (
                 <div className="rounded-lg border border-line bg-panel-2 px-3 py-2.5 text-xs leading-relaxed text-slate-300">
-                  Selling at <span className="font-semibold text-white">age {sellFit.bestAge}</span> leaves the most —
-                  about <span className="font-semibold text-accent tabular-nums">{fmtCompact(sellFit.bestNetWorth)}</span> at {life}.
-                  {sellFit.currentNetWorth != null && sellFit.gainVsCurrent > 500 && (
-                    <> That&apos;s <span className="font-semibold text-accent tabular-nums">+{fmtCompact(sellFit.gainVsCurrent)}</span> vs your current age&nbsp;{sellFit.currentAge}.</>
+                  Selling at <span className="font-semibold text-white">age {sellFit.bestAge}</span> lets you spend the most —
+                  about <span className="font-semibold text-accent tabular-nums">{fmtCurrency(Math.round(sellFit.bestSpend / 500) * 500)}</span>/yr.
+                  {sellFit.currentSpend != null && sellFit.gainVsCurrent > 500 && (
+                    <> That&apos;s <span className="font-semibold text-accent tabular-nums">+{fmtCurrency(Math.round(sellFit.gainVsCurrent / 500) * 500)}</span>/yr vs your current age&nbsp;{sellFit.currentAge}.</>
                   )}
-                  {sellFit.currentNetWorth != null && sellFit.gainVsCurrent <= 500 && sellFit.currentAge === sellFit.bestAge && (
+                  {sellFit.currentSpend != null && sellFit.gainVsCurrent <= 500 && sellFit.currentAge === sellFit.bestAge && (
                     <> Your current year is already the best.</>
                   )}
                   {!sellFit.sellBeatsHold && (
                     <span className="mt-1 block text-amber-300/90">
-                      Heads-up: holding it for life leaves more again (~{fmtCompact(sellFit.holdNetWorth)}) — selling isn&apos;t the wealth-max move for this plan.
+                      Heads-up: keeping the property lets you spend more (~{fmtCurrency(Math.round(sellFit.holdSpend / 500) * 500)}/yr) — selling doesn&apos;t lift your spending here.
                     </span>
                   )}
-                  <span className="mt-1 block text-[11px] text-muted">Maximises net worth at {life}, weighing growth &amp; rent kept against CGT and the means test.</span>
+                  <span className="mt-1 block text-[11px] text-muted">Maximises the yearly spending your plan can sustain, weighing the property&apos;s growth &amp; rent against the liquidity freed by selling.</span>
                 </div>
               )}
             </div>
