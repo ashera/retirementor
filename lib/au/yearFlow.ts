@@ -42,11 +42,12 @@ export function yearFlow(row: YearRow): YearFlow {
 
   // Net effect of income & spending on the portfolio. While working, salary is
   // spent on living (not tracked) and only explicit `savings` is added. In
-  // retirement, external income (pension, rent, part-time work, a still-working
-  // partner's take-home) funds spending; whatever's left is saved, and any
-  // shortfall is drawn from super/outside. A minimum-drawdown surplus is drawn
-  // from super but reinvested outside, so it nets out of this term.
-  const external = retired ? b.agePension + b.rentIncome + b.workIncome + b.takeHome : 0;
+  // retirement, external income (Age Pension, rent, part-time work, a still-working
+  // partner's take-home, and any recurring income stream — a DB pension / annuity /
+  // foreign pension) funds spending; whatever's left is saved, and any shortfall is
+  // drawn from super/outside. A minimum-drawdown surplus is drawn from super but
+  // reinvested outside, so it nets out of this term.
+  const external = retired ? b.agePension + b.rentIncome + b.workIncome + b.takeHome + (b.incomeStreamNet ?? 0) : 0;
   // A retirement life-event expense is funded through the normal drawdown, so it's
   // part of the spend the funding term reconciles. (In accumulation it's a direct
   // draw on savings, itemised as its own line below.)

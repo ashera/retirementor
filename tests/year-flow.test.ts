@@ -47,6 +47,10 @@ const vanilla: Record<string, RetirementPlan> = {
   "life-event-windfall": single({ lifeEvents: [{ id: "w1", kind: "income", amount: 100_000, atAge: 70 }] }),
   "life-event-expense": single({ lifeEvents: [{ id: "e1", kind: "expense", amount: 50_000, atAge: 72 }] }),
   "life-event-accum": single({ lifeEvents: [{ id: "w2", kind: "income", amount: 80_000, atAge: 60 }, { id: "e2", kind: "expense", amount: 30_000, atAge: 62 }] }),
+  // A recurring income stream (DB pension / annuity / foreign pension) funds part of
+  // retirement spending — it must be named in the waterfall (as reduced drawdown), not
+  // dumped into "other". Regression for yearFlow omitting incomeStreamNet from income.
+  "income-stream": single({ incomeStreams: [{ id: "s1", label: "DB pension", perYear: 30_000, fromAge: 65 }] }),
 };
 
 // Plans with one-off equity/loan events — the total must still tie (an "other"
