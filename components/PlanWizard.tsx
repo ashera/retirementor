@@ -1236,8 +1236,18 @@ export default function PlanWizard({
           : draft.mortgage
             ? `${fmtCurrency(draft.home?.value ?? 0)} · mortgage`
             : `${fmtCurrency(draft.home?.value ?? 0)} · owned`;
-      case "you": return Number.isFinite(previewSuper) ? `${fmtCurrency(previewSuper)} super` : "Not set yet";
-      case "partner": return draft.people[1] && Number.isFinite(draft.people[1].superBalance) ? `${fmtCurrency(draft.people[1].superBalance)} super` : "";
+      // Joint (SMSF) mode pools super into one household balance — apportion each
+      // person's SHARE by the split (matching the "Your share of the SMSF" field), so
+      // the cards don't show the whole pool as "yours" or a stale per-person balance.
+      case "you": {
+        const s = draft.superMode === "joint" ? (draft.jointSuperBalance * draft.jointSuperSplit) / 100 : draft.people[0].superBalance;
+        return Number.isFinite(s) ? `${fmtCurrency(s)} super` : "Not set yet";
+      }
+      case "partner": {
+        if (!draft.people[1]) return "";
+        const s = draft.superMode === "joint" ? (draft.jointSuperBalance * (100 - draft.jointSuperSplit)) / 100 : draft.people[1].superBalance;
+        return Number.isFinite(s) ? `${fmtCurrency(s)} super` : "";
+      }
       case "contributions": return contribMode === undefined ? "Not set yet" : contribMode === "no" ? "None" : `${fmtCurrency(contribTotal)}/yr`;
       case "outside": return outsideMode === undefined ? "Not set yet" : outsideMode === "no" ? "None" : fmtCurrency(draft.outsideSuper);
       case "property": return propMode === undefined ? "Not set yet" : propMode === "no" ? "None" : "Included";
