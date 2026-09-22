@@ -119,6 +119,10 @@ create table if not exists feedback (
 -- notified_at: when this row was included in a digest email to the team (null =
 -- still pending notification). Drives the debounced batch notifier.
 alter table feedback add column if not exists notified_at timestamptz;
+-- The submitter's current scenario (the composed plan) captured at submit time —
+-- even for guests — so the team can open and reproduce exactly what they were
+-- looking at. Read-only, admin-only; deleted with the feedback row.
+alter table feedback add column if not exists scenario jsonb;
 create index if not exists feedback_created_idx on feedback (created_at desc);
 create index if not exists feedback_unnotified_idx on feedback (created_at) where notified_at is null;
 

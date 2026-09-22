@@ -1,6 +1,7 @@
 import "server-only";
 import { query } from "./db";
 import { sendEmail } from "./email";
+import { SITE_URL } from "./site";
 import { feedbackNotificationEmail, feedbackDigestEmail, type FeedbackItem } from "./feedbackEmail";
 
 // Debounced batch notifier: after feedback arrives we wait a "quiet" window and
@@ -61,8 +62,10 @@ export async function flushFeedbackNotifications(): Promise<number> {
     sentiment: string | null;
     message: string;
     path: string | null;
+    has_scenario: boolean;
   }>(
-    `select f.id, u.email as user_email, f.email, f.sentiment, f.message, f.path
+    `select f.id, u.email as user_email, f.email, f.sentiment, f.message, f.path,
+            (f.scenario is not null) as has_scenario
        from feedback f
        left join users u on u.id = f.user_id
       where f.notified_at is null
@@ -75,6 +78,7 @@ export async function flushFeedbackNotifications(): Promise<number> {
     from: r.user_email ? `${r.user_email} (account)` : r.email ? `${r.email} (guest)` : "Anonymous",
     sentiment: r.sentiment,
     path: r.path,
+    scenarioUrl: r.has_scenario ? `${SITE_URL}/admin/feedback/${r.id}/scenario` : null,
   }));
 
   const single = items.length === 1;

@@ -12,12 +12,14 @@ export interface FeedbackRow {
   user_agent: string | null;
   handled: boolean;
   created_at: string;
+  has_scenario: boolean; // a captured scenario is viewable at /admin/feedback/<id>/scenario
 }
 
 export async function listFeedback(): Promise<FeedbackRow[]> {
   const r = await query<FeedbackRow>(
     `select f.id, f.user_id, u.email as user_email, f.email, f.sentiment,
-            f.message, f.path, f.user_agent, f.handled, f.created_at
+            f.message, f.path, f.user_agent, f.handled, f.created_at,
+            (f.scenario is not null) as has_scenario
        from feedback f
        left join users u on u.id = f.user_id
       order by f.created_at desc`,

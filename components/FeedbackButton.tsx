@@ -13,6 +13,19 @@ const SENTIMENTS = [
 // Hide the widget on backoffice and print/report surfaces.
 const HIDDEN_PREFIXES = ["/admin", "/report", "/audit"];
 
+// The user's current working scenario (the composed plan the dashboard uses), so
+// feedback carries what they were actually looking at. Best-effort; never throws.
+function currentScenario(): unknown {
+  try {
+    const raw = localStorage.getItem("au-retirement-plan");
+    if (!raw) return undefined;
+    const plan = JSON.parse(raw);
+    return plan && Array.isArray(plan.people) && plan.people.length > 0 ? plan : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export default function FeedbackButton() {
   const pathname = usePathname() || "/";
   const [open, setOpen] = useState(false);
@@ -59,6 +72,7 @@ export default function FeedbackButton() {
       email,
       sentiment: sentiment ?? undefined,
       path: pathname,
+      scenario: currentScenario(),
     });
     setSending(false);
     if (res.error) {

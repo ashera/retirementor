@@ -104,6 +104,16 @@ export default function FeedbackTable({ items }: { items: FeedbackRow[] }) {
                     Reply by email
                   </a>
                 )}
+                {f.has_scenario && (
+                  <a
+                    href={`/admin/feedback/${f.id}/scenario`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-medium text-accent transition hover:underline"
+                  >
+                    🔎 Open scenario
+                  </a>
+                )}
                 <button
                   disabled={pending}
                   onClick={() => {

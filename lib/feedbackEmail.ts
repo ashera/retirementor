@@ -18,6 +18,7 @@ export function feedbackNotificationEmail(f: {
   from: string; // account email, guest reply-to, or "Anonymous"
   sentiment: string | null;
   path: string | null;
+  scenarioUrl?: string | null; // read-only view of their captured scenario, if any
 }) {
   const mood = f.sentiment ? SENTIMENT_LABELS[f.sentiment] ?? "" : "";
   const subject = `💬 New ${SITE_NAME} feedback${mood ? ` (${mood})` : ""}`;
@@ -35,6 +36,7 @@ export function feedbackNotificationEmail(f: {
     "",
     f.message,
     "",
+    ...(f.scenarioUrl ? [`Their scenario: ${f.scenarioUrl}`, ""] : []),
     `View all: ${link}`,
   ].join("\n");
 
@@ -44,6 +46,7 @@ export function feedbackNotificationEmail(f: {
     ${rows.map(([k, v]) => `<tr><td style="color:#6b7280;padding:2px 12px 2px 0">${k}</td><td>${escapeHtml(v)}</td></tr>`).join("")}
   </table>
   <blockquote style="margin:0;padding:12px 16px;background:#f3f4f6;border-left:3px solid #10b981;border-radius:6px;white-space:pre-wrap;font-size:15px;color:#111">${escapeHtml(f.message)}</blockquote>
+  ${f.scenarioUrl ? `<p style="margin:12px 0 0"><a href="${f.scenarioUrl}" style="color:#10b981;font-weight:600">🔎 Open their scenario →</a></p>` : ""}
   <p style="margin:16px 0 0"><a href="${link}" style="color:#10b981">View all feedback →</a></p>
 </div>`;
 
@@ -55,6 +58,7 @@ export interface FeedbackItem {
   from: string;
   sentiment: string | null;
   path: string | null;
+  scenarioUrl?: string | null;
 }
 
 /** Digest of several feedback notes collected in one batch window. */
@@ -71,7 +75,7 @@ export function feedbackDigestEmail(items: FeedbackItem[]) {
   const text = [
     `${n} new feedback notes on ${SITE_NAME}:`,
     "",
-    ...items.map((f, i) => `${i + 1}. ${meta(f)}\n${f.message}\n`),
+    ...items.map((f, i) => `${i + 1}. ${meta(f)}\n${f.message}${f.scenarioUrl ? `\nTheir scenario: ${f.scenarioUrl}` : ""}\n`),
     `View all: ${link}`,
   ].join("\n");
 
@@ -79,6 +83,7 @@ export function feedbackDigestEmail(items: FeedbackItem[]) {
   <div style="margin:0 0 12px;padding:12px 16px;background:#f3f4f6;border-left:3px solid #10b981;border-radius:6px">
     <div style="color:#6b7280;font-size:12px;margin-bottom:6px">${escapeHtml(meta(f))}</div>
     <div style="white-space:pre-wrap;font-size:15px;color:#111">${escapeHtml(f.message)}</div>
+    ${f.scenarioUrl ? `<div style="margin-top:8px"><a href="${f.scenarioUrl}" style="color:#10b981;font-weight:600">🔎 Open their scenario →</a></div>` : ""}
   </div>`;
 
   const html = `<div style="font-family:system-ui,sans-serif;max-width:560px">
