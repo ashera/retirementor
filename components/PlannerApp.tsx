@@ -441,6 +441,9 @@ export default function PlannerApp({
   savedIdRef.current = savedId;
   const activeNameRef = useRef(activeName);
   activeNameRef.current = activeName;
+  // True while the first "create My First Scenario" round-trip is in flight, so the
+  // immediate-promote and debounced saves can't both create a duplicate row.
+  const creatingActiveRef = useRef(false);
 
   // Write the working scenario to the user's active named scenario (in place). When
   // there's no active scenario yet (a just-signed-up guest), create "My First
@@ -454,12 +457,18 @@ export default function PlannerApp({
       void updatePlan(id, activeNameRef.current || "My First Scenario", data, false);
       return;
     }
-    const res = await getOrCreateActiveScenario(data);
-    if (res.id) {
-      setSavedId(res.id);
-      persistSavedId(res.id);
-      if (!activeNameRef.current) setActiveName("My First Scenario");
-      router.refresh(); // bring the just-created plan into savedPlans (switcher / share / report)
+    if (creatingActiveRef.current) return; // a create is already in flight — don't duplicate
+    creatingActiveRef.current = true;
+    try {
+      const res = await getOrCreateActiveScenario(data);
+      if (res.id) {
+        setSavedId(res.id);
+        persistSavedId(res.id);
+        if (!activeNameRef.current) setActiveName("My First Scenario");
+        router.refresh(); // bring the just-created plan into savedPlans (switcher / share / report)
+      }
+    } finally {
+      creatingActiveRef.current = false;
     }
   };
 
@@ -485,6 +494,21 @@ export default function PlannerApp({
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storable, ready, user, configured, shared]);
+
+  // Promote a signed-in user's built local work to a saved scenario IMMEDIATELY when
+  // they don't have one yet — don't wait for the 1.5s debounce. Closes the race where
+  // a guest builds a plan, signs up (e.g. one-click Google), and bounces back from the
+  // OAuth redirect before the debounced first save can fire — which would leave the
+  // plan only in localStorage and never on their account. Fires once; the
+  // concurrent-create guard in autoSaveActive prevents a duplicate with the debounce.
+  const promotedRef = useRef(false);
+  useEffect(() => {
+    if (promotedRef.current || !ready || !user || !configured || shared) return;
+    if (savedIdRef.current) return; // already has an active scenario — nothing to promote
+    promotedRef.current = true;
+    void autoSaveActive(storableRef.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, user, configured, shared]);
 
   // Best-effort flush when the tab is hidden, to catch edits made within the
   // debounce window (localStorage already holds them for this device). Never in the
