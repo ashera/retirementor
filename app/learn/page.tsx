@@ -104,6 +104,20 @@ export default function LearnIndex() {
           <span aria-hidden className="text-accent">→</span>
         </Link>
         <Link
+          href="/learn/early-super-access"
+          className="flex items-center gap-4 rounded-2xl border border-accent/30 bg-accent/[0.07] p-5 transition hover:border-accent/50 hover:bg-accent/10"
+        >
+          <span aria-hidden className="text-3xl">🔓</span>
+          <span className="min-w-0 flex-1">
+            <span className="flex items-center gap-2">
+              <span className="font-semibold text-white">Accessing super early</span>
+              <span className="rounded-full bg-accent/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-accent">Interactive</span>
+            </span>
+            <span className="mt-0.5 block text-sm text-muted">The 2026 early-access debate, the rules, and a calculator showing what drawing super down before retirement really costs.</span>
+          </span>
+          <span aria-hidden className="text-accent">→</span>
+        </Link>
+        <Link
           href="/learn/australian-retirement-statistics"
           className="flex items-center gap-4 rounded-2xl border border-line bg-panel p-5 transition hover:border-accent/50 hover:bg-panel-2"
         >

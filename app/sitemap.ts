@@ -25,6 +25,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${SITE_URL}/learn/aged-care-calculator`, lastModified: BUILD_DATE, changeFrequency: "monthly", priority: 0.7 },
     { url: `${SITE_URL}/learn/age-pension-calculator`, lastModified: BUILD_DATE, changeFrequency: "monthly", priority: 0.7 },
     { url: `${SITE_URL}/learn/ttr-calculator`, lastModified: BUILD_DATE, changeFrequency: "monthly", priority: 0.7 },
+    { url: `${SITE_URL}/learn/early-super-access`, lastModified: BUILD_DATE, changeFrequency: "monthly", priority: 0.7 },
     { url: `${SITE_URL}/learn/australian-retirement-statistics`, lastModified: BUILD_DATE, changeFrequency: "monthly", priority: 0.7 },
     ...KB_ARTICLES.map((a) => ({
       url: `${SITE_URL}/learn/${a.slug}`,
