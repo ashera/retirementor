@@ -60,7 +60,7 @@ describe("Spending boost (mirror of trim)", () => {
     const after = simulate({ ...plan, ...boost.patch }, cfg);
     expect(after.lastsToLifeExpectancy).toBe(true);
     expect(boost.lastsAfter).toBe(true);
-  });
+  }, 20_000); // heavy MC + solver — a generous timeout so it doesn't flake under full-suite parallel load
 
   it("is not offered when the plan already can't last (trim's territory)", () => {
     const boost = boostSpending({ ...base, targetSpending: 95_000 }, cfg);

@@ -1334,6 +1334,18 @@ export function simulate(
       ? ages.reduce((s, a) => s + taxAtAge(grossWork / workers, a) + (!nonResident && a < pensionAge ? medicareLevy(grossWork / workers) : 0), 0)
       : 0;
     const netWork = grossWork - workTax;
+    // Super Guarantee on EMPLOYED part-time work (coast / part-time FIRE). When the
+    // work is employment (not hobby/self-employed), the employer pays SG on top of the
+    // wage — a concessional contribution taxed at 15% that lands in the worker's
+    // ACCUMULATION pool (a taxable-component contribution; it does NOT add to the
+    // tax-free component). Hobby / self-employed income without SG adds nothing.
+    // Backward compatible: a workIncome without addsSuper contributes no super, so
+    // existing saved plans are byte-identical. (The SG is paid by the employer on top
+    // of the wage, so it is not part of the retiree's cash flow — it only grows super,
+    // and never reduces the net income that offsets drawdown.)
+    const workSuperGross = grossWork > 0 && work?.addsSuper ? grossWork * config.sgRate : 0;
+    const workSuperTax = workSuperGross * config.contributionsTax;
+    const workSuperNet = workSuperGross - workSuperTax;
     // Per-person EMPLOYMENT income = this person's share of part-time work plus, for a
     // still-working partner in the staggered gap, their career salary. The Work Bonus
     // excludes the first $7,800/yr of EACH PENSION-AGE person's employment income from
@@ -1672,6 +1684,17 @@ export function simulate(
         accum[i] *= 1 + superAccumReturn;
       }
     });
+    // The year's Super Guarantee on employed part-time work lands in the worker's
+    // accumulation pool. Attribute it to the RETIRED people (those drawing down); a
+    // still-working partner in the staggered gap already accrues SG on their salary via
+    // contribute(). Added at year-end (no growth this year — conservative, and it keeps
+    // the fee/half-year-growth question out of the retirement loop) and recorded in the
+    // ledger below so the money-flow waterfall reconciles.
+    if (workSuperNet > 0) {
+      const retiredIdx = plan.people.map((_, i) => i).filter((i) => t >= retireOffsets[i]);
+      const share = retiredIdx.length > 0 ? workSuperNet / retiredIdx.length : 0;
+      retiredIdx.forEach((i) => { accum[i] += share; });
+    }
     // A life-event windfall arrived mid-year, so its retained portion earns only ~half
     // a year's return — weight it at half in the growth base (it took a full year
     // before, inconsistent with the accumulation phase). The opening pool earns a full
@@ -1815,9 +1838,9 @@ export function simulate(
         accumDrawn,
         pensionExtraDrawn,
         superTaxDraw,
-        contribGross: workContribGross,
-        contribTax: workContribTax,
-        contribNet: workContribNet,
+        contribGross: workContribGross + workSuperGross,
+        contribTax: workContribTax + workSuperTax,
+        contribNet: workContribNet + workSuperNet,
         savings: 0, // no separate savings stream in retirement — a gap-year surplus is the "income kept in savings" funding line
         salaryIncome: workGrossSalary,
         takeHome: workTakeHome,

@@ -540,7 +540,7 @@ describe("What-If strategies", () => {
     const b = base({ people: [{ currentAge: 65, superBalance: 300_000, salary: 0, voluntaryConcessional: 0, voluntaryNonConcessional: 0 }], retirementAge: 65 });
     const card = cardById(b, "part-time-work");
     const plan = card.apply(b, resolveValues(card, { perYear: 25_000, untilAge: 70 }));
-    expect(plan.workIncome).toEqual({ perYear: 25_000, untilAge: 70 });
+    expect(plan.workIncome).toEqual({ perYear: 25_000, untilAge: 70, addsSuper: true });
     // Earning while retired means drawing less, so super holds up better at 69
     // and the money lasts at least as long.
     const withWork = simulate(plan, cfg);

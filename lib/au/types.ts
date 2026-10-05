@@ -270,7 +270,7 @@ export interface RetirementPlan {
   budget?: RetirementBudget; // optional guided budget that produced targetSpending
   mortgage?: MortgageDetail; // optional home loan carried into retirement
   home?: HomeDetail; // the principal home as an asset (exempt; net-worth context only)
-  workIncome?: { perYear: number; untilAge: number }; // part-time work in early retirement (offsets drawdown; income-test assessable net of the Work Bonus)
+  workIncome?: { perYear: number; untilAge: number; addsSuper?: boolean }; // part-time work in early retirement (offsets drawdown; income-test assessable net of the Work Bonus). addsSuper = employed (employer pays Super Guarantee on top → concessional contribution); absent/false = hobby/self-employed, no SG
   ttr?: {
     extraSacrifice: number; // uniform per-person sacrifice/yr — legacy plans + the single-worker case (kept for back-compat)
     who?: number[]; // person indices running a TTR (defaults to [0]); each sacrifices in the years they are 60+ and still working

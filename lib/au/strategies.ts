@@ -734,9 +734,9 @@ export function buildStrategyCatalog(
       id: "part-time-work",
       group: "work",
       label: "Work part-time in early retirement",
-      blurb: "Earn some income in your first retirement years — it offsets what you draw down. Assessable under the Age Pension income test, but the Work Bonus exempts the first $7,800/yr each.",
+      blurb: "Earn some income in your first retirement years — it offsets what you draw down. Assessable under the Age Pension income test, but the Work Bonus exempts the first $7,800/yr each. Employed work also earns super (the Guarantee).",
       params: [
-        { key: "perYear", label: "Earn per year", min: 0, max: 60_000, step: 1_000, default: 20_000, prefix: "$", suffix: "/yr" },
+        { key: "perYear", label: "Earn per year", min: 0, max: 200_000, step: 1_000, default: 20_000, prefix: "$", suffix: "/yr" },
         {
           key: "untilAge",
           label: "Until age",
@@ -746,18 +746,36 @@ export function buildStrategyCatalog(
           default: Math.min(plan.lifeExpectancy, plan.retirementAge + 5),
           suffix: "yrs",
         },
+        {
+          key: "employed",
+          label: "Work type",
+          min: 0,
+          max: 1,
+          step: 1,
+          default: 1,
+          options: [
+            { value: 1, label: "Employed (earns super)" },
+            { value: 0, label: "Hobby / self-employed" },
+          ],
+        },
       ],
       note: (v) => {
         const people = plan.people.length;
         const bonus = 7_800 * people;
+        const sgRate = opts?.config?.sgRate ?? DEFAULT_CONFIG.sgRate;
+        const sgPct = Math.round(sgRate * 100);
+        const sg =
+          v.employed !== 0
+            ? ` As employment, the employer pays the ${sgPct}% Super Guarantee on top — about ${fmtCurrency(Math.round(v.perYear * sgRate))}/yr into super (taxed 15%), rebuilding your balance while you coast. Switch to “hobby / self-employed” if no super is paid.`
+            : ` As hobby or self-employed income, no Super Guarantee is added — switch to “employed” if an employer pays super on top.`;
         return (
           `Earning ${fmtCurrency(v.perYear)}/yr until age ${v.untilAge} means you draw about that much less from savings in ` +
           `each of those years. It's taxed at your marginal rate (with the low-income offset). Once you're on the Age ` +
           `Pension (from 67), the income test applies — but the first ${fmtCurrency(bonus)}${people > 1 ? ` (${fmtCurrency(7_800)} each)` : ""} ` +
-          `of work income is exempt under the Work Bonus.`
+          `of work income is exempt under the Work Bonus.` + sg
         );
       },
-      apply: (p, v) => ({ ...p, workIncome: { perYear: v.perYear, untilAge: v.untilAge } }),
+      apply: (p, v) => ({ ...p, workIncome: { perYear: v.perYear, untilAge: v.untilAge, addsSuper: v.employed !== 0 } }),
     });
   }
 
