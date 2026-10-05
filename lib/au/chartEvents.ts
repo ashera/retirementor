@@ -6,7 +6,7 @@
 // render as break bands (see breakSpans). This covers only the strategy layer.
 
 import type { RetirementPlan } from "./types";
-import { getInvestmentProperties, getSavingsChanges, oldestCurrentAge } from "./types";
+import { getInvestmentProperties, getSavingsChanges, householdRetirementOffset, oldestCurrentAge } from "./types";
 import { mortgagePayoffAge } from "./mortgage";
 import { fmtCompact } from "./format";
 
@@ -52,10 +52,20 @@ export function strategyEventPins(plan: RetirementPlan): EventPin[] {
     pins.push({ key: `savings-${c.id}`, age: c.atAge, icon: up ? "📈" : "📉", label: up ? "Save more" : "Save less", detail: `${fmtCompact(c.amount)}/yr`, color: "#34d399" });
     runningSavings = c.amount;
   }
-  if (plan.redirectMortgageToSavings && plan.mortgage?.strategy === "carry") {
-    const payoff = mortgagePayoffAge(plan.mortgage, oldestCurrentAge(plan));
-    if (payoff != null && payoff < plan.retirementAge) {
-      pins.push({ key: "mortgage-redirect", age: payoff, icon: "🏡", label: "Mortgage cleared → save the repayments", color: "#34d399" });
+  // A carried P&I loan that amortises on its own → pin the age it clears. In the
+  // WORKING years with the redirect on, that freed repayment goes to savings; when it
+  // clears in RETIREMENT the repayment was part of spending, so the drawdown drops.
+  // (The clear-with-super strategy has its own pin above.)
+  const mort = plan.mortgage;
+  if (mort?.strategy === "carry" && mort.type === "principal_interest") {
+    const payoff = mortgagePayoffAge(mort, oldestCurrentAge(plan));
+    if (payoff != null && payoff <= plan.lifeExpectancy) {
+      const inWorkingYears = payoff < oldestCurrentAge(plan) + householdRetirementOffset(plan);
+      if (plan.redirectMortgageToSavings && inWorkingYears) {
+        pins.push({ key: "mortgage-redirect", age: payoff, icon: "🏡", label: "Mortgage cleared → save the repayments", color: "#34d399" });
+      } else {
+        pins.push({ key: "mortgage-cleared", age: payoff, icon: "🏦", label: inWorkingYears ? "Mortgage cleared" : "Mortgage cleared — spending drops", color: "#f59e0b" });
+      }
     }
   }
   return pins;

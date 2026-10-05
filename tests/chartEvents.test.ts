@@ -33,6 +33,34 @@ describe("chartEvents — strategy pins", () => {
   it("no strategies → no pins", () => {
     expect(strategyEventPins(plan({}))).toEqual([]);
   });
+
+  // A carried P&I loan that amortises on its own → a "cleared" pin at the payoff age.
+  // balance 60k, rate 0, repayment 20k → clears after 3 years.
+  const carried = (over: Partial<RetirementPlan>): RetirementPlan =>
+    plan({
+      people: [{ currentAge: 60, superBalance: 0, salary: 0, voluntaryConcessional: 0, voluntaryNonConcessional: 0 }],
+      lifeExpectancy: 90,
+      mortgage: { type: "principal_interest", balance: 60_000, interestRate: 0, annualRepayment: 20_000, payoffAge: 63, strategy: "carry" } as RetirementPlan["mortgage"],
+      ...over,
+    });
+
+  it("pins a carried mortgage clearing in RETIREMENT, noting spending drops", () => {
+    const pins = strategyEventPins(carried({ retirementAge: 62 })); // clears at 63, after retiring
+    const m = pins.find((x) => x.key === "mortgage-cleared");
+    expect(m).toMatchObject({ age: 63 });
+    expect(m!.label).toMatch(/spending drops/);
+  });
+
+  it("in WORKING years with the redirect on, it's the redirect pin instead", () => {
+    const pins = strategyEventPins(carried({ retirementAge: 67, redirectMortgageToSavings: true })); // clears at 63, still working
+    expect(pins.find((x) => x.key === "mortgage-redirect")).toMatchObject({ age: 63 });
+    expect(pins.find((x) => x.key === "mortgage-cleared")).toBeUndefined();
+  });
+
+  it("an interest-only loan never clears on its own → no pin", () => {
+    const pins = strategyEventPins(carried({ retirementAge: 62, mortgage: { type: "interest_only", balance: 60_000, interestRate: 6, annualRepayment: 0, payoffAge: null, strategy: "carry" } as RetirementPlan["mortgage"] }));
+    expect(pins.find((x) => x.key?.startsWith("mortgage-"))).toBeUndefined();
+  });
 });
 
 describe("chartEvents — strategy bands", () => {
