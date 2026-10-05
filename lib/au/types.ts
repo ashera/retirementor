@@ -173,6 +173,18 @@ export interface LifeEvent {
   label?: string; // e.g. "Inheritance", "Big trip", "New car"
 }
 
+// A step change to how much is saved outside super during the WORKING years — e.g.
+// "save more once the mortgage clears / the kids leave home", or "save less while
+// paying school fees". `amount` is the NEW annual outside-super savings that applies
+// from `atAge` onward (the oldest person's age on the timeline), in today's dollars.
+// Steps compose: the effective savings for a year is the latest change whose atAge has
+// been reached, else the base `annualOutsideSavings`. (See savingsForAge.)
+export interface SavingsChange {
+  id: string; // stable id for the editor list (add/edit/remove)
+  atAge: number; // oldest person's age from which the new rate applies
+  amount: number; // new annual outside-super savings from that age (today's dollars)
+}
+
 // A recurring income STREAM — a defined-benefit pension, annuity, or foreign
 // pension / social security (e.g. US Social Security). Runs from `fromAge` to
 // `untilAge` (default: for life), in today's dollars. `indexed` (default true) keeps
@@ -249,7 +261,9 @@ export interface RetirementPlan {
   jointSuperSplit: number; // person[0]'s % share of the joint balance (0–100)
   homeowner: boolean; // principal home is exempt from the assets test
   outsideSuper: number; // combined non-super investments today (funds an early-retirement bridge)
-  annualOutsideSavings: number; // added to outside-super each working year
+  annualOutsideSavings: number; // added to outside-super each working year (the base rate)
+  savingsChanges?: SavingsChange[]; // optional step changes to the savings rate at chosen ages (kids leave home, mortgage paid off…)
+  redirectMortgageToSavings?: boolean; // when true, once the home loan clears its freed annual repayment is redirected into outside savings for the remaining working years
   retirementAge: number; // age of person[0] when household stops working
   spendingMode: SpendingMode;
   targetSpending: number; // flat annual spend (and the go-go base when deriving stages)
@@ -354,6 +368,26 @@ export function getLifeEvents(plan: RetirementPlan): LifeEvent[] {
   return (plan.lifeEvents ?? []).filter(
     (e) => e && e.amount > 0 && (e.kind === "income" || e.kind === "expense"),
   );
+}
+
+/** Valid savings-rate step changes, sorted by age ascending. Tolerates a missing
+ *  array; keeps only finite ages and non-negative amounts. */
+export function getSavingsChanges(plan: RetirementPlan): SavingsChange[] {
+  return (plan.savingsChanges ?? [])
+    .filter((c) => c && Number.isFinite(c.atAge) && Number.isFinite(c.amount) && c.amount >= 0)
+    .slice()
+    .sort((a, b) => a.atAge - b.atAge);
+}
+
+/** The outside-super savings rate for a given year, by the OLDEST person's age: the
+ *  base `annualOutsideSavings`, overridden by the latest step change reached so far.
+ *  (The mortgage-redirect top-up is applied separately in the engine.) */
+export function savingsForAge(plan: RetirementPlan, oldestAge: number): number {
+  let amount = plan.annualOutsideSavings;
+  for (const c of getSavingsChanges(plan)) {
+    if (oldestAge >= c.atAge) amount = c.amount;
+  }
+  return Math.max(0, amount);
 }
 
 /** Valid recurring income streams (DB pension, annuity, foreign pension). Defaults:

@@ -6,7 +6,8 @@
 // render as break bands (see breakSpans). This covers only the strategy layer.
 
 import type { RetirementPlan } from "./types";
-import { getInvestmentProperties } from "./types";
+import { getInvestmentProperties, getSavingsChanges, oldestCurrentAge } from "./types";
+import { mortgagePayoffAge } from "./mortgage";
 import { fmtCompact } from "./format";
 
 export interface EventPin {
@@ -43,6 +44,20 @@ export function strategyEventPins(plan: RetirementPlan): EventPin[] {
   if (wi) pins.push({ key: "part-time-end", age: wi.untilAge, icon: "👔", label: "Part-time work ends", color: "#38bdf8" });
   const dr = plan.debtRecycle;
   if (dr) pins.push({ key: "debt-recycle-end", age: dr.untilAge, icon: "♻️", label: "Debt recycling ends", color: "#38bdf8" });
+  // Stepped savings changes (kids leave home, mortgage paid off…): a pin per step,
+  // up or down relative to the running rate.
+  let runningSavings = plan.annualOutsideSavings;
+  for (const c of getSavingsChanges(plan)) {
+    const up = c.amount >= runningSavings;
+    pins.push({ key: `savings-${c.id}`, age: c.atAge, icon: up ? "📈" : "📉", label: up ? "Save more" : "Save less", detail: `${fmtCompact(c.amount)}/yr`, color: "#34d399" });
+    runningSavings = c.amount;
+  }
+  if (plan.redirectMortgageToSavings && plan.mortgage?.strategy === "carry") {
+    const payoff = mortgagePayoffAge(plan.mortgage, oldestCurrentAge(plan));
+    if (payoff != null && payoff < plan.retirementAge) {
+      pins.push({ key: "mortgage-redirect", age: payoff, icon: "🏡", label: "Mortgage cleared → save the repayments", color: "#34d399" });
+    }
+  }
   return pins;
 }
 

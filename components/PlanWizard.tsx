@@ -8,6 +8,7 @@ import BudgetBuilder from "@/components/BudgetBuilder";
 import BudgetQuest from "@/components/BudgetQuest";
 import PropertyCard from "@/components/PropertyCard";
 import IncomeStreamsEditor from "@/components/IncomeStreamsEditor";
+import SavingsChangesEditor from "@/components/SavingsChangesEditor";
 import { simulate } from "@/lib/au/simulate";
 import { runMonteCarlo, MC_CONFIDENCE_MC, MC_CONFIDENCE_TARGET } from "@/lib/au/montecarlo";
 import type { EngineConfig } from "@/lib/au/config";
@@ -15,7 +16,7 @@ import { fmtCompact, fmtCurrency } from "@/lib/au/format";
 import { planCompleteness } from "@/lib/au/completeness";
 import { essentialsFloor, appliedStrategies } from "@/lib/au/strategies";
 import { fromActiveScenario, type StrategyLayer } from "@/lib/au/scenario";
-import { mortgageAnnualCost } from "@/lib/au/mortgage";
+import { mortgageAnnualCost, mortgagePayoffAge } from "@/lib/au/mortgage";
 import InfoTip from "@/components/InfoTip";
 import { WizardHeaderCard } from "@/components/WizardArt";
 import { STEP_META, personaAvatarSrc, StepIcon } from "@/components/wizardVisuals";
@@ -585,6 +586,19 @@ export default function PlanWizard({
     ),
   };
 
+  // Mortgage-redirect preset: only offered when a carried P&I loan clears BEFORE
+  // retirement (so there are working years left to redirect the freed repayment into
+  // savings). Gives the payoff age + the freed annual amount for the toggle's hint.
+  const savingsRedirect = (() => {
+    const m = draft.mortgage;
+    if (!m || m.strategy !== "carry") return null;
+    const oldestNow = Math.max(0, ...draft.people.map((p) => p.currentAge).filter((a) => Number.isFinite(a) && a > 0));
+    const payoff = mortgagePayoffAge(m, oldestNow);
+    const freed = mortgageAnnualCost(m);
+    if (payoff == null || payoff >= draft.retirementAge || freed <= 0) return null;
+    return { payoff, freed };
+  })();
+
   const outsideStep = {
     key: "outside",
     nav: "Savings",
@@ -627,6 +641,39 @@ export default function PlanWizard({
               prefix="$"
             />
           </div>
+        )}
+        {outsideMode === "yes" && (
+          <SavingsChangesEditor
+            changes={draft.savingsChanges ?? []}
+            baseSavings={draft.annualOutsideSavings}
+            minAge={Math.min(...draft.people.map((p) => p.currentAge).filter((a) => Number.isFinite(a) && a > 0), draft.retirementAge)}
+            maxAge={draft.retirementAge}
+            defaultAge={draft.retirementAge}
+            onChange={(savingsChanges) => setDraft((prev) => ({ ...prev, savingsChanges }))}
+          />
+        )}
+        {outsideMode === "yes" && savingsRedirect && (
+          <button
+            type="button"
+            onClick={() => patch({ redirectMortgageToSavings: !draft.redirectMortgageToSavings })}
+            className={`flex w-full items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-left transition ${
+              draft.redirectMortgageToSavings ? "border-accent/50 bg-accent/10" : "border-line bg-panel hover:border-accent/40"
+            }`}
+          >
+            <span className="min-w-0">
+              <span className="flex items-center gap-2 font-semibold text-white">
+                <span aria-hidden>🏡→📈</span> Redirect my mortgage repayments into savings
+              </span>
+              <span className="mt-0.5 block text-xs text-muted">
+                Once the loan clears around age {savingsRedirect.payoff}, the{" "}
+                <span className="tabular-nums text-slate-200">{fmtCurrency(savingsRedirect.freed)}/yr</span> that was servicing it is
+                added to your savings for your remaining working years.
+              </span>
+            </span>
+            <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold ${draft.redirectMortgageToSavings ? "bg-accent/20 text-accent" : "bg-panel-2 text-muted"}`}>
+              {draft.redirectMortgageToSavings ? "On" : "Off"}
+            </span>
+          </button>
         )}
       </div>
     ),

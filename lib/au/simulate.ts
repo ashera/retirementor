@@ -25,6 +25,7 @@ import {
   oldestCurrentAge,
   personRetirementAge,
   personRetirementOffset,
+  savingsForAge,
   spendingForAge,
   startingSuperBalances,
 } from "./types";
@@ -648,7 +649,22 @@ export function simulate(
       // Savings additions pause only when no one's earning (a single on a break, or
       // a couple both on a break at once); if one partner keeps working, household
       // savings continue (a documented simplification — their share isn't separated).
-      const savings = anyoneWorking ? plan.annualOutsideSavings : 0;
+      // The rate can STEP at chosen ages (kids leave home, mortgage paid off…) via
+      // savingsForAge; the base is a flat annualOutsideSavings when no steps are set.
+      let savings = anyoneWorking ? savingsForAge(plan, oldest) : 0;
+      // Mortgage auto-redirect: once the home loan has cleared (amortised to its payoff
+      // age, or discharged early from super), the money that was servicing it is freed —
+      // optionally redirect that annual repayment into savings for the remaining working
+      // years. The repayment is a fixed nominal amount, so deflate it to this phase's
+      // (wage-real) today's dollars, matching the pool it joins.
+      if (
+        plan.redirectMortgageToSavings &&
+        anyoneWorking &&
+        mortgage &&
+        (mortgageCleared || !mortgageActiveAtAge(mortgage, oldest, t))
+      ) {
+        savings += mortgageAnnualCost(mortgage) / Math.pow(1 + wageInflation / 100, t);
+      }
       const outsideHalf = Math.pow(1 + realReturn, 0.5);
       // A life-event windfall arrives mid-year, so it earns ~half a year's return
       // (like savings) — weighted here rather than added post-growth (0 return, the
