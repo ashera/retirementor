@@ -821,6 +821,17 @@ export default function PlannerApp({
       people: prev.people.map((p, i) => (i === 0 ? p : { ...p, retirementAge: age })),
     }));
 
+  // Set a non-primary partner's own retirement age (couples). Person 0 uses the
+  // top-level `retirementAge`; each other partner carries their own override, so the
+  // dashboard can show one slider per person instead of a single slider that silently
+  // moves only person 0 (which made retiring the primary earlier look like it helped —
+  // really it just changed WHO retires first and when a salary bridges the gap).
+  const setPartnerRetireAge = (i: number, age: number) =>
+    setBase((prev) => ({
+      ...prev,
+      people: prev.people.map((p, idx) => (idx === i ? { ...p, retirementAge: age } : p)),
+    }));
+
   const resetToBaseline = () => {
     splitInto(baseline);
   };
@@ -1103,6 +1114,15 @@ export default function PlannerApp({
   const composedSpend = isStaged ? stages.goGo : plan.targetSpending;
   const retireOverridden = plan.retirementAge !== base.retirementAge;
   const spendOverridden = composedSpend !== baseSpend;
+  // Each non-primary partner's own retirement age for the dashboard sliders. When a
+  // partner has no explicit age they retire at the same OFFSET as the primary (so a
+  // younger partner retires at a younger age) — surface that derived age as the value.
+  const primaryOffset = Math.max(0, Math.round(plan.retirementAge - plan.people[0].currentAge));
+  const partnerRetireAgeOf = (i: number) =>
+    plan.people[i]?.retirementAge ?? Math.round((plan.people[i]?.currentAge ?? 0) + primaryOffset);
+  const basePrimaryOffset = Math.max(0, Math.round(base.retirementAge - base.people[0].currentAge));
+  const basePartnerAgeOf = (i: number) =>
+    base.people[i]?.retirementAge ?? Math.round((base.people[i]?.currentAge ?? 0) + basePrimaryOffset);
   const lockNote = (label: string) => (
     <>
       Set by the <span className="font-semibold">{label}</span> strategy —{" "}
@@ -1826,17 +1846,48 @@ export default function PlannerApp({
           </div>
           <div className="grid gap-x-8 gap-y-5 sm:grid-cols-2">
             <div>
-              <Field
-                label="Retirement age"
-                value={plan.retirementAge}
-                onChange={(v) => quickAdjust({ retirementAge: v })}
-                min={40}
-                max={75}
-                integer
-                suffix="yrs"
-                locked={retireOverridden}
-                lockNote={lockNote("Retire later")}
-              />
+              {isCouple ? (
+                // One slider per person: the single "Retirement age" slider used to move
+                // only person 0, so a younger partner's pinned age stayed put — which made
+                // retiring the primary earlier look like it raised success (it only changed
+                // who retires first and whether a salary bridges the early years).
+                <div className="space-y-4">
+                  <Field
+                    label="Your retirement age"
+                    value={plan.retirementAge}
+                    onChange={(v) => quickAdjust({ retirementAge: v })}
+                    min={40}
+                    max={75}
+                    integer
+                    suffix="yrs"
+                    locked={retireOverridden}
+                    lockNote={lockNote("Retire later")}
+                  />
+                  <Field
+                    label="Partner's retirement age"
+                    value={partnerRetireAgeOf(1)}
+                    onChange={(v) => setPartnerRetireAge(1, v)}
+                    min={40}
+                    max={75}
+                    integer
+                    suffix="yrs"
+                    locked={partnerRetireAgeOf(1) !== basePartnerAgeOf(1)}
+                    lockNote={lockNote("Retire later")}
+                  />
+                </div>
+              ) : (
+                <Field
+                  label="Retirement age"
+                  value={plan.retirementAge}
+                  onChange={(v) => quickAdjust({ retirementAge: v })}
+                  min={40}
+                  max={75}
+                  integer
+                  suffix="yrs"
+                  locked={retireOverridden}
+                  lockNote={lockNote("Retire later")}
+                />
+              )}
               {!retireOverridden && earliest?.age != null && earliest.age < plan.retirementAge && (
                 <button
                   onClick={() => retireEveryoneAt(earliest.age!)}
