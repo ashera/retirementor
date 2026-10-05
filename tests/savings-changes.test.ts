@@ -76,6 +76,16 @@ describe("Stepped savings in the engine (point #4B)", () => {
     expect(stepped).toBeGreaterThan(flat);
   });
 
+  it("a change AT the retirement age is a no-op (accumulation ends the year before)", () => {
+    // Retire at 65 → last working year is age 64. A change at 65 never fires (you're
+    // retired), so it must be byte-identical to no change — this was the 'not saving'
+    // bug: the wizard let a change be pinned at the retirement age. A change at 64 bites.
+    const noop = simulate(base({ savingsChanges: [{ id: "n", atAge: 65, amount: 99_000 }] }), cfg0);
+    const none = simulate(base(), cfg0);
+    expect(JSON.stringify(noop.rows)).toBe(JSON.stringify(none.rows));
+    expect(savingsAt(base({ savingsChanges: [{ id: "y", atAge: 64, amount: 99_000 }] }), 64)).toBe(99_000);
+  });
+
   it("is off by default — no savingsChanges is byte-identical to before", () => {
     const a = simulate(base(), cfg0);
     const b = simulate(base({ savingsChanges: [], redirectMortgageToSavings: false }), cfg0);

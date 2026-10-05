@@ -26,6 +26,8 @@ import {
   DEFAULT_PLAN,
   getInvestmentProperties,
   hasInvestmentProperty,
+  householdRetirementOffset,
+  oldestCurrentAge,
   personRetirementAge,
   type HomeDetail,
   type HomeTenure,
@@ -206,7 +208,11 @@ export default function PlanWizard({
   // default to $0 (so we can't tell "none" from "not answered yet"). Seeded from
   // the incoming plan; drives the completeness meter and reveals the fields.
   const hasContrib = initial.people.some((p) => p.voluntaryConcessional > 0 || p.voluntaryNonConcessional > 0);
-  const hasOutside = initial.outsideSuper > 0 || initial.annualOutsideSavings > 0;
+  const hasOutside =
+    initial.outsideSuper > 0 ||
+    initial.annualOutsideSavings > 0 ||
+    (initial.savingsChanges?.length ?? 0) > 0 ||
+    !!initial.redirectMortgageToSavings;
   // Recover the yes/no answer from data + the persisted `answered` flags.
   const [contribMode, setContribMode] = useState<OptMode | undefined>(hasContrib ? "yes" : initial.answered?.contributions ? "no" : undefined);
   const [outsideMode, setOutsideMode] = useState<OptMode | undefined>(hasOutside ? "yes" : initial.answered?.outside ? "no" : undefined);
@@ -267,7 +273,7 @@ export default function PlanWizard({
     setDraft((prev) => ({
       ...prev,
       answered: { ...prev.answered, outside: true },
-      ...(v === "no" ? { outsideSuper: 0, annualOutsideSavings: 0 } : {}),
+      ...(v === "no" ? { outsideSuper: 0, annualOutsideSavings: 0, savingsChanges: [], redirectMortgageToSavings: false } : {}),
     }));
   };
   const answerIncome = (v: OptMode) => {
@@ -586,16 +592,33 @@ export default function PlanWizard({
     ),
   };
 
+  // Savings changes apply only during the WORKING (accumulation) years, which end when
+  // the household enters retirement — i.e. at the FIRST retiree (staggered couples
+  // included). A change at/after that age is a no-op, so bound the editor to the last
+  // working year on the oldest-person axis (the same axis savingsChange.atAge uses).
+  const savingsMinAge = oldestCurrentAge(draft);
+  const householdRetireAxis = oldestCurrentAge(draft) + householdRetirementOffset(draft);
+  const savingsMaxAge = Math.max(savingsMinAge, householdRetireAxis - 1);
+  // A useful default: the mortgage payoff age if it lands in the working window
+  // (pairs with the redirect idea), else a few years before the household retires.
+  const savingsDefaultAge = (() => {
+    const payoff = draft.mortgage?.strategy === "carry" ? mortgagePayoffAge(draft.mortgage, savingsMinAge) : null;
+    if (payoff != null && payoff >= savingsMinAge && payoff <= savingsMaxAge) return payoff;
+    return Math.min(savingsMaxAge, Math.max(savingsMinAge, householdRetireAxis - 3));
+  })();
+
   // Mortgage-redirect preset: only offered when a carried P&I loan clears BEFORE
   // retirement (so there are working years left to redirect the freed repayment into
   // savings). Gives the payoff age + the freed annual amount for the toggle's hint.
   const savingsRedirect = (() => {
     const m = draft.mortgage;
     if (!m || m.strategy !== "carry") return null;
-    const oldestNow = Math.max(0, ...draft.people.map((p) => p.currentAge).filter((a) => Number.isFinite(a) && a > 0));
+    const oldestNow = oldestCurrentAge(draft);
     const payoff = mortgagePayoffAge(m, oldestNow);
     const freed = mortgageAnnualCost(m);
-    if (payoff == null || payoff >= draft.retirementAge || freed <= 0) return null;
+    // Only offered when the loan clears BEFORE the household stops working — otherwise
+    // there are no working years left to redirect the freed repayment into.
+    if (payoff == null || payoff >= savingsMaxAge + 1 || freed <= 0) return null;
     return { payoff, freed };
   })();
 
@@ -642,13 +665,13 @@ export default function PlanWizard({
             />
           </div>
         )}
-        {outsideMode === "yes" && (
+        {outsideMode === "yes" && householdRetireAxis > savingsMinAge && (
           <SavingsChangesEditor
             changes={draft.savingsChanges ?? []}
             baseSavings={draft.annualOutsideSavings}
-            minAge={Math.min(...draft.people.map((p) => p.currentAge).filter((a) => Number.isFinite(a) && a > 0), draft.retirementAge)}
-            maxAge={draft.retirementAge}
-            defaultAge={draft.retirementAge}
+            minAge={savingsMinAge}
+            maxAge={savingsMaxAge}
+            defaultAge={savingsDefaultAge}
             onChange={(savingsChanges) => setDraft((prev) => ({ ...prev, savingsChanges }))}
           />
         )}
