@@ -103,7 +103,9 @@ export default function SavingsChangesEditor({
         Save more (or less) from a certain age — e.g. once the{" "}
         <span className="text-slate-200">kids leave home</span> or the{" "}
         <span className="text-slate-200">mortgage is paid off</span>. Starts from{" "}
-        <span className="tabular-nums text-slate-200">{fmtCurrency(baseSavings)}/yr</span>.
+        <span className="tabular-nums text-slate-200">{fmtCurrency(baseSavings)}/yr</span>. Applies during your
+        working years — up to age <span className="tabular-nums text-slate-200">{maxAge}</span>, your last year
+        before retirement.
       </p>
 
       {sorted.length > 0 && (
