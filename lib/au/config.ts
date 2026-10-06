@@ -79,6 +79,8 @@ export interface EngineConfig {
   totalSuperBalanceNccThreshold: number;
   div293Threshold: number; // income (incl. concessional) above which Division 293 applies
   div293ExtraTaxRate: number; // extra contributions tax for high earners (15%)
+  downsizerCap: number; // max downsizer contribution to super per eligible person (from a home sale)
+  downsizerEligibilityAge: number; // minimum age to make a downsizer contribution (below it, nothing can go to super)
 
   // Ages
   preservationAge: number;
@@ -219,6 +221,8 @@ export const DEFAULT_CONFIG: EngineConfig = {
   totalSuperBalanceNccThreshold: 2_100_000,
   div293Threshold: 250_000,
   div293ExtraTaxRate: 0.15,
+  downsizerCap: 300_000,
+  downsizerEligibilityAge: 55,
 
   preservationAge: 60,
   agePensionAge: 67,
@@ -390,6 +394,14 @@ export function withDefaults(data: EngineConfig): EngineConfig {
       ...out,
       div293Threshold: DEFAULT_CONFIG.div293Threshold,
       div293ExtraTaxRate: DEFAULT_CONFIG.div293ExtraTaxRate,
+    };
+  }
+  // Downsizer contribution rules (cap + eligibility age), added after the initial seed.
+  if (out.downsizerCap == null) {
+    out = {
+      ...out,
+      downsizerCap: DEFAULT_CONFIG.downsizerCap,
+      downsizerEligibilityAge: DEFAULT_CONFIG.downsizerEligibilityAge,
     };
   }
   // Outside-super deferred-CGT taxation, added after the initial seed. Critical to

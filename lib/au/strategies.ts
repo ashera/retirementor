@@ -260,8 +260,15 @@ export function buildStrategyCatalog(
     const homeVal = Math.max(300_000, Math.round(plan.home?.value ?? 900_000));
     const loan = plan.mortgage?.balance ?? 0;
     const people = plan.people.length;
-    const superCap = 300_000 * people; // downsizer contribution cap ($300k/person)
+    const dzCap = opts?.config?.downsizerCap ?? 300_000;
+    const dzAge = opts?.config?.downsizerEligibilityAge ?? 55;
     const oldestNow = Math.max(...plan.people.map((pp) => pp.currentAge));
+    // Downsizer contributions follow the ATO rules: only a partner who is at least 55
+    // at the sale can contribute, $300k each. Count the eligible partners at a given
+    // (oldest-axis) downsize age, so the "into super" cap is 0 before 55 and rises as
+    // each partner crosses it.
+    const eligibleAt = (age: number) => plan.people.filter((pp) => age - (oldestNow - pp.currentAge) >= dzAge).length;
+    const superCap = dzCap * people; // absolute slider ceiling ($300k/person); dynamicMax tightens it by age
     const homeGrowth = (plan.home?.growthReal ?? 2) / 100;
     // Equity freed by a downsize to `newValue` at `age`: the home appreciates in
     // real terms until then, net of the new home and any loan. The downsizer
@@ -276,12 +283,14 @@ export function buildStrategyCatalog(
       group: "home",
       exclusive: "home",
       label: "Downsize your home",
-      blurb: `Move from your ${fmtCurrency(homeVal)} home to a cheaper one — the difference${loan ? ", after discharging your mortgage," : ""} is freed into savings, with up to $300k per person able to go into super as a downsizer contribution. Your new (smaller) home stays exempt from the Age Pension, so your net worth carries over — it's just reallocated.`,
+      blurb: `Move from your ${fmtCurrency(homeVal)} home to a cheaper one — the difference${loan ? ", after discharging your mortgage," : ""} is freed into savings. From age ${dzAge} each partner can also put up to ${fmtCurrency(dzCap)} of it into super as a downsizer contribution (before ${dzAge} it all goes to savings). Your new (smaller) home stays exempt from the Age Pension, so your net worth carries over — it's just reallocated.`,
       params: [
         {
           key: "age",
           label: "Downsize at age",
-          min: Math.max(60, plan.retirementAge),
+          // You can downsize at any age — the super downsizer rules (55+) only gate how
+          // much of the proceeds can go into super, handled by the "into super" cap.
+          min: Math.max(oldestNow + 1, 50),
           max: plan.lifeExpectancy,
           step: 1,
           default: Math.min(plan.lifeExpectancy, Math.max(plan.retirementAge, 66)),
@@ -304,8 +313,10 @@ export function buildStrategyCatalog(
           step: 10_000,
           default: 0,
           prefix: "$",
-          // Can't put more into super than the downsize actually frees.
-          dynamicMax: freedEquity,
+          // Can't put more into super than the downsize frees, nor more than the
+          // downsizer rules allow: $300k per partner who is 55+ at the sale (so 0
+          // before 55). Both bounds move with the chosen downsize age.
+          dynamicMax: (v) => Math.min(freedEquity(v), dzCap * eligibleAt(v.age ?? oldestNow)),
         },
       ],
       note: (v) => {
@@ -313,8 +324,14 @@ export function buildStrategyCatalog(
         const grown = Math.round(homeVal * Math.pow(1 + homeGrowth, yrs));
         const newV = Math.round(v.newValue ?? homeVal * 0.6);
         const freed = Math.round(freedEquity(v));
-        const toSuper = Math.min(Math.max(0, v.toSuper ?? 0), freed);
+        const eligible = eligibleAt(v.age ?? oldestNow);
+        // Clamp to BOTH what the sale frees and the downsizer cap ($300k per 55+ partner).
+        const toSuper = Math.min(Math.max(0, v.toSuper ?? 0), freed, dzCap * eligible);
         const toSavings = freed - toSuper;
+        const ruleNote =
+          eligible === 0
+            ? ` You're under ${dzAge} at this age, so none of it can go into super — it all goes to savings.`
+            : ` The downsizer rules let ${eligible === people ? (people > 1 ? "each of you" : "you") : `${eligible} of you`} put up to ${fmtCurrency(dzCap)} into super here.`;
         return (
           `By age ${v.age} your ${fmtCurrency(homeVal)} home is projected to be worth about ` +
           `${fmtCurrency(grown)} in today's dollars (it keeps appreciating until you sell). ` +
@@ -323,7 +340,8 @@ export function buildStrategyCatalog(
           `${fmtCurrency(newV)} for your new home` +
           `${toSuper > 0
             ? `, of which ${fmtCurrency(toSuper)} goes into super and ${fmtCurrency(toSavings)} into savings.`
-            : ` — all into savings.`}`
+            : ` — all into savings.`}` +
+          ruleNote
         );
       },
       apply: (p, v) => ({

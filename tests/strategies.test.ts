@@ -62,6 +62,37 @@ const applyOne = (plan: RetirementPlan, id: string, vals: Record<string, number>
   return card.apply(plan, resolveValues(card, vals));
 };
 
+describe("Downsize lever — super downsizer rules (55+ / $300k each)", () => {
+  const toSuperMax = (plan: RetirementPlan, v: Record<string, number>) =>
+    cardById(plan, "downsize").params.find((p) => p.key === "toSuper")!.dynamicMax!(v);
+
+  it("caps the into-super amount at $0 before 55, then up to $300k (single)", () => {
+    const single = base({ home: { value: 1_500_000, growthReal: 0 } });
+    expect(toSuperMax(single, { age: 52, newValue: 700_000, toSuper: 300_000 })).toBe(0); // under 55
+    const at60 = toSuperMax(single, { age: 60, newValue: 700_000, toSuper: 300_000 });
+    expect(at60).toBeGreaterThan(0);
+    expect(at60).toBeLessThanOrEqual(300_000);
+  });
+
+  it("no longer forces a 60+ downsize age (an under-55 downsize can be modelled)", () => {
+    const ageParam = cardById(base(), "downsize").params.find((p) => p.key === "age")!;
+    expect(ageParam.min).toBeLessThan(55);
+  });
+
+  it("couple cap counts only the partners who are 55+ at the sale", () => {
+    const couple = base({
+      household: "couple", superMode: "individual",
+      people: [
+        { currentAge: 56, superBalance: 300_000, salary: 0, voluntaryConcessional: 0, voluntaryNonConcessional: 0 },
+        { currentAge: 50, superBalance: 300_000, salary: 0, voluntaryConcessional: 0, voluntaryNonConcessional: 0, retirementAge: 65 },
+      ],
+      home: { value: 2_000_000, growthReal: 0 },
+    });
+    expect(toSuperMax(couple, { age: 56, newValue: 700_000, toSuper: 600_000 })).toBeCloseTo(300_000, 0); // partner still 50
+    expect(toSuperMax(couple, { age: 62, newValue: 700_000, toSuper: 600_000 })).toBeGreaterThan(300_000); // both 55+
+  });
+});
+
 describe("What-If strategies", () => {
   it("catalogs the levers that apply to the scenario", () => {
     const ids = buildStrategyCatalog(base({ mortgage: { type: "principal_interest", balance: 150_000, interestRate: 6, annualRepayment: 18_000, payoffAge: 72, strategy: "carry" }, investmentProperties: [prop()] })).map((c) => c.id);

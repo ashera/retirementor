@@ -123,6 +123,36 @@ describe("Review Tier-3 fixes", () => {
     expect(row.breakdown.homeProceedsToSuper).toBeCloseTo(300_000, 0); // requested $500k → capped at $300k (single)
   });
 
+  it("downsizer: nothing can go to super before age 55 (it all goes to savings)", () => {
+    const home = { value: 1_500_000, growthReal: 0, downsize: { atAge: 50, newValue: 600_000, toSuper: 300_000 } };
+    const plan = base({ people: [P({ currentAge: 45, superBalance: 200_000, salary: 150_000 })], retirementAge: 65, home });
+    const dsRow = simulate(plan, cfg).rows.find((r) => r.breakdown.homeProceeds > 0)!;
+    expect(dsRow.age).toBe(50); // the downsize still happens at 50
+    expect(dsRow.breakdown.homeProceedsToSuper).toBe(0); // but under 55 → $0 to super
+    expect(dsRow.breakdown.homeProceeds).toBeGreaterThan(300_000); // equity freed, all to savings
+  });
+
+  it("downsizer: couple cap counts only partners who are 55+ at the sale", () => {
+    // Oldest 56, partner 50 at the downsize age → only one eligible → $300k cap, not $600k.
+    const home = { value: 2_000_000, growthReal: 0, downsize: { atAge: 56, newValue: 700_000, toSuper: 600_000 } };
+    const plan = base({
+      household: "couple", superMode: "individual", retirementAge: 60,
+      people: [P({ currentAge: 56, superBalance: 300_000 }), P({ currentAge: 50, superBalance: 300_000, retirementAge: 60 })],
+      home,
+    });
+    const row = simulate(plan, cfg).rows.find((r) => r.breakdown.homeProceedsToSuper > 0)!;
+    expect(row.breakdown.homeProceedsToSuper).toBeCloseTo(300_000, 0); // only the 56-yo counts
+
+    // Both 56+ at the sale → full $600k allowed.
+    const bothEligible = base({
+      household: "couple", superMode: "individual", retirementAge: 60,
+      people: [P({ currentAge: 56, superBalance: 300_000 }), P({ currentAge: 56, superBalance: 300_000, retirementAge: 60 })],
+      home,
+    });
+    const row2 = simulate(bothEligible, cfg).rows.find((r) => r.breakdown.homeProceedsToSuper > 0)!;
+    expect(row2.breakdown.homeProceedsToSuper).toBeCloseTo(600_000, 0);
+  });
+
   it("#8 a floorPct over 100% is clamped — the floor never exceeds the start spend", () => {
     const tl = guardrailsTimeline({ ...base({ people: [P({ currentAge: 60, superBalance: 900_000 })], retirementAge: 60, outsideSuper: 0, targetSpending: 55_000 }), guardrails: { floorPct: 120 } }, cfg);
     expect(tl.floor).toBeLessThanOrEqual(tl.start);

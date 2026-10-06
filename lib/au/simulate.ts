@@ -524,10 +524,14 @@ export function simulate(
     let homeToSuperThisYear = 0;
     if (downsize && !downsized && oldest >= downsize.atAge) {
       const release = Math.max(0, homeVal - downsize.newValue - loanBal);
-      // The downsizer contribution is capped at $300k PER PERSON by law, regardless
-      // of how much equity is freed or requested (the UI slider caps too, but the
-      // engine is the source of truth for saved/seeded plans).
-      const toSuper = Math.max(0, Math.min(downsize.toSuper, release, 300_000 * plan.people.length));
+      // The downsizer contribution follows the ATO rules: only a person who is at
+      // least the eligibility age (55) at the sale can contribute, and each eligible
+      // person is capped at $300k. So below 55 NOTHING can go to super (it all goes to
+      // savings); for a couple only the 55+ partners count toward the cap. (The UI
+      // slider caps too, but the engine is the source of truth for saved/seeded plans.)
+      const eligibleDownsizers = ages.filter((a) => a >= config.downsizerEligibilityAge).length;
+      const downsizerSuperCap = config.downsizerCap * eligibleDownsizers;
+      const toSuper = Math.max(0, Math.min(downsize.toSuper, release, downsizerSuperCap));
       const toOutside = Math.max(0, release - toSuper);
       if (accum.length) addToSuper(0, toSuper);
       addCpiRealOutside(toOutside, t); // CPI-real freed equity — pre-boundary it's basis-corrected
@@ -904,8 +908,11 @@ export function simulate(
           propertyProceeds: accumPropertyProceeds,
           propertyCgt: accumPropertyCgt,
           propertySales: accumPropertySales,
-          homeProceeds: 0,
-          homeProceedsToSuper: 0,
+          // A downsize can now happen during the working years too (its super portion is
+          // gated by the 55+ downsizer rule), so report the freed equity in the ledger —
+          // otherwise the money-flow waterfall can't reconcile the jump in that year.
+          homeProceeds: homeProceedsThisYear,
+          homeProceedsToSuper: homeToSuperThisYear,
           homeValue: homeValueThisYear,
           homeEquity: homeEquityThisYear,
           ...deathBenefitFields(outside - drLoan + offsetHeldReal, homeEquityThisYear, 0),
