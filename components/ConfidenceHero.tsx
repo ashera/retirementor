@@ -249,6 +249,15 @@ export default function ConfidenceHero({
     </div>
   );
 
+  // The three spend zones. Rendered as captions anchored under the bar on wider
+  // screens, and as a plain stacked legend on mobile — where three fixed-width
+  // captions would overlap and become unreadable.
+  const zones = [
+    { tone: ZONE.bullet, name: "Failsafe zone", range: `up to ${fmtCompact(failsafe)}`, note: "survives worst history" },
+    { tone: ZONE.safe, name: "Prudent zone", range: `${fmtCompact(failsafe)}–${fmtCompact(safe)}`, note: `≈85% chance of lasting to ${lifeExpectancy}` },
+    { tone: ZONE.amber, name: "Risky zone", range: `${fmtCompact(safe)}–${fmtCompact(central)}`, note: "down to 50% likely to last" },
+  ];
+
   return (
     <section className="mb-6 overflow-hidden rounded-3xl border border-line bg-gradient-to-b from-panel-2 to-panel p-6 shadow-xl sm:p-7">
       <div className="grid gap-6 lg:grid-cols-[1fr_16rem]">
@@ -314,11 +323,23 @@ export default function ConfidenceHero({
                 <div key={i} className="absolute -top-1.5 h-7 w-0.5 bg-ink/60" style={{ left: `${p}%` }} />
               ))}
             </div>
-            <div className="relative mt-2 h-16">
-              {marker(zonePct[0], ZONE.bullet, "Failsafe zone", `up to ${fmtCompact(failsafe)}`, "survives worst history")}
-              {marker(zonePct[1], ZONE.safe, "Prudent zone", `${fmtCompact(failsafe)}–${fmtCompact(safe)}`, `≈85% chance of lasting to ${lifeExpectancy}`)}
-              {marker(zonePct[2], ZONE.amber, "Risky zone", `${fmtCompact(safe)}–${fmtCompact(central)}`, "down to 50% likely to last")}
+            {/* Wide screens: captions anchored under each zone of the bar. */}
+            <div className="relative mt-2 hidden h-16 sm:block">
+              {zones.map((z, i) => marker(zonePct[i], z.tone, z.name, z.range, z.note))}
             </div>
+            {/* Mobile: a stacked legend — three fixed-width captions would collide. */}
+            <ul className="mt-3 space-y-1.5 sm:hidden">
+              {zones.map((z) => (
+                <li key={z.name} className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                  <span className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide" style={{ color: z.tone }}>
+                    <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: z.tone }} aria-hidden />
+                    {z.name}
+                  </span>
+                  <span className="text-[13px] font-bold tabular-nums text-white">{z.range}</span>
+                  <span className="text-[11px] leading-tight text-muted">{z.note}</span>
+                </li>
+              ))}
+            </ul>
           </div>
 
           <p className="mt-7 text-sm leading-relaxed text-muted">
