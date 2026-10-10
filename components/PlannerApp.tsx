@@ -1162,7 +1162,7 @@ export default function PlannerApp({
             : undefined;
 
   const summary = [
-    { label: "Household", value: isCouple ? "Couple" : "Single" },
+    { label: "Household", value: `${isCouple ? "Couple" : "Single"} (${plan.people.map((p) => p.currentAge).join(", ")})` },
     { label: "Home", value: plan.homeowner ? "Owner" : "Renter" },
     { label: "Retire at", value: `${plan.retirementAge}` },
     {
