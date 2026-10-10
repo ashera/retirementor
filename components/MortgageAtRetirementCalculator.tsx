@@ -45,6 +45,12 @@ export default function MortgageAtRetirementCalculator() {
   const [infl, setInfl] = useState(2.5);
   const [life, setLife] = useState(90);
   const [showAssumptions, setShowAssumptions] = useState(false);
+  // Other assessable assets — so the Age Pension (and the uplift from clearing) is real,
+  // not an artefact of assuming the household has nothing outside super.
+  const [hasProperty, setHasProperty] = useState(false);
+  const [propValue, setPropValue] = useState(600_000);
+  const [propLoan, setPropLoan] = useState(0);
+  const [propYield, setPropYield] = useState(4);
 
   const r = useMemo(() => {
     // Annual P&I repayment implied by balance / rate / remaining term.
@@ -74,6 +80,12 @@ export default function MortgageAtRetirementCalculator() {
       lifeExpectancy: life,
       home: { value: homeValue, growthReal: 2 },
       mortgage: { type: "principal_interest", balance, interestRate: rate, annualRepayment: Math.round(repay), payoffAge: age + term, strategy },
+      // An investment property: net equity is asset-tested and its actual net rent is
+      // income-tested (not deemed) — the engine handles both, so the pension is right.
+      investmentProperties:
+        hasProperty && propValue > 0
+          ? [{ value: propValue, growthReal: 2, grossYield: propYield, costRatio: 25, loanBalance: propLoan, loanRate: 6, purchasePrice: propValue, strategy: "hold" as const, sellAtAge: life }]
+          : undefined,
     });
 
     const keep = simulate(plan("carry"), cfg);
@@ -102,7 +114,7 @@ export default function MortgageAtRetirementCalculator() {
       returnBeatsRate: ret > rate,
       enoughSuper,
     };
-  }, [couple, age, superBal, savings, homeValue, balance, rate, term, spend, ret, infl, life]);
+  }, [couple, age, superBal, savings, homeValue, balance, rate, term, spend, ret, infl, life, hasProperty, propValue, propLoan, propYield]);
 
   const winnerText =
     r.winner === "keep"
@@ -148,16 +160,31 @@ export default function MortgageAtRetirementCalculator() {
         <Row label="Interest rate" value={rate} min={3} max={10} step={0.1} onChange={setRate} display={`${rate.toFixed(1)}%`} />
         <Row label="Years left on the loan" value={term} min={1} max={25} step={1} onChange={setTerm} display={`${term} yr${term === 1 ? "" : "s"}`} hint={`≈ ${fmtCurrency(r.repay)}/yr in repayments`} />
         <Row label="Spending (excl. mortgage)" value={spend} min={20_000} max={150_000} step={1_000} onChange={setSpend} display={`${fmtCurrency(spend)}/yr`} />
+        <Row label="Shares & cash outside super" value={savings} min={0} max={3_000_000} step={5_000} onChange={setSavings} display={fmtCurrency(savings)} hint="Shares, ETFs, funds, bank — assessed for the Age Pension." />
+      </div>
+
+      {/* Investment property — so the means test (and the pension boost) is real */}
+      <div className="mt-4">
+        <label className="flex items-center gap-2 text-sm text-slate-200">
+          <input type="checkbox" checked={hasProperty} onChange={(e) => setHasProperty(e.target.checked)} className="h-4 w-4 accent-accent" />
+          I also have an investment property
+        </label>
+        {hasProperty && (
+          <div className="mt-3 grid gap-5 rounded-xl border border-line bg-panel-2/50 p-4 sm:grid-cols-3">
+            <Row label="Property value" value={propValue} min={100_000} max={3_000_000} step={25_000} onChange={setPropValue} display={fmtCurrency(propValue)} />
+            <Row label="Loan still owing on it" value={propLoan} min={0} max={2_000_000} step={10_000} onChange={setPropLoan} display={fmtCurrency(propLoan)} />
+            <Row label="Gross rental yield" value={propYield} min={1} max={8} step={0.1} onChange={setPropYield} display={`${propYield.toFixed(1)}%`} hint="Net equity is asset-tested; rent is income-tested." />
+          </div>
+        )}
       </div>
 
       <div className="mt-4">
         <button type="button" onClick={() => setShowAssumptions((v) => !v)} className="text-xs font-medium text-muted transition hover:text-white">
-          {showAssumptions ? "▾" : "▸"} More ({fmtCurrency(savings)} other savings · {fmtCurrency(homeValue)} home · {ret}% return · {infl}% inflation · to {life})
+          {showAssumptions ? "▾" : "▸"} More ({fmtCurrency(homeValue)} home · {ret}% return · {infl}% inflation · to {life})
         </button>
         {showAssumptions && (
           <div className="mt-3 grid gap-5 rounded-xl border border-line bg-panel-2/50 p-4 sm:grid-cols-2">
-            <Row label="Other savings (outside super)" value={savings} min={0} max={1_000_000} step={5_000} onChange={setSavings} display={fmtCurrency(savings)} />
-            <Row label="Home value" value={homeValue} min={300_000} max={3_000_000} step={25_000} onChange={setHomeValue} display={fmtCurrency(homeValue)} />
+            <Row label="Home value" value={homeValue} min={300_000} max={3_000_000} step={25_000} onChange={setHomeValue} display={fmtCurrency(homeValue)} hint="Your home is exempt from the assets test." />
             <Row label="Investment return (p.a.)" value={ret} min={3} max={10} step={0.1} onChange={setRet} display={`${ret.toFixed(1)}%`} hint="Super/savings earn this; compare it to your loan rate." />
             <Row label="Inflation (p.a.)" value={infl} min={1} max={5} step={0.1} onChange={setInfl} display={`${infl.toFixed(1)}%`} />
             <Row label="Plan to age" value={life} min={80} max={100} step={1} onChange={setLife} display={`${life}`} />

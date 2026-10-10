@@ -90,7 +90,9 @@ export default function MortgageAtRetirementPage() {
               <strong className="text-white">assessed</strong>. So drawing super to clear the loan <em>moves money from an assessed asset
               into an exempt one</em> — which can <strong className="text-white">increase your Age Pension</strong> by up to about 7.8% a
               year of the amount you clear (the assets-test taper). That pension boost is real cash, every year, and it&apos;s exactly what
-              a plain return-vs-rate calculator ignores. See the{" "}
+              a plain return-vs-rate calculator ignores. It only helps if your assessable assets are in the taper zone, though — so the
+              calculator also asks for your shares and any investment property; if you&apos;re already well above the cut-off, clearing
+              won&apos;t move the pension. See the{" "}
               <Link href="/learn/age-pension-calculator" className="text-accent hover:underline">Age Pension calculator</Link>.
             </p>
           </div>
