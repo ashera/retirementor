@@ -260,28 +260,39 @@ if (OUT) {
 
 // ── Save to the DB (deduped) ───────────────────────────────────────────────────────
 if (SAVE) {
-  const dbUrl = process.env.DATABASE_URL || process.env.DATABASE_PUBLIC_URL;
+  // Prefer the PUBLIC url: this tool runs OUTSIDE Railway (via `railway run`), where the
+  // internal host (postgres.railway.internal) isn't reachable — only the public proxy is.
+  const dbUrl = process.env.DATABASE_PUBLIC_URL || process.env.DATABASE_URL;
   if (!dbUrl) {
-    console.error("\n--save: no DATABASE_URL / DATABASE_PUBLIC_URL in env. Run via `railway run` to target prod.");
+    console.error("\n--save: no DATABASE_PUBLIC_URL / DATABASE_URL in env. Run via `railway run` (link the Postgres service) to target prod, or set DATABASE_URL for a local DB.");
+  } else if (/\.railway\.internal[:/]/.test(dbUrl)) {
+    console.error("\n--save: the only DB URL is the INTERNAL railway host (postgres.railway.internal), which isn't reachable from your machine.");
+    console.error("        Link the Postgres service so DATABASE_PUBLIC_URL is injected:  railway link -s Postgres  (then re-run with `railway run`).");
   } else if (top.length === 0) {
     console.error("\n--save: nothing to write.");
   } else {
-    const local = /@(localhost|127\.0\.0\.1|\[::1\])[:/]/.test(dbUrl) || /\.railway\.internal[:/]/.test(dbUrl);
-    const c = new pg.Client({ connectionString: dbUrl, ssl: local ? false : { rejectUnauthorized: false } });
-    await c.connect();
-    let ins = 0, dup = 0;
-    for (const p of top) {
-      const createdIso = Number.isFinite(p.createdMs) ? new Date(p.createdMs).toISOString() : null;
-      const res = await c.query(
-        `insert into reddit_outreach
-           (reddit_url, reddit_title, subreddit, article_slug, reddit_created_at, fit_score, matched, parsed, prefilled_url, suggested_response)
-         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
-         on conflict (reddit_url, article_slug) do nothing`,
-        [`https://www.reddit.com${p.href}`, p.title, p.sub, args.article, createdIso, p.fit, (p.matched || []).join(", "), JSON.stringify(p.parsed || {}), p.prefilled, p.response],
-      );
-      res.rowCount > 0 ? ins++ : dup++;
+    const local = /@(localhost|127\.0\.0\.1|\[::1\])[:/]/.test(dbUrl);
+    const c = new pg.Client({ connectionString: dbUrl, ssl: local ? false : { rejectUnauthorized: false }, connectionTimeoutMillis: 15000 });
+    try {
+      await c.connect();
+      let ins = 0, dup = 0;
+      for (const p of top) {
+        const createdIso = Number.isFinite(p.createdMs) ? new Date(p.createdMs).toISOString() : null;
+        const res = await c.query(
+          `insert into reddit_outreach
+             (reddit_url, reddit_title, subreddit, article_slug, reddit_created_at, fit_score, matched, parsed, prefilled_url, suggested_response)
+           values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+           on conflict (reddit_url, article_slug) do nothing`,
+          [`https://www.reddit.com${p.href}`, p.title, p.sub, args.article, createdIso, p.fit, (p.matched || []).join(", "), JSON.stringify(p.parsed || {}), p.prefilled, p.response],
+        );
+        res.rowCount > 0 ? ins++ : dup++;
+      }
+      await c.end();
+      console.error(`\n--save: inserted ${ins}, skipped ${dup} duplicate(s) → reddit_outreach (${dbUrl.replace(/:\/\/[^@]+@/, "://***@").replace(/\/[^/]*$/, "")}).`);
+    } catch (e) {
+      console.error(`\n--save: DB write FAILED — ${String(e).slice(0, 160)}`);
+      try { await c.end(); } catch { /* already closed */ }
+      process.exitCode = 1;
     }
-    await c.end();
-    console.error(`\n--save: inserted ${ins}, skipped ${dup} duplicate(s) → reddit_outreach.`);
   }
 }
