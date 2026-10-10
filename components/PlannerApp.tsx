@@ -46,7 +46,7 @@ import { composeScenario, toActiveScenario, EMPTY_LAYER, type StrategyLayer } fr
 import { initialWithdrawal, withdrawalBand } from "@/lib/au/withdrawal";
 import ProbabilityYearModal from "@/components/ProbabilityYearModal";
 import { retirementGoal } from "@/lib/au/goal";
-import { logout } from "@/app/actions/auth";
+import HeaderUserMenu from "@/components/HeaderUserMenu";
 import {
   deletePlan,
   updatePlan,
@@ -1337,39 +1337,7 @@ export default function PlannerApp({
                 )}
               </Link>
             )}
-            {user.isAdmin && (
-              <Link
-                href="/admin/review"
-                className="flex items-center gap-1.5 rounded-lg border border-accent/40 px-3 py-1.5 font-medium text-accent transition hover:bg-accent/10"
-              >
-                Admin
-                {reviewDue > 0 && (
-                  <span className="rounded-full bg-red-500 px-1.5 text-xs text-white">
-                    {reviewDue}
-                  </span>
-                )}
-              </Link>
-            )}
-            <Link
-              href="/account"
-              className="flex items-center gap-2 rounded-lg px-1.5 py-1 text-slate-200 transition hover:text-white"
-              title="Account settings"
-            >
-              {user.avatarUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={user.avatarUrl} alt="" className="h-7 w-7 rounded-full object-cover ring-1 ring-line" />
-              ) : (
-                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-panel-2 text-xs font-semibold text-slate-300 ring-1 ring-line">
-                  {(user.name ?? user.email).charAt(0).toUpperCase()}
-                </span>
-              )}
-              <span className="max-w-[12rem] truncate">{user.name ?? user.email}</span>
-            </Link>
-            <form action={logout}>
-              <button className="rounded-lg border border-line px-3 py-1.5 font-medium text-slate-200 transition hover:border-accent/50 hover:text-white">
-                Log out
-              </button>
-            </form>
+            <HeaderUserMenu user={user} reviewDue={reviewDue} />
           </>
         ) : (
           <>
