@@ -3,7 +3,69 @@
 import { useMemo, useState, useTransition } from "react";
 import { fmtDateTime } from "@/lib/au/format";
 import type { OutreachRow } from "@/lib/adminOutreach";
-import { setOutreachStatus, deleteOutreach } from "@/app/actions/outreach";
+import { setOutreachStatus, deleteOutreach, updateOutreachParsed } from "@/app/actions/outreach";
+import { OUTREACH_ARTICLES } from "@/lib/outreachArticles";
+
+/** Editable grid of the values parsed from the post — shows every field the article's
+ *  calculator takes (empty when the parser missed it), and saves edits back, which
+ *  rebuilds the prefilled link. */
+function ParsedEditor({ id, slug, parsed }: { id: string; slug: string; parsed: Record<string, unknown> | null }) {
+  const art = OUTREACH_ARTICLES[slug];
+  const [vals, setVals] = useState<Record<string, string>>(() => {
+    const o: Record<string, string> = {};
+    for (const f of art?.fields ?? []) {
+      const v = parsed?.[f.key];
+      o[f.key] = typeof v === "number" ? String(v) : "";
+    }
+    return o;
+  });
+  const [saved, setSaved] = useState(false);
+  const [pending, start] = useTransition();
+  if (!art) return null;
+
+  const save = () =>
+    start(async () => {
+      const payload: Record<string, number | null> = {};
+      for (const f of art.fields) {
+        const s = (vals[f.key] ?? "").trim();
+        payload[f.key] = s === "" ? null : Number(s);
+      }
+      await updateOutreachParsed(id, payload);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 1500);
+    });
+
+  return (
+    <div>
+      <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted">Extracted values — edit &amp; save (blank = not set)</div>
+      <div className="flex flex-wrap items-end gap-3">
+        {art.fields.map((f) => (
+          <label key={f.key} className="flex flex-col gap-1 text-[11px] text-muted">
+            {f.label}
+            <input
+              type="number"
+              inputMode="numeric"
+              value={vals[f.key] ?? ""}
+              placeholder="—"
+              min={f.min}
+              max={f.max}
+              onChange={(e) => setVals((v) => ({ ...v, [f.key]: e.target.value }))}
+              className="w-28 rounded-md border border-line bg-panel-2 px-2 py-1.5 text-sm tabular-nums text-white outline-none focus:border-accent"
+            />
+          </label>
+        ))}
+        <button
+          type="button"
+          onClick={save}
+          disabled={pending}
+          className="rounded-md border border-accent/40 bg-accent/10 px-3 py-1.5 text-xs font-semibold text-accent transition hover:bg-accent/20 disabled:opacity-60"
+        >
+          {saved ? "Saved ✓" : pending ? "Saving…" : "Save values"}
+        </button>
+      </div>
+    </div>
+  );
+}
 
 const STATUS: Record<string, { label: string; cls: string }> = {
   new: { label: "To action", cls: "bg-amber-500/15 text-amber-300" },
@@ -161,11 +223,7 @@ export default function OutreachTable({ items }: { items: OutreachRow[] }) {
                       <CopyButton text={o.prefilled_url} label="Copy link" />
                     </div>
                   )}
-                  {o.parsed && Object.keys(o.parsed).length > 0 && (
-                    <div className="text-[11px] text-muted">
-                      Parsed from the post: {Object.entries(o.parsed).map(([k, v]) => `${k}=${v}`).join(" · ")}
-                    </div>
-                  )}
+                  <ParsedEditor id={o.id} slug={o.article_slug} parsed={o.parsed} />
                 </div>
               )}
             </div>
