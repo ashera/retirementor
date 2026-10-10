@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import {
   Area,
   AreaChart,
@@ -245,6 +246,20 @@ export default function RetirementChart({
   // property sale…) as quiet bottom-axis pins + the recontribution window as a band.
   plan?: RetirementPlan | null;
 }) {
+  // Measure the rendered width so label placement can scale with it — the same chart
+  // is ~2× narrower on a phone, where a fixed desktop-tuned estimate would pack labels
+  // that actually overlap onto one row.
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const [plotW, setPlotW] = useState(0);
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver((entries) => setPlotW(entries[0].contentRect.width));
+    ro.observe(el);
+    setPlotW(el.clientWidth);
+    return () => ro.disconnect();
+  }, []);
+
   const { retirementAge, partnerRetirementAge, depletedAge } = result;
   // Markers sit on the OLDEST-person age axis, but each partner's OWN retirement age
   // must be shifted by the age gap to land on the right year (a person retires when
@@ -349,7 +364,13 @@ export default function RetirementChart({
   if (agedCare && agedCare.entryAge >= (result.rows[0]?.age ?? 0)) {
     markerInputs.push({ key: "aged-care", x: agedCare.entryAge, color: "#f472b6", name: "Aged care", dash: "5 3" });
   }
-  const { placed, rows: markerRows } = placeMarkers(markerInputs);
+  // Scale the label-width estimate to the live chart width: years-per-character =
+  // (domain years × px-per-char) / plot pixels. The plot is the measured width less
+  // the Y-axis and margins. Falls back to a desktop-ish width before the first measure.
+  const ageSpan = Math.max(1, (data[data.length - 1]?.age ?? 0) - (data[0]?.age ?? 0));
+  const plotPx = Math.max(140, (plotW || 700) - 54 - 16);
+  const charAges = (ageSpan * 6) / plotPx;
+  const { placed, rows: markerRows } = placeMarkers(markerInputs, charAges);
 
   // The OVERLAY: age-pinned What-If strategies + committed life events, shown as quiet
   // bottom-axis PINS (no in-plot text) rather than more labelled lines — the detail lives
@@ -392,6 +413,7 @@ export default function RetirementChart({
   const yDomainMax = headroomFrac > 0 ? Math.ceil(dataMax / (1 - headroomFrac)) : undefined;
 
   return (
+    <div ref={wrapRef}>
     <ResponsiveContainer width="100%" height={height}>
       <AreaChart
         data={data}
@@ -405,25 +427,38 @@ export default function RetirementChart({
         {selectedAge != null && (
           <ReferenceLine x={selectedAge} stroke="#e2e8f0" strokeWidth={1} strokeOpacity={0.5} />
         )}
-        {bands?.map((b) => (
-          <ReferenceArea
-            key={b.label}
-            x1={b.x1}
-            x2={b.x2}
-            fill={b.fill}
-            fillOpacity={0.08}
-            stroke="none"
-            label={{
-              value: b.label,
-              position: "insideBottom",
-              // Lift the phase labels (go-go / slow-go / no-go) clear of the bottom-axis
-              // event pins when there are any, so they don't overlap the chips.
-              offset: eventPins.length > 0 ? 22 : 5,
-              fill: b.fill,
-              fontSize: 11,
-            }}
-          />
-        ))}
+        {bands?.map((b) => {
+          // Narrow charts (phones): drop the "Years" suffix, and omit a band's label
+          // entirely when the band is too narrow to hold it — otherwise adjacent phase
+          // labels (go-go / slow-go / no-go) collide. The phase legend below the chart
+          // still names them all.
+          const bandPx = (Math.abs(b.x2 - b.x1) / ageSpan) * plotPx;
+          const text = plotPx < 460 ? b.label.replace(/\s*Years$/i, "") : b.label;
+          const fits = text.length * 6.5 + 8 <= bandPx;
+          return (
+            <ReferenceArea
+              key={b.label}
+              x1={b.x1}
+              x2={b.x2}
+              fill={b.fill}
+              fillOpacity={0.08}
+              stroke="none"
+              label={
+                fits
+                  ? {
+                      value: text,
+                      position: "insideBottom",
+                      // Lift the phase labels clear of the bottom-axis event pins when
+                      // there are any, so they don't overlap the chips.
+                      offset: eventPins.length > 0 ? 22 : 5,
+                      fill: b.fill,
+                      fontSize: 11,
+                    }
+                  : undefined
+              }
+            />
+          );
+        })}
         {/* Career-break ("gap year") spans — shaded so the working-years dip is
             clearly its full length. */}
         {breakSpans(result.rows as YearRow[]).map((s) => (
@@ -612,5 +647,6 @@ export default function RetirementChart({
         )}
       </AreaChart>
     </ResponsiveContainer>
+    </div>
   );
 }
