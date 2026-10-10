@@ -83,8 +83,6 @@ function relevance(title) {
 // ── Scrape one subreddit's /new/ feed down to the time cutoff ────────────────────
 async function scanSub(page, sub, cutoffMs) {
   const url = `https://www.reddit.com/r/${sub}/new/`;
-  await page.goto(url, { waitUntil: "domcontentloaded", timeout: 45000 });
-  await page.waitForTimeout(3500);
   const extract = () =>
     page.evaluate(() =>
       [...document.querySelectorAll("shreddit-post")].map((p) => ({
@@ -97,15 +95,41 @@ async function scanSub(page, sub, cutoffMs) {
       })),
     );
 
-  let posts = await extract();
+  // Load the feed, retrying once if the first paint comes back empty (a transient
+  // block / slow render otherwise reads as "0 posts").
+  let posts = [];
+  for (let attempt = 0; attempt < 2; attempt++) {
+    await page.goto(url, { waitUntil: "domcontentloaded", timeout: 45000 });
+    await page.waitForTimeout(attempt === 0 ? 4000 : 6000);
+    posts = await extract();
+    if (posts.length > 0) break;
+  }
+
+  // Infinite-scroll down to the time cutoff. Reddit lazy-loads the next batch when the
+  // feed's bottom sentinel scrolls into view, with a variable delay — so bring the LAST
+  // post into view and POLL for the post count to grow (up to ~5s) rather than a fixed
+  // wait. Only give up after two scrolls that add nothing.
+  let stale = 0;
   for (let i = 0; i < MAX_SCROLLS; i++) {
     const oldest = Math.min(...posts.map((p) => new Date(p.created).getTime()).filter(Number.isFinite));
     if (Number.isFinite(oldest) && oldest < cutoffMs) break; // reached the window edge
     const before = posts.length;
-    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-    await page.waitForTimeout(1400);
-    posts = await extract();
-    if (posts.length === before && i > 1) break; // feed stopped growing
+    await page.evaluate(() => {
+      const items = document.querySelectorAll("shreddit-post");
+      (items[items.length - 1] || document.body).scrollIntoView({ block: "end" });
+      window.scrollBy(0, 1200);
+    });
+    let grew = false;
+    for (let w = 0; w < 10; w++) {
+      await page.waitForTimeout(500);
+      posts = await extract();
+      if (posts.length > before) { grew = true; break; }
+    }
+    if (!grew) {
+      if (++stale >= 2) break; // genuinely stopped growing
+    } else {
+      stale = 0;
+    }
   }
   return posts;
 }
@@ -139,7 +163,11 @@ for (const sub of SUBS) {
       byId.set(id, { ...p, createdMs, relevance: score, matched, engagement, rank });
       kept++;
     }
-    console.error(`  r/${sub}: ${posts.length} fetched → ${kept} relevant in last ${HOURS}h`);
+    const inWindow = posts.filter((p) => new Date(p.created).getTime() >= cutoffMs).length;
+    console.error(`  r/${sub}: ${posts.length} fetched (${inWindow} in last ${HOURS}h) → ${kept} relevant`);
+    if (kept === 0 && inWindow > 0) {
+      console.error(`    (sample titles: ${posts.slice(0, 3).map((p) => `"${p.title.slice(0, 40)}"`).join(", ")})`);
+    }
   } catch (e) {
     console.error(`  r/${sub}: FAILED — ${String(e).slice(0, 120)}`);
   }
