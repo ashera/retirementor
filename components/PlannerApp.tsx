@@ -1306,7 +1306,7 @@ export default function PlannerApp({
       {/* Top bar: brand left, auth right */}
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3 text-sm">
         <Logo />
-        <div className="flex items-center gap-3">
+        <div className="flex min-w-0 flex-wrap items-center justify-end gap-x-3 gap-y-2">
         <Link
           href="/learn"
           className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-medium text-slate-200 transition hover:text-white"
