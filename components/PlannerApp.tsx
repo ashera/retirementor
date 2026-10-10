@@ -1317,28 +1317,12 @@ export default function PlannerApp({
           <span className="sm:hidden">Learn</span>
         </Link>
         {country && (
-          <span className="flex items-center" title="Your location">
+          <span className="hidden items-center sm:flex" title="Your location">
             <CountryFlag code={country} showCode={false} />
           </span>
         )}
         {user ? (
-          <>
-            {user.isAdmin && userStats && (
-              <Link
-                href="/admin/users"
-                title="Total users · signed up in the last 7 days"
-                className="flex items-center gap-1.5 rounded-full border border-line bg-panel-2 px-3 py-1.5 text-xs font-medium text-slate-300 transition hover:border-accent/50 hover:text-white"
-              >
-                <span aria-hidden>👥</span>
-                <span className="tabular-nums text-white">{userStats.total.toLocaleString()}</span>
-                <span className="text-muted">users</span>
-                {userStats.last7Days > 0 && (
-                  <span className="tabular-nums text-emerald-400">+{userStats.last7Days} · 7d</span>
-                )}
-              </Link>
-            )}
-            <HeaderUserMenu user={user} reviewDue={reviewDue} />
-          </>
+          <HeaderUserMenu user={user} reviewDue={reviewDue} userStats={userStats} />
         ) : (
           <>
             <Link

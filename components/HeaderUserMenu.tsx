@@ -13,9 +13,11 @@ import { logout } from "@/app/actions/auth";
 export default function HeaderUserMenu({
   user,
   reviewDue = 0,
+  userStats = null,
 }: {
   user: { email: string; isAdmin: boolean; name?: string | null; avatarUrl?: string | null };
   reviewDue?: number;
+  userStats?: { total: number; last7Days: number } | null;
 }) {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -61,7 +63,7 @@ export default function HeaderUserMenu({
             <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-[color:var(--bg,#0b1220)]" aria-hidden />
           )}
         </span>
-        <span className="max-w-[9rem] truncate sm:max-w-[12rem]">{label}</span>
+        <span className="max-w-[7.5rem] truncate sm:max-w-[12rem]">{label}</span>
         <svg
           className={`h-4 w-4 shrink-0 text-muted transition-transform ${open ? "rotate-180" : ""}`}
           viewBox="0 0 20 20"
@@ -94,6 +96,25 @@ export default function HeaderUserMenu({
               {reviewDue > 0 && (
                 <span className="rounded-full bg-red-500 px-1.5 text-xs font-semibold text-white tabular-nums">{reviewDue}</span>
               )}
+            </Link>
+          )}
+          {user.isAdmin && userStats && (
+            <Link
+              href="/admin/users"
+              role="menuitem"
+              onClick={() => setOpen(false)}
+              className="flex items-center justify-between gap-2 px-3 py-2 text-sm text-slate-200 transition hover:bg-panel-2 hover:text-white"
+              title="Total users · signed up in the last 7 days"
+            >
+              <span className="flex items-center gap-2">
+                <span aria-hidden>👥</span> Users
+              </span>
+              <span className="flex items-center gap-1.5 text-xs">
+                <span className="tabular-nums text-white">{userStats.total.toLocaleString()}</span>
+                {userStats.last7Days > 0 && (
+                  <span className="tabular-nums text-emerald-400">+{userStats.last7Days}·7d</span>
+                )}
+              </span>
             </Link>
           )}
           <Link
