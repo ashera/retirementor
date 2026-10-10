@@ -118,6 +118,20 @@ export default function LearnIndex() {
           <span aria-hidden className="text-accent">→</span>
         </Link>
         <Link
+          href="/learn/super-on-track"
+          className="flex items-center gap-4 rounded-2xl border border-accent/30 bg-accent/[0.07] p-5 transition hover:border-accent/50 hover:bg-accent/10"
+        >
+          <span aria-hidden className="text-3xl">🎯</span>
+          <span className="min-w-0 flex-1">
+            <span className="flex items-center gap-2">
+              <span className="font-semibold text-white">Is your super on track?</span>
+              <span className="rounded-full bg-accent/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-accent">Interactive</span>
+            </span>
+            <span className="mt-0.5 block text-sm text-muted">Compare your balance to the typical for your age, and see if you&apos;re on track for a comfortable retirement — with a catch-up figure if not.</span>
+          </span>
+          <span aria-hidden className="text-accent">→</span>
+        </Link>
+        <Link
           href="/learn/average-australian-retirement"
           className="flex items-center gap-4 rounded-2xl border border-accent/30 bg-accent/[0.07] p-5 transition hover:border-accent/50 hover:bg-accent/10"
         >
