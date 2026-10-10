@@ -17,7 +17,8 @@
     "test:record": "node scripts/run-tests.mjs",
     "test:e2e": "node scripts/e2e-scenarios.mjs",
     "measure:report": "node scripts/measure-report.mjs",
-    "reddit:scan": "node scripts/reddit-scan.mjs"
+    "reddit:scan": "node scripts/reddit-scan.mjs",
+    "reddit:match": "node scripts/reddit-match.mjs"
   },
   "dependencies": {
     "@types/pg": "^8.20.0",
