@@ -1,11 +1,12 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { Area, AreaChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { simulate } from "@/lib/au/simulate";
 import { DEFAULT_CONFIG as cfg } from "@/lib/au/config";
 import { DEFAULT_PLAN, type RetirementPlan, type MortgageStrategy } from "@/lib/au/types";
 import { rowNetWorth } from "@/lib/au/networth";
-import { fmtCurrency } from "@/lib/au/format";
+import { fmtCompact, fmtCurrency } from "@/lib/au/format";
 import Bert from "@/components/Bert";
 
 // Should you pay the mortgage off at retirement, or keep it? Runs the REAL engine for
@@ -104,8 +105,16 @@ export default function MortgageAtRetirementCalculator() {
     const pensionUplift = Math.round(pension(clear) - pension(keep)); // clearing usually lifts the pension
     const enoughSuper = balance <= superBal + savings;
 
+    // Net worth over time, both choices — the visual that makes the comparison land.
+    const series = keep.rows.map((row, i) => ({
+      age: row.age,
+      keep: Math.round(rowNetWorth(row)),
+      clear: clear.rows[i] ? Math.round(rowNetWorth(clear.rows[i])) : null,
+    }));
+
     return {
       repay: Math.round(repay),
+      series,
       nwKeep, nwClear, diff,
       pensionKeep: Math.round(pension(keep)), pensionClear: Math.round(pension(clear)), pensionUplift,
       lastsKeep: lasts(keep), lastsClear: lasts(clear),
@@ -210,6 +219,33 @@ export default function MortgageAtRetirementCalculator() {
                 Clearing it lifts your Age Pension by about <span className="font-semibold text-emerald-300">{fmtCurrency(r.pensionUplift)}/yr</span> (less assessable super), and ends the {fmtCurrency(r.repay)}/yr repayment.
               </p>
             )}
+            {/* Net worth over time — both choices */}
+            <div className="mt-4 rounded-xl border border-line bg-panel-2/40 p-3">
+              <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted">Net worth over time · today&apos;s dollars</div>
+              <div className="h-56 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={r.series} margin={{ top: 5, right: 6, left: 0, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="nwKeep" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#38bdf8" stopOpacity={0.25} /><stop offset="100%" stopColor="#38bdf8" stopOpacity={0.02} /></linearGradient>
+                      <linearGradient id="nwClear" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#34d399" stopOpacity={0.25} /><stop offset="100%" stopColor="#34d399" stopOpacity={0.02} /></linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#232c40" vertical={false} />
+                    <XAxis dataKey="age" stroke="#8b97ad" fontSize={11} tickLine={false} axisLine={{ stroke: "#232c40" }} />
+                    <YAxis stroke="#8b97ad" fontSize={11} tickLine={false} axisLine={false} width={48} tickFormatter={fmtCompact} />
+                    <Tooltip
+                      contentStyle={{ background: "#0b1220", border: "1px solid #232c40", borderRadius: 8, fontSize: 12 }}
+                      labelStyle={{ color: "#e2e8f0" }}
+                      formatter={(v: number, name: string) => [fmtCurrency(Math.round(v)), name]}
+                      labelFormatter={(a) => `Age ${a}`}
+                    />
+                    <Legend wrapperStyle={{ fontSize: 12 }} />
+                    <Area type="monotone" dataKey="keep" name="Keep the mortgage" stroke="#38bdf8" strokeWidth={2} fill="url(#nwKeep)" isAnimationActive={false} dot={false} />
+                    <Area type="monotone" dataKey="clear" name="Clear it with super" stroke="#34d399" strokeWidth={2} fill="url(#nwClear)" isAnimationActive={false} dot={false} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
             <div className="mt-4 flex flex-col gap-3 sm:flex-row">
               <Col title="Keep the mortgage" nw={r.nwKeep} pension={r.pensionKeep} lastsAge={r.lastsKeep} lasts={r.keepLasts} tone="#38bdf8" />
               <Col title="Clear it with super" nw={r.nwClear} pension={r.pensionClear} lastsAge={r.lastsClear} lasts={r.clearLasts} tone="#34d399" />
