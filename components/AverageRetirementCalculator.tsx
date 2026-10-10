@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { fmtCurrency } from "@/lib/au/format";
 import { DEFAULT_CONFIG } from "@/lib/au/config";
 import Bert from "@/components/Bert";
@@ -61,6 +61,26 @@ export default function AverageRetirementCalculator() {
   const [inflation, setInflation] = useState(2.5); // % p.a.
   const [showAssumptions, setShowAssumptions] = useState(false);
   const [activePreset, setActivePreset] = useState("average");
+
+  // Prefill from the URL (?age=&retire=&income=&super=) — used by the Reddit-outreach
+  // links so the calculator opens set to the numbers from the post being answered.
+  useEffect(() => {
+    try {
+      const p = new URLSearchParams(window.location.search);
+      const inRange = (k: string, lo: number, hi: number) => {
+        const v = Number(p.get(k));
+        return p.has(k) && Number.isFinite(v) && v >= lo && v <= hi ? v : null;
+      };
+      let touched = false;
+      const a = inRange("age", 18, 60); if (a != null) { setAge(a); touched = true; }
+      const rt = inRange("retire", 50, 75); if (rt != null) { setRetireAge(rt); touched = true; }
+      const inc = inRange("income", 1_000, 1_000_000); if (inc != null) { setIncome(Math.min(250_000, Math.round(inc))); touched = true; }
+      const s = inRange("super", 0, 5_000_000); if (s != null) { setSuperNow(Math.min(1_000_000, Math.round(s))); touched = true; }
+      if (touched) setActivePreset("");
+    } catch {
+      /* no URL / blocked — use defaults */
+    }
+  }, []);
 
   const r = useMemo(() => {
     const n = Math.max(0, retireAge - age);

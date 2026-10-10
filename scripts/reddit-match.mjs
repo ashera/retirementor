@@ -51,6 +51,17 @@ function parseIncome(t) {
   }
   return null;
 }
+function parseRetire(t) {
+  const m = t.match(/\bretir\w*\s*(?:at|by|at\s*age|age)?\s*(\d{2})\b/i);
+  if (m) { const a = Number(m[1]); if (a >= 50 && a <= 75) return a; }
+  return null;
+}
+function parseWithdraw(t) {
+  const m = t.match(/(?:withdraw|access|take\s*out|pull\s*out|release)\D{0,12}(\$?\s*[\d.,]+\s*k?)/i);
+  const v = m && money(m[1]);
+  if (v && v >= 1_000 && v <= 100_000) return v;
+  return null;
+}
 
 // ── Article registry: add an entry per /learn article you want to match ──────────
 // queries = the Reddit searches to run (relevance-sorted); fit = title keywords that
@@ -89,6 +100,24 @@ const ARTICLES = {
     fit: ["retire", "comfortable", "how much", "enough", "need to retire", "average", "asfa", "nest egg", "balance to retire"],
     pitch:
       "a breakdown (with a calculator) of whether the average Australian actually retires comfortably — reproducing the viral thread and adding the average-vs-median catch",
+    extract: (text) => {
+      const t = text.toLowerCase();
+      const o = {};
+      const age = parseAge(t); if (age) o.age = age;
+      const inc = parseIncome(t); if (inc) o.income = inc;
+      const sup = parseSuper(t); if (sup) o.super = sup;
+      const rt = parseRetire(t); if (rt) o.retire = rt;
+      return o;
+    },
+    draft: (v, url) => {
+      const bits = [v.age && `${v.age}`, v.super && `about $${Math.round(v.super / 1000)}k in super`, v.retire && `aiming to retire at ${v.retire}`].filter(Boolean).join(", ");
+      const lead = bits ? `At ${bits}, ` : ``;
+      return (
+        `${lead}whether "enough to retire comfortably" really holds up depends a lot on the assumptions — and the "average" balance is skewed well above the median.\n\n` +
+        `I put the maths (reproducing the viral thread) into a free calculator you can run with your own numbers${Object.keys(v).length ? ", prefilled here" : ""}: ${url}\n\n` +
+        `(Disclosure: it's my tool.)`
+      );
+    },
   },
   "early-super": {
     path: "/learn/early-super-access",
@@ -96,6 +125,23 @@ const ARTICLES = {
     queries: ["access super early", "withdraw super early", "early release super", "super for housing"],
     fit: ["access super", "early", "withdraw", "release", "super for", "hardship", "take out super"],
     pitch: "an explainer + calculator on what taking super out early really costs, in today's dollars",
+    extract: (text) => {
+      const t = text.toLowerCase();
+      const o = {};
+      const age = parseAge(t); if (age) o.age = age;
+      const rt = parseRetire(t); if (rt) o.retire = rt;
+      const w = parseWithdraw(t); if (w) { o.oneoff = w; o.mode = "oneoff"; }
+      return o;
+    },
+    draft: (v, url) => {
+      const bits = [v.age && `${v.age}`, v.oneoff && `looking at ~$${Math.round(v.oneoff / 1000)}k`].filter(Boolean).join(", ");
+      const lead = bits ? `At ${bits}, ` : ``;
+      return (
+        `${lead}the catch with taking super out early is the compounding you give up by retirement — it's usually a lot more than the amount withdrawn.\n\n` +
+        `This free calculator shows that cost in today's dollars${Object.keys(v).length ? ", prefilled with your numbers" : ""}: ${url}\n\n` +
+        `(Disclosure: it's my tool. There are also legitimate early-access grounds covered on the page.)`
+      );
+    },
   },
 };
 

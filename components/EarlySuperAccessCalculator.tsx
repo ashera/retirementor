@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { fmtCurrency } from "@/lib/au/format";
 import Bert from "@/components/Bert";
 
@@ -60,6 +60,24 @@ export default function EarlySuperAccessCalculator() {
   const [ret, setRet] = useState(7); // nominal super return, before fees
   const [infl, setInfl] = useState(2.5);
   const [showAssumptions, setShowAssumptions] = useState(false);
+
+  // Prefill from the URL (?age=&retire=&oneoff=&mode=) — used by the Reddit-outreach
+  // links so the calculator opens set to the numbers from the post being answered.
+  useEffect(() => {
+    try {
+      const p = new URLSearchParams(window.location.search);
+      const inRange = (k: string, lo: number, hi: number) => {
+        const v = Number(p.get(k));
+        return p.has(k) && Number.isFinite(v) && v >= lo && v <= hi ? v : null;
+      };
+      const a = inRange("age", 18, 66); if (a != null) setAge(a);
+      const rt = inRange("retire", 50, 75); if (rt != null) setRetireAge(rt);
+      const o = inRange("oneoff", 1_000, 100_000); if (o != null) { setOneoff(Math.round(o)); setMode("oneoff"); }
+      const m = p.get("mode"); if (m === "oneoff" || m === "yearly") setMode(m);
+    } catch {
+      /* no URL / blocked — use defaults */
+    }
+  }, []);
 
   const r = useMemo(() => {
     const yrs = Math.max(0, retireAge - age);
