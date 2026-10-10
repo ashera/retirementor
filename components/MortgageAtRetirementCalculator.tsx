@@ -52,6 +52,7 @@ export default function MortgageAtRetirementCalculator() {
   const [propValue, setPropValue] = useState(600_000);
   const [propLoan, setPropLoan] = useState(0);
   const [propYield, setPropYield] = useState(4);
+  const [view, setView] = useState<"networth" | "pension">("pension");
 
   const r = useMemo(() => {
     // Annual P&I repayment implied by balance / rate / remaining term.
@@ -105,11 +106,14 @@ export default function MortgageAtRetirementCalculator() {
     const pensionUplift = Math.round(pension(clear) - pension(keep)); // clearing usually lifts the pension
     const enoughSuper = balance <= superBal + savings;
 
-    // Net worth over time, both choices — the visual that makes the comparison land.
+    // Net worth AND Age Pension over time, both choices — the visuals that make the
+    // comparison land (the pension gap is where the two choices really diverge).
     const series = keep.rows.map((row, i) => ({
       age: row.age,
       keep: Math.round(rowNetWorth(row)),
       clear: clear.rows[i] ? Math.round(rowNetWorth(clear.rows[i])) : null,
+      keepPension: Math.round(row.agePension),
+      clearPension: Math.round(clear.rows[i]?.agePension ?? 0),
     }));
 
     return {
@@ -219,31 +223,44 @@ export default function MortgageAtRetirementCalculator() {
                 Clearing it lifts your Age Pension by about <span className="font-semibold text-emerald-300">{fmtCurrency(r.pensionUplift)}/yr</span> (less assessable super), and ends the {fmtCurrency(r.repay)}/yr repayment.
               </p>
             )}
-            {/* Net worth over time — both choices */}
+            {/* Over-time chart — toggle between the Age Pension (where the choices
+                diverge most) and total net worth. */}
             <div className="mt-4 rounded-xl border border-line bg-panel-2/40 p-3">
-              <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted">Net worth over time · today&apos;s dollars</div>
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                <div className="text-[11px] font-semibold uppercase tracking-wide text-muted">
+                  {view === "pension" ? "Age Pension each year · today's dollars" : "Net worth over time · today's dollars"}
+                </div>
+                <div className="inline-flex rounded-lg border border-line bg-panel p-0.5 text-xs">
+                  {([["pension", "Age Pension"], ["networth", "Net worth"]] as const).map(([k, lbl]) => (
+                    <button key={k} type="button" onClick={() => setView(k)} className={`rounded-md px-2.5 py-1 font-medium transition ${view === k ? "bg-accent text-ink" : "text-muted hover:text-white"}`}>{lbl}</button>
+                  ))}
+                </div>
+              </div>
               <div className="h-56 w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={r.series} margin={{ top: 5, right: 6, left: 0, bottom: 0 }}>
                     <defs>
-                      <linearGradient id="nwKeep" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#38bdf8" stopOpacity={0.25} /><stop offset="100%" stopColor="#38bdf8" stopOpacity={0.02} /></linearGradient>
-                      <linearGradient id="nwClear" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#34d399" stopOpacity={0.25} /><stop offset="100%" stopColor="#34d399" stopOpacity={0.02} /></linearGradient>
+                      <linearGradient id="nwKeep" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#38bdf8" stopOpacity={0.3} /><stop offset="100%" stopColor="#38bdf8" stopOpacity={0.02} /></linearGradient>
+                      <linearGradient id="nwClear" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#34d399" stopOpacity={0.3} /><stop offset="100%" stopColor="#34d399" stopOpacity={0.02} /></linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="#232c40" vertical={false} />
-                    <XAxis dataKey="age" stroke="#8b97ad" fontSize={11} tickLine={false} axisLine={{ stroke: "#232c40" }} />
+                    <XAxis dataKey="age" stroke="#8b97ad" fontSize={11} tickLine={false} axisLine={{ stroke: "#232c40" }} minTickGap={16} />
                     <YAxis stroke="#8b97ad" fontSize={11} tickLine={false} axisLine={false} width={48} tickFormatter={fmtCompact} />
                     <Tooltip
                       contentStyle={{ background: "#0b1220", border: "1px solid #232c40", borderRadius: 8, fontSize: 12 }}
                       labelStyle={{ color: "#e2e8f0" }}
-                      formatter={(v: number, name: string) => [fmtCurrency(Math.round(v)), name]}
+                      formatter={(v: number, name: string) => [`${fmtCurrency(Math.round(v))}${view === "pension" ? "/yr" : ""}`, name]}
                       labelFormatter={(a) => `Age ${a}`}
                     />
                     <Legend wrapperStyle={{ fontSize: 12 }} />
-                    <Area type="monotone" dataKey="keep" name="Keep the mortgage" stroke="#38bdf8" strokeWidth={2} fill="url(#nwKeep)" isAnimationActive={false} dot={false} />
-                    <Area type="monotone" dataKey="clear" name="Clear it with super" stroke="#34d399" strokeWidth={2} fill="url(#nwClear)" isAnimationActive={false} dot={false} />
+                    <Area type="monotone" dataKey={view === "pension" ? "keepPension" : "keep"} name="Keep the mortgage" stroke="#38bdf8" strokeWidth={2} fill="url(#nwKeep)" isAnimationActive={false} dot={false} />
+                    <Area type="monotone" dataKey={view === "pension" ? "clearPension" : "clear"} name="Clear it with super" stroke="#34d399" strokeWidth={2} fill="url(#nwClear)" isAnimationActive={false} dot={false} />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
+              {view === "pension" && (
+                <p className="mt-1 text-[11px] leading-snug text-muted">Clearing the loan lowers your assessable super, so you qualify for more Age Pension — every year from {cfg.agePensionAge}.</p>
+              )}
             </div>
 
             <div className="mt-4 flex flex-col gap-3 sm:flex-row">
