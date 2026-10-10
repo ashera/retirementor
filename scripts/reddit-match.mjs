@@ -14,10 +14,43 @@
 //   node scripts/reddit-match.mjs --list        # show the article registry
 
 import { chromium } from "playwright";
+import pg from "pg";
 import { writeFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 
 const SITE = "https://www.retirewiz.com.au";
+
+// ── Value parsing (best-effort, from the post title + body) ──────────────────────
+function money(s) {
+  if (!s) return null;
+  const k = /k\b/i.test(s);
+  const n = parseFloat(String(s).replace(/[$,\s]/g, "").replace(/k\b/i, ""));
+  if (!Number.isFinite(n)) return null;
+  return Math.round(k ? n * 1000 : n);
+}
+function parseAge(t) {
+  for (const re of [/\b(\d{2})\s*[mf]\b/, /\b(?:i['’]?m|i am|aged?|turning)\s*(\d{2})\b/, /\b(\d{2})\s*(?:yo|y\/?o|years?\s*old)\b/]) {
+    const m = t.match(re);
+    if (m) { const a = Number(m[1]); if (a >= 18 && a <= 70) return a; }
+  }
+  return null;
+}
+function parseSuper(t) {
+  for (const re of [/(\$?\s*[\d.,]+\s*k?)\s*(?:in\s+)?(?:of\s+)?super/i, /super\s*(?:balance|of|is|:|at|@)?\s*(\$?\s*[\d.,]+\s*k?)/i]) {
+    const m = t.match(re);
+    const v = m && money(m[1]);
+    if (v && v >= 1_000 && v <= 5_000_000) return v;
+  }
+  return null;
+}
+function parseIncome(t) {
+  for (const re of [/(?:earn|income|salary|making|wage)\D{0,10}(\$?\s*[\d.,]+\s*k?)/i, /(\$?\s*[\d.,]+\s*k?)\s*(?:a\s*year|p\.?a\.?|salary|income)/i]) {
+    const m = t.match(re);
+    const v = m && money(m[1]);
+    if (v && v >= 10_000 && v <= 1_000_000) return v;
+  }
+  return null;
+}
 
 // ── Article registry: add an entry per /learn article you want to match ──────────
 // queries = the Reddit searches to run (relevance-sorted); fit = title keywords that
@@ -30,6 +63,24 @@ const ARTICLES = {
     fit: ["on track", "behind", "how much super", "enough super", "super at", "average super", "median super", "for my age", "super balance", "am i", "compare", "retirement savings", "25", "30", "35", "40", "catch up"],
     pitch:
       "a free calculator that compares your balance to the typical for your age and shows whether you're on track for a comfortable retirement (with a catch-up figure if not), all in today's dollars",
+    extract: (text) => {
+      const t = text.toLowerCase();
+      const out = {};
+      const age = parseAge(t); if (age) out.age = age;
+      const sup = parseSuper(t); if (sup) out.super = sup;
+      const inc = parseIncome(t); if (inc) out.income = inc;
+      return out;
+    },
+    draft: (v, url) => {
+      const have = [v.age && `${v.age}`, v.super && `about $${Math.round(v.super / 1000)}k in super`, v.income && `earning ~$${Math.round(v.income / 1000)}k`].filter(Boolean).join(", ");
+      const lead = have ? `At ${have}, a quick gut-check: ` : `A quick way to gut-check this: `;
+      return (
+        `${lead}it helps to compare against the typical balance for your age and whether you're on track for a comfortable retirement, ` +
+        `rather than just "above average" (the average is skewed high).\n\n` +
+        `I built a free calculator that does exactly that — in today's dollars${v.age || v.super ? ", prefilled with your numbers" : ""}: ${url}\n\n` +
+        `(Disclosure: it's my tool. Happy to explain the assumptions.)`
+      );
+    },
   },
   "average-australian": {
     path: "/learn/average-australian-retirement",
@@ -71,7 +122,15 @@ const HOURS = Number(args.hours ?? 168); // default 7 days — outreach wants a 
 const MIN_FIT = Number(args.min ?? 2);
 const LIMIT = Number(args.limit ?? 20);
 const OUT = args.out ? String(args.out) : null;
+const SAVE = !!args.save; // write results to the DB (DATABASE_URL) — use `railway run` for prod
 const T = HOURS <= 168 ? "week" : HOURS <= 744 ? "month" : "year";
+const articleUrl = `${SITE}${ART.path}`;
+const prefilledUrl = (parsed) => {
+  const qs = new URLSearchParams();
+  for (const [k, v] of Object.entries(parsed || {})) qs.set(k, String(v));
+  const s = qs.toString();
+  return s ? `${articleUrl}?${s}` : articleUrl;
+};
 const cutoffMs = Date.now() - HOURS * 3600 * 1000;
 
 // ── Fit scoring ──────────────────────────────────────────────────────────────────
@@ -136,25 +195,43 @@ for (const sub of SUBS) {
   }
   console.error(`  r/${sub}: ${subHits} candidate(s)`);
 }
-await browser.close();
-
 const rows = [...byId.values()].sort(
   (a, b) => b.fit - a.fit || (b.createdMs || 0) - (a.createdMs || 0),
 );
 const top = rows.slice(0, LIMIT);
+
+// Enrich the top candidates (only when saving, since it opens each post): parse the
+// values from title+body, build the prefilled page link, and draft a response.
+async function openBody(href) {
+  await page.goto(`https://www.reddit.com${href}`, { waitUntil: "domcontentloaded", timeout: 40000 });
+  await page.waitForTimeout(3000);
+  return page.evaluate(() => (document.querySelector('[slot="text-body"]')?.innerText || "").slice(0, 2000));
+}
+if (SAVE) {
+  console.error(`  enriching ${top.length} candidate(s)…`);
+  for (const p of top) {
+    try {
+      const body = ART.extract ? await openBody(p.href) : "";
+      p.parsed = ART.extract ? ART.extract(`${p.title}\n${body}`) : {};
+    } catch {
+      p.parsed = {};
+    }
+    p.prefilled = prefilledUrl(p.parsed);
+    p.response = ART.draft ? ART.draft(p.parsed, p.prefilled) : `${ART.pitch} — ${p.prefilled}`;
+  }
+}
+await browser.close();
 
 const ageStr = (ms) => {
   if (!Number.isFinite(ms)) return "?";
   const h = (Date.now() - ms) / 3600000;
   return h < 1 ? `${Math.round(h * 60)}m` : h < 24 ? `${Math.round(h)}h` : `${Math.round(h / 24)}d`;
 };
-const articleUrl = `${SITE}${ART.path}`;
 const stamp = new Date().toISOString().replace("T", " ").slice(0, 16);
 
 let md = `# Reddit outreach matches — ${ART.name}\n`;
 md += `_Article: ${articleUrl} · scanned ${SUBS.map((s) => "r/" + s).join(", ")} · last ${HOURS}h · ${stamp} · ${rows.length} candidates_\n\n`;
 md += `> ⚠️ **Comment genuinely.** Only reply where the article truly answers the question, lead with a real answer in your own words, disclose it's your tool, and follow each subreddit's self-promotion rules (several AU finance subs restrict links or require flair). Don't copy-paste the same comment around — that's spam and gets you (and the link) banned.\n\n`;
-md += `**Draft to personalise:** &gt; ${ART.pitch} — ${articleUrl}\n\n`;
 md += `---\n\n`;
 if (top.length === 0) {
   md += `_No candidates over the fit threshold (min ${MIN_FIT}) in the window. Try --hours=720 or --min=1, or tweak the article's queries/fit terms in the registry._\n`;
@@ -162,7 +239,10 @@ if (top.length === 0) {
   top.forEach((p, i) => {
     const link = `https://www.reddit.com${p.href}`;
     md += `## ${i + 1}. [${p.title}](${link})\n`;
-    md += `r/${p.sub} · ${ageStr(p.createdMs)} ago · fit ${p.fit}${p.isQ ? " · question" : ""}\n`;
+    const parsedStr = p.parsed && Object.keys(p.parsed).length ? ` · parsed ${Object.entries(p.parsed).map(([k, v]) => `${k}=${v}`).join(" ")}` : "";
+    md += `r/${p.sub} · ${ageStr(p.createdMs)} ago · fit ${p.fit}${p.isQ ? " · question" : ""}${parsedStr}\n`;
+    if (p.prefilled) md += `prefilled: ${p.prefilled}\n`;
+    if (p.response) md += `draft: ${p.response.replace(/\s+/g, " ").slice(0, 200)}…\n`;
     md += `matched: ${p.matched.join(", ") || "(recency only)"}\n\n`;
   });
 }
@@ -176,4 +256,32 @@ if (OUT) {
   }
   writeFileSync(OUT, md);
   console.error(`\nWrote ${OUT}`);
+}
+
+// ── Save to the DB (deduped) ───────────────────────────────────────────────────────
+if (SAVE) {
+  const dbUrl = process.env.DATABASE_URL || process.env.DATABASE_PUBLIC_URL;
+  if (!dbUrl) {
+    console.error("\n--save: no DATABASE_URL / DATABASE_PUBLIC_URL in env. Run via `railway run` to target prod.");
+  } else if (top.length === 0) {
+    console.error("\n--save: nothing to write.");
+  } else {
+    const local = /@(localhost|127\.0\.0\.1|\[::1\])[:/]/.test(dbUrl) || /\.railway\.internal[:/]/.test(dbUrl);
+    const c = new pg.Client({ connectionString: dbUrl, ssl: local ? false : { rejectUnauthorized: false } });
+    await c.connect();
+    let ins = 0, dup = 0;
+    for (const p of top) {
+      const createdIso = Number.isFinite(p.createdMs) ? new Date(p.createdMs).toISOString() : null;
+      const res = await c.query(
+        `insert into reddit_outreach
+           (reddit_url, reddit_title, subreddit, article_slug, reddit_created_at, fit_score, matched, parsed, prefilled_url, suggested_response)
+         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+         on conflict (reddit_url, article_slug) do nothing`,
+        [`https://www.reddit.com${p.href}`, p.title, p.sub, args.article, createdIso, p.fit, (p.matched || []).join(", "), JSON.stringify(p.parsed || {}), p.prefilled, p.response],
+      );
+      res.rowCount > 0 ? ins++ : dup++;
+    }
+    await c.end();
+    console.error(`\n--save: inserted ${ins}, skipped ${dup} duplicate(s) → reddit_outreach.`);
+  }
 }

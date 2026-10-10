@@ -365,6 +365,30 @@ create table if not exists compliance_findings (
 create index if not exists compliance_audits_ran_idx on compliance_audits(ran_at desc);
 create index if not exists compliance_findings_audit_idx on compliance_findings(audit_id, severity, sort);
 create unique index if not exists compliance_audits_share_uidx on compliance_audits(share_token) where share_token is not null;
+
+-- Reddit outreach leads — threads where one of our /learn articles genuinely answers
+-- the question, found by scripts/reddit-match.mjs. Each row is a candidate to leave a
+-- helpful comment on: the post link, a suggested (personalisable) response, and a link
+-- to our page prefilled with the values parsed from the post. Admins track which ones
+-- they've commented on at /admin/outreach. Dedup on (reddit_url, article_slug).
+create table if not exists reddit_outreach (
+  id uuid primary key default gen_random_uuid(),
+  reddit_url text not null,
+  reddit_title text,
+  subreddit text,
+  article_slug text not null,              -- which /learn article this matches
+  reddit_created_at timestamptz,           -- when the post was made (if known)
+  fit_score int not null default 0,
+  matched text,                            -- comma-joined fit keywords (debug)
+  parsed jsonb,                            -- values extracted from the post (age/super/income…)
+  prefilled_url text,                      -- our page link, prefilled from the parsed values
+  suggested_response text,                 -- a draft comment to personalise
+  status text not null default 'new',      -- new | commented | skipped
+  commented_at timestamptz,
+  created_at timestamptz not null default now()
+);
+create unique index if not exists reddit_outreach_uidx on reddit_outreach (reddit_url, article_slug);
+create index if not exists reddit_outreach_status_idx on reddit_outreach (status, created_at desc);
 `;
 
 /** Apply the schema. Safe to run repeatedly. */

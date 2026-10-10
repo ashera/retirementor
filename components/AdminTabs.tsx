@@ -1,17 +1,19 @@
 import Link from "next/link";
 
-type Tab = "review" | "parameters" | "sources" | "returns" | "tests" | "scenarios" | "moneysmart" | "users" | "media" | "feedback" | "advisers" | "marketing" | "reddit" | "releases" | "audits" | "infoblasts";
+type Tab = "review" | "parameters" | "sources" | "returns" | "tests" | "scenarios" | "moneysmart" | "users" | "media" | "feedback" | "advisers" | "marketing" | "reddit" | "outreach" | "releases" | "audits" | "infoblasts";
 
 export default function AdminTabs({
   active,
   staleCount = 0,
   feedbackCount = 0,
   adviserCount = 0,
+  outreachCount = 0,
 }: {
   active: Tab;
   staleCount?: number;
   feedbackCount?: number;
   adviserCount?: number;
+  outreachCount?: number;
 }) {
   const tab = (href: string, key: Tab, label: string, badge: number) => {
     const isActive = active === key;
@@ -60,6 +62,7 @@ export default function AdminTabs({
         {tab("/admin/marketing", "marketing", "Kit", 0)}
         {tab("/admin/infoblasts", "infoblasts", "InfoBlasts", 0)}
         {tab("/admin/reddit-scenarios", "reddit", "Scenarios", 0)}
+        {tab("/admin/outreach", "outreach", "Outreach", outreachCount)}
         {tab("/admin/feedback", "feedback", "Feedback", feedbackCount)}
         {tab("/admin/advisers", "advisers", "Advisers", adviserCount)}
         {tab("/admin/media", "media", "Media", 0)}

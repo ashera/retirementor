@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { fmtCurrency } from "@/lib/au/format";
 import { DEFAULT_CONFIG } from "@/lib/au/config";
 import Bert from "@/components/Bert";
@@ -68,6 +68,26 @@ export default function SuperOnTrackCalculator() {
   const [incomeGrowth, setIncomeGrowth] = useState(2.6);
   const [inflation, setInflation] = useState(2.5);
   const [showAssumptions, setShowAssumptions] = useState(false);
+
+  // Prefill from the URL (?age=&super=&income=) — used by the Reddit-outreach links so
+  // the calculator opens already set to the numbers from the post being answered.
+  useEffect(() => {
+    try {
+      const p = new URLSearchParams(window.location.search);
+      const inRange = (k: string, lo: number, hi: number) => {
+        const v = Number(p.get(k));
+        return p.has(k) && Number.isFinite(v) && v >= lo && v <= hi ? v : null;
+      };
+      const a = inRange("age", 18, 66);
+      if (a != null) setAge(a);
+      const s = inRange("super", 0, 5_000_000);
+      if (s != null) setSuperNow(Math.min(1_200_000, Math.round(s)));
+      const inc = inRange("income", 1_000, 1_000_000);
+      if (inc != null) setIncome(Math.min(300_000, Math.round(inc)));
+    } catch {
+      /* no URL / blocked — just use defaults */
+    }
+  }, []);
 
   const r = useMemo(() => {
     const median = medianForAge(age);
