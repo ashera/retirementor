@@ -183,8 +183,14 @@ export default function SuperOnTrackCalculator() {
                   : <>Below the {fmtCurrency(MOD)} modest mark — the Age Pension would do the heavy lifting.</>}
             </p>
             <p className="mt-2 text-sm text-slate-300">
-              To be <em>on track</em> for comfortable, you&apos;d want about <span className="font-semibold text-white">{fmtCurrency(r.onTrackNow)}</span> by now.
-              {r.catchUpGross > 0 && <> You&apos;re behind — roughly <span className="font-semibold text-amber-200">{fmtCurrency(r.catchUpGross)}/yr extra</span> into super (before tax) would close the gap.</>}
+              {r.onTrackNow > 0 ? (
+                <>
+                  To be <em>on track</em> for comfortable, you&apos;d want about <span className="font-semibold text-white">{fmtCurrency(r.onTrackNow)}</span> by now.
+                  {r.catchUpGross > 0 && <> You&apos;re behind — roughly <span className="font-semibold text-amber-200">{fmtCurrency(r.catchUpGross)}/yr extra</span> into super (before tax) would close the gap.</>}
+                </>
+              ) : (
+                <>With this income, your future employer super <em>alone</em> is projected to reach comfortable — you don&apos;t need any balance behind you yet, so whatever you&apos;ve already got is a head start.</>
+              )}
             </p>
             <p className="mt-3 text-[13px] italic leading-snug text-accent-soft">&ldquo;{bert}&rdquo;</p>
           </div>
