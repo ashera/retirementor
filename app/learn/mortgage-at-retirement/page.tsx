@@ -63,7 +63,9 @@ export default function MortgageAtRetirementPage() {
         <h2 className="text-xl font-bold text-white">Run it both ways</h2>
         <p className="mt-3 text-[15px] leading-relaxed text-slate-300">
           This runs the <strong className="text-white">full RetireWiz engine</strong> — the Age Pension means test, tax and drawdown —
-          for both choices, so the comparison is real, not a rule of thumb.
+          for both choices, so the comparison is real, not a rule of thumb. It assumes your super and savings keep earning the
+          <strong className="text-white"> return you set (7% a year by default)</strong> — the number to weigh against your mortgage rate.
+          Both are inputs you can change.
         </p>
         <div className="mt-6">
           <MortgageAtRetirementCalculator />

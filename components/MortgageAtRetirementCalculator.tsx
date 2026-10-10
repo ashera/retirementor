@@ -170,7 +170,8 @@ export default function MortgageAtRetirementCalculator() {
         <Row label="Your age (retiring now)" value={age} min={60} max={80} step={1} onChange={setAge} display={`${age}`} />
         <Row label="Super balance" value={superBal} min={50_000} max={3_000_000} step={10_000} onChange={setSuperBal} display={fmtCurrency(superBal)} />
         <Row label="Mortgage still owing" value={balance} min={0} max={1_000_000} step={5_000} onChange={setBalance} display={fmtCurrency(balance)} />
-        <Row label="Interest rate" value={rate} min={3} max={10} step={0.1} onChange={setRate} display={`${rate.toFixed(1)}%`} />
+        <Row label="Mortgage interest rate" value={rate} min={3} max={10} step={0.1} onChange={setRate} display={`${rate.toFixed(1)}%`} />
+        <Row label="Super / savings return" value={ret} min={3} max={10} step={0.1} onChange={setRet} display={`${ret.toFixed(1)}%`} hint="What your super earns if you keep it invested — compare it to the loan rate." />
         <Row label="Years left on the loan" value={term} min={1} max={25} step={1} onChange={setTerm} display={`${term} yr${term === 1 ? "" : "s"}`} hint={`≈ ${fmtCurrency(r.repay)}/yr in repayments`} />
         <Row label="Spending (excl. mortgage)" value={spend} min={20_000} max={150_000} step={1_000} onChange={setSpend} display={`${fmtCurrency(spend)}/yr`} />
         <Row label="Shares & cash outside super" value={savings} min={0} max={3_000_000} step={5_000} onChange={setSavings} display={fmtCurrency(savings)} hint="Shares, ETFs, funds, bank — assessed for the Age Pension." />
@@ -193,12 +194,11 @@ export default function MortgageAtRetirementCalculator() {
 
       <div className="mt-4">
         <button type="button" onClick={() => setShowAssumptions((v) => !v)} className="text-xs font-medium text-muted transition hover:text-white">
-          {showAssumptions ? "▾" : "▸"} More ({fmtCurrency(homeValue)} home · {ret}% return · {infl}% inflation · to {life})
+          {showAssumptions ? "▾" : "▸"} More ({fmtCurrency(homeValue)} home · {infl}% inflation · to {life})
         </button>
         {showAssumptions && (
           <div className="mt-3 grid gap-5 rounded-xl border border-line bg-panel-2/50 p-4 sm:grid-cols-2">
             <Row label="Home value" value={homeValue} min={300_000} max={3_000_000} step={25_000} onChange={setHomeValue} display={fmtCurrency(homeValue)} hint="Your home is exempt from the assets test." />
-            <Row label="Investment return (p.a.)" value={ret} min={3} max={10} step={0.1} onChange={setRet} display={`${ret.toFixed(1)}%`} hint="Super/savings earn this; compare it to your loan rate." />
             <Row label="Inflation (p.a.)" value={infl} min={1} max={5} step={0.1} onChange={setInfl} display={`${infl.toFixed(1)}%`} />
             <Row label="Plan to age" value={life} min={80} max={100} step={1} onChange={setLife} display={`${life}`} />
           </div>
