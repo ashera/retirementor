@@ -606,8 +606,13 @@ export default function PlannerApp({
   // renders immediately and these fill in when ready (`mc`/`earliest` are null until the
   // first result, then hold the last value while a plan change recomputes). The cheap
   // deterministic goal-seek (~20ms) stays synchronous — lots of UI reads it inline.
-  const { mc, earliest } = useHeavyMetrics(plan, config, ready && configured);
+  const { mc, earliest, pending: mcPending } = useHeavyMetrics(plan, config, ready && configured);
   const successPct = mc ? Math.round(mc.successRate * 100) : null;
+  // True when the dial is showing a PRIOR result while a new Monte Carlo is in flight
+  // after an edit (e.g. the Go-go spend slider). We keep the last number visible (no
+  // flicker) but shimmer the dial so a recompute — or, if the worker ever stalls, a
+  // stale number — is never shown as a settled, confident figure.
+  const confidenceStale = mcPending && successPct != null;
   const successTone: "accent" | "amber" | "red" =
     !mc ? "amber" : mc.successRate >= 0.85 ? "accent" : mc.successRate >= 0.6 ? "amber" : "red";
   const gs = useMemo(() => whatWillItTake(plan, config), [plan, config]);
@@ -1575,6 +1580,7 @@ export default function PlannerApp({
         failsafe={failsafeTotal}
         confidencePct={successPct ?? 0}
         confidenceLoading={successPct == null}
+        confidenceStale={confidenceStale}
         assumedReturnPct={plan.investmentReturn}
         lifeExpectancy={plan.lifeExpectancy}
         lastsToLE={result.lastsToLifeExpectancy}

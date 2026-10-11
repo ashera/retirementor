@@ -62,6 +62,7 @@ export interface ConfidenceHeroProps {
   chips?: PlanChip[]; // committed life events + applied strategies, shown at the foot
   showInfoBlasts?: boolean; // show the backoffice-managed rotating announcement banner (main dashboard only)
   confidenceLoading?: boolean; // the Monte Carlo % isn't ready yet (runs in a worker) — show a spinner in the dial, not 0%
+  confidenceStale?: boolean; // a prior % is shown while a new Monte Carlo recomputes after an edit — shimmer the dial so it's clearly updating, never a settled stale number
   // The full Age Pension the household falls back to once savings run low — shown as a
   // safety-net note under a "running short" verdict. Null when it doesn't apply (e.g. a
   // non-resident not claiming it from abroad).
@@ -99,6 +100,7 @@ export default function ConfidenceHero({
   chips,
   showInfoBlasts,
   confidenceLoading,
+  confidenceStale,
   agePension = null,
   buildOwnHref = null,
   sharedName = null,
@@ -392,8 +394,9 @@ export default function ConfidenceHero({
               </div>
             ) : (
               <div
-                className="relative grid h-[76px] w-[76px] shrink-0 place-items-center rounded-full"
+                className={`relative grid h-[76px] w-[76px] shrink-0 place-items-center rounded-full ${confidenceStale ? "animate-pulse opacity-70" : ""}`}
                 style={{ background: `conic-gradient(${dialColor} ${confidencePct}%, #263048 ${confidencePct}% 100%)` }}
+                aria-busy={confidenceStale || undefined}
               >
                 <div className="absolute inset-[7px] rounded-full bg-panel" />
                 <span className="relative text-lg font-bold tabular-nums text-white">{confidencePct}%</span>
@@ -403,7 +406,11 @@ export default function ConfidenceHero({
               <b className="font-semibold text-slate-200">
                 {lastsToLE ? `Chance your money lasts to ${lifeExpectancy}+` : "Chance your money lasts"}
               </b>{" "}
-              — {confidenceLoading ? "assessing across thousands of market scenarios…" : dialLabel}
+              — {confidenceLoading
+                ? "assessing across thousands of market scenarios…"
+                : confidenceStale
+                  ? "updating for your change…"
+                  : dialLabel}
             </p>
             {dialExplainer && <span className="shrink-0 self-start">{dialExplainer}</span>}
           </div>
