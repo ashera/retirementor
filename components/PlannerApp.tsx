@@ -27,6 +27,7 @@ import GuidedIntro from "@/components/GuidedIntro";
 import GetStartedPanel from "@/components/GetStartedPanel";
 import CompletenessRing from "@/components/CompletenessRing";
 import { planCompleteness, budgetCompleteness } from "@/lib/au/completeness";
+import { budgetTotal } from "@/lib/au/budget";
 import NewScenarioModal from "@/components/NewScenarioModal";
 import ConfidenceHero, { type PlanChip } from "@/components/ConfidenceHero";
 import { useHeavyMetrics } from "@/components/useHeavyMetrics";
@@ -795,6 +796,26 @@ export default function PlannerApp({
   // move here — the lever shows an override badge and points to What-If.
   const quickAdjust = (patch: Partial<RetirementPlan>) =>
     setBase((prev) => ({ ...prev, ...patch }));
+
+  // The "Go-go spend" quick-adjust. When a detailed budget is committed it's the single
+  // source of truth for spend, so scale its categories (keeping the mix) to the new go-go
+  // total as well — otherwise the budget, and the budget wizard it opens, keep showing the
+  // old figure while the dashboard goal updates.
+  const adjustGoGo = (v: number) => {
+    const patch: Partial<RetirementPlan> = { spendingStages: { ...base.spendingStages, goGo: v } };
+    const cats = base.budget?.categories;
+    if (cats) {
+      const curr = budgetTotal(cats);
+      if (curr > 0 && Math.abs(curr - v) >= 1) {
+        const f = v / curr;
+        patch.budget = {
+          ...base.budget!,
+          categories: Object.fromEntries(Object.entries(cats).map(([k, amt]) => [k, Math.max(0, Math.round(amt * f))])),
+        };
+      }
+    }
+    quickAdjust(patch);
+  };
 
   // The budget is the single source of truth for spend. The "Adjust spending" What-If
   // lever is an EXPLORATION on the What-If board; the moment a real budget is committed
@@ -1852,13 +1873,7 @@ export default function PlannerApp({
             <Field
               label={isStaged ? "Go-go spend" : "Spend/yr"}
               value={isStaged ? stages.goGo : plan.targetSpending}
-              onChange={(v) =>
-                isStaged
-                  ? quickAdjust({
-                      spendingStages: { ...base.spendingStages, goGo: v },
-                    })
-                  : quickAdjust({ targetSpending: v })
-              }
+              onChange={(v) => (isStaged ? adjustGoGo(v) : quickAdjust({ targetSpending: v }))}
               min={20_000}
               max={200_000}
               step={1000}
