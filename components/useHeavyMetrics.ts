@@ -52,13 +52,31 @@ export function useHeavyMetrics(
     const w = workerRef.current;
 
     if (w) {
+      // The worker posts TWO messages per request: the Monte Carlo first (so the dial +
+      // fan paint immediately), then the earliest-retirement result. Keep the listener
+      // attached until both arrive, then cache the pair and detach.
+      let gotMc: MC | null = null;
+      let gotEarliest: Earliest | null = null;
       const onMsg = (e: MessageEvent) => {
         if (e.data?.id !== id) return; // ignore stale results (a newer plan is in flight)
-        if (e.data.mc) setMc(e.data.mc as MC);
-        if (e.data.earliest) setEarliest(e.data.earliest as Earliest);
-        if (e.data.mc && e.data.earliest) setMetrics(key, e.data.mc, e.data.earliest);
-        setPending(false);
-        w.removeEventListener("message", onMsg);
+        if (e.data.error) {
+          setPending(false);
+          w.removeEventListener("message", onMsg);
+          return;
+        }
+        if (e.data.mc) {
+          gotMc = e.data.mc as MC;
+          setMc(gotMc);
+          setPending(false); // the dial's number is ready — don't wait on the solver
+        }
+        if (e.data.earliest) {
+          gotEarliest = e.data.earliest as Earliest;
+          setEarliest(gotEarliest);
+        }
+        if (gotMc && gotEarliest) {
+          setMetrics(key, gotMc, gotEarliest);
+          w.removeEventListener("message", onMsg);
+        }
       };
       w.addEventListener("message", onMsg);
       w.postMessage({ id, plan, config });

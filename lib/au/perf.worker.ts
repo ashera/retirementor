@@ -22,9 +22,14 @@ const ctx = self as unknown as {
 ctx.onmessage = (e) => {
   const { id, plan, config } = e.data;
   try {
+    // Post the Monte Carlo as soon as it's done so the confidence dial + fan chart paint
+    // WITHOUT waiting on the earliest-retirement solver (a binary search that runs its own
+    // Monte Carlo per candidate — roughly as costly again). On a slow device the solver was
+    // adding seconds to the dial's refresh for a number the dial doesn't even use.
     const mc = runMonteCarlo(plan, config);
+    ctx.postMessage({ id, mc });
     const earliest = earliestRetirement(plan, config);
-    ctx.postMessage({ id, mc, earliest });
+    ctx.postMessage({ id, earliest });
   } catch (err) {
     ctx.postMessage({ id, error: String(err) });
   }
