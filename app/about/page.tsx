@@ -54,6 +54,7 @@ export default function AboutPage() {
           <li><strong className="text-white">Retirement drawdown</strong> — your spending goal (or a detailed budget), including a home loan carried into retirement.</li>
           <li><strong className="text-white">Early retirement</strong> — the &ldquo;bridge&rdquo; from retiring before super unlocks at 60, through to the Age Pension at 67.</li>
           <li><strong className="text-white">Your situation</strong> — singles or couples, homeowners or renters, savings outside super, and an investment property.</li>
+          <li><strong className="text-white">Other income</strong> — defined-benefit pensions, annuities and foreign pensions (e.g. US Social Security), taxed and means-tested for life or a set period — plus a non-resident tax mode for retiring overseas.</li>
           <li><strong className="text-white">Uncertainty</strong> — thousands of Monte Carlo simulations to estimate how <em>likely</em> your money is to last, not just a single line.</li>
         </ul>
       </Section>
