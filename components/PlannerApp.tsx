@@ -60,7 +60,7 @@ import {
 import ShareControl from "@/components/ShareControl";
 import { simulate } from "@/lib/au/simulate";
 import type { EngineConfig } from "@/lib/au/config";
-import { fmtCurrency } from "@/lib/au/format";
+import { fmtCurrency, fmtCompact } from "@/lib/au/format";
 import { track, trackPlanBuiltConversion } from "@/lib/analytics";
 import { trackVisit } from "@/app/actions/track";
 import CountryFlag from "@/components/CountryFlag";
@@ -1618,7 +1618,19 @@ export default function PlannerApp({
         <StatCard
           label="Super at retirement"
           value={fmtCurrency(result.superAtRetirement)}
-          sub={`at age ${result.retirementAge} · today's dollars`}
+          sub={
+            <>
+              at age {result.retirementAge} · today&apos;s dollars
+              {result.totalAtRetirement - result.superAtRetirement >= 1000 && (
+                <span
+                  className="mt-0.5 block text-emerald-400/90"
+                  title="Savings outside super at retirement — also funds your income, and (unlike super) can be spent before preservation age."
+                >
+                  + {fmtCompact(result.totalAtRetirement - result.superAtRetirement)} outside super
+                </span>
+              )}
+            </>
+          }
           highlight
           explainer={
             <SuperAtRetirementExplainer
