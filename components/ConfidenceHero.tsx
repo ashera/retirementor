@@ -44,6 +44,11 @@ export interface ConfidenceHeroProps {
   lifeExpectancy: number;
   lastsToLE: boolean;
   depletedAge: number | null;
+  // Set when the plan can't fund the early-retirement bridge (retired before super
+  // unlocks, accessible savings fall short) even though the money never truly runs out.
+  // A liquidity problem, shown as an amber note so the positive "money lasts" verdict
+  // doesn't hide it. `unlockAge` is when super becomes accessible.
+  bridgeShortfall?: { age: number; unlockAge: number } | null;
   pending: boolean; // safe/failsafe tiers recomputing after an edit (keep last numbers, shimmer)
   loading: boolean; // first load — no real safe/failsafe tier yet, so show a skeleton not fallbacks
   whatIfHref: string;
@@ -85,6 +90,7 @@ export default function ConfidenceHero({
   lifeExpectancy,
   lastsToLE,
   depletedAge,
+  bridgeShortfall = null,
   pending,
   loading,
   whatIfHref,
@@ -301,6 +307,20 @@ export default function ConfidenceHero({
           >
             {verdict}
           </p>
+
+          {/* Early-retirement bridge gap: the money never runs out (super is locked and
+              keeps growing), but you can't access enough to fund the years before it
+              unlocks. A different problem from depletion, so it gets its own amber note
+              rather than being hidden by a positive "your money lasts" verdict. */}
+          {bridgeShortfall && (
+            <p className="mt-3 rounded-lg border border-amber-400/30 bg-amber-400/[0.07] px-3 py-2 text-[13px] leading-snug text-amber-200">
+              <span aria-hidden>⚠️</span> Your <b className="font-semibold">early-retirement bridge is short</b>. You retire before you can
+              access super, so from around <b className="font-semibold">age {bridgeShortfall.age}</b> your outside-super savings can&apos;t
+              cover your spending until super unlocks at <b className="font-semibold">{bridgeShortfall.unlockAge}</b>. Your money doesn&apos;t run
+              out — the locked super keeps growing — but you&apos;d need more <b className="font-semibold">accessible</b> savings (or a slightly
+              later retirement) to actually fund those years.
+            </p>
+          )}
 
           {/* Safety-net reassurance under a "running short" verdict — the Age Pension is
               the floor income once savings run low. Kept to one compact muted line. */}

@@ -1585,6 +1585,11 @@ export default function PlannerApp({
         lifeExpectancy={plan.lifeExpectancy}
         lastsToLE={result.lastsToLifeExpectancy}
         depletedAge={result.depletedAge}
+        bridgeShortfall={
+          result.bridgeShortfallAge != null
+            ? { age: result.bridgeShortfallAge, unlockAge: result.superUnlockAge ?? config.preservationAge }
+            : null
+        }
         pending={mcMaxPending}
         loading={heroWarming || successPct == null || safeLiving == null || failsafeLiving == null}
         whatIfHref={whatIfHref}

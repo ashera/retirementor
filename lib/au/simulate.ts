@@ -1935,12 +1935,25 @@ export function simulate(
   // year first appears when savings can't cover full spending; because the plot
   // shows start-of-year balances, the balance itself only hits zero the next year.
   // Reporting that zero age keeps the marker, card and narrative aligned with the graph.
+  //
+  // EXCEPTION — the early-retirement bridge. If every unfunded year is in the `bridge`
+  // phase (retired before preservation age, super still LOCKED), the shortfall is a
+  // liquidity gap, not depletion: the (sizeable) super keeps compounding untouched and
+  // the plan recovers the moment super unlocks. The balance never hits zero — so calling
+  // it "Depletes" while the chart climbs to millions is misleading. Report it as a
+  // distinct bridge shortfall instead, and leave depletedAge null.
+  let bridgeShortfallAge: number | null = null;
   const firstShortAge = rows.find((r) => !r.funded)?.age ?? null;
   if (firstShortAge !== null) {
-    const zeroRow = rows.find(
-      (r) => r.phase !== "accumulation" && r.age >= firstShortAge && r.total < 1,
-    );
-    depletedAge = zeroRow ? zeroRow.age : firstShortAge;
+    const unfundedOnlyInBridge = rows.every((r) => r.funded || r.phase === "bridge");
+    if (unfundedOnlyInBridge) {
+      bridgeShortfallAge = firstShortAge;
+    } else {
+      const zeroRow = rows.find(
+        (r) => r.phase !== "accumulation" && r.age >= firstShortAge && r.total < 1,
+      );
+      depletedAge = zeroRow ? zeroRow.age : firstShortAge;
+    }
   }
 
   // A plan only "lasts to life expectancy" if it actually modelled retirement years
@@ -1960,6 +1973,7 @@ export function simulate(
     superAtRetirement,
     totalAtRetirement,
     depletedAge,
+    bridgeShortfallAge,
     lastsToLifeExpectancy: depletedAge === null && modelledRetirement,
     firstAgePensionAge,
     realReturn: meanRealReturn,

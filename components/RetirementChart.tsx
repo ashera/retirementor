@@ -260,7 +260,7 @@ export default function RetirementChart({
     return () => ro.disconnect();
   }, []);
 
-  const { retirementAge, partnerRetirementAge, depletedAge } = result;
+  const { retirementAge, partnerRetirementAge, depletedAge, bridgeShortfallAge } = result;
   // Markers sit on the OLDEST-person age axis, but each partner's OWN retirement age
   // must be shifted by the age gap to land on the right year (a person retires when
   // the oldest is `anchor + their offset-from-now`). For singles / same-age couples
@@ -359,6 +359,10 @@ export default function RetirementChart({
   });
   if (depletedAge !== null) {
     markerInputs.push({ key: "deplete", x: depletedAge, color: "#ef4444", name: `Depletes ~${depletedAge}`, dash: "2 2" });
+  } else if (bridgeShortfallAge !== null) {
+    // Not depletion — the balance keeps growing (super is locked). It's a bridge
+    // liquidity gap: accessible savings fall short before super unlocks.
+    markerInputs.push({ key: "bridge-short", x: bridgeShortfallAge, color: "#f59e0b", name: `Bridge gap ~${bridgeShortfallAge} · super locked`, dash: "2 2" });
   }
   // Aged care → a labelled line at the entry age (a structural, singular event).
   if (agedCare && agedCare.entryAge >= (result.rows[0]?.age ?? 0)) {

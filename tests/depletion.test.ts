@@ -57,4 +57,34 @@ describe("Money lasts & depletion", () => {
     const peak = r.rows.reduce((m, x) => (x.total > m.total ? x : m), r.rows[0]);
     expect(peak.age).toBe(60);
   });
+
+  it("reports a BRIDGE shortfall (not depletion) when early retirement can't be funded before super unlocks", () => {
+    // Retire at 55 with lots of (locked) super but thin outside savings: the years
+    // 55→60 can't be funded from accessible money, yet the balance never hits zero and
+    // the plan recovers once super unlocks. That's a liquidity gap, not depletion.
+    const r = simulate(
+      plan({
+        people: [{ currentAge: 54, superBalance: 2_300_000, salary: 120_000, voluntaryConcessional: 0, voluntaryNonConcessional: 0 }],
+        outsideSuper: 150_000,
+        annualOutsideSavings: 0,
+        retirementAge: 55,
+        targetSpending: 110_000,
+        lifeExpectancy: 92,
+      }),
+      cfg,
+    );
+    expect(r.bridgeShortfallAge).not.toBeNull();
+    expect(r.bridgeShortfallAge).toBeGreaterThanOrEqual(55);
+    expect(r.bridgeShortfallAge!).toBeLessThan(60); // before super unlocks
+    expect(r.depletedAge).toBeNull(); // the money does NOT run out…
+    expect(r.rows[r.rows.length - 1].total).toBeGreaterThan(0); // …it recovers and ends positive
+    // Every unfunded year is in the pre-preservation bridge; nothing short afterwards.
+    expect(r.rows.filter((x) => !x.funded).every((x) => x.phase === "bridge")).toBe(true);
+  });
+
+  it("a genuine run-out is still depletion, not a bridge shortfall", () => {
+    const r = simulate(plan(), cfg); // retire 60, overspends → truly depletes
+    expect(r.depletedAge).not.toBeNull();
+    expect(r.bridgeShortfallAge).toBeNull();
+  });
 });

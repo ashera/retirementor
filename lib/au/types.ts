@@ -718,7 +718,12 @@ export interface SimResult {
   agePensionAge: number; // from the active config (used for chart markers)
   superAtRetirement: number; // combined super when retirement begins
   totalAtRetirement: number; // total investable assets when retirement begins
-  depletedAge: number | null; // first age spending couldn't be met; null if never
+  depletedAge: number | null; // first age savings actually run out (balance → 0 and don't recover); null if never
+  // Set when the ONLY unfunded years are in the pre-preservation bridge (retired early,
+  // super still locked) and the plan recovers once super unlocks — a liquidity gap, NOT
+  // depletion. The balance never reaches zero, so this is reported separately (amber
+  // "bridge shortfall") instead of a red "Depletes" marker. null when there's no such gap.
+  bridgeShortfallAge: number | null;
   lastsToLifeExpectancy: boolean;
   firstAgePensionAge: number | null; // age the household first receives Age Pension
   realReturn: number; // inflation-adjusted return (fraction)

@@ -336,12 +336,20 @@ describe(`Stress matrix — ${PLANS.length} plans, universal invariants`, () => 
     expect(fails.slice(0, 25)).toEqual([]);
   });
 
-  it("depletion flag is consistent (lasts ⇔ every year funded)", () => {
+  it("shortfall flags are consistent (lasts ⇔ no true depletion; depletion xor bridge gap)", () => {
     const fails: string[] = [];
     for (const { name, plan } of PLANS) {
       const r = simulate(plan, cfg);
       const anyShort = r.rows.some((x) => !x.funded);
-      if (r.lastsToLifeExpectancy === anyShort) fails.push(`${name}: lasts=${r.lastsToLifeExpectancy} but anyShort=${anyShort}`);
+      // Every unfunded plan is classified as exactly one kind of shortfall: a true
+      // depletion (savings run out) OR a recoverable pre-preservation bridge gap
+      // (super still locked) — never both, and a shortfall is never left unclassified.
+      if (r.depletedAge !== null && r.bridgeShortfallAge !== null) fails.push(`${name}: both depleted & bridge-short`);
+      if (anyShort && r.depletedAge === null && r.bridgeShortfallAge === null) fails.push(`${name}: short but unclassified`);
+      if (!anyShort && (r.depletedAge !== null || r.bridgeShortfallAge !== null)) fails.push(`${name}: flagged short with every year funded`);
+      // "Lasts to life expectancy" means the money never actually runs out — a bridge
+      // liquidity gap doesn't count as running out.
+      if (r.lastsToLifeExpectancy !== (r.depletedAge === null)) fails.push(`${name}: lasts=${r.lastsToLifeExpectancy} but depletedAge=${r.depletedAge}`);
     }
     expect(fails.slice(0, 25)).toEqual([]);
   });
