@@ -9,6 +9,7 @@ export const STEP_META: Record<string, { color: string; desc: string }> = {
   contributions: { color: "#fbbf24", desc: "Extra super you add beyond the employer 12%." },
   outside: { color: "#a78bfa", desc: "Savings you can use before super unlocks at 60." },
   property: { color: "#fb923c", desc: "An investment property is counted by the Age Pension." },
+  income: { color: "#2dd4bf", desc: "Defined-benefit & foreign pensions, annuities, dividends." },
   goal: { color: "#fb7185", desc: "When you retire and how much you'll spend." },
   assumptions: { color: "#22d3ee", desc: "Long-run return, inflation and fees." },
   super: { color: "#2dd4bf", desc: "Your superannuation balance." },
@@ -39,6 +40,8 @@ export function StepIcon({ stepKey, size = 22 }: { stepKey: string; size?: numbe
     super: (<><ellipse cx="12" cy="6" rx="7" ry="2.5" /><path d="M5 6v6c0 1.38 3.13 2.5 7 2.5s7-1.12 7-2.5V6" /><path d="M5 12v6c0 1.38 3.13 2.5 7 2.5s7-1.12 7-2.5v-6" /></>),
     // Hand holding a coin — the Age Pension / income received.
     pension: (<><circle cx="12" cy="8" r="3" /><path d="M4 20a5 5 0 0 1 6-4.9" /><path d="M13.5 18.5h4a1.5 1.5 0 0 0 0-3H14l-2-1.6a2 2 0 0 0-2.4 0" /></>),
+    // Hand holding a coin — a recurring income stream (DB / annuity / foreign pension).
+    income: (<><circle cx="12" cy="8" r="3" /><path d="M4 20a5 5 0 0 1 6-4.9" /><path d="M13.5 18.5h4a1.5 1.5 0 0 0 0-3H14l-2-1.6a2 2 0 0 0-2.4 0" /></>),
   };
   return (
     <span

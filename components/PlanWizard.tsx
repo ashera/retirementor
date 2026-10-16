@@ -835,7 +835,7 @@ export default function PlanWizard({
         <WizardHeaderCard
           page="income"
           eyebrow="Other income"
-          blurb="Income beyond your super and savings — a pension, annuity, dividend, or foreign pension (e.g. US Social Security), for life or a set period. It offsets what you draw from savings. Most people can skip this."
+          blurb="Income beyond your super and savings — a defined-benefit or foreign pension (e.g. US Social Security), an annuity, or dividends, for life or a set period. It offsets what you draw from savings. Have one? Add it here — otherwise most people can skip this."
         />
         <OptionalAnswer
           question="Any other income to include?"

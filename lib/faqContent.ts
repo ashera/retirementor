@@ -43,6 +43,10 @@ export const FAQS: Faq[] = [
     a: "These are benchmarks published by the Association of Superannuation Funds of Australia (ASFA). A 'comfortable' retirement — around $52,000 a year for a single and $73,000 for a couple — allows for private health cover, occasional travel, dining out and a reasonable car. A 'modest' retirement — roughly $33,000 (single) and $48,000 (couple) — covers the basics and is better than relying on the Age Pension alone. ASFA updates these figures every quarter for inflation. You can start your budget from these figures inside the planner and adjust them to your own life.",
   },
   {
+    q: "Can I include a foreign pension or other income like US Social Security?",
+    a: "Yes. The planner has an 'Other income' step for guaranteed income that isn't super drawdown — a defined-benefit (DB) pension, an annuity, or a foreign pension such as US Social Security. For each one you set whether it's indexed (keeps its real value) or fixed, whether it's taxable, and whether it counts towards the Age Pension income test, and it can run for life or a set period. The income offsets how much you draw from your own savings each year. If you're retiring permanently overseas there's also a non-resident tax mode, which changes how Australian-sourced and foreign-sourced income is taxed.",
+  },
+  {
     q: "How are RetireWiz's projections calculated?",
     a: "Projections are modelled year by year using current Australian rules for super, tax, contribution caps and the means-tested Age Pension. All results are shown in today's dollars so the figures are meaningful now, using default long-term economic assumptions consistent with ASIC's guidance for retirement estimates, and they account for super fees. Because markets are uncertain, the planner also runs thousands of simulations to estimate how likely your money is to last. Results are estimates, not a guarantee of future outcomes.",
   },
