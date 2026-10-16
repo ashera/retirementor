@@ -174,7 +174,8 @@ export default function GuidedIntro({
   const mc = useMemo(() => runMonteCarlo(mcPlan, config), [mcPlan, config]);
   const successPct = Math.round(mc.successRate * 100);
   const lasts = result.lastsToLifeExpectancy;
-  const tone = lasts ? "text-emerald-400" : "text-amber-400";
+  const bridgeGap = result.bridgeShortfallAge;
+  const tone = lasts && bridgeGap == null ? "text-emerald-400" : "text-amber-400";
   // The reliability panel states a likelihood, so it's toned by the Monte Carlo
   // success (85% bar), not by whether the smooth-return line happens to survive.
   const mcTone =
@@ -447,9 +448,11 @@ export default function GuidedIntro({
             <IncomeChart result={result} animate height={190} ages={ageGapInfo(plan)} />
           </div>
           <p className={`mt-3 rounded-xl border border-line bg-panel-2 px-4 py-3 text-sm ${tone}`}>
-            {lasts
-              ? `On a steady, average return, your super, savings and the Age Pension keep you going to ${plan.lifeExpectancy} and beyond. Real returns rise and fall, though — we'll stress-test that next.`
-              : `On a steady, average return, this stretches to about age ${result.depletedAge} before leaning fully on the Age Pension. A little less spending or a later retirement helps — and next we'll see how market ups and downs affect it.`}
+            {bridgeGap != null
+              ? `Your money lasts the whole way — but you retire before your super unlocks, so from around age ${bridgeGap} your savings outside super can't cover your spending until then. More accessible savings, or retiring a little later, would bridge that gap.`
+              : lasts
+                ? `On a steady, average return, your super, savings and the Age Pension keep you going to ${plan.lifeExpectancy} and beyond. Real returns rise and fall, though — we'll stress-test that next.`
+                : `On a steady, average return, this stretches to about age ${result.depletedAge} before leaning fully on the Age Pension. A little less spending or a later retirement helps — and next we'll see how market ups and downs affect it.`}
           </p>
           {step === 5 && <Actions label="How reliable is this? →" onClick={next} />}
         </Panel>

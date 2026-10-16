@@ -364,7 +364,9 @@ export default function BudgetBuilder({ plan, config, onApply, onProgress, onClo
                 Show {monthly ? "yearly" : "monthly"}
               </button>
               <div className="mt-1.5 text-xs text-muted">
-                {impact.lastsToLifeExpectancy ? (
+                {impact.bridgeShortfallAge != null ? (
+                  <span className="text-amber-400">lasts to {plan.lifeExpectancy}+, but a bridge gap from ~{impact.bridgeShortfallAge} (super locked)</span>
+                ) : impact.lastsToLifeExpectancy ? (
                   <span className="text-accent">projected to last to {plan.lifeExpectancy}+</span>
                 ) : (
                   <span className="text-amber-400">projected to last to {impact.depletedAge}</span>
@@ -1135,12 +1137,18 @@ function PayoffStep({
 
       <div
         className={`rounded-xl border px-4 py-3 text-sm ${
-          impact.lastsToLifeExpectancy
+          impact.lastsToLifeExpectancy && impact.bridgeShortfallAge == null
             ? "border-accent/30 bg-accent/10 text-accent"
             : "border-amber-500/30 bg-amber-500/10 text-amber-300"
         }`}
       >
-        {impact.lastsToLifeExpectancy ? (
+        {impact.bridgeShortfallAge != null ? (
+          <span>
+            Your savings last to {plan.lifeExpectancy}+, but you retire before your super unlocks — so from around age{" "}
+            <span className="font-bold">{impact.bridgeShortfallAge}</span> your accessible savings can&apos;t cover this budget until
+            then. You&apos;d need more savings outside super, or a slightly later retirement, to fund those years.
+          </span>
+        ) : impact.lastsToLifeExpectancy ? (
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span>On this budget your savings are projected to last to {plan.lifeExpectancy}+.</span>
             {canBoost && (

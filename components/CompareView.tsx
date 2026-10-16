@@ -90,8 +90,12 @@ export default function CompareView({ config, savedPlans, activeName, activeId }
 
   const series: CompareSeries[] = computed.map((c) => ({ id: c.id, label: c.label, color: c.color, result: c.result }));
 
-  // Sortable "money lasts" — higher is better.
-  const lastsVal = (c: (typeof computed)[number]) => (c.result.lastsToLifeExpectancy ? c.plan.lifeExpectancy + 1 : (c.result.depletedAge ?? 0));
+  // Sortable "money lasts" — higher is better. A bridge shortfall (can't fund the
+  // pre-preservation years) ranks just below a clean "lasts", above a true depletion.
+  const lastsVal = (c: (typeof computed)[number]) =>
+    c.result.lastsToLifeExpectancy
+      ? c.plan.lifeExpectancy + (c.result.bridgeShortfallAge != null ? 0 : 1)
+      : (c.result.depletedAge ?? 0);
 
   const rows: MetricRow[] = [
     { label: "Household", input: true, cell: (c) => (c.plan.household === "couple" ? "Couple" : "Single") },
@@ -100,7 +104,7 @@ export default function CompareView({ config, savedPlans, activeName, activeId }
     { label: "Investment return", input: true, cell: (c) => `${c.plan.investmentReturn}%` },
     { label: "Plan until age", input: true, cell: (c) => `${c.plan.lifeExpectancy}` },
     { label: "Super at retirement", cell: (c) => fmtCurrency(c.result.superAtRetirement), best: "max", metric: (c) => c.result.superAtRetirement },
-    { label: "Money lasts", cell: (c) => (c.result.lastsToLifeExpectancy ? `to ${c.plan.lifeExpectancy}+` : `to ${c.result.depletedAge}`), best: "max", metric: lastsVal },
+    { label: "Money lasts", cell: (c) => (c.result.lastsToLifeExpectancy ? (c.result.bridgeShortfallAge != null ? `to ${c.plan.lifeExpectancy}+ ⚠ bridge gap` : `to ${c.plan.lifeExpectancy}+`) : `to ${c.result.depletedAge}`), best: "max", metric: lastsVal },
     { label: "Likely to last", cell: (c) => `${Math.round(c.mc.successRate * 100)}%`, best: "max", metric: (c) => c.mc.successRate },
     { label: "Withdrawal rate (yr 1)", cell: (c) => (c.wr ? `${(c.wr.portfolioRate * 100).toFixed(1)}%` : "—"), best: "min", metric: (c) => c.wr?.portfolioRate ?? Infinity },
     { label: "Age Pension from", cell: (c) => (c.result.firstAgePensionAge === null ? "—" : `age ${c.result.firstAgePensionAge}`) },

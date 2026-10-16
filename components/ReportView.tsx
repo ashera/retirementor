@@ -104,7 +104,8 @@ export default function ReportView({
   const successPct = Math.round(mc.successRate * 100);
   // Extra-page data: life events default to the plan's own; a "money lasts" label.
   const events = lifeEvents ?? getLifeEvents(plan);
-  const lastsText = (lasts: boolean, depAge: number | null) => (lasts ? `to ${plan.lifeExpectancy}+` : `to age ${depAge}`);
+  const lastsText = (lasts: boolean, depAge: number | null, bridgeAge: number | null = null) =>
+    lasts ? (bridgeAge != null ? `to ${plan.lifeExpectancy}+ · bridge gap` : `to ${plan.lifeExpectancy}+`) : `to age ${depAge}`;
   const wageInfl = plan.inflation + (config.livingStandardsGrowthPct ?? 0);
   const people = plan.people;
   const mtg = plan.mortgage;
@@ -283,8 +284,14 @@ export default function ReportView({
             <Stat label="Retirement income goal" value={`${money(goal.total)}/yr`} sub={goal.loanKind !== "none" ? "includes home-loan costs" : "living costs"} />
             <Stat
               label="Money lasts"
-              value={result.lastsToLifeExpectancy ? `projected to ${plan.lifeExpectancy}+` : `projected to age ${result.depletedAge}`}
-              sub={`${successPct}% likely (Monte Carlo)`}
+              value={
+                result.lastsToLifeExpectancy
+                  ? result.bridgeShortfallAge != null
+                    ? `to ${plan.lifeExpectancy}+ · bridge gap`
+                    : `projected to ${plan.lifeExpectancy}+`
+                  : `projected to age ${result.depletedAge}`
+              }
+              sub={result.bridgeShortfallAge != null ? `can't fund before super unlocks` : `${successPct}% likely (Monte Carlo)`}
             />
             <Stat
               label="Age Pension from"
@@ -301,9 +308,11 @@ export default function ReportView({
             retirement, then draw down. Dashed markers show retirement and Age
             Pension age
             {bands ? "; shaded bands mark the go-go / slow-go / no-go stages" : ""}.
-            {result.lastsToLifeExpectancy
-              ? " Your balance is projected to last the whole plan on these assumptions."
-              : ` The “Depletes” marker is where savings are projected to run out (~${result.depletedAge}).`}
+            {result.bridgeShortfallAge != null
+              ? ` Your balance lasts the whole plan, but the amber “Bridge gap” marker (~${result.bridgeShortfallAge}) flags that you retire before your super unlocks — so your outside-super savings can’t cover the years until then. You’d need more accessible savings, or a slightly later retirement, to fund that gap.`
+              : result.lastsToLifeExpectancy
+                ? " Your balance is projected to last the whole plan on these assumptions."
+                : ` The “Depletes” marker is where savings are projected to run out (~${result.depletedAge}).`}
           </Lead>
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-2">
             <RetirementChart result={result} bands={bands} animate={false} height={200} wageInflationPct={wageInfl} cpiPct={plan.inflation} ages={ageGapInfo(plan)} lifeEvents={plan.lifeEvents} agedCare={plan.agedCare?.enabled ? { entryAge: plan.agedCare.entryAge, durationYears: plan.agedCare.durationYears } : null} plan={plan} />
@@ -555,7 +564,7 @@ export default function ReportView({
                     <tr className="border-b border-slate-100">
                       <td className="py-0.5 text-left font-medium text-slate-700">Money lasts</td>
                       <td className="text-slate-500">{lastsText(baseline.lastsToLifeExpectancy, baseline.depletedAge)}</td>
-                      <td className="font-medium text-slate-800">{lastsText(result.lastsToLifeExpectancy, result.depletedAge)}</td>
+                      <td className="font-medium text-slate-800">{lastsText(result.lastsToLifeExpectancy, result.depletedAge, result.bridgeShortfallAge)}</td>
                     </tr>
                     <tr className="border-b border-slate-100">
                       <td className="py-0.5 text-left font-medium text-slate-700">Likely to fund the plan</td>

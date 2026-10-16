@@ -575,10 +575,20 @@ export function MoneyLastsExplainer({
     result.totalAtRetirement - result.superAtRetirement,
   );
   const lasts = result.lastsToLifeExpectancy;
+  const bridgeGap = result.bridgeShortfallAge;
 
   return (
     <Explainer title="Money lasts">
-      {lasts ? (
+      {bridgeGap != null ? (
+        <p>
+          Your balance lasts your whole horizon — it never hits zero. But you retire before your super
+          unlocks ({config.preservationAge}), so from around age{" "}
+          <span className="font-semibold text-amber-400">{bridgeGap}</span> your savings outside super
+          can&apos;t fully cover your spending until then. The locked super keeps growing, so it&apos;s a
+          liquidity gap, not running out — more accessible savings, or a slightly later retirement, would
+          fund those years.
+        </p>
+      ) : lasts ? (
         <p>
           Your income sources cover your spending every year through to age{" "}
           <span className="font-semibold text-accent">
@@ -631,9 +641,11 @@ export function MoneyLastsExplainer({
         <Figure
           label="Result"
           value={
-            lasts
-              ? `lasts to ${plan.lifeExpectancy}+`
-              : `runs short at ${result.depletedAge}`
+            bridgeGap != null
+              ? `lasts to ${plan.lifeExpectancy}+ · bridge gap ~${bridgeGap}`
+              : lasts
+                ? `lasts to ${plan.lifeExpectancy}+`
+                : `runs short at ${result.depletedAge}`
           }
         />
       </div>

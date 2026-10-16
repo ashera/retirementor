@@ -2239,7 +2239,15 @@ export default function PlannerApp({
       {/* Narrative */}
       <div className="mt-6 rounded-2xl border border-line bg-panel p-6 text-sm text-slate-300">
         <h2 className="mb-2 font-semibold text-white">What this means</h2>
-        {result.lastsToLifeExpectancy ? (
+        {result.bridgeShortfallAge != null ? (
+          <p>
+            Your balance lasts your whole plan — but you retire before your super unlocks, so from around age{" "}
+            <span className="font-semibold text-amber-400">{result.bridgeShortfallAge}</span> your savings outside super
+            can&apos;t cover {spendPhrase} until it does. The locked super keeps growing (so you don&apos;t run out), but
+            you&apos;d need more <span className="font-semibold">accessible</span> savings, or a slightly later retirement,
+            to fund those bridge years. The levers above model retiring later or saving more.
+          </p>
+        ) : result.lastsToLifeExpectancy ? (
           <p>
             Your plan funds {spendPhrase} through to age {plan.lifeExpectancy}.
             You reach retirement at {result.retirementAge} with{" "}
