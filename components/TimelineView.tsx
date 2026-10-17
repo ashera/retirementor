@@ -8,6 +8,7 @@ import { DEFAULT_PLAN } from "@/lib/au/types";
 import type { SavedPlan } from "@/app/actions/plans";
 import { simulate } from "@/lib/au/simulate";
 import { runMonteCarlo } from "@/lib/au/montecarlo";
+import { metricsKey, getMetrics } from "@/lib/au/mcCache";
 import { buildTimeline, phaseLabel, type TimelinePhase } from "@/lib/au/timeline";
 import { track } from "@/lib/analytics";
 import Bert from "@/components/Bert";
@@ -83,10 +84,31 @@ export default function TimelineView({
     Number.isFinite(plan.lifeExpectancy);
 
   const result = useMemo(() => (built && plan ? simulate(plan, config) : null), [built, plan, config]);
-  const mc = useMemo(
-    () => (built && plan ? runMonteCarlo(plan, config, { iterations: 1000 }) : null),
-    [built, plan, config],
-  );
+  // The confidence Monte Carlo (~1s, more on a slow device) only feeds the "X% chance it
+  // lasts" line — so don't block navigation on it. Reuse the dashboard's cached run for
+  // this exact plan if there is one (instant); otherwise compute it AFTER first paint so
+  // opening the timeline is immediate and the % fills in a moment later.
+  const [mc, setMc] = useState<ReturnType<typeof runMonteCarlo> | null>(null);
+  useEffect(() => {
+    if (!built || !plan) {
+      setMc(null);
+      return;
+    }
+    const cached = getMetrics(metricsKey(plan, config)) ?? getMetrics(metricsKey({ ...plan, whatIf: undefined }, config));
+    if (cached?.mc) {
+      setMc(cached.mc as ReturnType<typeof runMonteCarlo>);
+      return;
+    }
+    setMc(null);
+    let cancelled = false;
+    const t = setTimeout(() => {
+      if (!cancelled) setMc(runMonteCarlo(plan, config, { iterations: 1000 }));
+    }, 0);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [built, plan, config]);
   const timeline = useMemo(
     () => (plan && result ? buildTimeline(plan, result, config, { mcPct: mc ? mc.successRate * 100 : null }) : null),
     [plan, result, config, mc],
