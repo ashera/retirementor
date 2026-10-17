@@ -131,6 +131,12 @@ export interface PropertyDetail {
   purchasePrice: number; // cost base for CGT (today's-dollar approximation)
   strategy: "hold" | "sell"; // hold for income, or sell at an age
   sellAtAge: number; // oldest person's age at sale (when strategy === "sell")
+  // Working-years treatment of positive net rent: SAVED (reinvested into the outside-
+  // super pool) or SPENT? Default (false/absent) = spent — most landlords consume the
+  // net yield, so it doesn't silently build pre-retirement savings. Set true to reinvest
+  // it. A geared LOSS is always funded from salary either way (never drawn from the pool),
+  // and the rent is taxed regardless; in retirement the net rent always offsets drawdown.
+  reinvestWhileWorking?: boolean;
 }
 
 /** The CGT working behind a single investment-property sale (today's dollars). */
@@ -205,6 +211,12 @@ export interface IncomeStream {
   assessable?: boolean; // default true → counted in the Age Pension income test
   foreignSourced?: boolean; // default false. Only bites when taxResidency === "non-resident": a foreign-sourced stream (e.g. US Social Security) isn't taxed by Australia or counted in its income test; a resident is taxed on worldwide income regardless.
   owner?: number; // couples only: which person the income belongs to for TAX (0 = you, 1 = partner). Omitted → split evenly. No effect on the Age Pension income test (assessed on combined household income) or for a single.
+  // Working-years treatment: when this stream overlaps the working years, is its
+  // net-of-tax amount SAVED (reinvested into the outside-super pool) or SPENT? Default
+  // (false/absent) = spent — a stream is assumed to fund living, so it simply doesn't
+  // feed the pool. Set true for genuine surplus income the household reinvests. It's
+  // taxed either way, and in retirement it always offsets the drawdown regardless.
+  reinvestWhileWorking?: boolean;
 }
 
 // Aged care (v1, consumer-facing general information). Models a late-life
@@ -406,6 +418,7 @@ export function getIncomeStreams(plan: RetirementPlan): Required<IncomeStream>[]
       assessable: s.assessable ?? true,
       foreignSourced: s.foreignSourced ?? false,
       owner: typeof s.owner === "number" && s.owner >= 0 ? s.owner : -1, // -1 = split evenly
+      reinvestWhileWorking: s.reinvestWhileWorking ?? false, // default: spent while working
     }));
 }
 

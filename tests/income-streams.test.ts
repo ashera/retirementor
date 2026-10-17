@@ -53,4 +53,23 @@ describe("Income streams (DB pension / annuity / foreign pension)", () => {
     expect(rowAt(bounded, 70).incomeStream).toBeCloseTo(20_000, -1);
     expect(rowAt(bounded, 75).incomeStream).toBe(0);
   });
+
+  it("while WORKING: a stream is spent by default, but reinvested when flagged", () => {
+    // Someone still working (55, retires at 65) with a stream running through the working
+    // years. By default the stream funds living (no effect on the pool); flagged to
+    // reinvest, its net builds the outside pool, so there's more at retirement.
+    const working = (reinvest: boolean) => base([S({ perYear: 40_000, fromAge: 55, taxable: true, assessable: false, reinvestWhileWorking: reinvest })], {
+      people: [{ ...DEFAULT_PLAN.people[0], currentAge: 55, superBalance: 250_000, salary: 80_000, voluntaryConcessional: 0, voluntaryNonConcessional: 0 }],
+      retirementAge: 65, outsideSuper: 50_000, annualOutsideSavings: 0,
+    });
+    const spent = simulate(working(false), cfg);
+    const saved = simulate(working(true), cfg);
+    // Same super either way (stream doesn't touch super); the reinvested case has far more
+    // outside. The "spent" pool is just the opening $50k grown (no stream added); "saved"
+    // adds ~10 years of reinvested net stream on top.
+    const outAtRet = (r: ReturnType<typeof simulate>) => r.totalAtRetirement - r.superAtRetirement;
+    expect(spent.superAtRetirement).toBeCloseTo(saved.superAtRetirement, -1);
+    expect(outAtRet(spent)).toBeLessThan(100_000); // opening $50k grown only
+    expect(outAtRet(saved)).toBeGreaterThan(outAtRet(spent) + 150_000); // 10 yrs of reinvested net stream
+  });
 });

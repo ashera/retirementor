@@ -728,9 +728,23 @@ export function simulate(
       const accumPropertyEquity = properties.reduce((s, prop, pi) => s + (sold[pi] ? 0 : netEquity({ ...prop, loanBalance: prop.loanBalance / accumPropDeflator }, propertyValueAt(prop, t))), 0);
       // Net rent the properties throw off during the working years too (positive
       // income, or a negative cash drain for a geared property) — surfaced on the
-      // income chart alongside take-home pay. Like salary take-home it's disposable
-      // income, not auto-saved, so it doesn't itself move the balance.
-      const accumRentCash = properties.reduce((s, prop, pi) => s + (sold[pi] ? 0 : netRentCash({ ...prop, loanBalance: prop.loanBalance / accumPropDeflator, loanOffset: (prop.loanOffset ?? 0) / accumPropDeflator }, propertyValueAt(prop, t))), 0);
+      // income chart alongside take-home pay. Whether the POSITIVE net rent is then
+      // reinvested into savings or simply spent is a per-property choice
+      // (reinvestWhileWorking, default spent) — see `rentSaved` below.
+      const accumRentByProp = properties.map((prop, pi) =>
+        sold[pi]
+          ? 0
+          : netRentCash({ ...prop, loanBalance: prop.loanBalance / accumPropDeflator, loanOffset: (prop.loanOffset ?? 0) / accumPropDeflator }, propertyValueAt(prop, t)),
+      );
+      const accumRentCash = accumRentByProp.reduce((a, b) => a + b, 0);
+      // Fraction of the pooled POSITIVE net rent that comes from properties the user
+      // reinvests while working (the rest is consumed). Used to scale `rentSaved`.
+      const totalPosRent = accumRentByProp.reduce((s, x) => s + Math.max(0, x), 0);
+      const reinvestPosRent = properties.reduce(
+        (s, prop, pi) => s + (!sold[pi] && prop.reinvestWhileWorking ? Math.max(0, accumRentByProp[pi]) : 0),
+        0,
+      );
+      const rentReinvestFrac = totalPosRent > 0 ? reinvestPosRent / totalPosRent : 0;
       // Offset cash held against unsold property loans (today's dollars) — added to net
       // worth + the means test via offsetHeld, like the home-loan offset.
       const accumPropertyOffsetHeld = properties.reduce((s, prop, pi) => s + (sold[pi] ? 0 : Math.max(0, prop.loanOffset ?? 0) / accumPropDeflator), 0);
@@ -751,17 +765,20 @@ export function simulate(
       // Income streams that have STARTED but the household is still working — a
       // defined-benefit / annuity / foreign pension is paid from its fromAge whether
       // or not you've retired. Taxed at the marginal rate on top of salary + net rent
-      // (working age → no SAPTO); it's extra disposable income and, like take-home
-      // pay, it isn't auto-saved, so it doesn't feed the pool. Split across earners.
+      // (working age → no SAPTO). By default it's disposable income that funds living —
+      // it isn't auto-saved — but a stream flagged reinvestWhileWorking has its net
+      // added to the pool (see `streamSaved` below). Split across earners.
       const streamWorkers = Math.max(1, plan.people.length);
       const cpiPowAccum = Math.pow(1 + plan.inflation / 100, t);
       let accumStreamGross = 0;
+      let reinvestStreamGross = 0; // gross of streams the user reinvests while working
       const accumStreamTaxablePer = new Array(streamWorkers).fill(0) as number[];
       const accumStreamNames: string[] = [];
       for (const s of incomeStreams) {
         if (oldest < s.fromAge || oldest >= s.untilAge) continue;
         const real = s.indexed ? s.perYear : s.perYear / cpiPowAccum;
         accumStreamGross += real;
+        if (s.reinvestWhileWorking) reinvestStreamGross += real;
         accumStreamNames.push(s.label);
         if (s.taxable && !(nonResident && s.foreignSourced)) {
           const own = s.owner >= 0 && s.owner < streamWorkers ? s.owner : -1;
@@ -784,12 +801,17 @@ export function simulate(
       const accumTaxDetail = plan.people.map((_, i) =>
         taxDetailFor(i, { salary: taxables[i], work: 0, rent: accumRentPer, stream: accumStreamTaxablePer[i] ?? 0, dividends: outsidePerAccum, gain: 0 }, false, false),
       );
-      // Positive net rent (after its income tax) is reinvested into the outside pool,
-      // so a cash-flow-positive property visibly builds wealth over the working years.
-      // A geared loss is NOT drawn from the pool here — it's a disposable cash drain
-      // funded from salary (its negative-gearing tax saving is already in accumRentTax).
-      const rentSaved = Math.max(0, accumRentCash - accumRentTax);
-      outside += rentSaved;
+      // Positive net rent (after its income tax) from properties the user REINVESTS is
+      // added to the outside pool, so a cash-flow-positive property they reinvest visibly
+      // builds wealth over the working years. By default rent is SPENT (reinvestWhile
+      // Working = false) → nothing accrues. A geared loss is never drawn from the pool —
+      // it's a cash drain funded from salary (its negative-gearing tax saving is already
+      // in accumRentTax). Likewise a reinvested income stream's net is saved; by default
+      // a stream funds living (streamSaved = 0).
+      const rentSaved = Math.max(0, accumRentCash - accumRentTax) * rentReinvestFrac;
+      const streamSaved =
+        accumStreamGross > 0 ? Math.max(0, accumStreamNet) * (reinvestStreamGross / accumStreamGross) : 0;
+      outside += rentSaved + streamSaved;
       // Life events (working years): a windfall lands in savings untaxed (added with
       // half-year growth above); a one-off expense is drawn from savings — super is
       // preserved and can't fund it — so it's floored at what the outside pool holds

@@ -212,7 +212,9 @@ describe(`Stress matrix — ${PLANS.length} plans, universal invariants`, () => 
         return Math.max(0, p.salary - sacrificed);
       };
       const prop = plan.investmentProperty;
-      const netRentAt = prop ? (y: number) => ref.propertyNetRent(prop, y, plan.inflation) : undefined;
+      // Net rent feeds the pool during the working years only when the property is set to
+      // REINVEST it (default is to spend it — so the oracle leaves it out otherwise).
+      const netRentAt = prop && prop.reinvestWhileWorking ? (y: number) => ref.propertyNetRent(prop, y, plan.inflation) : undefined;
       const expOutside = ref.outsideAccumWithTax(
         plan.outsideSuper, plan.annualOutsideSavings, plan.investmentReturn, wageInfl,
         cfg.outsideTax.incomeYieldPct, n, plan.people.map(taxableSalary), netRentAt,

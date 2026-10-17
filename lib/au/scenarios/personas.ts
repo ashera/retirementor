@@ -351,7 +351,9 @@ function bridgingBen(config: EngineConfig): PersonaReport {
 // ── Landlord Lena ────────────────────────────────────────────────────────────
 function landlordLena(config: EngineConfig): PersonaReport {
   const person: Person = { currentAge: 60, superBalance: 350_000, salary: 90_000, voluntaryConcessional: 0, voluntaryNonConcessional: 0 };
-  const prop: PropertyDetail = { value: 500_000, growthReal: 2, grossYield: 4.5, costRatio: 28, loanBalance: 150_000, loanRate: 6, purchasePrice: 300_000, strategy: "hold", sellAtAge: 85 };
+  // Lena reinvests her positive net rent during the working years (reinvestWhileWorking),
+  // so it builds the outside pool — the oracle below mirrors that by passing netRentAt.
+  const prop: PropertyDetail = { value: 500_000, growthReal: 2, grossYield: 4.5, costRatio: 28, loanBalance: 150_000, loanRate: 6, purchasePrice: 300_000, strategy: "hold", sellAtAge: 85, reinvestWhileWorking: true };
   const plan: RetirementPlan = {
     ...DEFAULT_PLAN, household: "single", people: [person], superMode: "individual",
     homeowner: true, outsideSuper: 60_000, annualOutsideSavings: 4_000, investmentProperty: prop,
@@ -369,6 +371,7 @@ function landlordLena(config: EngineConfig): PersonaReport {
     assumptions: [
       "Today's dollars (inflation 0%); retires at Age Pension age (67).",
       "The investment property is assessable: its net equity counts under the assets test and its actual net rent under the income test (not deemed).",
+      "Lena reinvests her positive net rent while working, so it builds her outside-super savings (the default is to spend it).",
       `Reference data: FY${config.financialYear} config seed.`,
     ],
     inputs: [

@@ -90,6 +90,7 @@ export default function IncomeStreamsEditor({
   defaultAge,
   nonResident = false,
   couple = false,
+  retirementAge,
   onChange,
 }: {
   streams: IncomeStream[];
@@ -98,6 +99,7 @@ export default function IncomeStreamsEditor({
   defaultAge: number;
   nonResident?: boolean; // plan is a foreign resident → show the AU-sourced/foreign toggle
   couple?: boolean; // couple → show the whose-income (owner) selector
+  retirementAge?: number; // household retirement age → show the "reinvest while working" toggle only when the stream overlaps the working years
   onChange: (streams: IncomeStream[]) => void;
 }) {
   const [draft, setDraft] = useState<IncomeStream | null>(null);
@@ -292,6 +294,14 @@ export default function IncomeStreamsEditor({
                   onChange={(foreignSourced) => setDraft({ ...draft, foreignSourced })}
                   label="Foreign-sourced"
                   hint="A non-Australian pension (e.g. US Social Security). As a non-resident it's outside Australian tax and its income test. Off for an Australian pension."
+                />
+              )}
+              {retirementAge != null && draft.fromAge < retirementAge && (
+                <Toggle
+                  on={draft.reinvestWhileWorking ?? false}
+                  onChange={(reinvestWhileWorking) => setDraft({ ...draft, reinvestWhileWorking })}
+                  label="Reinvest while still working"
+                  hint="This income starts before you retire. Off = it funds your living (default); On = you save it into your outside-super investments."
                 />
               )}
             </div>

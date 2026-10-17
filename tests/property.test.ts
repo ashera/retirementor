@@ -141,18 +141,28 @@ describe("Rent income tax & negative gearing", () => {
     expect(row.breakdown.rentTax).toBeCloseTo(0, 0);
   });
 
-  it("reinvests positive after-tax net rent into savings during the working years", () => {
-    // Same working plan with vs without a cash-flow-positive property: the property
-    // version ends the year with MORE outside savings (the after-tax rent is saved).
+  it("by DEFAULT consumes net rent while working (not saved)", () => {
+    // Default (reinvestWhileWorking absent): a cash-flow-positive property's net rent is
+    // SPENT during the working years, so it doesn't build the outside pool.
     const working = { currentAge: 58, superBalance: 300_000, salary: 95_000, voluntaryConcessional: 0, voluntaryNonConcessional: 0 };
     const p = base({ people: [working], retirementAge: 67, outsideSuper: 200_000, annualOutsideSavings: 0 });
     const withProp = rowAt(simulate({ ...p, investmentProperty: prop() }, cfg), 58);
     const without = rowAt(simulate(p, cfg), 58);
+    expect(withProp.rentIncome).toBeGreaterThan(0); // the property IS cash-flow positive…
+    expect(withProp.breakdown.rentSaved).toBe(0); // …but the rent is consumed, not saved
+    expect(withProp.breakdown.closingOutside - without.breakdown.closingOutside).toBeCloseTo(0, 0);
+  });
+
+  it("reinvests positive after-tax net rent when reinvestWhileWorking is set", () => {
+    const working = { currentAge: 58, superBalance: 300_000, salary: 95_000, voluntaryConcessional: 0, voluntaryNonConcessional: 0 };
+    const p = base({ people: [working], retirementAge: 67, outsideSuper: 200_000, annualOutsideSavings: 0 });
+    const withProp = rowAt(simulate({ ...p, investmentProperty: prop({ reinvestWhileWorking: true }) }, cfg), 58);
+    const without = rowAt(simulate(p, cfg), 58);
     expect(withProp.breakdown.rentSaved).toBeGreaterThan(0);
     // Extra closing outside ≈ the reinvested after-tax rent.
     expect(withProp.breakdown.closingOutside - without.breakdown.closingOutside).toBeCloseTo(withProp.breakdown.rentSaved!, 0);
-    // A geared loss is NOT reinvested (disposable drain), so rentSaved is 0.
-    const geared = rowAt(simulate({ ...p, investmentProperty: prop({ loanBalance: 500_000 }) }, cfg), 58);
+    // A geared loss is NOT reinvested (disposable drain), so rentSaved is 0 even when set.
+    const geared = rowAt(simulate({ ...p, investmentProperty: prop({ loanBalance: 500_000, reinvestWhileWorking: true }) }, cfg), 58);
     expect(geared.rentIncome).toBeLessThan(0);
     expect(geared.breakdown.rentSaved).toBe(0);
   });

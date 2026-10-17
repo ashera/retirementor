@@ -16,6 +16,7 @@ export default function PropertyCard({
   property: p,
   retirementAge,
   lifeExpectancy,
+  workingYears = false,
   expanded,
   onToggle,
   onChange,
@@ -26,6 +27,7 @@ export default function PropertyCard({
   property: PropertyDetail;
   retirementAge: number;
   lifeExpectancy: number;
+  workingYears?: boolean; // there are pre-retirement years → offer the spend/reinvest-net-rent choice
   expanded: boolean;
   onToggle: () => void;
   onChange: (patch: Partial<PropertyDetail>) => void;
@@ -187,6 +189,34 @@ export default function PropertyCard({
           suffix="yrs"
           hint="Triggers CGT (50% discount); net proceeds move into your outside-super savings."
         />
+      )}
+
+      {/* While still working, is the positive net rent spent or saved? (Only relevant
+          with working years ahead and a cash-flow-positive property.) */}
+      {workingYears && netRent > 0 && (
+        <div>
+          <div className="mb-2 text-sm font-semibold text-slate-200">While you&apos;re still working, the net rent is…</div>
+          <div className="grid grid-cols-2 gap-2">
+            {([
+              ["Spent", false],
+              ["Reinvested", true],
+            ] as const).map(([lbl, val]) => (
+              <button
+                key={lbl}
+                type="button"
+                onClick={() => onChange({ reinvestWhileWorking: val })}
+                className={`rounded-lg border px-3 py-2 text-sm transition ${
+                  (p.reinvestWhileWorking ?? false) === val
+                    ? "border-accent bg-accent/10 font-semibold text-accent"
+                    : "border-line bg-panel text-slate-200 hover:text-white"
+                }`}
+              >
+                {lbl === "Spent" ? "Spent (funds living)" : "Saved into investments"}
+              </button>
+            ))}
+          </div>
+          <p className="mt-1 text-[11px] text-muted">Most landlords spend the net yield (the default). Choose &ldquo;saved&rdquo; only if you reinvest it — it then builds your outside-super savings before retirement.</p>
+        </div>
       )}
 
       {/* Advanced fold — sensible defaults otherwise */}

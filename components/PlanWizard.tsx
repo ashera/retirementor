@@ -766,6 +766,7 @@ export default function PlanWizard({
                 property={pp}
                 retirementAge={draft.retirementAge}
                 lifeExpectancy={draft.lifeExpectancy}
+                workingYears={draft.people.every((pp2) => (pp2.retirementAge ?? draft.retirementAge) > pp2.currentAge)}
                 expanded={i === openProp}
                 onToggle={() => setOpenProp((prev) => (prev === i ? null : i))}
                 onChange={(patchP) => setPropertyAt(i, patchP)}
@@ -854,6 +855,7 @@ export default function PlanWizard({
             defaultAge={draft.retirementAge}
             nonResident={draft.taxResidency === "non-resident"}
             couple={draft.household === "couple"}
+            retirementAge={draft.retirementAge}
             onChange={(incomeStreams) => setDraft((prev) => ({ ...prev, incomeStreams }))}
           />
         )}
