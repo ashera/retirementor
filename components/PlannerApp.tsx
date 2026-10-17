@@ -7,6 +7,7 @@ import StatCard from "@/components/StatCard";
 import RetirementChart from "@/components/RetirementChart";
 import { ageGapInfo } from "@/components/ageAxis";
 import DashboardLoadingOverlay from "@/components/DashboardLoadingOverlay";
+import RetirementStoryStrip from "@/components/RetirementStoryStrip";
 import YearDetailModal from "@/components/YearDetailModal";
 import IncomeYearModal from "@/components/IncomeYearModal";
 import IncomeChart from "@/components/IncomeChart";
@@ -1619,7 +1620,6 @@ export default function PlannerApp({
         loading={heroWarming || successPct == null || safeLiving == null || failsafeLiving == null}
         whatIfHref={whatIfHref}
         stressHref={stressHref}
-        timelineHref={timelineHref}
         scenarioName={shared ? null : activeName}
         hasNotes={!!(((activePlan && (notesOverride[activePlan.id] ?? activePlan.notes)) || "") as string).trim()}
         onManage={user && !shared ? () => setScenarioModalOpen(true) : null}
@@ -1637,6 +1637,13 @@ export default function PlannerApp({
             : null
         }
       />
+
+      {/* Retirement story — a milestone timeline (Go-go/Slow-go/No-go + key beats) that
+          leads into the full narrated story. Promoted out of the hero's button row so
+          it's a feature in its own right, not a buried link. */}
+      {timelineHref && (
+        <RetirementStoryStrip plan={plan} result={result} href={timelineHref} couple={isCouple} />
+      )}
 
       {/* Stat cards */}
       <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

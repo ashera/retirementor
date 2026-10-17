@@ -53,7 +53,6 @@ export interface ConfidenceHeroProps {
   loading: boolean; // first load — no real safe/failsafe tier yet, so show a skeleton not fallbacks
   whatIfHref: string;
   stressHref: string;
-  timelineHref?: string;
   // Folded-in scenario identity (see PlannerApp's Manage modal).
   scenarioName: string | null;
   hasNotes: boolean;
@@ -95,7 +94,6 @@ export default function ConfidenceHero({
   loading,
   whatIfHref,
   stressHref,
-  timelineHref,
   scenarioName,
   hasNotes,
   onManage,
@@ -385,14 +383,8 @@ export default function ConfidenceHero({
             >
               Pressure test it with History <span aria-hidden className="text-accent">→</span>
             </Link>
-            {timelineHref && (
-              <Link
-                href={timelineHref}
-                className="rounded-xl border border-accent/40 bg-accent/10 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:border-accent/70 hover:bg-accent/20"
-              >
-                See your retirement story <span aria-hidden className="text-accent">→</span>
-              </Link>
-            )}
+            {/* "See your retirement story" moved out to its own prominent story strip
+                on the dashboard (RetirementStoryStrip) — no longer a buried button here. */}
           </div>
           </>
           )}
