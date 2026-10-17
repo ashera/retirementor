@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
 import Field from "@/components/Field";
 import HomeEditor, { DEFAULT_HOME, defaultMortgage } from "@/components/HomeEditor";
 import CompletenessRing from "@/components/CompletenessRing";
@@ -199,6 +199,18 @@ export default function PlanWizard({
   const [draft, setDraft] = useState<RetirementPlan>(initial);
   const [step, setStep] = useState(0);
   const [view, setView] = useState<"summary" | "step">("summary");
+  // Moving between steps re-runs the preview simulations, which can block the click
+  // briefly. Run step/overview navigation as a transition so React keeps the current
+  // page interactive and we can show a spinner on the button while the next one renders.
+  const [navPending, startNav] = useTransition();
+  // Only surface the spinner if a step change actually takes a moment — a fast machine
+  // flips through instantly and shouldn't flash a spinner on every click.
+  const [navSlow, setNavSlow] = useState(false);
+  useEffect(() => {
+    if (!navPending) { setNavSlow(false); return; }
+    const t = setTimeout(() => setNavSlow(true), 120);
+    return () => clearTimeout(t);
+  }, [navPending]);
   const [budgetOpen, setBudgetOpen] = useState(false); // budget builder, nested over the wizard
   // Classic builder is always the default; the Budget Quiz is a per-session opt-in.
   const [budgetPlayMode, setBudgetPlayMode] = useState(false);
@@ -1345,7 +1357,7 @@ export default function PlanWizard({
     if (key === "outside" && outsideImpact > 500) return { text: `✓ +${fmtCompact(outsideImpact)}`, tone: "text-accent" };
     return { text: "✓ Done", tone: "text-accent" };
   };
-  const goToStep = (i: number) => { setStep(i); setView("step"); };
+  const goToStep = (i: number) => startNav(() => { setStep(i); setView("step"); });
 
   // Finish only when the essentials are actually entered; otherwise jump to the
   // first step still missing a required figure (rather than completing on NaN).
@@ -1496,7 +1508,7 @@ export default function PlanWizard({
               <button
                 key={i}
                 type="button"
-                onClick={() => setStep(i)}
+                onClick={() => startNav(() => setStep(i))}
                 aria-current={isCurrent ? "step" : undefined}
                 className={`rounded-full px-2.5 py-1 text-xs font-medium transition ${cls}`}
               >
@@ -1560,23 +1572,30 @@ export default function PlanWizard({
         {/* Footer */}
         <div className="flex items-center justify-between gap-3 border-t border-line px-6 py-4">
           <button
-            onClick={() => (safeStep === 0 ? setView("summary") : setStep(safeStep - 1))}
+            onClick={() => startNav(() => (safeStep === 0 ? setView("summary") : setStep(safeStep - 1)))}
             className="rounded-lg px-4 py-2 text-sm font-medium text-muted transition hover:text-white"
           >
             {safeStep === 0 ? "← Overview" : "← Back"}
           </button>
           <button
             onClick={() => {
+              if (navPending) return; // already advancing — ignore a double-click
               if (isLast) {
                 finish();
                 return;
               }
-              setStep(safeStep + 1); // the page-change effect saves the draft
-
+              startNav(() => setStep(safeStep + 1)); // the page-change effect saves the draft
             }}
-            className="rounded-lg bg-accent px-5 py-2 text-sm font-semibold text-ink transition hover:bg-accent-soft"
+            aria-busy={navSlow}
+            className="inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2 text-sm font-semibold text-ink transition hover:bg-accent-soft"
           >
-            {isLast ? (configured ? "Update plan" : "See my plan") : "Next →"}
+            {navSlow && !isLast && (
+              <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden>
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-90" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V0C5.4 0 0 5.4 0 12h4z" />
+              </svg>
+            )}
+            {isLast ? (configured ? "Update plan" : "See my plan") : navSlow ? "Loading…" : "Next →"}
           </button>
         </div>
         </>
