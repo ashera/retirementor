@@ -4,7 +4,7 @@ import Link from "next/link";
 import Bert from "@/components/Bert";
 import { ageGapInfo, agesAt } from "@/components/ageAxis";
 import { fmtCompact } from "@/lib/au/format";
-import type { RetirementPlan, SimResult } from "@/lib/au/types";
+import { oldestCurrentAge, type RetirementPlan, type SimResult } from "@/lib/au/types";
 
 // Spending-smile chapter colours — matched to the balance chart's bands so the two read
 // as the same story told two ways.
@@ -13,9 +13,10 @@ const CH = { gogo: "#34d399", slowgo: "#f59e0b", nogo: "#a78bfa" } as const;
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
 interface Node {
-  age: number;
+  age: number; // oldest-person axis position
   label: string;
   tone: string; // dot colour
+  who: "both" | 0 | 1; // whose event — "both" (shared-time, e.g. retire) shows both ages; a person index shows only that person's age
 }
 
 /**
@@ -58,43 +59,72 @@ export default function RetirementStoryStrip({
       : [{ label: "Retirement", from: retire, to: life, color: CH.gogo }]
   ).filter((c) => c.to > c.from + 0.01);
 
-  // Milestone beats along the line (deduped by age; only those within the horizon).
-  const agedCare = plan.agedCare?.enabled ? plan.agedCare.entryAge : null;
-  const pensionAge = result.firstAgePensionAge ?? result.agePensionAge;
-  const raw: (Node | null)[] = [
-    { age: retire, label: couple ? "You both retire" : "You retire", tone: "#e2e8f0" },
-    result.superUnlockAge != null && result.superUnlockAge > retire
-      ? { age: result.superUnlockAge, label: "Super unlocks", tone: "#2dd4bf" }
-      : null,
-    pensionAge != null && pensionAge >= retire && pensionAge <= life
-      ? { age: pensionAge, label: "Age Pension", tone: "#38bdf8" }
-      : null,
-    agedCare != null && agedCare >= retire && agedCare <= life
-      ? { age: agedCare, label: "Aged care", tone: "#f472b6" }
-      : null,
-  ];
-  // How it ends — the emotional payoff beat.
+  // ── Milestone beats ────────────────────────────────────────────────────────
+  // Per-person events (super unlocks, Age Pension) are attributed to the member they
+  // apply to and show only THAT person's age. A couple reaches each at a different time,
+  // so labelling both partners' ages would wrongly imply it happens to both at once
+  // (e.g. the older "waiting" to 64 to unlock super, or the younger getting the pension
+  // at 64). Shared-time beats (retire together, the final horizon) keep both ages.
+  const anchor = oldestCurrentAge(plan);
+  const people = plan.people;
+  const multi = people.length > 1;
+  const whoFor = (i: number): Node["who"] => (multi ? ((i === 0 ? 0 : 1) as 0 | 1) : "both");
+
+  // Super unlocks — only for a member whose super unlocks AFTER they retire (someone who
+  // retires before preservation age). Prefer the per-person array; fall back to the single.
+  const suAges: (number | null)[] =
+    (result.superUnlockAges ?? []).some((a) => a != null)
+      ? result.superUnlockAges
+      : result.superUnlockAge != null
+        ? result.superUnlockIsPartner
+          ? [null, result.superUnlockAge]
+          : [result.superUnlockAge]
+        : [];
+  const suNodes: Node[] = suAges.flatMap((a, i) =>
+    a != null && a > retire && a <= life ? [{ age: Math.round(a), label: "Super unlocks", tone: "#2dd4bf", who: whoFor(i) }] : [],
+  );
+
+  // Age Pension — the eligibility-age milestone, each partner at their own 67 (different
+  // times). A universal life beat for residents, even if the means test pays $0 for a
+  // while; hidden only when the household can't claim it at all (non-resident, not claiming).
+  const claimsAgePension = plan.taxResidency !== "non-resident" || !!plan.claimAgePensionAbroad;
+  const apNodes: Node[] = !claimsAgePension
+    ? []
+    : people.flatMap((p, i) => {
+        const axisAge = Math.round(anchor + (result.agePensionAge - p.currentAge));
+        return axisAge >= retire && axisAge <= life ? [{ age: axisAge, label: "Age Pension", tone: "#38bdf8", who: whoFor(i) }] : [];
+      });
+
+  // Aged care — a single-member event; attribute it to the member entering care.
+  const acNode: Node | null =
+    plan.agedCare?.enabled && plan.agedCare.entryAge >= retire && plan.agedCare.entryAge <= life
+      ? { age: plan.agedCare.entryAge, label: "Aged care", tone: "#f472b6", who: whoFor(plan.agedCare.person ?? 0) }
+      : null;
+
+  const retireNode: Node = { age: retire, label: couple ? "You both retire" : "You retire", tone: "#e2e8f0", who: "both" };
+
+  // How it ends — the emotional payoff beat (a shared time point → both ages).
   const endNode: Node =
     result.depletedAge != null
-      ? { age: result.depletedAge, label: `Funds run low ~${result.depletedAge}`, tone: "#ef4444" }
+      ? { age: result.depletedAge, label: `Funds run low ~${result.depletedAge}`, tone: "#ef4444", who: "both" }
       : result.bridgeShortfallAge != null
-        ? { age: life, label: `Lasts to ${life} · bridge gap`, tone: "#f59e0b" }
-        : { age: life, label: `Lasts to ${life}`, tone: "#34d399" };
+        ? { age: life, label: `Lasts to ${life} · bridge gap`, tone: "#f59e0b", who: "both" }
+        : { age: life, label: `Lasts to ${life}`, tone: "#34d399", who: "both" };
 
-  // Build the final node list, drop near-duplicate ages, keep sorted.
+  // Sort, then drop near-duplicate ages (same-age couples collapse per-person beats to one).
   const nodes: Node[] = [];
-  for (const n of [...raw.filter(Boolean) as Node[], endNode].sort((a, b) => a.age - b.age)) {
+  for (const n of [retireNode, ...suNodes, ...apNodes, ...(acNode ? [acNode] : []), endNode].sort((a, b) => a.age - b.age)) {
     if (!nodes.some((m) => Math.abs(m.age - n.age) < 0.5)) nodes.push(n);
   }
 
-  // Couples with an age gap: the strip (like the chart) is indexed by the OLDEST person's
-  // age, so a bare "age 61" is ambiguous. Show BOTH ages — "You 61 · Ptnr 58" on the nodes,
-  // and "61 and 58" in the teaser — so it's clear whose age is whose.
+  // Age-gapped couples show the relevant age(s): "both" beats show both partners'
+  // ("You 61 · Ptnr 58"); a per-person beat shows only that member's ("Ptnr · 60").
   const gap = ageGapInfo(plan);
-  const ageSub = (anchorAge: number): string => {
-    if (!gap) return `age ${anchorAge}`;
-    const { you, partner } = agesAt(gap, anchorAge);
-    return `You ${you} · Ptnr ${partner}`;
+  const ageSub = (n: Node): string => {
+    if (!gap) return `age ${n.age}`;
+    const { you, partner } = agesAt(gap, n.age);
+    if (n.who === "both") return `You ${you} · Ptnr ${partner}`;
+    return n.who === 0 ? `You · ${you}` : `Ptnr · ${partner}`;
   };
   const rAges = gap ? agesAt(gap, retire) : null;
   const retireRef = rAges ? `${rAges.you} and ${rAges.partner}` : `${retire}`;
@@ -162,7 +192,7 @@ export default function RetirementStoryStrip({
               return (
                 <div key={`lbl-${i}`} className="absolute" style={{ left: `${left}%`, width: gap ? 104 : 92, top: lower ? 26 : 0, transform }}>
                   <div className="truncate text-[11px] font-semibold leading-tight text-slate-200" style={{ textAlign: align }}>{n.label}</div>
-                  <div className="whitespace-nowrap text-[10px] leading-tight text-muted" style={{ textAlign: align }}>{ageSub(n.age)}</div>
+                  <div className="whitespace-nowrap text-[10px] leading-tight text-muted" style={{ textAlign: align }}>{ageSub(n)}</div>
                   <div className="absolute w-px bg-line" style={{ top: "100%", height: lower ? 4 : 30, ...connector }} aria-hidden />
                 </div>
               );
