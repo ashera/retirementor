@@ -4,21 +4,25 @@ import { useEffect, useRef, useState } from "react";
 import Bert, { type BertPose } from "@/components/Bert";
 
 // Light, original finance/retirement one-liners — Bert-flavoured, no real-person
-// attributions (so nothing reads as a misquote). Each pairs with a fitting pose.
-const QUOTES: { text: string; pose: BertPose }[] = [
-  { text: "Compound interest: the quiet magic that works even while you nap.", pose: "atom" },
-  { text: "A budget is just telling your money where to go instead of wondering where it went.", pose: "glasses" },
-  { text: "Super is a slow cooker — set it, leave it, and resist lifting the lid for thirty years.", pose: "flask" },
-  { text: "The best time to start saving was years ago. The second best time is before this dialog finishes.", pose: "eureka" },
-  { text: "Retirement: when you stop living at work and start working at living.", pose: "violin" },
-  { text: "Time in the market beats timing the market — and beats refreshing this page.", pose: "glasses" },
-  { text: "The share market is the only shop where everyone runs for the exit when things go on sale.", pose: "atom" },
-  { text: "A dollar saved is a dollar that keeps working long after you've clocked off.", pose: "eureka" },
-  { text: "Don't put all your eggs in one basket — especially if the basket still has a mortgage.", pose: "flask" },
-  { text: "Early retirement is just unemployment with a really good spreadsheet.", pose: "bicycle" },
-  { text: "Bert's first rule of investing: never check your balance on a Monday.", pose: "glasses" },
-  { text: "Money can't buy happiness — but it's far comfier to ponder that in a paid-off home.", pose: "violin" },
+// attributions (so nothing reads as a misquote).
+const QUOTES: string[] = [
+  "Compound interest: the quiet magic that works even while you nap.",
+  "A budget is just telling your money where to go instead of wondering where it went.",
+  "Super is a slow cooker — set it, leave it, and resist lifting the lid for thirty years.",
+  "The best time to start saving was years ago. The second best time is before this dialog finishes.",
+  "Retirement: when you stop living at work and start working at living.",
+  "Time in the market beats timing the market — and beats refreshing this page.",
+  "The share market is the only shop where everyone runs for the exit when things go on sale.",
+  "A dollar saved is a dollar that keeps working long after you've clocked off.",
+  "Don't put all your eggs in one basket — especially if the basket still has a mortgage.",
+  "Early retirement is just unemployment with a really good spreadsheet.",
+  "Bert's first rule of investing: never check your balance on a Monday.",
+  "Money can't buy happiness — but it's far comfier to ponder that in a paid-off home.",
 ];
+
+// A single fixed pose for the whole dialog — swapping the <img src> mid-load (while
+// the main thread is busy) would leave Bert blank until the new pose fetched.
+const BERT_POSE: BertPose = "glasses";
 
 /**
  * Full-screen loading dialog for the INITIAL dashboard compute (Monte Carlo +
@@ -73,7 +77,7 @@ export default function DashboardLoadingOverlay({ active }: { active: boolean })
   }, [render]);
 
   if (!render) return null;
-  const q = QUOTES[idx];
+  const quote = QUOTES[idx];
 
   return (
     <div
@@ -85,7 +89,7 @@ export default function DashboardLoadingOverlay({ active }: { active: boolean })
       <div className="absolute inset-0 bg-ink/85 backdrop-blur-md" />
       <div className="relative w-full max-w-md rounded-3xl border border-line bg-gradient-to-b from-panel-2 to-panel p-8 text-center shadow-2xl">
         <div className="dlo-bob mx-auto w-fit">
-          <Bert pose={q.pose} size={118} className="mx-auto" priority />
+          <Bert pose={BERT_POSE} size={118} className="mx-auto" priority />
         </div>
 
         <div className="mt-3 flex items-center justify-center gap-2 text-accent">
@@ -97,7 +101,7 @@ export default function DashboardLoadingOverlay({ active }: { active: boolean })
         </div>
 
         <p key={idx} className="dlo-quote mx-auto mt-4 flex min-h-[4.5rem] max-w-xs items-center justify-center text-[15px] font-medium leading-relaxed text-slate-200">
-          &ldquo;{q.text}&rdquo;
+          &ldquo;{quote}&rdquo;
         </p>
 
         <div className="mx-auto mt-2 h-1.5 w-44 overflow-hidden rounded-full bg-panel-2">
