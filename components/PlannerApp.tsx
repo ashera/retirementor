@@ -611,7 +611,13 @@ export default function PlannerApp({
   // renders immediately and these fill in when ready (`mc`/`earliest` are null until the
   // first result, then hold the last value while a plan change recomputes). The cheap
   // deterministic goal-seek (~20ms) stays synchronous — lots of UI reads it inline.
-  const { mc, earliest, pending: mcPending } = useHeavyMetrics(plan, config, ready && configured);
+  // A full-screen editor (the plan wizard or budget builder) covers the dashboard and
+  // commits to the plan continuously as the user moves between pages. Pause the dashboard's
+  // heavy recomputes while one is open — otherwise each edit kicks off the main-thread
+  // safe-spend solvers behind the modal, whose ~1-3s solve lands on the user's NEXT click
+  // and freezes it. They all recompute once the editor closes (the gate is in their deps).
+  const heavyPaused = wizardOpen || budgetOpen;
+  const { mc, earliest, pending: mcPending } = useHeavyMetrics(plan, config, ready && configured && !heavyPaused);
   const successPct = mc ? Math.round(mc.successRate * 100) : null;
   // True when the dial is showing a PRIOR result while a new Monte Carlo is in flight
   // after an edit (e.g. the Go-go spend slider). We keep the last number visible (no
@@ -636,7 +642,7 @@ export default function PlannerApp({
   // we've already solved (e.g. after a round-trip to What-If), so we can skip the solve.
   const tierKey = useMemo(() => JSON.stringify({ p: plan, c: config }), [plan, config]);
   useEffect(() => {
-    if (!ready || !configured) return;
+    if (!ready || !configured || heavyPaused) return;
     const cached = tierCache.get(tierKey);
     if (cached) {
       // Reuse the already-computed tiers — no recompute, no "Assessing" flash.
@@ -661,7 +667,7 @@ export default function PlannerApp({
     }, 400);
     return () => clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tierKey, ready, configured]);
+  }, [tierKey, ready, configured, heavyPaused]);
   // SAFE WITHDRAWAL RATE marker — a FIXED benchmark, computed on STEADY (flat real)
   // spending like the classic 4% rule, so it's a stable property of the portfolio and
   // doesn't wobble as the budget's level or shape (the "spending smile") changes. It's
@@ -683,7 +689,7 @@ export default function PlannerApp({
   const [flexSafeRate, setFlexSafeRate] = useState<number | null>(null);
   const [safeRatePending, setSafeRatePending] = useState(false);
   useEffect(() => {
-    if (!ready || !configured) return;
+    if (!ready || !configured || heavyPaused) return;
     setSafeRatePending(true);
     const id = setTimeout(() => {
       const rateFor = (guardrails: RetirementPlan["guardrails"]): number | null => {
@@ -699,7 +705,7 @@ export default function PlannerApp({
     return () => clearTimeout(id);
     // Deliberately keyed on the non-spending plan, so budget tweaks don't recompute it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [flatKey, config, ready, configured]);
+  }, [flatKey, config, ready, configured, heavyPaused]);
 
   const tweaked = useMemo(
     // Compare the composed plans without their bookmarks — a freshly-loaded scenario
