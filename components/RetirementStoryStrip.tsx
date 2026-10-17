@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import Bert from "@/components/Bert";
+import { fmtCompact } from "@/lib/au/format";
 import type { RetirementPlan, SimResult } from "@/lib/au/types";
 
 // Spending-smile chapter colours — matched to the balance chart's bands so the two read
@@ -81,10 +82,22 @@ export default function RetirementStoryStrip({
     if (!nodes.some((m) => Math.abs(m.age - n.age) < 0.5)) nodes.push(n);
   }
 
-  const headline =
+  // A narrative teaser — the opening line of the story, trailing off so it reads straight
+  // into the "Read year by year →" CTA. Mood-matched to the real outcome; falls back to a
+  // number-free line if super at retirement isn't a usable figure yet.
+  const who = couple ? "you both" : "you";
+  const superOk = Number.isFinite(result.superAtRetirement) && result.superAtRetirement > 0;
+  const superStr = fmtCompact(result.superAtRetirement);
+  const teaser =
     result.depletedAge != null
-      ? `Retire at ${retire} · a gap to close`
-      : `Retire at ${retire} · your money lasts to ${life}`;
+      ? `${couple ? "You both" : "You"} retire at ${retire} — but there's a gap to close. See how the story goes…`
+      : result.bridgeShortfallAge != null
+        ? `${couple ? "You both" : "You"} retire at ${retire}, before your super unlocks — but the early years fall short. See the story…`
+        : result.superUnlockAge != null && result.superUnlockAge > retire
+          ? `${couple ? "You both" : "You"} retire at ${retire}, before super unlocks at ${result.superUnlockAge} — see how the bridge holds…`
+          : superOk
+            ? `At ${retire}, ${who} finish work with ${superStr} behind you — then the years begin to unfold…`
+            : `At ${retire}, ${who} step back from work — here's how the years unfold…`;
 
   return (
     <Link
@@ -101,7 +114,7 @@ export default function RetirementStoryStrip({
               {couple ? "Our retirement story" : "Your retirement story"}
             </span>
           </div>
-          <div className="truncate text-[13px] text-muted">{headline}</div>
+          <div className="line-clamp-2 text-[13px] leading-snug text-slate-200">{teaser}</div>
         </div>
         <span className="hidden shrink-0 items-center gap-1 rounded-lg border border-accent/40 bg-accent/10 px-3 py-1.5 text-xs font-semibold text-white transition group-hover:bg-accent/20 sm:inline-flex">
           Read year by year <span aria-hidden className="text-accent transition-transform group-hover:translate-x-0.5">→</span>
