@@ -6,6 +6,7 @@ import Link from "next/link";
 import StatCard from "@/components/StatCard";
 import RetirementChart from "@/components/RetirementChart";
 import { ageGapInfo } from "@/components/ageAxis";
+import DashboardLoadingOverlay from "@/components/DashboardLoadingOverlay";
 import YearDetailModal from "@/components/YearDetailModal";
 import IncomeYearModal from "@/components/IncomeYearModal";
 import IncomeChart from "@/components/IncomeChart";
@@ -228,6 +229,10 @@ export default function PlannerApp({
     const t = setTimeout(() => setHeroWarming(false), HERO_WARMUP_MS);
     return () => clearTimeout(t);
   }, [warmSeq]);
+  // The INITIAL dashboard load runs the Monte Carlo + safe-spend solvers (a few seconds).
+  // Until they first land we lock the page behind a full-screen Bert loading dialog;
+  // once loaded, later edits just use the hero's in-place shimmer, never the full lock.
+  const [everLoaded, setEverLoaded] = useState(false);
 
   // Adopt a composed plan as the active scenario (splits it into base + strategy layer).
   const splitInto = (composed: RetirementPlan) => {
@@ -1174,6 +1179,17 @@ export default function PlannerApp({
   const failsafeLiving = failsafeSpend ?? cachedTiers?.failsafe ?? null;
   const safeTotal = Math.min((safeLiving ?? centralLiving) + confLoan, centralTotal);
   const failsafeTotal = Math.min((failsafeLiving ?? safeLiving ?? centralLiving) + confLoan, safeTotal);
+  // The headline numbers are ready once the Monte Carlo % and both spend tiers have
+  // landed and the warm-up floor has passed. Latch `everLoaded` the first time, so the
+  // full-screen loading dialog shows only for the initial page load.
+  const metricsReady =
+    successPct != null && safeLiving != null && failsafeLiving != null && !heroWarming;
+  useEffect(() => {
+    if (metricsReady && !everLoaded) setEverLoaded(true);
+  }, [metricsReady, everLoaded]);
+  // Lock the page behind the loading dialog while the initial compute runs (configured
+  // means there's a real plan — the empty get-started state is never "loading").
+  const showLoadingDialog = ready && configured && !everLoaded;
   // Apply the safe tier as the new spend (its LIVING part; the engine layers the
   // loan on itself). Edits the base inputs, like the other quick-adjust levers.
   const goalSub =
@@ -1313,6 +1329,9 @@ export default function PlannerApp({
 
   return (
     <main className="mx-auto max-w-5xl px-5 py-10">
+      {/* Initial-load lock: the first Monte Carlo + solver pass takes a few seconds, so
+          hold the page behind a Bert loading dialog until the headline numbers land. */}
+      <DashboardLoadingOverlay active={showLoadingDialog} />
       {/* Scenario-switch lock: reloading + re-simulating a plan takes a few seconds. */}
       {switching && (
         <div
