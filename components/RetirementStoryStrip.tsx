@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import Bert from "@/components/Bert";
+import { ageGapInfo, agesAt } from "@/components/ageAxis";
 import { fmtCompact } from "@/lib/au/format";
 import type { RetirementPlan, SimResult } from "@/lib/au/types";
 
@@ -36,7 +37,11 @@ export default function RetirementStoryStrip({
   couple: boolean;
 }) {
   const retire = result.retirementAge;
-  const life = Math.max(plan.lifeExpectancy, retire + 1);
+  // The projection horizon (oldest-person axis) — the last simulated row. For an
+  // age-gapped couple the engine carries past the oldest's life expectancy to the
+  // YOUNGER partner's, so use the real last row rather than plan.lifeExpectancy.
+  const lastRowAge = result.rows.length ? result.rows[result.rows.length - 1].age : plan.lifeExpectancy;
+  const life = Math.max(lastRowAge, retire + 1);
   const span = life - retire || 1;
   const pos = (age: number) => clamp(((age - retire) / span) * 100, 0, 100);
 
@@ -82,22 +87,38 @@ export default function RetirementStoryStrip({
     if (!nodes.some((m) => Math.abs(m.age - n.age) < 0.5)) nodes.push(n);
   }
 
+  // Couples with an age gap: the strip (like the chart) is indexed by the OLDEST person's
+  // age, so a bare "age 61" is ambiguous. Show BOTH ages — "You 61 · Ptnr 58" on the nodes,
+  // and "61 and 58" in the teaser — so it's clear whose age is whose.
+  const gap = ageGapInfo(plan);
+  const ageSub = (anchorAge: number): string => {
+    if (!gap) return `age ${anchorAge}`;
+    const { you, partner } = agesAt(gap, anchorAge);
+    return `You ${you} · Ptnr ${partner}`;
+  };
+  const rAges = gap ? agesAt(gap, retire) : null;
+  const retireRef = rAges ? `${rAges.you} and ${rAges.partner}` : `${retire}`;
+
   // A narrative teaser — the opening line of the story, trailing off so it reads straight
   // into the "Read year by year →" CTA. Mood-matched to the real outcome; falls back to a
   // number-free line if super at retirement isn't a usable figure yet.
   const who = couple ? "you both" : "you";
+  const Who = couple ? "You both" : "You";
+  // For an age-gapped couple the super-unlock age is on the oldest's axis, so drop the
+  // specific figure to avoid implying it's both partners'.
+  const unlockClause = gap ? "before your super unlocks" : `before super unlocks at ${result.superUnlockAge}`;
   const superOk = Number.isFinite(result.superAtRetirement) && result.superAtRetirement > 0;
   const superStr = fmtCompact(result.superAtRetirement);
   const teaser =
     result.depletedAge != null
-      ? `${couple ? "You both" : "You"} retire at ${retire} — but there's a gap to close. See how the story goes…`
+      ? `${Who} retire at ${retireRef} — but there's a gap to close. See how the story goes…`
       : result.bridgeShortfallAge != null
-        ? `${couple ? "You both" : "You"} retire at ${retire}, before your super unlocks — but the early years fall short. See the story…`
+        ? `${Who} retire at ${retireRef}, before your super unlocks — but the early years fall short. See the story…`
         : result.superUnlockAge != null && result.superUnlockAge > retire
-          ? `${couple ? "You both" : "You"} retire at ${retire}, before super unlocks at ${result.superUnlockAge} — see how the bridge holds…`
+          ? `${Who} retire at ${retireRef}, ${unlockClause} — see how the bridge holds…`
           : superOk
-            ? `At ${retire}, ${who} finish work with ${superStr} behind you — then the years begin to unfold…`
-            : `At ${retire}, ${who} step back from work — here's how the years unfold…`;
+            ? `At ${retireRef}, ${who} finish work with ${superStr} behind you — then the years begin to unfold…`
+            : `At ${retireRef}, ${who} step back from work — here's how the years unfold…`;
 
   return (
     <Link
@@ -123,7 +144,7 @@ export default function RetirementStoryStrip({
 
       {/* Timeline track — scrolls on very narrow screens rather than squishing. */}
       <div className="mt-5 overflow-x-auto pb-1">
-        <div className="relative min-w-[460px]">
+        <div className="relative" style={{ minWidth: gap ? 560 : 460 }}>
           {/* Milestone labels ABOVE the track — staggered onto two rows so adjacent beats
               (often only a year or two apart, e.g. retire then super unlocks) never collide.
               A faint tick connects each label to its dot on the track below. */}
@@ -139,9 +160,9 @@ export default function RetirementStoryStrip({
               const align = anchor === "start" ? "left" : anchor === "end" ? "right" : "center";
               const connector = anchor === "start" ? { left: 1 } : anchor === "end" ? { right: 1 } : { left: "50%", transform: "translateX(-50%)" };
               return (
-                <div key={`lbl-${i}`} className="absolute" style={{ left: `${left}%`, width: 92, top: lower ? 26 : 0, transform }}>
+                <div key={`lbl-${i}`} className="absolute" style={{ left: `${left}%`, width: gap ? 104 : 92, top: lower ? 26 : 0, transform }}>
                   <div className="truncate text-[11px] font-semibold leading-tight text-slate-200" style={{ textAlign: align }}>{n.label}</div>
-                  <div className="text-[10px] leading-tight text-muted" style={{ textAlign: align }}>age {n.age}</div>
+                  <div className="whitespace-nowrap text-[10px] leading-tight text-muted" style={{ textAlign: align }}>{ageSub(n.age)}</div>
                   <div className="absolute w-px bg-line" style={{ top: "100%", height: lower ? 4 : 30, ...connector }} aria-hidden />
                 </div>
               );
