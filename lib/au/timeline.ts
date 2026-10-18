@@ -555,7 +555,14 @@ export function buildTimeline(
     vignette: d.vignette,
     kind: d.kind,
     year: yearAt(d.age),
-    phase: (d.kind === "horizon" || d.kind === "horizon-short" ? "horizon" : phaseOf(d.age)) as TimelinePhase,
+    // Phase by age, EXCEPT the pre-retirement "last stretch of working years" beat — it's
+    // anchored at the retirement age (the end of the build), so phaseOf would file it under
+    // go-go. It belongs in "Before you retire". The retire beat (same age) starts go-go.
+    phase: (d.kind === "horizon" || d.kind === "horizon-short"
+      ? "horizon"
+      : d.kind === "build"
+        ? "build"
+        : phaseOf(d.age)) as TimelinePhase,
   }));
 
   const retireOwnAge = plan.people[0].currentAge + personRetirementOffset(plan, 0);
