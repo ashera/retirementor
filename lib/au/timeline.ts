@@ -559,10 +559,15 @@ export function buildTimeline(
   }));
 
   const retireOwnAge = plan.people[0].currentAge + personRetirementOffset(plan, 0);
+  // Age-gapped couple: show BOTH partners' ages as retirement begins (e.g. "61 & 58"),
+  // matching the dashboard story strip, rather than just the primary person's age.
+  const retireGap = couple && plan.people[0].currentAge !== plan.people[1].currentAge;
+  const ageAtStart = (i: number) => Math.round(plan.people[i].currentAge + (retireStartAge - oldest));
+  const retireRef = retireGap ? `${ageAtStart(0)} & ${ageAtStart(1)}` : `${retireOwnAge}`;
   const headline =
     mood === "short"
-      ? `Retire at ${retireOwnAge} — with a gap to close`
-      : `Retire at ${retireOwnAge} · your money lasts to ${life}`;
+      ? `Retire at ${retireRef} — with a gap to close`
+      : `Retire at ${retireRef} · your money lasts to ${life}`;
 
   return {
     title: couple ? "Our retirement timeline" : "My retirement timeline",
