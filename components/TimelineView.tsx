@@ -10,6 +10,7 @@ import { simulate } from "@/lib/au/simulate";
 import { runMonteCarlo } from "@/lib/au/montecarlo";
 import { metricsKey, getMetrics } from "@/lib/au/mcCache";
 import { buildTimeline, phaseLabel, type TimelinePhase } from "@/lib/au/timeline";
+import { ageGapInfo, agesAt } from "@/components/ageAxis";
 import { track } from "@/lib/analytics";
 import Bert from "@/components/Bert";
 import YearDetailModal from "@/components/YearDetailModal";
@@ -147,6 +148,16 @@ export default function TimelineView({
   const whatIfHref = shared ? `${sharedPlan!.basePath}/what-if` : "/what-if";
   const homeHref = shared ? sharedPlan!.basePath : "/";
 
+  // Beats sit on the OLDEST person's age axis. For a couple of different ages, show BOTH
+  // partners' ages at each beat (the title already says whose event it is) so it's clear
+  // whose age is whose — matching the balance chart's dual-age axis.
+  const gap = ageGapInfo(plan);
+  const beatAgeLabel = (age: number): string => {
+    if (!gap) return `age ${age}`;
+    const { you, partner } = agesAt(gap, age);
+    return `You ${you} · Partner ${partner}`;
+  };
+
   // Group beats into chapters by phase (the spending smile is the narrative arc).
   const chapters: { phase: TimelinePhase; label: string; beats: typeof timeline.beats }[] = [];
   for (const beat of timeline.beats) {
@@ -241,7 +252,7 @@ export default function TimelineView({
                     >
                       <div className="flex items-baseline gap-2">
                         <span className="font-mono text-[13px] font-semibold tabular-nums text-accent">{beat.yearLabel ?? beat.year}</span>
-                        <span className="text-[12px] text-muted">· age {beat.age}</span>
+                        <span className="text-[12px] text-muted">· {beatAgeLabel(beat.age)}</span>
                       </div>
                       <h3 className="mt-0.5 font-serif text-xl font-semibold text-white">{beat.title}</h3>
                       <p className="mt-1.5 text-[15px] leading-relaxed text-slate-200">{beat.fact}</p>
