@@ -27,7 +27,7 @@ import { fmtCurrency } from "@/lib/au/format";
 export type TimelinePose =
   | "pointer" | "eureka" | "atom" | "flask" | "glasses" | "violin" | "bicycle" | "blackboard";
 
-export type TimelinePhase = "build" | "gogo" | "slowgo" | "nogo" | "horizon";
+export type TimelinePhase = "build" | "bridge" | "gogo" | "slowgo" | "nogo" | "horizon";
 export type TimelineMood = "strong" | "ok" | "tight" | "short";
 
 export interface TimelineBeat {
@@ -56,6 +56,7 @@ export interface Timeline {
 
 const PHASE_LABEL: Record<TimelinePhase, string> = {
   build: "Before you retire",
+  bridge: "The bridge years",
   gogo: "The go-go years",
   slowgo: "Slowing down",
   nogo: "The later years",
@@ -149,8 +150,18 @@ export function buildTimeline(
   };
   const vig = (arr: readonly string[]) => (mood === "short" ? undefined : pick(arr));
 
+  // "The bridge": retiring BEFORE preservation age means living off outside-super savings
+  // until super unlocks. The engine marks those years with the `bridge` row phase (NOT
+  // just any post-retirement super unlock — a staggered couple both retiring at 60+ has a
+  // later super→pension flip but no bridge). The chapter spans retirement up to and
+  // including the super-unlock beat; after it the ordinary go-go/slow-go/no-go phases resume.
+  const bridgeRows = result.rows.filter((r) => r.phase === "bridge");
+  const bridgeEnd = bridgeRows.length
+    ? result.superUnlockAge ?? bridgeRows[bridgeRows.length - 1].age + 1
+    : null;
   const phaseOf = (age: number): TimelinePhase => {
     if (age < retireStartAge) return "build";
+    if (bridgeEnd != null && age <= bridgeEnd) return "bridge";
     if (age >= noGoAge) return "nogo";
     if (age >= slowGoAge) return "slowgo";
     return "gogo";
@@ -245,8 +256,19 @@ export function buildTimeline(
       icon: "🎻",
       kind: "retire",
       title: couple ? "You both finish work" : "You finish work",
-      fact: `Retirement begins on a ${$(goGo)}/yr plan${mood === "strong" ? " — comfortably funded" : ""}.`,
-      bert: { pose: "violin", line: "“From here on, the plan does the earning — not you.”" },
+      fact: `Retirement begins on a ${$(goGo)}/yr plan${
+        bridgeEnd != null
+          ? " — and since you retire before your super unlocks, these first years run on your outside-super savings"
+          : mood === "strong"
+            ? " — comfortably funded"
+            : ""
+      }.`,
+      bert: {
+        pose: "violin",
+        line: bridgeEnd != null
+          ? "“Your super is still locked for now — this stretch is what your savings outside super are for.”"
+          : "“From here on, the plan does the earning — not you.”",
+      },
       vignette: vig(VIG.retire),
     });
   }
@@ -272,17 +294,26 @@ export function buildTimeline(
   // ── Super flips to the tax-free pension phase (per person) ───────────────────
   result.superUnlockAges.forEach((a, i) => {
     if (a == null) return;
+    const whose = couple ? `${i === 0 ? "Your" : "Your partner's"} super` : "Your super";
+    // When this unlock ends the early-retirement bridge, lead with ACCESS (you can finally
+    // draw it) and mark the bridge complete — not just the tax change.
+    const endsBridge = bridgeEnd != null && a <= bridgeEnd;
     add({
       id: `unlock-${i}`,
       order: 5,
       age: a,
       icon: "🔓",
       kind: "super-flip",
-      title: couple
-        ? `${i === 0 ? "Your" : "Your partner's"} super turns tax-free`
-        : "Your super turns tax-free",
-      fact: "Preserved super moves into the tax-free pension phase — its earnings and withdrawals stop being taxed.",
-      bert: { pose: "eureka", line: "“From here the tax office stops taking a slice of this pot. Nice.”" },
+      title: endsBridge ? `${whose} unlocks` : `${whose} turns tax-free`,
+      fact: endsBridge
+        ? "Preservation age — your super is now yours to draw on and moves into the tax-free pension phase. You've crossed the bridge."
+        : "Preserved super moves into the tax-free pension phase — its earnings and withdrawals stop being taxed.",
+      bert: {
+        pose: "eureka",
+        line: endsBridge
+          ? "“That's the bridge behind you — your super's unlocked, and the tax office steps back too.”"
+          : "“From here the tax office stops taking a slice of this pot. Nice.”",
+      },
     });
   });
 
